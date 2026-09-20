@@ -36,6 +36,18 @@ export const EnvSchema = z
     /** Limite especifico del cotizador (mas estricto: cada cotizacion cuesta dinero). */
     QUOTE_RATE_LIMIT_MAX: z.coerce.number().int().min(1).default(10),
 
+    /**
+     * Base de datos (Supabase). AMBAS SON OPCIONALES a proposito: sin ellas la
+     * API arranca igual y el cotizador sigue funcionando; solo quedan
+     * deshabilitadas las funciones que necesitan guardar datos. Asi un
+     * despliegue no se cae por una variable que todavia no se ha configurado.
+     *
+     * DATABASE_URL: conexion agrupada (puerto 6543), la que usa la aplicacion.
+     * DIRECT_URL:   conexion directa (puerto 5432), solo para migraciones.
+     */
+    DATABASE_URL: z.string().url().optional(),
+    DIRECT_URL: z.string().url().optional(),
+
     /** Base de operaciones: origen del calculo de distancia. */
     COMPANY_BASE_CITY: z.string().default('Atlanta'),
     COMPANY_BASE_STATE: z.string().length(2).default('GA'),

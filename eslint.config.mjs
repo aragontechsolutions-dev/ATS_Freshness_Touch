@@ -5,7 +5,14 @@ import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
   {
-    ignores: ['**/dist/**', '**/node_modules/**', '**/.turbo/**', '**/coverage/**'],
+    // El cliente de Prisma son miles de lineas generadas: no se analizan.
+    ignores: [
+      '**/dist/**',
+      '**/node_modules/**',
+      '**/.turbo/**',
+      '**/coverage/**',
+      '**/src/generated/**',
+    ],
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,

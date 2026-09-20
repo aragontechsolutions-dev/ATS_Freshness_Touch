@@ -14,6 +14,25 @@ services:
     plan: starter
 
     buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm turbo run build --filter=@freshness/api
+
+    # MIGRACIONES AUTOMATICAS
+    # -----------------------
+    # Render ejecuta este comando DESPUES de compilar y ANTES de enviar
+    # trafico a la version nueva. Es el momento correcto para migrar:
+    #   - Si la migracion falla, el despliegue se aborta y la version
+    #     anterior sigue atendiendo. No queda una version nueva contra una
+    #     base de datos a medio migrar.
+    #   - Las credenciales ya viven en Render: no hay que duplicarlas en
+    #     GitHub ni en ningun otro sitio.
+    #
+    # `prisma migrate deploy` solo aplica las migraciones pendientes y nunca
+    # borra datos por su cuenta: si no hay ninguna, no hace nada.
+    #
+    # Mientras DIRECT_URL no este configurada, el paso se omite en vez de
+    # fallar, para que un despliegue no se caiga por una variable que
+    # todavia no se ha rellenado.
+    preDeployCommand: '[ -z "$DIRECT_URL" ] && echo ''DIRECT_URL no configurada: se omiten las migraciones'' || pnpm --filter @freshness/api db:deploy'
+
     startCommand: node apps/api/dist/main.js
 
     # Render reinicia el servicio si esta sonda deja de responder.
@@ -39,6 +58,15 @@ services:
         value: mock
       # Secreto: se introduce a mano en el panel, nunca en el repositorio.
       - key: GOOGLE_MAPS_API_KEY
+        sync: false
+
+      # --- Base de datos (Supabase) ---
+      # Secretos: se introducen a mano en el panel, nunca en el repositorio.
+      # DATABASE_URL: conexion AGRUPADA (puerto 6543), la que usa la aplicacion.
+      - key: DATABASE_URL
+        sync: false
+      # DIRECT_URL: conexion DIRECTA (puerto 5432), solo para las migraciones.
+      - key: DIRECT_URL
         sync: false
 
       - key: DISTANCE_CACHE_TTL_SECONDS
