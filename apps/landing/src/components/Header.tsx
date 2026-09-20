@@ -1,9 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { company } from '../config/company';
 import { LanguageSwitcher } from './LanguageSwitcher';
 import { ThemeToggle } from './ThemeToggle';
-import { PhoneIcon } from './Icons';
+import { CloseIcon, MenuIcon, PhoneIcon } from './Icons';
 import { Logo } from './Logo';
 
 const NAV_ITEMS = [
@@ -14,17 +14,46 @@ const NAV_ITEMS = [
   { href: '#faq', key: 'nav.faq' },
 ] as const;
 
+/**
+ * Cabecera pensada primero para movil.
+ *
+ * A 390 pixeles de ancho no caben logotipo, cinco enlaces, telefono, idioma,
+ * tema y menu. Las decisiones de recorte, en orden de importancia:
+ *   - El logotipo siempre, porque identifica.
+ *   - Idioma, tema y menu como ICONOS: la palabra "Menu" se cortaba.
+ *   - El telefono se mueve dentro del menu desplegable, donde ademas gana
+ *     protagonismo en vez de competir por espacio.
+ */
 export function Header() {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
 
+  // Con el menu abierto no se puede desplazar el fondo: en movil resulta
+  // desconcertante ver moverse la pagina detras del panel.
+  useEffect(() => {
+    document.body.style.overflow = open ? 'hidden' : '';
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [open]);
+
+  // Cerrar con la tecla de escape es lo que espera quien navega con teclado.
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (event: KeyboardEvent): void => {
+      if (event.key === 'Escape') setOpen(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [open]);
+
   return (
     <header
-      className="sticky top-0 z-40 border-b border-slate-200 bg-canvas/90 backdrop-blur
-                       dark:border-night-600 dark:bg-night-900/90"
+      className="sticky top-0 z-40 border-b border-slate-200 bg-canvas/95 backdrop-blur
+                 dark:border-night-600 dark:bg-night-900/95"
     >
-      <div className="ft-container flex h-16 items-center justify-between gap-4">
-        <a href="#top" aria-label={company.name} className="shrink-0">
+      <div className="ft-container flex h-16 items-center justify-between gap-2">
+        <a href="#top" aria-label={company.name} className="min-w-0 shrink">
           <Logo size="sm" />
         </a>
 
@@ -41,26 +70,30 @@ export function Header() {
           ))}
         </nav>
 
-        <div className="flex items-center gap-2">
+        <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
           <a
             href={company.phoneHref}
-            className="hidden items-center gap-2 text-sm font-semibold text-slate-700 sm:inline-flex
+            className="hidden items-center gap-2 text-sm font-semibold text-slate-700 xl:inline-flex
                        dark:text-slate-200"
           >
             <PhoneIcon className="h-4 w-4 text-brand-700 dark:text-brand-300" />
             {company.phoneDisplay}
           </a>
+
           <LanguageSwitcher />
           <ThemeToggle />
+
           <button
             type="button"
-            className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold lg:hidden
-                       dark:border-night-600"
+            className="inline-flex h-11 w-11 items-center justify-center rounded-lg border
+                       border-slate-300 text-slate-700 transition-colors hover:bg-slate-100
+                       lg:hidden dark:border-night-600 dark:text-slate-200 dark:hover:bg-night-700"
             aria-expanded={open}
             aria-controls="mobile-nav"
+            aria-label={t('nav.menu')}
             onClick={() => setOpen((value) => !value)}
           >
-            {t('nav.menu')}
+            {open ? <CloseIcon className="h-5 w-5" /> : <MenuIcon className="h-5 w-5" />}
           </button>
         </div>
       </div>
@@ -68,7 +101,8 @@ export function Header() {
       {open && (
         <nav
           id="mobile-nav"
-          className="border-t border-slate-200 lg:hidden dark:border-night-600"
+          className="border-t border-slate-200 bg-canvas lg:hidden dark:border-night-600
+                     dark:bg-night-900"
           aria-label={t('nav.menu')}
         >
           <ul className="ft-container flex flex-col py-2">
@@ -77,13 +111,24 @@ export function Header() {
                 <a
                   href={item.href}
                   onClick={() => setOpen(false)}
-                  className="block py-2 text-sm font-medium text-slate-700 dark:text-slate-200"
+                  // Altura de 48 pixeles: el minimo recomendado para tocar con
+                  // el dedo sin fallar.
+                  className="flex min-h-12 items-center border-b border-slate-100 text-base
+                             font-medium text-slate-700 last:border-0
+                             dark:border-night-700 dark:text-slate-200"
                 >
                   {t(item.key)}
                 </a>
               </li>
             ))}
           </ul>
+
+          <div className="ft-container pb-4">
+            <a href={company.phoneHref} className="ft-btn-secondary w-full">
+              <PhoneIcon className="h-4 w-4" />
+              {company.phoneDisplay}
+            </a>
+          </div>
         </nav>
       )}
     </header>

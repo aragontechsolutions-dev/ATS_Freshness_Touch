@@ -9,7 +9,37 @@ import {
   type QuoteResponse,
 } from '@freshness/types';
 
-const BASE_URL: string = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:3001/api/v1';
+/** Prefijo de version que sirve la API. */
+const API_PREFIX = '/api/v1';
+
+/**
+ * Normaliza la direccion de la API.
+ *
+ * Tolera el error de configuracion mas comun: poner solo el dominio
+ * (https://api.ejemplo.com) y olvidar el prefijo de version. Sin esto, todas
+ * las peticiones responden 404 y el sitio parece roto aunque la API funcione
+ * perfectamente; con esto, ambas formas valen.
+ *
+ * Solo se anade el prefijo cuando la direccion NO tiene ninguna ruta: si
+ * alguien configura un prefijo distinto a proposito, se respeta.
+ */
+export function normalizeApiBaseUrl(raw: string): string {
+  const sinBarraFinal = raw.trim().replace(/\/+$/, '');
+
+  try {
+    const url = new URL(sinBarraFinal);
+    return url.pathname === '/' || url.pathname === ''
+      ? `${url.origin}${API_PREFIX}`
+      : sinBarraFinal;
+  } catch {
+    // No es una URL absoluta (por ejemplo una ruta relativa): se deja igual.
+    return sinBarraFinal;
+  }
+}
+
+const BASE_URL: string = normalizeApiBaseUrl(
+  import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:3001/api/v1',
+);
 
 /** Error normalizado de la API, con la clave i18n que debe mostrarse. */
 export class ApiClientError extends Error {
@@ -52,6 +82,15 @@ async function request<T>(
   }
 
   if (!response.ok) {
+    if (response.status === 404) {
+      // Casi siempre es configuracion, no un fallo de la API: ayuda a
+      // diagnosticarlo sin tener que leer el codigo.
+      console.error(
+        `[Freshness Touch] La API respondio 404 en ${BASE_URL}${path}. ` +
+          'Revisa VITE_API_BASE_URL: debe incluir el prefijo /api/v1.',
+      );
+    }
+
     const parsed = ApiErrorSchema.safeParse(payload);
     const apiError: ApiError = parsed.success
       ? parsed.data

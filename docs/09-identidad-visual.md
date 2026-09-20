@@ -141,6 +141,29 @@ tejado blanco) es brillante y la marca se reconoce sin dificultad.
 Regla: **un solo botón amarillo por pantalla visible.** Si hay dos, ninguno
 destaca y se pierde su función.
 
+## Interfaz pensada primero para móvil
+
+La mayoría del tráfico de un servicio de limpieza es móvil, así que el ancho de
+referencia es **390 píxeles**, no el escritorio.
+
+Decisiones que salieron de medir en ese ancho:
+
+| Problema                                                        | Solución                                                                                     |
+| --------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| "Menu" se cortaba en la cabecera                                | Iconos para idioma, tema y menú                                                              |
+| Dos botones EN/ES ocupaban el doble de lo necesario             | Un botón que **alterna**: muestra el idioma activo, la etiqueta accesible dice a cuál cambia |
+| El botón de tema medía 34 px                                    | Los tres controles a **44 px**, el mínimo para tocar con el dedo sin fallar                  |
+| El logotipo completo desbordaba junto a tres controles de 44 px | Nombre más pequeño en móvil y descriptor oculto por debajo de `sm`                           |
+| "CLEANING SERVICES" se partía en dos líneas                     | Oculto en móvil: la marca ya se reconoce con isotipo y nombre                                |
+| El teléfono competía por espacio en la cabecera                 | Se movió dentro del menú, donde además gana protagonismo                                     |
+
+La barra fija inferior respeta `safe-area-inset-bottom`: sin eso, en un iPhone
+los botones quedan medio tapados por la barra del sistema.
+
+**Comprobado en cada cambio**, con un navegador real a 390 píxeles: que no haya
+desplazamiento horizontal, que ningún elemento desborde y que todos los
+controles lleguen a 44 píxeles de alto.
+
 ## Cómo verificar el contraste al añadir pantallas
 
 El proyecto incluye una auditoría que mide los colores **realmente pintados por

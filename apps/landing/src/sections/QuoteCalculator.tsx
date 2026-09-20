@@ -112,7 +112,7 @@ export function QuoteCalculator() {
   const showResult = quote !== null;
 
   return (
-    <section id="quote" className="bg-brand-50 py-16 lg:py-20 dark:bg-night-800">
+    <section id="quote" className="bg-brand-50 py-12 sm:py-16 lg:py-20 dark:bg-night-800">
       <div className="ft-container">
         <h2
           className="ft-rule text-3xl font-bold tracking-tight text-brand-800
