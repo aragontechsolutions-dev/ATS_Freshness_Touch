@@ -34,8 +34,10 @@ export function Services() {
 
             return (
               <article key={code} className="ft-card flex flex-col p-6">
-                <span className="w-fit rounded-lg bg-brand-100 p-2 text-brand-700
-                                 dark:bg-brand-900/50 dark:text-brand-300">
+                <span
+                  className="w-fit rounded-lg bg-brand-100 p-2 text-brand-700
+                                 dark:bg-brand-900/50 dark:text-brand-300"
+                >
                   <SparkleIcon className="h-5 w-5" />
                 </span>
 

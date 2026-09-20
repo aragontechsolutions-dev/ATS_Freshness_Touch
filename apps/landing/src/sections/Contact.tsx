@@ -43,7 +43,10 @@ export function Contact() {
                     {t('contact.email')}
                   </dt>
                   <dd>
-                    <a href={`mailto:${company.email}`} className="text-slate-600 dark:text-slate-400">
+                    <a
+                      href={`mailto:${company.email}`}
+                      className="text-slate-600 dark:text-slate-400"
+                    >
                       {company.email}
                     </a>
                   </dd>

@@ -57,8 +57,7 @@ export class GoogleDistanceProvider implements DistanceProvider {
         headers: {
           'Content-Type': 'application/json',
           'X-Goog-Api-Key': this.options.apiKey,
-          'X-Goog-FieldMask':
-            'originIndex,destinationIndex,distanceMeters,duration,condition',
+          'X-Goog-FieldMask': 'originIndex,destinationIndex,distanceMeters,duration,condition',
         },
         body: JSON.stringify({
           origins: [{ waypoint: { address: formatAddress(query.originPostalCode, query.state) } }],

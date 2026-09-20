@@ -31,10 +31,14 @@ export function ServiceAreas() {
         <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {zones.map((zone) => (
             <div key={zone.code} className="ft-card p-5">
-              <span className="inline-flex items-center gap-2 text-sm font-bold text-brand-700
-                               dark:text-brand-400">
+              <span
+                className="inline-flex items-center gap-2 text-sm font-bold text-brand-700
+                               dark:text-brand-400"
+              >
                 <MapPinIcon className="h-4 w-4" />
-                {zone.serviceable ? t('areas.zoneLabel', { zone: zone.code }) : t('areas.outOfRange')}
+                {zone.serviceable
+                  ? t('areas.zoneLabel', { zone: zone.code })
+                  : t('areas.outOfRange')}
               </span>
 
               {zone.serviceable && (

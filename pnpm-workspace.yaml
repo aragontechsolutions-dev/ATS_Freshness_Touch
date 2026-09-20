@@ -1,10 +1,10 @@
 packages:
-  - "apps/*"
-  - "packages/*"
+  - 'apps/*'
+  - 'packages/*'
 
 # pnpm 10 bloquea los scripts de post-instalacion por defecto.
 # Solo autorizamos los paquetes que realmente necesitan compilar binarios.
 onlyBuiltDependencies:
   - esbuild
-  - "@tailwindcss/oxide"
+  - '@tailwindcss/oxide'
   - unrs-resolver

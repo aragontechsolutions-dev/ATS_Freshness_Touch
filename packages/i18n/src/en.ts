@@ -143,10 +143,12 @@ export const en = {
       service: {
         STANDARD: 'Standard cleaning · {{bedrooms}} bd / {{bathrooms}} ba · {{squareFeet}} sq ft',
         DEEP: 'Deep cleaning · {{bedrooms}} bd / {{bathrooms}} ba · {{squareFeet}} sq ft',
-        MOVE_IN_OUT: 'Move in / move out · {{bedrooms}} bd / {{bathrooms}} ba · {{squareFeet}} sq ft',
+        MOVE_IN_OUT:
+          'Move in / move out · {{bedrooms}} bd / {{bathrooms}} ba · {{squareFeet}} sq ft',
         POST_CONSTRUCTION:
           'Post-construction · {{bedrooms}} bd / {{bathrooms}} ba · {{squareFeet}} sq ft',
-        AIRBNB_TURNOVER: 'Airbnb turnover · {{bedrooms}} bd / {{bathrooms}} ba · {{squareFeet}} sq ft',
+        AIRBNB_TURNOVER:
+          'Airbnb turnover · {{bedrooms}} bd / {{bathrooms}} ba · {{squareFeet}} sq ft',
         COMMERCIAL: 'Commercial cleaning',
       },
       addOn: {
@@ -228,7 +230,10 @@ export const en = {
 
   faq: {
     title: 'Frequently asked questions',
-    q1: { q: 'Do I pay sales tax?', a: 'No. Cleaning services are exempt from sales tax in Georgia, so the price you see is the price you pay.' },
+    q1: {
+      q: 'Do I pay sales tax?',
+      a: 'No. Cleaning services are exempt from sales tax in Georgia, so the price you see is the price you pay.',
+    },
     q2: {
       q: 'What exactly is the travel deposit?',
       a: 'It is a refundable hold based on how far your home is from our base. It is authorised on your card at booking, credited against your final invoice, and only charged if you cancel once our team is already travelling to you.',

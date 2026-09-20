@@ -21,7 +21,11 @@ export interface MileageRateEntry {
 export const IRS_MILEAGE_RATES: readonly MileageRateEntry[] = [
   { effectiveFrom: '2025-01-01', centsPerMile: 70, source: 'IRS standard mileage rate 2025' },
   { effectiveFrom: '2026-01-01', centsPerMile: 72.5, source: 'IRS Notice 2026-10' },
-  { effectiveFrom: '2026-07-01', centsPerMile: 76, source: 'IRS Notice 2026-10 (vigencia 1 jul 2026)' },
+  {
+    effectiveFrom: '2026-07-01',
+    centsPerMile: 76,
+    source: 'IRS Notice 2026-10 (vigencia 1 jul 2026)',
+  },
 ] as const;
 
 /**

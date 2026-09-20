@@ -4,8 +4,7 @@ import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 
 /** Ruta absoluta a partir de una ruta relativa a este archivo. */
-const resolvePath = (relative: string): string =>
-  fileURLToPath(new URL(relative, import.meta.url));
+const resolvePath = (relative: string): string => fileURLToPath(new URL(relative, import.meta.url));
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],

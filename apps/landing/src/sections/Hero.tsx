@@ -6,18 +6,25 @@ export function Hero() {
   const points = [t('hero.point1'), t('hero.point2'), t('hero.point3')];
 
   return (
-    <section id="top" className="relative overflow-hidden bg-gradient-to-b from-brand-50 to-white
-                                 dark:from-slate-900 dark:to-slate-950">
+    <section
+      id="top"
+      className="relative overflow-hidden bg-gradient-to-b from-brand-50 to-white
+                                 dark:from-slate-900 dark:to-slate-950"
+    >
       <div className="ft-container grid gap-10 py-16 lg:grid-cols-2 lg:items-center lg:py-24">
         <div>
-          <p className="inline-flex items-center gap-2 rounded-full bg-brand-100 px-3 py-1 text-xs
-                        font-semibold text-brand-800 dark:bg-brand-900/50 dark:text-brand-200">
+          <p
+            className="inline-flex items-center gap-2 rounded-full bg-brand-100 px-3 py-1 text-xs
+                        font-semibold text-brand-800 dark:bg-brand-900/50 dark:text-brand-200"
+          >
             <ShieldIcon className="h-4 w-4" />
             {t('hero.badge')}
           </p>
 
-          <h1 className="mt-5 text-4xl font-extrabold tracking-tight text-slate-900 sm:text-5xl
-                         dark:text-white">
+          <h1
+            className="mt-5 text-4xl font-extrabold tracking-tight text-slate-900 sm:text-5xl
+                         dark:text-white"
+          >
             {t('hero.title')}
           </h1>
 
@@ -27,7 +34,10 @@ export function Hero() {
 
           <ul className="mt-6 space-y-2">
             {points.map((point) => (
-              <li key={point} className="flex items-start gap-2 text-sm text-slate-700 dark:text-slate-300">
+              <li
+                key={point}
+                className="flex items-start gap-2 text-sm text-slate-700 dark:text-slate-300"
+              >
                 <CheckIcon className="mt-0.5 h-4 w-4 shrink-0 text-brand-600 dark:text-brand-400" />
                 {point}
               </li>

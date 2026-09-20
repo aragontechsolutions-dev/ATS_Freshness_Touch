@@ -18,13 +18,17 @@ export function Faq() {
         <div className="mt-8 space-y-3">
           {QUESTIONS.map((key) => (
             <details key={key} className="ft-card group p-5">
-              <summary className="cursor-pointer list-none font-semibold text-slate-900
-                                  marker:content-none dark:text-white">
+              <summary
+                className="cursor-pointer list-none font-semibold text-slate-900
+                                  marker:content-none dark:text-white"
+              >
                 <span className="flex items-center justify-between gap-4">
                   {t(`faq.${key}.q`)}
-                  <span className="text-brand-700 transition-transform group-open:rotate-45
+                  <span
+                    className="text-brand-700 transition-transform group-open:rotate-45
                                    dark:text-brand-400"
-                        aria-hidden="true">
+                    aria-hidden="true"
+                  >
                     +
                   </span>
                 </span>

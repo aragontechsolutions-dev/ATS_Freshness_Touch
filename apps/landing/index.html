@@ -11,21 +11,7 @@
       content="Instant online quotes for residential and commercial cleaning across Georgia. Transparent pricing, insured and background-checked cleaners."
     />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
-    <script>
-      // Aplica el tema guardado ANTES de pintar para evitar el parpadeo blanco
-      // al cargar en modo oscuro. Se ejecuta en linea a proposito.
-      (function () {
-        try {
-          var stored = localStorage.getItem('ft-theme');
-          var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-          if (stored === 'dark' || (stored !== 'light' && prefersDark)) {
-            document.documentElement.classList.add('dark');
-          }
-        } catch (error) {
-          /* localStorage puede estar bloqueado: se ignora y queda el tema claro */
-        }
-      })();
-    </script>
+    <script src="/theme-init.js"></script>
   </head>
   <body>
     <div id="root"></div>

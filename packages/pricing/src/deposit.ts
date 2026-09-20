@@ -19,11 +19,7 @@ import { clamp, roundCents } from './money';
  * El deposito se RETIENE (autorizacion), no se cobra, y se acredita contra
  * el total al finalizar el trabajo.
  */
-export function calculateDeposit(
-  miles: number,
-  config: PricingConfig,
-  now: Date,
-): QuoteDeposit {
+export function calculateDeposit(miles: number, config: PricingConfig, now: Date): QuoteDeposit {
   const rate = resolveMileageRate(now);
   const excessMiles = Math.max(0, miles - config.deposit.freeRadiusMiles);
   const billableMiles = config.deposit.roundTrip ? excessMiles * 2 : excessMiles;

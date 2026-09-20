@@ -91,9 +91,7 @@ export function QuoteCalculator() {
         hasQuoteRef.current = true;
       } catch (error) {
         if (controller.signal.aborted) return;
-        setErrorKey(
-          error instanceof ApiClientError ? error.messageKey : 'calculator.errorGeneric',
-        );
+        setErrorKey(error instanceof ApiClientError ? error.messageKey : 'calculator.errorGeneric');
       } finally {
         if (!controller.signal.aborted) setLoading(false);
       }
@@ -169,7 +167,13 @@ export function QuoteCalculator() {
                     >
                       {t(`frequency.${frequency.code}`)}
                       {frequency.discountPercent > 0 && (
-                        <span className={selected ? 'ml-1.5 text-brand-100' : 'ml-1.5 text-brand-700 dark:text-brand-400'}>
+                        <span
+                          className={
+                            selected
+                              ? 'ml-1.5 text-brand-100'
+                              : 'ml-1.5 text-brand-700 dark:text-brand-400'
+                          }
+                        >
                           −{frequency.discountPercent}%
                         </span>
                       )}
@@ -302,10 +306,7 @@ export function QuoteCalculator() {
           {/* ---------------------------- Resultado ---------------------------- */}
           <div className="lg:col-span-2" aria-live="polite" aria-busy={loading}>
             {errorKey && (
-              <div
-                className="ft-card border-red-300 p-6 dark:border-red-900"
-                role="alert"
-              >
+              <div className="ft-card border-red-300 p-6 dark:border-red-900" role="alert">
                 <h3 className="font-semibold text-red-700 dark:text-red-400">
                   {t('calculator.errorTitle')}
                 </h3>

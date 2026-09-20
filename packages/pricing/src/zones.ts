@@ -13,7 +13,9 @@ export function resolveZone(miles: number, config: PricingConfig): ZoneRule {
     }
   }
   const fallback = config.zones.find((zone) => zone.maxMiles === null);
-  return fallback ?? { code: 'OUT_OF_RANGE', maxMiles: null, surchargeCents: 0, serviceable: false };
+  return (
+    fallback ?? { code: 'OUT_OF_RANGE', maxMiles: null, surchargeCents: 0, serviceable: false }
+  );
 }
 
 export function zoneCodeFor(miles: number, config: PricingConfig): ServiceZone {

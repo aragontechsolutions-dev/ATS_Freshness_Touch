@@ -1,9 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  AddOnCodeSchema,
-  FrequencySchema,
-  ServiceTypeSchema,
-} from '@freshness/types';
+import { AddOnCodeSchema, FrequencySchema, ServiceTypeSchema } from '@freshness/types';
 import { en } from './en';
 import { es } from './es';
 

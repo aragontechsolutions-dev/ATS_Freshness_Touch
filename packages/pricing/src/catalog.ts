@@ -19,11 +19,13 @@ export function buildCatalog(
   now: Date,
   config: PricingConfig = defaultPricingConfig,
 ): CatalogResponse {
-  const services: CatalogService[] = (Object.keys(config.services) as ServiceType[]).map((code) => ({
-    code,
-    minimumCents: config.services[code].minimumCents,
-    instantQuote: config.services[code].instantQuote,
-  }));
+  const services: CatalogService[] = (Object.keys(config.services) as ServiceType[]).map(
+    (code) => ({
+      code,
+      minimumCents: config.services[code].minimumCents,
+      instantQuote: config.services[code].instantQuote,
+    }),
+  );
 
   const addOns: CatalogAddOn[] = (Object.keys(config.addOns) as AddOnCode[]).map((code) => ({
     code,

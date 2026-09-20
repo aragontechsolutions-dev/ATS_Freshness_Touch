@@ -2,7 +2,12 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { randomUUID } from 'node:crypto';
 import type { CatalogResponse, QuoteRequest, QuoteResponse } from '@freshness/types';
-import { buildCatalog, calculateQuote, defaultPricingConfig, type PricingConfig } from '@freshness/pricing';
+import {
+  buildCatalog,
+  calculateQuote,
+  defaultPricingConfig,
+  type PricingConfig,
+} from '@freshness/pricing';
 import type { Env } from '../common/config/env';
 import { DistanceService } from '../distance/distance.service';
 

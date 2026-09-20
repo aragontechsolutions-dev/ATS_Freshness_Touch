@@ -5,7 +5,9 @@
   "description": "Motor de precios y deposito por distancia de Freshness Touch (logica pura y testeable)",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",

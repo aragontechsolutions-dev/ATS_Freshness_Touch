@@ -18,8 +18,10 @@ export function Header() {
   const [open, setOpen] = useState(false);
 
   return (
-    <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/90 backdrop-blur
-                       dark:border-slate-800 dark:bg-slate-950/90">
+    <header
+      className="sticky top-0 z-40 border-b border-slate-200 bg-white/90 backdrop-blur
+                       dark:border-slate-800 dark:bg-slate-950/90"
+    >
       <div className="ft-container flex h-16 items-center justify-between gap-4">
         <a href="#top" className="flex items-center gap-2 font-bold text-slate-900 dark:text-white">
           <span className="rounded-lg bg-brand-700 p-1.5 text-white">

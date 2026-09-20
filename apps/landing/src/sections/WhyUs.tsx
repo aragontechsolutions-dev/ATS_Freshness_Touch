@@ -21,8 +21,10 @@ export function WhyUs() {
         <div className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
           {ITEMS.map(({ key, Icon }) => (
             <div key={key}>
-              <span className="inline-flex rounded-lg bg-white p-2 text-brand-700 shadow-sm
-                               dark:bg-slate-950 dark:text-brand-400">
+              <span
+                className="inline-flex rounded-lg bg-white p-2 text-brand-700 shadow-sm
+                               dark:bg-slate-950 dark:text-brand-400"
+              >
                 <Icon className="h-5 w-5" />
               </span>
               <h3 className="mt-3 font-semibold text-slate-900 dark:text-white">

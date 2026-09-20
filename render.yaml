@@ -1,0 +1,63 @@
+# Infraestructura de la API en Render (Infrastructure as Code).
+# Importar desde el panel de Render: Blueprints > New Blueprint Instance.
+services:
+  - type: web
+    name: freshness-touch-api
+    runtime: node
+    region: ohio
+
+    # IMPORTANTE: NO usar el plan gratuito.
+    # El plan free suspende el servicio tras 15 minutos de inactividad y el
+    # primer arranque tarda entre 30 y 60 segundos. Para un cotizador eso
+    # significa que el visitante ve un error y se va. El plan starter mantiene
+    # el servicio siempre encendido.
+    plan: starter
+
+    buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm turbo run build --filter=@freshness/api
+    startCommand: node apps/api/dist/main.js
+
+    # Render reinicia el servicio si esta sonda deja de responder.
+    healthCheckPath: /health
+
+    autoDeploy: true
+
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: '22'
+      - key: API_PREFIX
+        value: api/v1
+
+      # Dominios del sitio publico. Sustituir por los reales de Vercel.
+      - key: CORS_ORIGINS
+        sync: false
+
+      # mock | google. Empezar en "mock" y cambiar cuando haya clave y
+      # facturacion activa en Google Cloud.
+      - key: DISTANCE_PROVIDER
+        value: mock
+      # Secreto: se introduce a mano en el panel, nunca en el repositorio.
+      - key: GOOGLE_MAPS_API_KEY
+        sync: false
+
+      - key: DISTANCE_CACHE_TTL_SECONDS
+        value: '86400'
+      - key: DISTANCE_CACHE_MAX_ENTRIES
+        value: '5000'
+      - key: DISTANCE_TIMEOUT_MS
+        value: '5000'
+
+      - key: RATE_LIMIT_TTL_SECONDS
+        value: '60'
+      - key: RATE_LIMIT_MAX
+        value: '60'
+      - key: QUOTE_RATE_LIMIT_MAX
+        value: '10'
+
+      - key: COMPANY_BASE_CITY
+        sync: false
+      - key: COMPANY_BASE_STATE
+        sync: false
+      - key: COMPANY_BASE_POSTAL_CODE
+        sync: false
