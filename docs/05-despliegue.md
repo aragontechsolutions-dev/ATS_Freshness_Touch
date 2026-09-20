@@ -13,6 +13,18 @@ Dos servicios independientes: la API en **Render** y el sitio público en
 El archivo `render.yaml` describe el servicio. En Render:
 **Blueprints → New Blueprint Instance → seleccionar el repositorio**.
 
+> ⚠️ **`render.yaml` solo se aplica a servicios creados desde un Blueprint.**
+> Si el servicio se creó a mano en el panel, Render **no lee ese archivo**:
+> el comando de compilación, el de arranque, el pre-despliegue y las variables
+> hay que configurarlos en la interfaz. El archivo sigue siendo útil como
+> documentación de cuál debe ser esa configuración.
+>
+> No hace falta borrar y recrear el servicio para arreglarlo: basta con copiar
+> a mano lo que falte. Y conviene **no** recrearlo, porque el dominio de la API
+> está escrito en `connect-src` de `apps/landing/vercel.json` y en la variable
+> `VITE_API_BASE_URL` de Vercel; si el dominio cambia, el cotizador del sitio
+> deja de funcionar hasta actualizar ambos.
+
 ### El plan gratuito no sirve
 
 El plan _free_ de Render **suspende el servicio tras 15 minutos sin tráfico**, y

@@ -151,3 +151,59 @@ describe('reglas de integridad', () => {
     expect(rule.rows[0]?.delete_rule).toBe('RESTRICT');
   });
 });
+
+describe('seguridad de la base de datos', () => {
+  /**
+   * Supabase publica por API REST todas las tablas del esquema "public". Una
+   * tabla sin seguridad a nivel de fila queda accesible para cualquiera que
+   * tenga la clave publica del proyecto, saltandose la API y sus permisos.
+   *
+   * Este test es el guardia que impide que vuelva a ocurrir: si alguien anade
+   * una tabla y olvida protegerla, la integracion continua se pone en rojo y
+   * el mensaje dice exactamente que linea falta.
+   */
+  it('TODAS las tablas tienen la seguridad a nivel de fila activada', async () => {
+    const result = await db.query<{ relname: string }>(
+      `SELECT c.relname
+       FROM pg_class c
+       JOIN pg_namespace n ON n.oid = c.relnamespace
+       WHERE n.nspname = 'public' AND c.relkind = 'r' AND NOT c.relrowsecurity
+       ORDER BY c.relname`,
+    );
+
+    const desprotegidas = result.rows.map((row) => row.relname);
+    const ayuda = desprotegidas
+      .map((t) => `ALTER TABLE "${t}" ENABLE ROW LEVEL SECURITY;`)
+      .join('\n');
+
+    expect(
+      desprotegidas,
+      `Tablas expuestas por la API publica de Supabase. Anade a una migracion nueva:\n${ayuda}`,
+    ).toEqual([]);
+  });
+
+  it('ninguna tabla usa FORCE, que dejaria fuera a la propia API', async () => {
+    // La API se conecta con el rol propietario, que no esta sujeto a las
+    // politicas mientras no se active FORCE. Activarlo sin crear politicas
+    // dejaria al sistema sin acceso a sus propios datos.
+    const result = await db.query<{ relname: string }>(
+      `SELECT c.relname
+       FROM pg_class c
+       JOIN pg_namespace n ON n.oid = c.relnamespace
+       WHERE n.nspname = 'public' AND c.relkind = 'r' AND c.relforcerowsecurity`,
+    );
+
+    expect(result.rows.map((row) => row.relname)).toEqual([]);
+  });
+
+  it('no hay politicas que abran las tablas por accidente', async () => {
+    // El modelo de acceso es "todo pasa por la API". Una politica aqui
+    // significaria que alguien abrio una puerta directa: debe ser deliberado
+    // y quedar revisado, no aparecer por copiar y pegar de un tutorial.
+    const result = await db.query<{ tablename: string; policyname: string }>(
+      `SELECT tablename, policyname FROM pg_policies WHERE schemaname = 'public'`,
+    );
+
+    expect(result.rows).toEqual([]);
+  });
+});
