@@ -63,6 +63,19 @@ Una serie semanal no son 52 citas sueltas copiadas. Siendo un objeto de primer
 nivel se puede pausar, reprogramar o cambiar de precio toda la serie de una vez,
 que es como lo pide el negocio.
 
+## Al añadir una tabla nueva
+
+La migración que la crea **debe** activar la seguridad a nivel de fila:
+
+```sql
+ALTER TABLE "nombre_de_la_tabla" ENABLE ROW LEVEL SECURITY;
+```
+
+Sin esa línea, Supabase publica la tabla por su API REST y queda accesible con
+la clave pública del proyecto. Hay un test que lo impide (falla e imprime la
+línea exacta que falta), pero conviene escribirla desde el principio. El
+razonamiento completo está en `docs/04-seguridad.md`.
+
 ## Datos sensibles
 
 `addresses.accessNotes` guarda códigos de puerta, dónde está la llave o si hay

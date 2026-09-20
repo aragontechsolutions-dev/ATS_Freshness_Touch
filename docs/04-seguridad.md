@@ -64,6 +64,91 @@ Comprobado en ejecución real contra la API levantada:
 | Cabeceras de la API                                  | CSP, `nosniff`, `Referrer-Policy`, HSTS presentes        |
 | Sitio en navegador real                              | Sin errores de consola                                   |
 
+## Seguridad de la base de datos
+
+### El problema: Supabase publica las tablas por su cuenta
+
+Supabase expone **automáticamente** por API REST todas las tablas del esquema
+`public`. Cualquiera con la clave pública del proyecto —que es pública por
+diseño y acaba en el navegador— puede leerlas y escribirlas **saltándose por
+completo nuestra API y sus comprobaciones**.
+
+En este sistema eso expondría datos de clientes, importes de pagos y, lo más
+grave, `addresses.accessNotes`: códigos de puerta y dónde está la llave.
+
+Las tablas se crearon sin esa protección (Supabase las marca como
+`UNRESTRICTED`) y la migración `20260920170000_enable_rls` la activa.
+
+### Modelo de acceso
+
+> **Todo pasa por la API. Nadie habla con la base de datos directamente.**
+
+La API se conecta con el rol **propietario** de las tablas. En PostgreSQL el
+propietario no se ve afectado por las políticas de fila mientras no se active
+`FORCE`, así que activar la seguridad no le quita acceso. Los roles públicos de
+Supabase (`anon`, `authenticated`), en cambio, se quedan sin nada.
+
+Por eso la seguridad se activa **sin crear ninguna política**: eso significa
+"denegar a todos salvo al propietario", que es exactamente lo que se quiere
+mientras la API sea el único camino de entrada.
+
+### Dos capas, no una
+
+| Capa                                              | Qué hace                                                                          |
+| ------------------------------------------------- | --------------------------------------------------------------------------------- |
+| Seguridad a nivel de fila activada, sin políticas | Deniega a cualquier rol que no sea el propietario                                 |
+| Permisos retirados a `anon` y `authenticated`     | Aunque alguien creara una política por error, sin permisos de tabla no hay acceso |
+
+La segunda capa incluye `ALTER DEFAULT PRIVILEGES`, de modo que **las tablas
+futuras tampoco nacen accesibles**.
+
+### El guardia contra el olvido
+
+Activar la protección una vez no sirve si la siguiente tabla nace sin ella. Hay
+tres tests que lo impiden (`src/database/migrations.test.ts`):
+
+1. **Todas las tablas tienen la seguridad activada.** Si falta alguna, la CI se
+   pone en rojo y el mensaje imprime la línea `ALTER TABLE ... ENABLE ROW LEVEL
+SECURITY;` exacta que hay que añadir.
+2. **Ninguna usa `FORCE`**, que dejaría fuera a la propia API.
+3. **No hay ninguna política**, para que abrir una puerta directa tenga que ser
+   una decisión deliberada y revisada, no algo copiado de un tutorial.
+
+Comprobado que el guardia funciona de verdad: al añadir una tabla sin proteger,
+el test falla e indica la línea que falta.
+
+## Seguridad del almacenamiento de archivos
+
+Supabase Storage **todavía no se usa**: las fotos de los trabajos llegan en la
+Etapa 3. Se dejan escritas las reglas ahora para que no se improvisen después.
+
+Estado actual: Supabase protege `storage.objects` por defecto y no hay ninguna
+política, así que nadie tiene acceso. El riesgo aparece el día que alguien cree
+un **bucket público** desde el panel, porque entonces sus archivos quedan
+accesibles con solo conocer la URL, sin ninguna credencial.
+
+Reglas para cuando se implemente:
+
+1. **Ningún bucket público.** Las fotos de una casa ajena no pueden estar a un
+   enlace de distancia. Se crean con `public = false`.
+2. **Acceso mediante URLs firmadas de corta duración** (minutos, no días),
+   generadas por la API tras comprobar que quien pide la foto tiene derecho a
+   verla.
+3. **Ruta con el identificador dentro**: `job-photos/{bookingId}/{archivo}`.
+   Las políticas se apoyan en esa ruta para acotar quién ve qué.
+4. **Consentimiento explícito** del cliente para las fotos de antes y después,
+   registrado con fecha.
+5. **Caducidad**: las fotos de trabajos cerrados no deben conservarse
+   indefinidamente. Hay que fijar un plazo y borrarlas.
+
+SQL de partida, para aplicar cuando exista la funcionalidad:
+
+```sql
+insert into storage.buckets (id, name, public)
+values ('job-photos', 'job-photos', false);
+-- Sin politicas: solo la API, con su clave de servicio, puede leer y escribir.
+```
+
 ## Incidente resuelto: la sonda de salud quedaba limitada
 
 Detectado en los registros de Render, ya corregido. Merece quedar escrito
@@ -114,3 +199,7 @@ Lista de comprobación para cada funcionalidad futura:
 5. ¿Los mensajes de error revelan algo que no deberían?
 6. ¿Hay algún secreto que pueda acabar en el paquete del navegador?
 7. ¿Qué pasa si el servicio externo del que depende falla o tarda?
+8. **¿Añade tablas?** Entonces la migración debe activar la seguridad a nivel
+   de fila en cada una. El test lo comprueba, pero es más rápido escribirlo a
+   la primera que descubrirlo en la CI.
+9. **¿Guarda archivos?** Bucket privado y URLs firmadas de corta duración.
