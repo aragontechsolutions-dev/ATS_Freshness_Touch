@@ -21,7 +21,7 @@ export function ServiceAreas() {
   );
 
   return (
-    <section id="areas" className="py-16 lg:py-20">
+    <section id="areas" className="py-12 sm:py-16 lg:py-20">
       <div className="ft-container">
         <h2
           className="ft-rule text-3xl font-bold tracking-tight text-brand-800

@@ -17,7 +17,7 @@
         { "key": "X-Frame-Options", "value": "DENY" },
         {
           "key": "Permissions-Policy",
-          "value": "geolocation=(), camera=(), microphone=(), payment=(), interest-cohort=()"
+          "value": "geolocation=(), camera=(), microphone=(), payment=()"
         },
         {
           "key": "Strict-Transport-Security",

@@ -6,10 +6,10 @@ export function Contact() {
   const { t } = useTranslation();
 
   return (
-    <section id="contact" className="py-16 lg:py-20">
+    <section id="contact" className="py-12 sm:py-16 lg:py-20">
       <div className="ft-container">
         <div className="ft-card overflow-hidden">
-          <div className="grid gap-8 p-8 lg:grid-cols-2 lg:p-12">
+          <div className="grid gap-8 p-6 sm:p-8 lg:grid-cols-2 lg:p-12">
             <div>
               <h2
                 className="ft-rule text-3xl font-bold tracking-tight text-brand-800

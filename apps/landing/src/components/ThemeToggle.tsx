@@ -14,10 +14,12 @@ export function ThemeToggle() {
       onClick={toggleTheme}
       title={label}
       aria-label={label}
-      className="rounded-lg border border-slate-300 p-2 text-slate-600 transition-colors
-                 hover:bg-slate-100 dark:border-night-600 dark:text-slate-300 dark:hover:bg-night-700"
+      // 44 pixeles: el minimo recomendado para tocar con el dedo sin fallar.
+      className="inline-flex h-11 w-11 items-center justify-center rounded-lg border
+                 border-slate-300 text-slate-600 transition-colors hover:bg-slate-100
+                 dark:border-night-600 dark:text-slate-300 dark:hover:bg-night-700"
     >
-      {theme === 'dark' ? <SunIcon className="h-4 w-4" /> : <MoonIcon className="h-4 w-4" />}
+      {theme === 'dark' ? <SunIcon className="h-5 w-5" /> : <MoonIcon className="h-5 w-5" />}
     </button>
   );
 }

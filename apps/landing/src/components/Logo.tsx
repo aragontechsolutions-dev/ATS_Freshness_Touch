@@ -52,7 +52,11 @@ interface LogoProps {
 }
 
 const SIZES = {
-  sm: { mark: 'h-11 w-11', name: 'text-lg', sub: 'text-[0.55rem]' },
+  sm: {
+    mark: 'h-10 w-10 sm:h-11 sm:w-11',
+    name: 'text-base sm:text-lg',
+    sub: 'text-[0.5rem] sm:text-[0.55rem]',
+  },
   md: { mark: 'h-14 w-14', name: 'text-xl', sub: 'text-[0.6rem]' },
   lg: { mark: 'h-20 w-20', name: 'text-3xl', sub: 'text-[0.7rem]' },
 } as const;
@@ -70,8 +74,12 @@ export function Logo({ size = 'sm', withTagline = false, className = '' }: LogoP
           <span className="text-ink dark:text-white">Touch</span>
         </span>
 
-        {/* Filete amarillo entre el nombre y el descriptor, como en el manual. */}
-        <span className="mt-1.5 flex items-center gap-2">
+        {/*
+          Filete amarillo y descriptor, como en el manual de marca.
+          En pantallas estrechas se oculta: partido en dos lineas quedaba
+          descuidado, y ahi la marca ya se reconoce con isotipo y nombre.
+        */}
+        <span className="mt-1.5 hidden items-center gap-2 sm:flex">
           <span className="h-0.5 w-4 rounded-full bg-sun-400" aria-hidden="true" />
           <span
             className={`font-display font-semibold tracking-[0.24em] text-slate-600

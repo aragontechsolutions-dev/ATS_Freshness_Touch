@@ -96,15 +96,6 @@ export function MoonIcon({ className = base }: IconProps) {
   );
 }
 
-export function SparkleIcon({ className = base }: IconProps) {
-  return (
-    <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden="true">
-      <path d="M12 2.5 13.8 8 19.5 9.8 13.8 11.6 12 17.1 10.2 11.6 4.5 9.8 10.2 8 12 2.5Z" />
-      <path d="M18.5 15.5 19.4 18l2.6.9-2.6.9-.9 2.6-.9-2.6-2.6-.9 2.6-.9.9-2.5Z" opacity=".7" />
-    </svg>
-  );
-}
-
 export function ShieldIcon({ className = base }: IconProps) {
   return (
     <svg
@@ -184,6 +175,72 @@ export function SunflowerIcon({ className = base }: IconProps) {
         ))}
       </g>
       <circle cx="12" cy="12" r="3.6" fill="currentColor" opacity="0.4" />
+    </svg>
+  );
+}
+
+/** Globo terraqueo: selector de idioma. */
+export function GlobeIcon({ className = base }: IconProps) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      className={className}
+      aria-hidden="true"
+    >
+      <circle cx="12" cy="12" r="9" />
+      <path d="M3.5 9h17M3.5 15h17" strokeLinecap="round" />
+      <path d="M12 3a15 15 0 0 1 0 18 15 15 0 0 1 0-18Z" />
+    </svg>
+  );
+}
+
+/** Menu de navegacion en movil. */
+export function MenuIcon({ className = base }: IconProps) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      className={className}
+      aria-hidden="true"
+    >
+      <path strokeLinecap="round" d="M4 7h16M4 12h16M4 17h16" />
+    </svg>
+  );
+}
+
+/** Cierre del menu. */
+export function CloseIcon({ className = base }: IconProps) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      className={className}
+      aria-hidden="true"
+    >
+      <path strokeLinecap="round" d="m6 6 12 12M18 6 6 18" />
+    </svg>
+  );
+}
+
+/** Flecha de los botones de accion, como en el manual de marca. */
+export function ArrowRightIcon({ className = base }: IconProps) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      className={className}
+      aria-hidden="true"
+    >
+      <path strokeLinecap="round" strokeLinejoin="round" d="M4 12h15m0 0-5.5-5.5M19 12l-5.5 5.5" />
     </svg>
   );
 }
