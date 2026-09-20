@@ -3,6 +3,9 @@
 Dos servicios independientes: la API en **Render** y el sitio público en
 **Vercel**.
 
+> La lista completa de variables, lista para copiar y pegar, está en
+> [08 — Variables de entorno](08-variables-de-entorno.md).
+
 ---
 
 ## API — Render

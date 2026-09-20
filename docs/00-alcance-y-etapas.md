@@ -64,6 +64,15 @@ cuando aparecen clientes y reservas que sí hay que guardar.
   captura parcial al finalizar el trabajo. Verificación de firma en los webhooks.
 - Portal del cliente: historial, facturas, reprogramación y propinas opcionales.
 - Panel de administración: clientes, trabajos, calendario y asignación de personal.
+- **Configuración del negocio desde el panel**, para que la empresa no dependa
+  del equipo técnico en el día a día:
+  - Datos de contacto (teléfono, correo, horario), hoy en
+    `apps/landing/src/config/company.ts`.
+  - Textos y afirmaciones del sitio que deben mantenerse veraces
+    (seguros, verificación de antecedentes, garantía).
+  - Zona de servicio y, más adelante, las tarifas: pasarlas de archivo a base
+    de datos permite ajustar precios sin desplegar, pero exige registrar quién
+    cambió qué y cuándo, porque afecta directamente a la facturación.
 
 **Requisitos previos:** cuentas de Supabase y Stripe, y la dirección completa
 del cliente (que en la Etapa 1 no se pide a propósito).
