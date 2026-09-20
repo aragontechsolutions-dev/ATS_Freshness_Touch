@@ -48,6 +48,36 @@ export const EnvSchema = z
     DATABASE_URL: z.string().url().optional(),
     DIRECT_URL: z.string().url().optional(),
 
+    /**
+     * Pagos. "mock" simula el proveedor sin mover dinero y es el valor por
+     * defecto: asi el sistema arranca y se puede probar de punta a punta sin
+     * una cuenta de Stripe. En produccion hay que poner "stripe".
+     */
+    PAYMENT_PROVIDER: z.enum(['mock', 'stripe']).default('mock'),
+    STRIPE_SECRET_KEY: z.string().min(1).optional(),
+    /** Secreto del endpoint de webhook (whsec_...), distinto de la clave secreta. */
+    STRIPE_WEBHOOK_SECRET: z.string().min(1).optional(),
+    STRIPE_TIMEOUT_MS: z.coerce.number().int().min(1000).default(10000),
+    /** Clave con la que se firman los webhooks simulados en desarrollo y pruebas. */
+    PAYMENT_MOCK_WEBHOOK_SECRET: z.string().min(1).default('mock-webhook-secret'),
+    /**
+     * Dias que dura la retencion antes de caducar. Las redes de tarjetas dan
+     * 7 dias; poner mas haria creer que un deposito antiguo todavia se puede
+     * capturar cuando en realidad ya no.
+     */
+    PAYMENT_AUTHORIZATION_DAYS: z.coerce.number().int().min(1).max(7).default(7),
+    /**
+     * Texto que acompana al nombre de la empresa en el extracto del cliente.
+     * Stripe solo admite letras, numeros y espacios, y como maximo 10.
+     */
+    PAYMENT_STATEMENT_DESCRIPTOR: z
+      .string()
+      .trim()
+      .min(5)
+      .max(10)
+      .regex(/^[A-Za-z0-9 ]+$/, 'Solo se admiten letras, numeros y espacios')
+      .default('FRESHNESS'),
+
     /** Base de operaciones: origen del calculo de distancia. */
     COMPANY_BASE_CITY: z.string().default('Atlanta'),
     COMPANY_BASE_STATE: z.string().length(2).default('GA'),
@@ -59,6 +89,20 @@ export const EnvSchema = z
   .refine((env) => env.DISTANCE_PROVIDER !== 'google' || Boolean(env.GOOGLE_MAPS_API_KEY), {
     message: 'GOOGLE_MAPS_API_KEY es obligatoria cuando DISTANCE_PROVIDER=google',
     path: ['GOOGLE_MAPS_API_KEY'],
+  })
+  .refine((env) => env.PAYMENT_PROVIDER !== 'stripe' || Boolean(env.STRIPE_SECRET_KEY), {
+    message: 'STRIPE_SECRET_KEY es obligatoria cuando PAYMENT_PROVIDER=stripe',
+    path: ['STRIPE_SECRET_KEY'],
+  })
+  /*
+   * Sin el secreto del webhook, Stripe podria avisar de que un deposito quedo
+   * autorizado y no habria forma de comprobar que el aviso viene de Stripe:
+   * cualquiera podria confirmar reservas que nadie ha pagado. Por eso es
+   * obligatorio, no opcional.
+   */
+  .refine((env) => env.PAYMENT_PROVIDER !== 'stripe' || Boolean(env.STRIPE_WEBHOOK_SECRET), {
+    message: 'STRIPE_WEBHOOK_SECRET es obligatoria cuando PAYMENT_PROVIDER=stripe',
+    path: ['STRIPE_WEBHOOK_SECRET'],
   });
 
 export type Env = z.infer<typeof EnvSchema>;

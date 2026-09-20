@@ -7,6 +7,7 @@ import {
   API_ERROR_CODES,
   type BookingRequest,
   type BookingResponse,
+  type PaymentIntent,
   type QuoteResponse,
 } from '@freshness/types';
 import type { Env } from '../common/config/env';
@@ -14,6 +15,7 @@ import { buildPricingConfig } from '../common/pricing-config';
 import { PrismaService } from '../database/prisma.service';
 import { Prisma } from '../generated/prisma/client';
 import { DistanceService } from '../distance/distance.service';
+import { PaymentsService } from '../payments/payments.service';
 import { AvailabilityService } from '../scheduling/availability.service';
 import { isSlotStillAvailable } from '../scheduling/slots';
 
@@ -26,6 +28,7 @@ export class BookingsService {
     private readonly prisma: PrismaService,
     private readonly distance: DistanceService,
     private readonly availability: AvailabilityService,
+    private readonly payments: PaymentsService,
     config: ConfigService<Env, true>,
   ) {
     this.pricingConfig = buildPricingConfig(config);
@@ -47,8 +50,10 @@ export class BookingsService {
    * 3. LA FRANJA SE VUELVE A COMPROBAR. Entre que el cliente ve los huecos y
    *    pulsa "reservar" pueden pasar minutos y otra persona ocuparlo.
    *
-   * 4. LA RESERVA NACE PENDIENTE DE PAGO. Solo queda en firme cuando se
-   *    retiene el deposito, que es el paso siguiente (Etapa 2.4).
+   * 4. LA RESERVA NACE PENDIENTE DE PAGO. Solo queda en firme cuando el
+   *    proveedor confirma que el deposito quedo retenido, y eso llega por
+   *    webhook: el navegador no puede confirmarlo por si mismo porque podria
+   *    cerrarse a mitad, o mentir.
    */
   async create(request: BookingRequest, now: Date = new Date()): Promise<BookingResponse> {
     const durationMinutes = this.availability.durationFor(request);
@@ -74,8 +79,9 @@ export class BookingsService {
     const endsAt = new Date(startsAt.getTime() + durationMinutes * 60_000);
     const holdExpiresAt = new Date(now.getTime() + schedulingConfig.paymentHoldMinutes * 60_000);
 
+    let booking: Omit<BookingResponse, 'payment'>;
     try {
-      return await this.persist({
+      booking = await this.persist({
         request,
         quote,
         startsAt,
@@ -100,6 +106,42 @@ export class BookingsService {
         });
       }
       throw error;
+    }
+
+    return { ...booking, payment: await this.holdDeposit(booking, request) };
+  }
+
+  /**
+   * Retiene el deposito, ya con la reserva guardada.
+   *
+   * Se hace FUERA de la transaccion a proposito: una llamada de red dentro de
+   * ella mantendria bloqueada la agenda del dia mientras se espera a un
+   * servidor ajeno.
+   *
+   * Si el proveedor falla, la reserva NO se pierde: se devuelve con
+   * `payment: null` y queda pendiente de que alguien la gestione. Perder una
+   * reserva ya aceptada seria peor que tener que pedir la tarjeta despues.
+   */
+  private async holdDeposit(
+    booking: Omit<BookingResponse, 'payment'>,
+    request: BookingRequest,
+  ): Promise<PaymentIntent | null> {
+    if (booking.nextStep !== 'PAYMENT') return null;
+
+    try {
+      return await this.payments.createDepositHold({
+        bookingId: booking.bookingId,
+        bookingReference: booking.reference,
+        amountCents: booking.deposit.amountCents,
+        customerEmail: request.contact.email,
+        customerName: `${request.contact.firstName} ${request.contact.lastName}`,
+      });
+    } catch (error) {
+      this.logger.error(
+        `No se pudo retener el deposito de la reserva ${booking.reference}: ` +
+          (error instanceof Error ? error.message : 'error desconocido'),
+      );
+      return null;
     }
   }
 
@@ -138,8 +180,17 @@ export class BookingsService {
     durationMinutes: number;
     now: Date;
     holdExpiresAt: Date;
-  }): Promise<BookingResponse> {
+  }): Promise<Omit<BookingResponse, 'payment'>> {
     const { request, quote, startsAt, endsAt, durationMinutes, now, holdExpiresAt } = args;
+
+    /*
+     * Con la tarifa actual el deposito minimo son 30 dolares, asi que siempre
+     * hay algo que retener. Si alguna vez se configura un deposito de cero,
+     * pedir una tarjeta para retener nada seria un obstaculo sin sentido: la
+     * reserva queda confirmada directamente.
+     */
+    const requierePago = quote.deposit.amountCents > 0;
+
     const localDate = DateTime.fromJSDate(startsAt)
       .setZone(this.availability.config.timezone)
       .toFormat('yyyy-MM-dd');
@@ -258,7 +309,7 @@ export class BookingsService {
           customerId: customer.id,
           addressId: address.id,
           quoteId: savedQuote.id,
-          status: 'PENDING_PAYMENT',
+          status: requierePago ? 'PENDING_PAYMENT' : 'CONFIRMED',
           service: request.service,
           frequency: request.frequency,
           bedrooms: request.bedrooms,
@@ -290,7 +341,7 @@ export class BookingsService {
       return {
         bookingId: booking.id,
         reference: booking.reference,
-        status: 'PENDING_PAYMENT',
+        status: requierePago ? 'PENDING_PAYMENT' : 'CONFIRMED',
         scheduledStart: startsAt.toISOString(),
         scheduledEnd: endsAt.toISOString(),
         timezone: booking.timezone,
@@ -299,8 +350,8 @@ export class BookingsService {
         totals: quote.totals,
         deposit: quote.deposit,
         balanceDueAtServiceCents: quote.balanceDueAtServiceCents,
-        nextStep: 'PAYMENT',
-        holdExpiresAt: holdExpiresAt.toISOString(),
+        nextStep: requierePago ? 'PAYMENT' : 'NONE',
+        holdExpiresAt: requierePago ? holdExpiresAt.toISOString() : null,
       };
     });
   }

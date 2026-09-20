@@ -133,12 +133,37 @@ describe('reglas de integridad', () => {
     ).rejects.toThrow();
   });
 
-  it('impide dos intentos de pago con el mismo identificador de Stripe', async () => {
+  it('impide dos movimientos con el mismo identificador del mismo proveedor', async () => {
     const columns = await db.query<{ indexdef: string }>(
       `SELECT indexdef FROM pg_indexes
-       WHERE tablename = 'payments' AND indexdef LIKE '%stripePaymentIntentId%'`,
+       WHERE tablename = 'payments' AND indexdef LIKE '%providerPaymentIntentId%'`,
     );
-    expect(columns.rows.some((row) => row.indexdef.includes('UNIQUE'))).toBe(true);
+
+    const unico = columns.rows.find((row) => row.indexdef.includes('UNIQUE'));
+    expect(unico).toBeDefined();
+    // La unicidad es del PAR: el simulador imita el formato de Stripe, asi que
+    // el identificador por si solo no distingue de que proveedor viene.
+    expect(unico?.indexdef).toContain('provider');
+  });
+
+  it('la tabla de pagos no da por supuesto ningun proveedor', async () => {
+    // Guardar un identificador del simulador en una columna llamada "stripe..."
+    // seria guardar un dato que miente sobre su origen.
+    const columnas = await db.query<{ column_name: string }>(
+      `SELECT column_name FROM information_schema.columns
+       WHERE table_schema = 'public' AND column_name ILIKE '%stripe%'`,
+    );
+    expect(columnas.rows.map((row) => row.column_name)).toEqual([]);
+  });
+
+  it('un pago debe declarar siempre quien lo custodia', async () => {
+    const columna = await db.query<{ is_nullable: string; column_default: string | null }>(
+      `SELECT is_nullable, column_default FROM information_schema.columns
+       WHERE table_name = 'payments' AND column_name = 'provider'`,
+    );
+    expect(columna.rows[0]?.is_nullable).toBe('NO');
+    // Sin valor por defecto: cada insercion tiene que decirlo explicitamente.
+    expect(columna.rows[0]?.column_default).toBeNull();
   });
 
   it('no permite borrar un cliente que conserva historial de reservas', async () => {

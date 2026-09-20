@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { FrequencySchema, LocaleSchema, ServiceTypeSchema } from './enums';
+import { PaymentIntentSchema } from './payment';
 import { QuoteAddOnInputSchema, QuoteDepositSchema, QuoteTotalsSchema } from './quote';
 
 /**
@@ -119,5 +120,10 @@ export const BookingResponseSchema = z.strictObject({
   nextStep: z.enum(['PAYMENT', 'NONE']),
   /** Momento en que se libera la franja si no se completa el pago. */
   holdExpiresAt: z.iso.datetime().nullable(),
+  /**
+   * Sesion para autorizar el deposito. Es null si el pago no esta
+   * configurado, en cuyo caso la reserva queda pendiente de gestion manual.
+   */
+  payment: PaymentIntentSchema.nullable(),
 });
 export type BookingResponse = z.infer<typeof BookingResponseSchema>;

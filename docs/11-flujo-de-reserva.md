@@ -3,8 +3,8 @@
 Cómo una cotización se convierte en una cita. Corresponde al bloque 2.2 de la
 Etapa 2.
 
-> **Estado:** la API está terminada y probada. El formulario del sitio web y el
-> pago del depósito llegan a continuación.
+> **Estado:** la API está terminada y probada, incluido el depósito
+> (`docs/12-pagos-y-deposito.md`). Falta el formulario del sitio web.
 
 ## Endpoints
 
@@ -46,8 +46,13 @@ Entre que el cliente ve los huecos y pulsa "reservar" pueden pasar minutos.
 
 `PENDING_PAYMENT`. **No está confirmada**: solo retiene la franja 30 minutos.
 Pasado ese plazo el hueco vuelve a ofrecerse, porque un formulario abandonado
-no puede bloquear la agenda para siempre. La confirmación llega cuando se
-retiene el depósito (bloque 2.4).
+no puede bloquear la agenda para siempre.
+
+La respuesta incluye `payment.clientSecret`, con el que el navegador confirma
+la tarjeta directamente contra el proveedor. La reserva pasa a `CONFIRMED`
+cuando el proveedor avisa por webhook de que el depósito quedó retenido —nunca
+porque lo diga el navegador, que puede cerrarse a mitad o mentir. El detalle
+está en `docs/12-pagos-y-deposito.md`.
 
 ## Cómo se evita que dos personas reserven el mismo hueco
 

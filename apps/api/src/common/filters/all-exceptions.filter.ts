@@ -17,6 +17,27 @@ interface StructuredErrorBody {
 }
 
 /**
+ * Error del lector del cuerpo de la peticion (cuerpo demasiado grande, JSON
+ * roto). No es una HttpException de Nest, asi que sin este caso saldria como
+ * un 500: el cliente veria "error del servidor" cuando el fallo es suyo y,
+ * peor, un proveedor de pago reintentaria para siempre un evento que nunca
+ * vamos a aceptar.
+ */
+interface BodyParserError {
+  type: string;
+  status?: number;
+  statusCode?: number;
+}
+
+function asBodyParserError(exception: unknown): BodyParserError | null {
+  if (typeof exception !== 'object' || exception === null) return null;
+  const candidate = exception as Partial<BodyParserError>;
+  return typeof candidate.type === 'string' && candidate.type.startsWith('entity.')
+    ? (candidate as BodyParserError)
+    : null;
+}
+
+/**
  * Convierte cualquier excepcion en la respuesta de error unica de la API.
  *
  * SEGURIDAD: al cliente nunca se le envian stack traces, rutas del servidor
@@ -41,7 +62,20 @@ export class AllExceptionsFilter implements ExceptionFilter {
       requestId,
     };
 
-    if (exception instanceof ThrottlerException) {
+    const bodyError = asBodyParserError(exception);
+
+    if (bodyError) {
+      status = bodyError.status ?? bodyError.statusCode ?? HttpStatus.BAD_REQUEST;
+      body = {
+        statusCode: status,
+        code:
+          status === HttpStatus.PAYLOAD_TOO_LARGE
+            ? API_ERROR_CODES.PAYLOAD_TOO_LARGE
+            : API_ERROR_CODES.VALIDATION_ERROR,
+        messageKey: 'calculator.errorGeneric',
+        requestId,
+      };
+    } else if (exception instanceof ThrottlerException) {
       status = HttpStatus.TOO_MANY_REQUESTS;
       body = {
         statusCode: status,

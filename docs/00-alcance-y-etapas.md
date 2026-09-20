@@ -75,9 +75,12 @@ Progreso:
 - ✅ **API de reserva** (`docs/11-flujo-de-reserva.md`): disponibilidad por
   franjas, recálculo de distancia con la dirección completa y tres capas
   contra la doble reserva.
-- ⬜ Formulario de reserva en el sitio web.
+- ✅ **Pagos y depósito** (`docs/12-pagos-y-deposito.md`): retención del
+  depósito al reservar, webhook con verificación de firma e idempotencia, y
+  proveedor simulado que permite probarlo todo sin cuenta de Stripe.
+- ⬜ Formulario de reserva en el sitio web, con el paso de tarjeta.
 - ⬜ Autenticación y panel de administración.
-- ⬜ Stripe: retención del depósito y captura al finalizar.
+- ⬜ Captura del importe final y devoluciones desde el panel.
 - ⬜ Avisos por correo y SMS.
 - Calendario de disponibilidad y reserva en línea.
 - **Stripe**: retención del depósito con `capture_method: 'manual'` al reservar y
