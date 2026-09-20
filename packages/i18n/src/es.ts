@@ -143,6 +143,15 @@ export const es: TranslationResources = {
       'Demasiadas cotizaciones en poco tiempo. Espera un momento e inténtalo de nuevo.',
   },
 
+  booking: {
+    errorSlotTaken: 'Acaban de ocupar esa hora. Elige otra franja, por favor.',
+    errorAlreadyBooked: 'Ya tienes una reserva a esa hora.',
+    errorRequiresWalkthrough:
+      'Los trabajos comerciales se agendan tras una visita gratuita. Contáctanos y la organizamos.',
+    errorDateOutOfRange: 'Elige una fecha dentro de los próximos 90 días.',
+    errorNotBookable: 'No podemos reservar este trabajo en línea. Contáctanos y te ayudamos.',
+  },
+
   quote: {
     line: {
       service: {

@@ -27,8 +27,23 @@ export class DistanceService {
     this.originPostalCode = this.config.get('COMPANY_BASE_POSTAL_CODE', { infer: true });
   }
 
-  async resolve(destinationPostalCode: string, state: string): Promise<ResolvedDistance> {
-    const key = `${this.provider.name}:${this.originPostalCode}:${state}:${destinationPostalCode}`;
+  async resolve(
+    destinationPostalCode: string,
+    state: string,
+    /** Calle y ciudad, si se conocen (solo al reservar). */
+    detail: { line1?: string; city?: string } = {},
+  ): Promise<ResolvedDistance> {
+    // El detalle forma parte de la clave: la distancia hasta un portal
+    // concreto no es la misma que hasta el centro del codigo postal, y
+    // mezclarlas en la cache daria depositos incorrectos.
+    const key = [
+      this.provider.name,
+      this.originPostalCode,
+      state,
+      destinationPostalCode,
+      detail.line1 ?? '',
+      detail.city ?? '',
+    ].join(':');
 
     const cached = this.cache.get(key);
     if (cached) {
@@ -39,6 +54,8 @@ export class DistanceService {
       originPostalCode: this.originPostalCode,
       destinationPostalCode,
       state,
+      ...(detail.line1 ? { destinationLine1: detail.line1 } : {}),
+      ...(detail.city ? { destinationCity: detail.city } : {}),
     });
 
     this.cache.set(key, result);

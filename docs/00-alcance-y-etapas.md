@@ -68,9 +68,14 @@ Progreso:
 - ✅ **Modelo de datos** (`docs/10-modelo-de-datos.md`): esquema completo de 11
   tablas, migración inicial y prueba automática que la aplica sobre un
   PostgreSQL real sin necesidad de servidor ni credenciales.
-- ⬜ Conexión de la aplicación a la base de datos.
-- ⬜ Reserva en línea: dirección completa, recálculo de distancia real,
-  franjas horarias y capacidad por zona.
+- ✅ **Conexión de la aplicación a la base de datos**, opcional en tiempo de
+  ejecución: si falta o se cae, el cotizador sigue funcionando.
+- ✅ **Seguridad de la base de datos**: acceso público cerrado y guardia
+  automático para las tablas futuras (`docs/04-seguridad.md`).
+- ✅ **API de reserva** (`docs/11-flujo-de-reserva.md`): disponibilidad por
+  franjas, recálculo de distancia con la dirección completa y tres capas
+  contra la doble reserva.
+- ⬜ Formulario de reserva en el sitio web.
 - ⬜ Autenticación y panel de administración.
 - ⬜ Stripe: retención del depósito y captura al finalizar.
 - ⬜ Avisos por correo y SMS.
