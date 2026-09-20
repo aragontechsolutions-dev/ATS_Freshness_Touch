@@ -3,6 +3,7 @@ import type { Locale } from '@freshness/types';
 import { useCatalog } from '../hooks/useCatalog';
 import { formatCentsCompact } from '../lib/format';
 import { MapPinIcon } from '../components/Icons';
+import { Reveal } from '../components/Reveal';
 
 /**
  * Zonas de servicio. Los datos vienen del catalogo de la API, de modo que
@@ -32,8 +33,12 @@ export function ServiceAreas() {
         <p className="mt-3 max-w-2xl text-slate-600 dark:text-slate-300">{t('areas.subtitle')}</p>
 
         <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {zones.map((zone) => (
-            <div key={zone.code} className="ft-card p-5">
+          {zones.map((zone, indice) => (
+            <Reveal
+              key={zone.code}
+              delayMs={indice * 90}
+              className="ft-card ft-card-interactive p-5"
+            >
               <span
                 className="inline-flex items-center gap-2 text-sm font-bold text-brand-700
                                dark:text-brand-300"
@@ -60,7 +65,7 @@ export function ServiceAreas() {
                   </p>
                 </>
               )}
-            </div>
+            </Reveal>
           ))}
         </div>
       </div>

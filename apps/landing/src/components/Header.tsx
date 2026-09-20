@@ -5,6 +5,7 @@ import { LanguageSwitcher } from './LanguageSwitcher';
 import { ThemeToggle } from './ThemeToggle';
 import { CloseIcon, MenuIcon, PhoneIcon } from './Icons';
 import { Logo } from './Logo';
+import { useScrolled } from '../hooks/useScrolled';
 
 const NAV_ITEMS = [
   { href: '#services', key: 'nav.services' },
@@ -27,6 +28,7 @@ const NAV_ITEMS = [
 export function Header() {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
+  const desplazada = useScrolled();
 
   // Con el menu abierto no se puede desplazar el fondo: en movil resulta
   // desconcertante ver moverse la pagina detras del panel.
@@ -49,8 +51,11 @@ export function Header() {
 
   return (
     <header
-      className="sticky top-0 z-40 border-b border-slate-200 bg-canvas/95 backdrop-blur
-                 dark:border-night-600 dark:bg-night-900/95"
+      // La sombra aparece solo al desplazar: arriba del todo ensucia, y al
+      // bajar separa la cabecera del contenido que pasa por debajo.
+      className={`sticky top-0 z-40 border-b border-slate-200 bg-canvas/95 backdrop-blur
+                  transition-shadow duration-300 dark:border-night-600 dark:bg-night-900/95
+                  ${desplazada ? 'ft-header-scrolled' : ''}`}
     >
       <div className="ft-container flex h-16 items-center justify-between gap-2">
         <a href="#top" aria-label={company.name} className="min-w-0 shrink">

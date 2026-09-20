@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { company } from '../config/company';
 import { MailIcon, PhoneIcon, MapPinIcon } from '../components/Icons';
+import { Reveal } from '../components/Reveal';
 
 export function Contact() {
   const { t } = useTranslation();
@@ -8,7 +9,7 @@ export function Contact() {
   return (
     <section id="contact" className="py-12 sm:py-16 lg:py-20">
       <div className="ft-container">
-        <div className="ft-card overflow-hidden">
+        <Reveal className="ft-card overflow-hidden">
           <div className="grid gap-8 p-6 sm:p-8 lg:grid-cols-2 lg:p-12">
             <div>
               <h2
@@ -70,7 +71,7 @@ export function Contact() {
               </div>
             </dl>
           </div>
-        </div>
+        </Reveal>
       </div>
     </section>
   );

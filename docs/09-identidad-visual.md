@@ -164,6 +164,71 @@ los botones quedan medio tapados por la barra del sistema.
 desplazamiento horizontal, que ningún elemento desborde y que todos los
 controles lleguen a 44 píxeles de alto.
 
+## Movimiento
+
+Las animaciones están para guiar la mirada, no para lucirse. Tres reglas
+gobiernan todas:
+
+### 1. Nada se mueve sin permiso
+
+Todo cuelga de la clase `ft-motion`, que el script de arranque añade **solo**
+si el sistema no pide reducir el movimiento. Para quien lo pidió —hay personas
+a las que el movimiento les provoca mareo— o si JavaScript falla, el contenido
+se ve **completo y quieto**, nunca invisible.
+
+Ese orden importa: las animaciones de entrada parten de opacidad cero, así que
+ese estado inicial solo puede aplicarse cuando hay permiso. Por eso la decisión
+se toma antes del primer pintado, en `public/theme-init.js`, y no dentro de un
+componente.
+
+Hay además una regla `@media (prefers-reduced-motion: reduce)` que anula
+duraciones globalmente, como cinturón de seguridad.
+
+### 2. Solo se animan `opacity` y `transform`
+
+Son las dos propiedades que el navegador compone sin recalcular el diseño de la
+página, así que no provocan tirones ni en móviles modestos. Nunca se anima
+`width`, `height`, `top` ni `margin`.
+
+### 3. Recorridos cortos y rápidos
+
+Entre 12 y 16 píxeles, y menos de medio segundo. Una animación que se nota es
+una animación que estorba.
+
+### Qué se anima
+
+| Elemento                    | Efecto                                            | Para qué                                                                                                |
+| --------------------------- | ------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| Portada                     | Entrada en cascada al cargar                      | Orden de lectura: distintivo, titular, texto, botones                                                   |
+| Tarjetas y secciones        | Aparición al entrar en pantalla, en cascada corta | Acompaña el desplazamiento sin que todo surja de golpe                                                  |
+| Tarjetas de servicio y zona | Elevación al pasar el ratón                       | Indica que son elementos con entidad propia                                                             |
+| Botones                     | Reducción al pulsar                               | Confirma el toque, sobre todo en móvil                                                                  |
+| Total del presupuesto       | Destello amarillo al cambiar                      | Sin él, el precio se actualiza en silencio y no queda claro si ya refleja lo que se acaba de tocar      |
+| Espera del cotizador        | Esqueleto en vez de texto                         | Muestra la forma del resultado; un "cargando" deja la columna vacía y el salto posterior resulta brusco |
+| Cabecera                    | Sombra al desplazar                               | Arriba del todo ensucia; al bajar separa la cabecera del contenido                                      |
+
+La cascada usa un retardo corto que se reinicia cada tres elementos: si creciera
+con cada tarjeta, las últimas tardarían demasiado en aparecer.
+
+### Cómo se verifica
+
+Un navegador real comprueba los tres escenarios y exige que **ningún elemento
+animado quede invisible** en ninguno:
+
+| Escenario            | Resultado                                                      |
+| -------------------- | -------------------------------------------------------------- |
+| Movimiento reducido  | Sin clase `ft-motion`, 27 elementos animados, **0 invisibles** |
+| Movimiento permitido | Con clase, tras recorrer la página, **0 invisibles**           |
+| Sin JavaScript       | Nada queda oculto por CSS                                      |
+
+> Aviso para quien repita la comprobación: con el desplazamiento suave activo,
+> un bucle de `scrollTo` redirige la animación anterior en cada paso y la página
+> nunca llega al final, de modo que la medición saldría mal sin que el sitio
+> tenga ningún problema. Hay que desplazarse con `behavior: 'instant'`.
+
+Coste de todo esto: **+0.7 kB** comprimidos en JavaScript y **+0.6 kB** en CSS.
+No se añadió ninguna librería de animación; una típica ronda los 50 kB.
+
 ## Cómo verificar el contraste al añadir pantallas
 
 El proyecto incluye una auditoría que mide los colores **realmente pintados por

@@ -1,5 +1,7 @@
 import { useTranslation } from 'react-i18next';
 
+import { Reveal } from '../components/Reveal';
+
 const QUESTIONS = ['q1', 'q2', 'q3', 'q4', 'q5', 'q6'] as const;
 
 /**
@@ -19,27 +21,29 @@ export function Faq() {
         </h2>
 
         <div className="mt-8 space-y-3">
-          {QUESTIONS.map((key) => (
-            <details key={key} className="ft-card group p-5">
-              <summary
-                className="cursor-pointer list-none font-semibold text-slate-900
+          {QUESTIONS.map((key, indice) => (
+            <Reveal key={key} delayMs={indice * 70}>
+              <details className="ft-card group p-5">
+                <summary
+                  className="cursor-pointer list-none font-semibold text-slate-900
                                   marker:content-none dark:text-white"
-              >
-                <span className="flex items-center justify-between gap-4">
-                  {t(`faq.${key}.q`)}
-                  <span
-                    className="text-brand-700 transition-transform group-open:rotate-45
+                >
+                  <span className="flex items-center justify-between gap-4">
+                    {t(`faq.${key}.q`)}
+                    <span
+                      className="text-brand-700 transition-transform group-open:rotate-45
                                    dark:text-brand-300"
-                    aria-hidden="true"
-                  >
-                    +
+                      aria-hidden="true"
+                    >
+                      +
+                    </span>
                   </span>
-                </span>
-              </summary>
-              <p className="mt-3 text-sm leading-relaxed text-slate-600 dark:text-slate-400">
-                {t(`faq.${key}.a`)}
-              </p>
-            </details>
+                </summary>
+                <p className="mt-3 text-sm leading-relaxed text-slate-600 dark:text-slate-400">
+                  {t(`faq.${key}.a`)}
+                </p>
+              </details>
+            </Reveal>
           ))}
         </div>
       </div>

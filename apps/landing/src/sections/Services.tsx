@@ -3,6 +3,7 @@ import type { Locale, ServiceType } from '@freshness/types';
 import { useCatalog } from '../hooks/useCatalog';
 import { formatCentsCompact } from '../lib/format';
 import { SunflowerIcon } from '../components/Icons';
+import { Reveal } from '../components/Reveal';
 
 const SERVICE_ORDER: ServiceType[] = [
   'STANDARD',
@@ -32,11 +33,18 @@ export function Services() {
         </p>
 
         <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {SERVICE_ORDER.map((code) => {
+          {SERVICE_ORDER.map((code, indice) => {
             const entry = catalog?.services.find((service) => service.code === code);
 
             return (
-              <article key={code} className="ft-card flex flex-col p-6">
+              <Reveal
+                as="article"
+                key={code}
+                // Cascada corta: si el retardo creciera con cada tarjeta, las
+                // ultimas tardarian demasiado en aparecer.
+                delayMs={(indice % 3) * 90}
+                className="ft-card ft-card-interactive flex flex-col p-6"
+              >
                 <span
                   className="w-fit rounded-xl bg-brand-50 p-2.5 text-brand-700
                                  dark:bg-night-700 dark:text-sun-400"
@@ -58,7 +66,7 @@ export function Services() {
                       ? `${t('services.startingAt')} ${formatCentsCompact(entry.minimumCents, locale)}`
                       : t('services.requiresVisit')}
                 </p>
-              </article>
+              </Reveal>
             );
           })}
         </div>
