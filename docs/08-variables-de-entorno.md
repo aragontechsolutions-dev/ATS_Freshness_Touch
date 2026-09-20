@@ -148,7 +148,9 @@ las sentencias preparadas que necesitan las migraciones de Prisma. La
 aplicación usa la agrupada (aguanta muchas conexiones cortas) y las migraciones
 la directa.
 
-Variables que tendrá la API en la Etapa 2 (aún no existen en el código):
+Variables de la API en la Etapa 2. `DIRECT_URL` ya se usa: es la que necesitan
+las migraciones (ver `docs/10-modelo-de-datos.md`). El resto entra cuando la
+aplicación se conecte a la base de datos.
 
 ```bash
 SUPABASE_URL=https://<ref>.supabase.co

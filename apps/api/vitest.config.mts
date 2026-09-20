@@ -4,11 +4,8 @@ export default defineConfig({
   test: {
     environment: 'node',
     include: ['src/**/*.test.ts'],
-  },
-  esbuild: {
-    // Nest usa decoradores "legacy"; los tests instancian las clases a mano,
-    // por eso no hace falta emitDecoratorMetadata.
-    target: 'es2023',
-    tsconfigRaw: { compilerOptions: { experimentalDecorators: true } },
+    // Las migraciones se prueban levantando un PostgreSQL en WebAssembly:
+    // la primera ejecucion tarda mas que un test normal.
+    testTimeout: 30_000,
   },
 });

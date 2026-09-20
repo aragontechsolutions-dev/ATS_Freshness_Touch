@@ -51,14 +51,29 @@ cuando aparecen clientes y reservas que sí hay que guardar.
 
 ---
 
-## Etapa 2 — Reservas y pagos (siguiente)
+## Etapa 2 — Reservas y pagos (en curso)
 
 **Objetivo:** convertir la cotización en una cita confirmada y cobrada.
 
-- Supabase: autenticación, base de datos (PostgreSQL) y almacenamiento.
-- Prisma con dos cadenas de conexión: agrupada para la aplicación y directa para
-  las migraciones.
-- Modelo de datos: clientes, direcciones, trabajos, citas, series recurrentes.
+Decisiones tomadas con la dirección:
+
+- **Reserva como invitado**, sin obligar a crear cuenta: cada paso extra en el
+  formulario pierde clientes. La cuenta se podrá añadir después.
+- **Tarjeta obligatoria al reservar** para retener el depósito de traslado, que
+  es justo para lo que se diseñó: protege a la empresa si el cliente cancela
+  con el equipo ya en camino.
+
+Progreso:
+
+- ✅ **Modelo de datos** (`docs/10-modelo-de-datos.md`): esquema completo de 11
+  tablas, migración inicial y prueba automática que la aplica sobre un
+  PostgreSQL real sin necesidad de servidor ni credenciales.
+- ⬜ Conexión de la aplicación a la base de datos.
+- ⬜ Reserva en línea: dirección completa, recálculo de distancia real,
+  franjas horarias y capacidad por zona.
+- ⬜ Autenticación y panel de administración.
+- ⬜ Stripe: retención del depósito y captura al finalizar.
+- ⬜ Avisos por correo y SMS.
 - Calendario de disponibilidad y reserva en línea.
 - **Stripe**: retención del depósito con `capture_method: 'manual'` al reservar y
   captura parcial al finalizar el trabajo. Verificación de firma en los webhooks.
