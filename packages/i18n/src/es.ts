@@ -1,0 +1,283 @@
+import type { TranslationResources } from './en';
+
+/**
+ * Textos en espanol. El tipo `TranslationResources` obliga a que existan
+ * exactamente las mismas claves que en ingles: si falta una, no compila.
+ *
+ * Ortografia: el texto de cara al cliente lleva tildes y signos de apertura
+ * (¿ ¡). Es contenido comercial y escribirlo mal resta credibilidad.
+ */
+export const es: TranslationResources = {
+  common: {
+    companyName: 'Freshness Touch',
+    tagline: 'Limpieza profesional en todo Georgia',
+    callUs: 'Llámanos',
+    emailUs: 'Escríbenos',
+    getQuote: 'Cotiza al instante',
+    bookNow: 'Reservar',
+    learnMore: 'Saber más',
+    loading: 'Calculando...',
+    from: 'desde',
+    perVisit: 'por visita',
+    optional: 'opcional',
+    language: 'Idioma',
+    theme: { light: 'Modo claro', dark: 'Modo oscuro' },
+  },
+
+  nav: {
+    services: 'Servicios',
+    quote: 'Cotización',
+    areas: 'Zonas de servicio',
+    whyUs: 'Por qué nosotros',
+    faq: 'Preguntas',
+    contact: 'Contacto',
+    menu: 'Menú',
+  },
+
+  hero: {
+    badge: 'Con licencia · Asegurados · Afianzados',
+    title: 'Una casa impecable, sin sorpresas en el precio',
+    subtitle:
+      'Obtén un precio real en menos de un minuto. Sin llamadas de vuelta, sin cargos ocultos y con un depósito de traslado transparente que se descuenta de tu factura final.',
+    primaryCta: 'Ver mi precio ahora',
+    secondaryCta: 'Ver servicios',
+    point1: 'Precios transparentes que ves antes de reservar',
+    point2: 'Personal con verificación de antecedentes',
+    point3: 'En Georgia los servicios de limpieza no pagan sales tax',
+  },
+
+  services: {
+    title: 'Servicios',
+    subtitle: 'Limpieza residencial y comercial adaptada a cómo vives y trabajas.',
+    startingAt: 'Desde',
+    requiresVisit: 'Requiere visita previa al inmueble',
+    STANDARD: {
+      name: 'Limpieza estándar',
+      description:
+        'Cocina, baños, pisos, polvo y superficies. Ideal como servicio recurrente semanal, quincenal o mensual.',
+    },
+    DEEP: {
+      name: 'Limpieza profunda',
+      description:
+        'Todo lo de la limpieza estándar más zócalos, rejillas de ventilación, fregado detallado y suciedad acumulada.',
+    },
+    MOVE_IN_OUT: {
+      name: 'Mudanza (entrada o salida)',
+      description:
+        'Limpieza de vivienda vacía para inquilinos, propietarios y compradores. Incluye interior de gabinetes, electrodomésticos y clósets.',
+    },
+    POST_CONSTRUCTION: {
+      name: 'Post-construcción',
+      description:
+        'Retiro de polvo fino, escombros y trabajo de detalle tras una remodelación u obra nueva.',
+    },
+    AIRBNB_TURNOVER: {
+      name: 'Rotación Airbnb',
+      description:
+        'Preparación rápida entre huéspedes con lista de verificación, ropa de cama y reposición bajo pedido.',
+    },
+    COMMERCIAL: {
+      name: 'Comercial y oficinas',
+      description:
+        'Oficinas, clínicas y locales. Se cotiza tras una visita para ajustar el alcance y el horario a tus instalaciones.',
+    },
+  },
+
+  addOns: {
+    title: 'Extras',
+    INSIDE_FRIDGE: 'Interior del refrigerador',
+    INSIDE_OVEN: 'Interior del horno',
+    INSIDE_CABINETS: 'Interior de gabinetes de cocina',
+    INTERIOR_WINDOWS: 'Ventanas por dentro',
+    LAUNDRY: 'Cargas de lavandería',
+    BASEMENT: 'Sótano',
+    GARAGE: 'Garaje',
+    PET_HAIR: 'Exceso de pelo de mascotas',
+    PATIO: 'Balcón o patio',
+    BED_LINENS: 'Cambio de ropa de cama',
+  },
+
+  frequency: {
+    title: '¿Con qué frecuencia?',
+    ONE_TIME: 'Una vez',
+    WEEKLY: 'Semanal',
+    BIWEEKLY: 'Cada 2 semanas',
+    MONTHLY: 'Mensual',
+    savePercent: 'Ahorra {{percent}}%',
+  },
+
+  calculator: {
+    title: 'Cotización instantánea',
+    subtitle: 'Responde cinco preguntas y ve tu precio. Sin registro y sin llamadas.',
+    serviceLabel: '¿Qué necesitas?',
+    bedroomsLabel: 'Habitaciones',
+    bathroomsLabel: 'Baños',
+    squareFeetLabel: 'Pies cuadrados aproximados',
+    postalCodeLabel: 'Código postal',
+    postalCodeHelp:
+      'Solo necesitamos tu código postal para estimar el traslado. No pedimos tu dirección.',
+    postalCodePlaceholder: '30303',
+    addOnsLabel: '¿Algo adicional?',
+    quantityLabel: 'Cant.',
+    submit: 'Calcular mi precio',
+    recalculate: 'Actualizar precio',
+    yourEstimate: 'Tu estimado',
+    estimatedTotal: 'Total estimado',
+    travelDeposit: 'Depósito de traslado (retenido, no cobrado)',
+    dueAtService: 'Saldo a pagar el día del servicio',
+    distanceSummary: 'A unas {{miles}} millas de nuestra base — zona {{zone}}',
+    breakdown: 'Desglose del precio',
+    validUntil: 'Válido hasta {{date}}',
+    noTax: 'Impuesto sobre ventas: $0.00 (exento en Georgia)',
+    manualReviewTitle: 'Este caso necesita revisión',
+    manualReviewBody:
+      'Cuéntanos un poco más y un miembro de nuestro equipo te enviará una propuesta personalizada.',
+    requestCallback: 'Solicitar propuesta personalizada',
+    errorTitle: 'No pudimos calcular tu precio',
+    errorGeneric: 'Ocurrió un problema de nuestro lado. Inténtalo de nuevo o llámanos.',
+    errorNetwork:
+      'No pudimos contactar el servicio de precios. Revisa tu conexión e inténtalo otra vez.',
+    errorValidation: 'Revisa los campos marcados.',
+    errorPostalCode: 'Ingresa un código postal válido de 5 dígitos.',
+    errorRateLimited:
+      'Demasiadas cotizaciones en poco tiempo. Espera un momento e inténtalo de nuevo.',
+  },
+
+  quote: {
+    line: {
+      service: {
+        STANDARD:
+          'Limpieza estándar · {{bedrooms}} hab / {{bathrooms}} baños · {{squareFeet}} pies²',
+        DEEP: 'Limpieza profunda · {{bedrooms}} hab / {{bathrooms}} baños · {{squareFeet}} pies²',
+        MOVE_IN_OUT: 'Mudanza · {{bedrooms}} hab / {{bathrooms}} baños · {{squareFeet}} pies²',
+        POST_CONSTRUCTION:
+          'Post-construcción · {{bedrooms}} hab / {{bathrooms}} baños · {{squareFeet}} pies²',
+        AIRBNB_TURNOVER:
+          'Rotación Airbnb · {{bedrooms}} hab / {{bathrooms}} baños · {{squareFeet}} pies²',
+        COMMERCIAL: 'Limpieza comercial',
+      },
+      addOn: {
+        INSIDE_FRIDGE: 'Interior del refrigerador',
+        INSIDE_OVEN: 'Interior del horno',
+        INSIDE_CABINETS: 'Interior de gabinetes de cocina',
+        INTERIOR_WINDOWS: 'Ventanas por dentro (x{{quantity}})',
+        LAUNDRY: 'Lavandería ({{quantity}} cargas)',
+        BASEMENT: 'Sótano',
+        GARAGE: 'Garaje',
+        PET_HAIR: 'Exceso de pelo de mascotas',
+        PATIO: 'Balcón o patio',
+        BED_LINENS: 'Ropa de cama (x{{quantity}})',
+      },
+      discount: {
+        ONE_TIME: 'Descuento',
+        WEEKLY: 'Descuento por servicio semanal ({{percent}}%)',
+        BIWEEKLY: 'Descuento por servicio quincenal ({{percent}}%)',
+        MONTHLY: 'Descuento por servicio mensual ({{percent}}%)',
+      },
+      minimumAdjustment: 'Mínimo del servicio (${{minimum}})',
+      zoneSurcharge: 'Recargo por traslado · zona {{zone}} ({{miles}} millas)',
+      salesTax: 'Impuesto sobre ventas ({{percent}}%)',
+    },
+    disclaimer: {
+      estimate:
+        'Este es un estimado basado en la información que nos diste. El precio final se confirma en el lugar antes de comenzar.',
+      deposit:
+        'El depósito de traslado se autoriza en tu tarjeta al reservar y se acredita íntegramente contra tu factura final. Solo se cobra si cancelas cuando nuestro equipo ya va en camino.',
+      taxExempt:
+        'Los servicios de limpieza están exentos del impuesto sobre ventas en el estado de Georgia.',
+      validity: 'Esta cotización es válida por 7 días.',
+      distanceEstimated:
+        'La distancia se estima desde tu código postal y se confirma cuando tengamos la dirección completa.',
+    },
+    review: {
+      commercialWalkthrough:
+        'Los trabajos comerciales se cotizan tras una visita gratuita para ajustar el alcance a tus instalaciones.',
+      outOfServiceArea:
+        'Este código postal está fuera de nuestra zona habitual. Aun así podríamos ayudarte: consúltanos.',
+      outOfState: 'Por ahora operamos únicamente en el estado de Georgia.',
+      largeProperty:
+        'Las propiedades grandes se cotizan de forma individual para que el estimado sea preciso.',
+    },
+    tax: {
+      gaExempt: 'Exento — los servicios de limpieza no pagan impuesto en Georgia',
+    },
+  },
+
+  whyUs: {
+    title: '¿Por qué Freshness Touch?',
+    insured: {
+      title: 'Asegurados y afianzados',
+      body: 'Póliza de responsabilidad civil y fianza de limpieza que protegen tu hogar y tus bienes.',
+    },
+    vetted: {
+      title: 'Equipo verificado',
+      body: 'Cada persona del equipo pasa verificación de antecedentes penales e identidad antes de su primer trabajo.',
+    },
+    transparent: {
+      title: 'Precios transparentes',
+      body: 'Ves el desglose completo antes de reservar: servicio, extras, traslado y depósito.',
+    },
+    guarantee: {
+      title: 'Garantía de repaso',
+      body: '¿Algo no quedó bien? Avísanos dentro de 24 horas y volvemos a corregirlo.',
+    },
+  },
+
+  areas: {
+    title: 'Zonas de servicio',
+    subtitle:
+      'Trabajamos por zonas para reducir el tiempo de traslado y mantener tu precio justo. Ingresa tu código postal en el cotizador para ver tu zona.',
+    zoneLabel: 'Zona {{zone}}',
+    upToMiles: 'Hasta {{miles}} millas desde nuestra base',
+    beyondMiles: 'Más allá de {{miles}} millas',
+    noSurcharge: 'Sin recargo por traslado',
+    surcharge: 'Recargo por traslado de {{amount}}',
+    outOfRange: 'Fuera de nuestra zona habitual — contáctanos para una propuesta personalizada',
+  },
+
+  faq: {
+    title: 'Preguntas frecuentes',
+    q1: {
+      q: '¿Tengo que pagar impuesto sobre ventas?',
+      a: 'No. En Georgia los servicios de limpieza están exentos del sales tax, así que el precio que ves es el que pagas.',
+    },
+    q2: {
+      q: '¿Qué es exactamente el depósito de traslado?',
+      a: 'Es una retención reembolsable calculada según la distancia entre tu casa y nuestra base. Se autoriza en tu tarjeta al reservar, se descuenta de la factura final y solo se cobra si cancelas cuando el equipo ya va en camino.',
+    },
+    q3: {
+      q: '¿Debo estar en casa durante la limpieza?',
+      a: 'No. Muchos clientes dejan instrucciones de acceso al reservar. Tú decides qué te resulta más cómodo.',
+    },
+    q4: {
+      q: '¿Llevan sus propios productos?',
+      a: 'Sí, el equipo llega con equipo y productos profesionales. Si prefieres que usemos los tuyos, solo avísanos.',
+    },
+    q5: {
+      q: '¿Debo dejar propina?',
+      a: 'La propina nunca es obligatoria. Es común dejar entre 15% y 20% en limpiezas puntuales, profundas o de mudanza; en servicios recurrentes muchos clientes prefieren un bono de fin de año.',
+    },
+    q6: {
+      q: '¿Cómo reprogramo o cancelo?',
+      a: 'Contáctanos al menos 24 horas antes de tu cita y la movemos sin costo.',
+    },
+  },
+
+  contact: {
+    title: 'Cuando tú digas',
+    subtitle: 'Obtén tu precio en línea o habla con una persona: como prefieras.',
+    phone: 'Teléfono',
+    email: 'Correo',
+    hours: 'Horario',
+    hoursValue: 'Lunes a sábado, 8:00 AM - 6:00 PM',
+    serviceArea: 'Con base en {{city}}, {{state}}',
+  },
+
+  footer: {
+    rights: 'Todos los derechos reservados.',
+    legalNote:
+      'Los precios mostrados son estimados y se confirman antes de iniciar cualquier trabajo.',
+    privacy: 'Privacidad',
+    terms: 'Términos',
+  },
+};

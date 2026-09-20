@@ -1,0 +1,98 @@
+@import 'tailwindcss';
+
+/*
+ * Modo oscuro por clase (no por media query) para que el usuario pueda
+ * elegirlo explicitamente. El script de index.html aplica la clase antes
+ * del primer pintado para que no haya parpadeo.
+ */
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  /* Paleta de marca: verde azulado "limpio y fresco". */
+  --color-brand-50: #f0fdfa;
+  --color-brand-100: #ccfbf1;
+  --color-brand-200: #99f6e4;
+  --color-brand-300: #5eead4;
+  --color-brand-400: #2dd4bf;
+  --color-brand-500: #14b8a6;
+  --color-brand-600: #0d9488;
+  --color-brand-700: #0f766e;
+  --color-brand-800: #115e59;
+  --color-brand-900: #134e4a;
+  --color-brand-950: #042f2e;
+
+  /*
+   * Tipografia del sistema: sin fuentes externas. Evita una peticion a un
+   * tercero (privacidad del visitante), acelera la carga y simplifica la CSP.
+   */
+  --font-sans:
+    ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
+    'Noto Sans', sans-serif;
+}
+
+@layer base {
+  html {
+    scroll-padding-top: 5rem; /* para que el header fijo no tape los anclajes */
+  }
+
+  body {
+    @apply bg-white text-slate-800 antialiased;
+  }
+
+  .dark body {
+    @apply bg-slate-950 text-slate-200;
+  }
+
+  /* Foco visible y consistente: requisito de accesibilidad. */
+  :focus-visible {
+    @apply outline-2 outline-offset-2 outline-brand-600;
+  }
+}
+
+@layer components {
+  .ft-container {
+    @apply mx-auto w-full max-w-6xl px-4 sm:px-6 lg:px-8;
+  }
+
+  .ft-card {
+    @apply rounded-2xl border border-slate-200 bg-white shadow-sm;
+  }
+
+  .dark .ft-card {
+    @apply border-slate-800 bg-slate-900;
+  }
+
+  .ft-input {
+    @apply w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900
+           shadow-sm transition-colors placeholder:text-slate-400
+           focus:border-brand-600 focus:ring-2 focus:ring-brand-600/30 focus:outline-none;
+  }
+
+  .dark .ft-input {
+    @apply border-slate-700 bg-slate-950 text-slate-100 placeholder:text-slate-500;
+  }
+
+  .ft-label {
+    @apply mb-1.5 block text-sm font-medium text-slate-700;
+  }
+
+  .dark .ft-label {
+    @apply text-slate-300;
+  }
+
+  .ft-btn-primary {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg bg-brand-700 px-5 py-3
+           text-sm font-semibold text-white transition-colors hover:bg-brand-800
+           disabled:cursor-not-allowed disabled:opacity-60;
+  }
+
+  .ft-btn-secondary {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg border border-slate-300
+           bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition-colors
+           hover:bg-slate-50;
+  }
+
+  .dark .ft-btn-secondary {
+    @apply border-slate-700 bg-slate-900 text-slate-200 hover:bg-slate-800;
+  }
+}

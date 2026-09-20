@@ -1,0 +1,27 @@
+# Dependencias
+node_modules/
+.pnpm-store/
+
+# Builds
+dist/
+build/
+.turbo/
+*.tsbuildinfo
+
+# Entorno (NUNCA subir secretos al repositorio)
+.env
+.env.*
+!.env.example
+
+# Logs y cobertura
+logs/
+*.log
+npm-debug.log*
+pnpm-debug.log*
+coverage/
+
+# Editores / SO
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json
