@@ -2,6 +2,9 @@
 node_modules/
 .pnpm-store/
 
+# Cliente de Prisma generado: se regenera con "pnpm db:generate"
+apps/api/src/generated/
+
 # Builds
 dist/
 build/

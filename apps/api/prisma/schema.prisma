@@ -1,0 +1,535 @@
+// ===========================================================================
+// MODELO DE DATOS DE FRESHNESS TOUCH
+// ===========================================================================
+// Reglas que se respetan en todo el esquema:
+//
+// 1. DINERO EN CENTAVOS ENTEROS. Ningun importe es decimal. Los campos
+//    terminan en "Cents" para que sea imposible confundirse.
+//
+// 2. FOTOGRAFIA DEL PRECIO, NO REFERENCIA. Una reserva guarda el precio que
+//    se pacto, no un enlace a la tarifa vigente. Si manana suben los precios,
+//    las reservas de ayer deben seguir mostrando lo que el cliente acepto.
+//    Por eso se guarda tambien `pricingVersion`: permite reproducir el calculo.
+//
+// 3. FECHAS CON ZONA HORARIA (timestamptz). La empresa opera en Georgia
+//    (America/New_York) pero el horario de verano cambia dos veces al ano:
+//    guardar la hora sin zona provocaria citas desplazadas una hora.
+//
+// 4. RESERVA COMO INVITADO. Un cliente existe sin cuenta de usuario. El campo
+//    `authUserId` se rellena solo si mas adelante crea contrasena.
+//
+// 5. BORRADO CONTROLADO. Los datos de un cliente no se borran en cascada por
+//    accidente: las relaciones con historial usan Restrict.
+// ===========================================================================
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  // En Prisma 7 las cadenas de conexion NO van en el esquema:
+  //   - Las migraciones toman la suya de `prisma.config.ts` (conexion directa,
+  //     puerto 5432, porque el agrupador en modo transaccion no admite las
+  //     sentencias preparadas que necesita Prisma Migrate).
+  //   - La aplicacion usa un adaptador con la conexion agrupada (puerto 6543).
+  // Mucha documentacion antigua todavia muestra `url` aqui: ya no es valido.
+}
+
+// ---------------------------------------------------------------------------
+// Enumeraciones
+// ---------------------------------------------------------------------------
+
+/// Debe mantenerse en paralelo con ServiceTypeSchema de @freshness/types.
+enum ServiceType {
+  STANDARD
+  DEEP
+  MOVE_IN_OUT
+  POST_CONSTRUCTION
+  AIRBNB_TURNOVER
+  COMMERCIAL
+}
+
+enum Frequency {
+  ONE_TIME
+  WEEKLY
+  BIWEEKLY
+  MONTHLY
+}
+
+enum ServiceZone {
+  A
+  B
+  C
+  D
+  OUT_OF_RANGE
+}
+
+enum Locale {
+  en
+  es
+}
+
+/// De donde salio la cotizacion. Permite medir que canal convierte.
+enum QuoteSource {
+  WEB
+  ADMIN
+  PHONE
+}
+
+enum BookingStatus {
+  /// Creada pero sin deposito retenido todavia. No ocupa agenda en firme.
+  PENDING_PAYMENT
+  /// Deposito retenido y cita confirmada.
+  CONFIRMED
+  /// El equipo esta en el domicilio.
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+  /// El cliente no estaba y no se pudo acceder.
+  NO_SHOW
+}
+
+enum CancelledBy {
+  CUSTOMER
+  COMPANY
+  SYSTEM
+}
+
+enum SeriesStatus {
+  ACTIVE
+  PAUSED
+  ENDED
+}
+
+enum PaymentKind {
+  /// Retencion del deposito por desplazamiento (autorizacion, no cobro).
+  DEPOSIT_HOLD
+  /// Cobro del importe final del servicio.
+  FINAL_CHARGE
+  TIP
+  REFUND
+}
+
+enum PaymentStatus {
+  REQUIRES_PAYMENT_METHOD
+  REQUIRES_CONFIRMATION
+  /// Autorizado y a la espera de captura: el estado del deposito retenido.
+  REQUIRES_CAPTURE
+  SUCCEEDED
+  CANCELED
+  FAILED
+}
+
+enum StaffRole {
+  ADMIN
+  DISPATCHER
+  CLEANER
+}
+
+enum ActorType {
+  SYSTEM
+  STAFF
+  CUSTOMER
+}
+
+// ---------------------------------------------------------------------------
+// Clientes y direcciones
+// ---------------------------------------------------------------------------
+
+model Customer {
+  id String @id @default(uuid()) @db.Uuid
+
+  /// Identificador del usuario en Supabase Auth. Nulo mientras el cliente
+  /// sea invitado: reservar no exige crear cuenta.
+  authUserId String? @unique
+
+  email     String  @unique
+  firstName String
+  lastName  String
+  phone     String
+  locale    Locale  @default(en)
+
+  /// Consentimiento explicito para comunicaciones comerciales. Separado del
+  /// correo transaccional, que no necesita consentimiento.
+  marketingOptIn Boolean @default(false)
+
+  /// Notas internas del equipo. Nunca se muestran al cliente.
+  internalNotes String?
+
+  addresses  Address[]
+  quotes     Quote[]
+  bookings   Booking[]
+  series     RecurringSeries[]
+  createdAt  DateTime          @default(now()) @db.Timestamptz(3)
+  updatedAt  DateTime          @updatedAt @db.Timestamptz(3)
+
+  @@index([createdAt])
+  @@map("customers")
+}
+
+model Address {
+  id         String   @id @default(uuid()) @db.Uuid
+  customerId String   @db.Uuid
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  line1      String
+  line2      String?
+  city       String
+  state      String  @default("GA") @db.Char(2)
+  postalCode String  @db.VarChar(10)
+
+  /// Instrucciones de acceso: codigos de puerta, ubicacion de la llave, perro
+  /// en el jardin. DATO SENSIBLE: solo debe ser visible para el equipo
+  /// asignado al trabajo y para administracion, nunca en listados generales.
+  accessNotes String?
+
+  /// Ultima distancia calculada desde la base de operaciones. Se guarda para
+  /// no repetir la consulta al proveedor (que se paga por uso) en cada visita.
+  distanceMiles      Float?
+  zone               ServiceZone?
+  distanceProvider   String?
+  distanceComputedAt DateTime?    @db.Timestamptz(3)
+
+  isPrimary Boolean @default(false)
+
+  bookings  Booking[]
+  series    RecurringSeries[]
+  createdAt DateTime          @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime          @updatedAt @db.Timestamptz(3)
+
+  @@index([customerId])
+  @@index([postalCode])
+  @@map("addresses")
+}
+
+// ---------------------------------------------------------------------------
+// Cotizaciones
+// ---------------------------------------------------------------------------
+
+/// Cotizacion emitida. Hasta la Etapa 1 no se guardaba ninguna; ahora se
+/// conserva para poder medir cuantas terminan en reserva y para recuperar a
+/// quien cotizo y no reservo.
+model Quote {
+  id String @id @default(uuid()) @db.Uuid
+
+  /// Nulo cuando alguien cotiza sin dejar sus datos: en el cotizador publico
+  /// solo se pide el codigo postal.
+  customerId String?   @db.Uuid
+  customer   Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+
+  source QuoteSource @default(WEB)
+  locale Locale      @default(en)
+
+  // --- Entrada ---
+  service     ServiceType
+  frequency   Frequency
+  bedrooms    Int
+  bathrooms   Int
+  squareFeet  Int
+  /// Extras solicitados: [{ code, quantity }].
+  addOns      Json        @default("[]")
+  postalCode  String      @db.VarChar(10)
+  state       String      @default("GA") @db.Char(2)
+
+  // --- Resultado (fotografia del calculo) ---
+  distanceMiles Float
+  zone          ServiceZone
+  /// Desglose completo de lineas tal y como se le mostro al cliente.
+  lines         Json
+  serviceCents    Int
+  addOnsCents     Int
+  surchargesCents Int
+  discountCents   Int
+  taxCents        Int
+  totalCents      Int
+  depositCents    Int
+  currency        String @default("USD") @db.Char(3)
+
+  /// Version de la configuracion de precios usada. Sin esto, un presupuesto
+  /// antiguo no se puede reproducir despues de cambiar las tarifas.
+  pricingVersion String
+
+  manualReviewReasons Json @default("[]")
+
+  expiresAt DateTime @db.Timestamptz(3)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+
+  booking Booking?
+
+  @@index([customerId])
+  @@index([createdAt])
+  @@index([postalCode])
+  @@map("quotes")
+}
+
+// ---------------------------------------------------------------------------
+// Reservas
+// ---------------------------------------------------------------------------
+
+model Booking {
+  id String @id @default(uuid()) @db.Uuid
+
+  /// Referencia legible para hablar con el cliente por telefono: FT-2026-0001.
+  reference String @unique @db.VarChar(20)
+
+  customerId String   @db.Uuid
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Restrict)
+
+  addressId String  @db.Uuid
+  address   Address @relation(fields: [addressId], references: [id], onDelete: Restrict)
+
+  /// Cotizacion de origen, si la reserva vino del cotizador publico.
+  quoteId String? @unique @db.Uuid
+  quote   Quote?  @relation(fields: [quoteId], references: [id], onDelete: SetNull)
+
+  seriesId String?          @db.Uuid
+  series   RecurringSeries? @relation(fields: [seriesId], references: [id], onDelete: SetNull)
+
+  status BookingStatus @default(PENDING_PAYMENT)
+
+  // --- Fotografia del servicio contratado ---
+  service    ServiceType
+  frequency  Frequency
+  bedrooms   Int
+  bathrooms  Int
+  squareFeet Int
+  addOns     Json        @default("[]")
+
+  // --- Agenda ---
+  scheduledStart DateTime @db.Timestamptz(3)
+  scheduledEnd   DateTime @db.Timestamptz(3)
+  /// Zona horaria con la que se mostro la cita al cliente.
+  timezone       String   @default("America/New_York")
+
+  // --- Fotografia del precio pactado ---
+  distanceMiles   Float
+  zone            ServiceZone
+  lines           Json
+  serviceCents    Int
+  addOnsCents     Int
+  surchargesCents Int
+  discountCents   Int
+  taxCents        Int
+  totalCents      Int
+  depositCents    Int
+  /// Total menos deposito: lo que queda por cobrar el dia del servicio.
+  balanceDueCents Int
+  currency        String @default("USD") @db.Char(3)
+  pricingVersion  String
+
+  /// Indicaciones que deja el cliente al reservar.
+  customerNotes String?
+
+  // --- Cierre ---
+  startedAt          DateTime?    @db.Timestamptz(3)
+  completedAt        DateTime?    @db.Timestamptz(3)
+  cancelledAt        DateTime?    @db.Timestamptz(3)
+  cancelledBy        CancelledBy?
+  cancellationReason String?
+
+  payments    Payment[]
+  assignments BookingAssignment[]
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  /// La agenda se consulta casi siempre por fecha y estado.
+  @@index([scheduledStart, status])
+  @@index([customerId])
+  @@index([status])
+  @@index([zone, scheduledStart])
+  @@map("bookings")
+}
+
+/// Serie recurrente. Es un objeto de primer nivel y no una copia de citas
+/// sueltas: asi se puede pausar, reprogramar o cambiar el precio de toda la
+/// serie de una vez, que es como lo pide el negocio.
+model RecurringSeries {
+  id String @id @default(uuid()) @db.Uuid
+
+  customerId String   @db.Uuid
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Restrict)
+
+  addressId String  @db.Uuid
+  address   Address @relation(fields: [addressId], references: [id], onDelete: Restrict)
+
+  status    SeriesStatus @default(ACTIVE)
+  frequency Frequency
+
+  service    ServiceType
+  bedrooms   Int
+  bathrooms  Int
+  squareFeet Int
+  addOns     Json        @default("[]")
+
+  /// 0 = domingo ... 6 = sabado, en la zona horaria de la empresa.
+  dayOfWeek  Int
+  /// Hora local de inicio en formato HH:MM.
+  startTime  String @db.VarChar(5)
+  durationMinutes Int
+
+  startDate DateTime  @db.Date
+  endDate   DateTime? @db.Date
+
+  bookings  Booking[]
+  createdAt DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime  @updatedAt @db.Timestamptz(3)
+
+  @@index([customerId])
+  @@index([status])
+  @@map("recurring_series")
+}
+
+// ---------------------------------------------------------------------------
+// Pagos
+// ---------------------------------------------------------------------------
+
+/// Reflejo local de cada movimiento en Stripe. Stripe es la fuente de verdad
+/// del dinero; esta tabla existe para poder consultar el estado sin llamar a
+/// su API y para conciliar.
+model Payment {
+  id String @id @default(uuid()) @db.Uuid
+
+  bookingId String  @db.Uuid
+  booking   Booking @relation(fields: [bookingId], references: [id], onDelete: Restrict)
+
+  kind   PaymentKind
+  status PaymentStatus
+
+  stripePaymentIntentId String  @unique
+  stripeCustomerId      String?
+  /// Ultimos cuatro digitos y marca, solo para mostrarlos. NUNCA se guarda
+  /// el numero de tarjeta: lo custodia Stripe.
+  cardBrand             String?
+  cardLast4             String? @db.VarChar(4)
+
+  amountAuthorizedCents Int
+  amountCapturedCents   Int @default(0)
+  amountRefundedCents   Int @default(0)
+  currency              String @default("USD") @db.Char(3)
+
+  authorizedAt DateTime? @db.Timestamptz(3)
+  capturedAt   DateTime? @db.Timestamptz(3)
+  canceledAt   DateTime? @db.Timestamptz(3)
+  /// Una retencion caduca a los 7 dias: pasada esa fecha ya no se puede
+  /// capturar y hay que volver a pedir la tarjeta.
+  expiresAt    DateTime? @db.Timestamptz(3)
+
+  /// Ultimo error devuelto por Stripe, para soporte.
+  lastErrorCode    String?
+  lastErrorMessage String?
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  @@index([bookingId])
+  @@index([status])
+  @@map("payments")
+}
+
+/// Registro de eventos recibidos de Stripe.
+///
+/// Stripe reenvia el mismo evento si no responde un 2xx a tiempo. Sin esta
+/// tabla, un reintento podria capturar dos veces el mismo deposito. La clave
+/// primaria es el identificador del evento: procesarlo dos veces es imposible.
+model WebhookEvent {
+  /// Identificador del evento en Stripe (evt_...).
+  id String @id
+
+  provider    String   @default("stripe")
+  type        String
+  receivedAt  DateTime @default(now()) @db.Timestamptz(3)
+  processedAt DateTime? @db.Timestamptz(3)
+  /// Mensaje de error si el procesamiento fallo, para poder reintentar a mano.
+  failureReason String?
+  payload     Json
+
+  @@index([type])
+  @@index([processedAt])
+  @@map("webhook_events")
+}
+
+// ---------------------------------------------------------------------------
+// Personal
+// ---------------------------------------------------------------------------
+
+/// Personal de la empresa. El modulo completo de recursos humanos (nominas,
+/// seguro de accidentes) llega en la Etapa 4; aqui solo lo imprescindible
+/// para asignar trabajos.
+model Staff {
+  id String @id @default(uuid()) @db.Uuid
+
+  /// Usuario de Supabase Auth con el que inicia sesion.
+  authUserId String? @unique
+
+  firstName String
+  lastName  String
+  email     String    @unique
+  phone     String?
+  role      StaffRole @default(CLEANER)
+  isActive  Boolean   @default(true)
+
+  assignments BookingAssignment[]
+  createdAt   DateTime            @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime            @updatedAt @db.Timestamptz(3)
+
+  @@index([isActive])
+  @@map("staff")
+}
+
+model BookingAssignment {
+  bookingId String  @db.Uuid
+  booking   Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  staffId String @db.Uuid
+  staff   Staff  @relation(fields: [staffId], references: [id], onDelete: Restrict)
+
+  /// Persona responsable del trabajo frente al resto del equipo.
+  isLead     Boolean  @default(false)
+  assignedAt DateTime @default(now()) @db.Timestamptz(3)
+
+  @@id([bookingId, staffId])
+  @@index([staffId])
+  @@map("booking_assignments")
+}
+
+// ---------------------------------------------------------------------------
+// Configuracion y auditoria
+// ---------------------------------------------------------------------------
+
+/// Configuracion editable desde el panel de administracion: telefono, correo,
+/// horarios y textos del sitio. Existe para que la empresa no dependa del
+/// equipo tecnico para cambiar un dato de contacto.
+model BusinessSetting {
+  key       String   @id @db.VarChar(80)
+  value     Json
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+  updatedBy String?  @db.Uuid
+
+  @@map("business_settings")
+}
+
+/// Rastro de quien hizo que. Imprescindible cuando se pueden cambiar precios
+/// y cancelar cobros desde un panel.
+model AuditLog {
+  id String @id @default(uuid()) @db.Uuid
+
+  actorType ActorType
+  actorId   String?   @db.Uuid
+  action    String    @db.VarChar(80)
+
+  entityType String  @db.VarChar(40)
+  entityId   String?
+
+  metadata Json?
+  /// Direccion IP de origen, util para investigar accesos indebidos.
+  ipAddress String? @db.Inet
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+
+  @@index([entityType, entityId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
