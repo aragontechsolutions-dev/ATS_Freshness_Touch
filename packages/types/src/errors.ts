@@ -11,8 +11,12 @@ export const ApiErrorSchema = z.strictObject({
   code: z.string(),
   /** Clave i18n para mostrar un mensaje al usuario final. */
   messageKey: z.string(),
-  /** Detalle por campo, solo en errores de validacion. */
-  fields: z.array(z.strictObject({ path: z.string(), messageKey: z.string() })).optional(),
+  /**
+   * Detalle por campo, solo en errores de validacion.
+   * `message` es texto tecnico para depuracion: la interfaz muestra al usuario
+   * el `messageKey` general y resalta los campos indicados en `path`.
+   */
+  fields: z.array(z.strictObject({ path: z.string(), message: z.string() })).optional(),
   requestId: z.string().optional(),
 });
 export type ApiError = z.infer<typeof ApiErrorSchema>;
