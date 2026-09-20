@@ -52,7 +52,30 @@ export interface DepositRule {
   maxCents: number;
 }
 
+/**
+ * Cuanto se tarda en hacer el trabajo. Es una estimacion de tiempo REAL en el
+ * domicilio para un equipo estandar, y sirve para dos cosas: decidir que
+ * huecos caben en la agenda y no prometer al cliente una hora imposible.
+ *
+ * Estas cifras deben ajustarse con datos reales: el sector recomienda medir
+ * los tiempos durante 4-6 semanas y usar la media movil.
+ */
+export interface DurationRate {
+  baseMinutes: number;
+  perBedroomMinutes: number;
+  perBathroomMinutes: number;
+  minutesPerSquareFoot: number;
+}
+
 export interface PricingConfig {
+  /**
+   * Version de esta tabla de tarifas. Se guarda en cada cotizacion y en cada
+   * reserva: sin ella, un presupuesto de hace tres meses no se puede
+   * reproducir despues de cambiar los precios.
+   *
+   * Hay que subirla CADA VEZ que se toque un importe de este archivo.
+   */
+  version: string;
   currency: 'USD';
   baseOfOperations: { city: string; state: string; postalCode: string };
   services: Record<ServiceType, ServiceRate>;
@@ -65,6 +88,15 @@ export interface PricingConfig {
   taxRatePercent: number;
   taxExempt: boolean;
   taxReasonKey: string;
+  /** Duracion estimada del trabajo, por servicio. */
+  durations: Record<ServiceType, DurationRate>;
+  /** Minutos que suma cada extra al trabajo. */
+  addOnMinutes: Record<AddOnCode, number>;
+  /** La duracion se redondea hacia arriba a este multiplo, para cuadrar agenda. */
+  durationRoundingMinutes: number;
+  durationMinMinutes: number;
+  durationMaxMinutes: number;
+
   /** Dias de validez del presupuesto. */
   validityDays: number;
   /** Por encima de estos pies cuadrados se exige revision humana. */
@@ -78,6 +110,7 @@ export interface PricingConfig {
 }
 
 export const defaultPricingConfig: PricingConfig = {
+  version: '2026.09.1',
   currency: 'USD',
   baseOfOperations: { city: 'Atlanta', state: 'GA', postalCode: '30303' },
 
@@ -172,6 +205,63 @@ export const defaultPricingConfig: PricingConfig = {
     minCents: 3000,
     maxCents: 12000,
   },
+
+  durations: {
+    STANDARD: {
+      baseMinutes: 45,
+      perBedroomMinutes: 15,
+      perBathroomMinutes: 20,
+      minutesPerSquareFoot: 0.02,
+    },
+    DEEP: {
+      baseMinutes: 75,
+      perBedroomMinutes: 25,
+      perBathroomMinutes: 35,
+      minutesPerSquareFoot: 0.035,
+    },
+    MOVE_IN_OUT: {
+      baseMinutes: 90,
+      perBedroomMinutes: 30,
+      perBathroomMinutes: 40,
+      minutesPerSquareFoot: 0.04,
+    },
+    POST_CONSTRUCTION: {
+      baseMinutes: 120,
+      perBedroomMinutes: 35,
+      perBathroomMinutes: 45,
+      minutesPerSquareFoot: 0.05,
+    },
+    AIRBNB_TURNOVER: {
+      baseMinutes: 30,
+      perBedroomMinutes: 12,
+      perBathroomMinutes: 18,
+      minutesPerSquareFoot: 0.015,
+    },
+    COMMERCIAL: {
+      baseMinutes: 0,
+      perBedroomMinutes: 0,
+      perBathroomMinutes: 0,
+      minutesPerSquareFoot: 0,
+    },
+  },
+
+  addOnMinutes: {
+    INSIDE_FRIDGE: 20,
+    INSIDE_OVEN: 25,
+    INSIDE_CABINETS: 30,
+    INTERIOR_WINDOWS: 5,
+    LAUNDRY: 15,
+    BASEMENT: 30,
+    GARAGE: 30,
+    PET_HAIR: 20,
+    PATIO: 15,
+    BED_LINENS: 8,
+  },
+
+  durationRoundingMinutes: 30,
+  durationMinMinutes: 60,
+  /** Diez horas: por encima de eso el trabajo se reparte en varios dias. */
+  durationMaxMinutes: 600,
 
   taxRatePercent: 0,
   taxExempt: true,

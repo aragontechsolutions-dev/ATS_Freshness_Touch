@@ -61,9 +61,7 @@ export class GoogleDistanceProvider implements DistanceProvider {
         },
         body: JSON.stringify({
           origins: [{ waypoint: { address: formatAddress(query.originPostalCode, query.state) } }],
-          destinations: [
-            { waypoint: { address: formatAddress(query.destinationPostalCode, query.state) } },
-          ],
+          destinations: [{ waypoint: { address: formatDestination(query) } }],
           travelMode: 'DRIVE',
           routingPreference: 'TRAFFIC_UNAWARE',
         }),
@@ -105,9 +103,20 @@ export class GoogleDistanceProvider implements DistanceProvider {
   }
 }
 
-/** Direccion en el formato que espera la API: solo ZIP, estado y pais. */
+/** Direccion en el formato que espera la API: ZIP, estado y pais. */
 function formatAddress(postalCode: string, state: string): string {
   return `${postalCode}, ${state}, USA`;
+}
+
+/**
+ * Destino con el mayor detalle disponible. Al reservar se conoce la calle, y
+ * entonces la ruta se calcula hasta el portal en vez de hasta el centro del
+ * codigo postal.
+ */
+function formatDestination(query: DistanceQuery): string {
+  const base = formatAddress(query.destinationPostalCode, query.state);
+  const detalle = [query.destinationLine1, query.destinationCity].filter(Boolean).join(', ');
+  return detalle ? `${detalle}, ${base}` : base;
 }
 
 /** Convierte la duracion de Google ("1234s") a minutos enteros. */

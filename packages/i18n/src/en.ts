@@ -138,6 +138,15 @@ export const en = {
     errorRateLimited: 'Too many quotes in a short time. Please wait a moment and try again.',
   },
 
+  booking: {
+    errorSlotTaken: 'That time was just taken. Please pick another slot.',
+    errorAlreadyBooked: 'You already have a booking at that time.',
+    errorRequiresWalkthrough:
+      'Commercial jobs are scheduled after a free on-site walkthrough. Contact us and we will arrange it.',
+    errorDateOutOfRange: 'Please choose a date within the next 90 days.',
+    errorNotBookable: 'We cannot book this job online. Contact us and we will help you.',
+  },
+
   quote: {
     line: {
       service: {

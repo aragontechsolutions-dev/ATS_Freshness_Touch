@@ -337,6 +337,9 @@ model Booking {
 
   /// La agenda se consulta casi siempre por fecha y estado.
   @@index([scheduledStart, status])
+  /// Ademas existe un indice unico parcial sobre (customerId, scheduledStart)
+  /// para las reservas no canceladas, creado en la migracion
+  /// 20260920180000: Prisma no sabe expresar indices parciales.
   @@index([customerId])
   @@index([status])
   @@index([zone, scheduledStart])

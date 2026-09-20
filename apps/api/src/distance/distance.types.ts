@@ -6,6 +6,14 @@ export interface DistanceQuery {
   destinationPostalCode: string;
   /** Codigo de estado de dos letras (p.ej. GA). */
   state: string;
+  /**
+   * Calle y ciudad del destino, si se conocen. Solo las hay al reservar: el
+   * cotizador publico pide unicamente el codigo postal. Cuando estan, el
+   * proveedor real calcula la ruta hasta el portal en vez de hasta el centro
+   * del codigo postal, y el deposito se ajusta a la distancia de verdad.
+   */
+  destinationLine1?: string;
+  destinationCity?: string;
 }
 
 export interface DistanceResult {

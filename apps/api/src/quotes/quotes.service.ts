@@ -2,13 +2,9 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { randomUUID } from 'node:crypto';
 import type { CatalogResponse, QuoteRequest, QuoteResponse } from '@freshness/types';
-import {
-  buildCatalog,
-  calculateQuote,
-  defaultPricingConfig,
-  type PricingConfig,
-} from '@freshness/pricing';
+import { buildCatalog, calculateQuote, type PricingConfig } from '@freshness/pricing';
 import type { Env } from '../common/config/env';
+import { buildPricingConfig } from '../common/pricing-config';
 import { DistanceService } from '../distance/distance.service';
 
 /**
@@ -26,16 +22,7 @@ export class QuotesService {
     private readonly distance: DistanceService,
     config: ConfigService<Env, true>,
   ) {
-    // La base de operaciones es especifica del despliegue, por eso se toma
-    // del entorno; el resto de tarifas viene del paquete de precios.
-    this.pricingConfig = {
-      ...defaultPricingConfig,
-      baseOfOperations: {
-        city: config.get('COMPANY_BASE_CITY', { infer: true }),
-        state: config.get('COMPANY_BASE_STATE', { infer: true }),
-        postalCode: config.get('COMPANY_BASE_POSTAL_CODE', { infer: true }),
-      },
-    };
+    this.pricingConfig = buildPricingConfig(config);
   }
 
   async estimate(request: QuoteRequest, now: Date = new Date()): Promise<QuoteResponse> {
