@@ -4,19 +4,19 @@
   "private": true,
   "description": "API de Freshness Touch: cotizador instantaneo y catalogo de precios",
   "scripts": {
-    "build": "nest build",
+    "build": "prisma generate && nest build",
     "clean": "rm -rf dist .turbo *.tsbuildinfo",
     "db:deploy": "prisma migrate deploy",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:status": "prisma migrate status",
     "db:studio": "prisma studio",
-    "dev": "nest start --watch",
+    "dev": "prisma generate && nest start --watch",
     "lint": "eslint src",
     "start": "node dist/main.js",
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "typecheck": "prisma generate && tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
     "@freshness/i18n": "workspace:*",
@@ -27,8 +27,10 @@
     "@nestjs/core": "^12.0.3",
     "@nestjs/platform-express": "^12.0.3",
     "@nestjs/throttler": "^6.7.0",
+    "@prisma/adapter-pg": "^7.10.0",
     "@prisma/client": "^7.10.0",
     "helmet": "^8.3.0",
+    "pg": "^8.23.0",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.2",
     "zod": "^4.6.5"
@@ -38,6 +40,7 @@
     "@nestjs/cli": "^12.0.3",
     "@types/express": "^5.0.0",
     "@types/node": "^22.10.0",
+    "@types/pg": "^8.23.1",
     "prisma": "^7.10.0",
     "typescript": "^5.9.3",
     "vitest": "^4.1.11"

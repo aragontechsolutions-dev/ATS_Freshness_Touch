@@ -51,8 +51,10 @@ async function bootstrap(): Promise<void> {
   // Sin esto el limitador de peticiones veria una sola IP para todo el mundo.
   app.set('trust proxy', 1);
 
+  // Se excluyen ambas rutas: `exclude` compara la ruta exacta, asi que
+  // indicar solo "health" dejaria /health/ready colgando del prefijo.
   app.setGlobalPrefix(config.get('API_PREFIX', { infer: true }), {
-    exclude: ['health'],
+    exclude: ['health', 'health/ready'],
   });
 
   app.useGlobalFilters(new AllExceptionsFilter());

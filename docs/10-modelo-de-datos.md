@@ -3,10 +3,9 @@
 Esquema de la base de datos (PostgreSQL en Supabase, gestionado con Prisma).
 Vive en `apps/api/prisma/schema.prisma`.
 
-> **Estado:** el esquema y su migración inicial están escritos y verificados,
-> pero **la aplicación todavía no se conecta a la base de datos**. Eso llega en
-> el siguiente incremento, para no romper el despliegue actual de la API, que
-> hoy funciona sin ninguna base de datos. Ver "Cómo aplicar la migración".
+> **Estado:** esquema, migración inicial y conexión de la API listos. La base
+> de datos es **opcional en tiempo de ejecución**: si no está configurada o se
+> cae, el cotizador sigue funcionando.
 
 ## Las cinco reglas del esquema
 
@@ -100,6 +99,73 @@ pnpm db:deploy     # aplicarlas
 Se usa la conexión **directa** (puerto 5432) y no la agrupada (6543) porque el
 agrupador en modo transacción no admite las sentencias preparadas que necesita
 Prisma Migrate.
+
+## La base de datos es opcional
+
+`PrismaService` no hereda de `PrismaClient`: lo envuelve. Así la instancia
+puede no existir, y eso permite una propiedad valiosa:
+
+> **Si la base de datos falta o se cae, el cotizador sigue dando precios.**
+
+El cotizador es la parte que genera negocio y no necesita base de datos para
+calcular. Sería absurdo que una caída de Supabase dejara el sitio sin poder
+cotizar. Lo que sí la necesita devuelve un `503` claro, no un error interno.
+
+Dos detalles que se descubrieron probándolo:
+
+- **`$connect()` no comprueba nada.** Con adaptador es perezoso: devuelve éxito
+  aunque el servidor esté apagado. Por eso el servicio lanza un `SELECT 1` real
+  al arrancar; es la única forma de saber que hay alguien al otro lado.
+- **La conexión se recupera sola.** Si la base de datos estaba caída al
+  arrancar, la sonda de disponibilidad reintenta la conexión. No hace falta
+  reiniciar la API cuando Supabase vuelve.
+
+### Dos sondas distintas
+
+| Ruta            | Qué dice                                        | Quién la usa   |
+| --------------- | ----------------------------------------------- | -------------- |
+| `/health`       | Que el proceso está en pie                      | Render         |
+| `/health/ready` | Qué partes funcionan, incluida la base de datos | Monitorización |
+
+La de Render **no** depende de la base de datos a propósito: si dependiera, una
+caída de Supabase provocaría reinicios en bucle de una API que en realidad
+sigue dando precios.
+
+## Migraciones automáticas al desplegar
+
+`render.yaml` define un **comando pre-despliegue** que Render ejecuta después de
+compilar y **antes** de enviar tráfico a la versión nueva:
+
+```
+[ -z "$DIRECT_URL" ] && echo 'omitidas' || pnpm --filter @freshness/api db:deploy
+```
+
+Por qué ahí y no en otro sitio:
+
+- **Si la migración falla, el despliegue se aborta** y la versión anterior
+  sigue atendiendo. Nunca queda código nuevo contra una base de datos a medio
+  migrar. Comprobado: un fallo devuelve código distinto de cero.
+- **Las credenciales ya están en Render.** No hay que duplicarlas en GitHub,
+  que es lo que exigiría migrar desde la integración continua.
+- Si `DIRECT_URL` todavía no existe, el paso se **omite** en vez de fallar, para
+  que un despliegue no se caiga por una variable sin rellenar.
+
+`prisma migrate deploy` solo aplica lo pendiente y nunca reinicia la base de
+datos; si no hay migraciones nuevas, no hace nada.
+
+### Lo que hay que vigilar
+
+Automatizar las migraciones traslada un riesgo: **una migración destructiva se
+aplica sin que nadie la pare**. Dos reglas para convivir con eso:
+
+1. **Nunca borrar en la misma versión que deja de usar algo.** Primero se añade
+   la columna nueva y se despliega; cuando ninguna versión viva usa la vieja,
+   se borra en una migración posterior. Si se borra a la vez, durante los
+   segundos en que conviven ambas versiones la antigua consulta una columna que
+   ya no existe.
+2. **El SQL de cada migración se revisa en el pull request.** Está en texto
+   plano en `prisma/migrations/`, precisamente para poder leerlo antes de
+   fusionar.
 
 ## Nota sobre Prisma 7
 

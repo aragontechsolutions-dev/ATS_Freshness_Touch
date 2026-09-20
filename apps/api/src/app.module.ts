@@ -4,6 +4,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { validateEnv, type Env } from './common/config/env';
 import { RequestIdMiddleware } from './common/middleware/request-id.middleware';
+import { DatabaseModule } from './database/database.module';
 import { DistanceModule } from './distance/distance.module';
 import { HealthModule } from './health/health.module';
 import { QuotesModule } from './quotes/quotes.module';
@@ -40,6 +41,7 @@ import { QuotesModule } from './quotes/quotes.module';
       ],
     }),
 
+    DatabaseModule,
     HealthModule,
     DistanceModule,
     QuotesModule,
