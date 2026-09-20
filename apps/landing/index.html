@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en" class="scroll-smooth">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" content="#0f766e" />
+    <title>Freshness Touch · Professional cleaning in Georgia</title>
+    <meta
+      name="description"
+      content="Instant online quotes for residential and commercial cleaning across Georgia. Transparent pricing, insured and background-checked cleaners."
+    />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <script>
+      // Aplica el tema guardado ANTES de pintar para evitar el parpadeo blanco
+      // al cargar en modo oscuro. Se ejecuta en linea a proposito.
+      (function () {
+        try {
+          var stored = localStorage.getItem('ft-theme');
+          var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+          if (stored === 'dark' || (stored !== 'light' && prefersDark)) {
+            document.documentElement.classList.add('dark');
+          }
+        } catch (error) {
+          /* localStorage puede estar bloqueado: se ignora y queda el tema claro */
+        }
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
