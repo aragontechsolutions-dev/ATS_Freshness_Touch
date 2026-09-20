@@ -23,7 +23,10 @@ export function ServiceAreas() {
   return (
     <section id="areas" className="py-16 lg:py-20">
       <div className="ft-container">
-        <h2 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
+        <h2
+          className="ft-rule text-3xl font-bold tracking-tight text-brand-800
+                       dark:text-white"
+        >
           {t('areas.title')}
         </h2>
         <p className="mt-3 max-w-2xl text-slate-600 dark:text-slate-300">{t('areas.subtitle')}</p>
@@ -33,7 +36,7 @@ export function ServiceAreas() {
             <div key={zone.code} className="ft-card p-5">
               <span
                 className="inline-flex items-center gap-2 text-sm font-bold text-brand-700
-                               dark:text-brand-400"
+                               dark:text-brand-300"
               >
                 <MapPinIcon className="h-4 w-4" />
                 {zone.serviceable

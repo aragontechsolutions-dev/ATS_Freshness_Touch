@@ -75,20 +75,27 @@ proveedor de distancia funciona en modo simulado por defecto.
 
 ## Documentación
 
-| Documento                                                       | Contenido                                     |
-| --------------------------------------------------------------- | --------------------------------------------- |
-| [00 — Alcance y etapas](docs/00-alcance-y-etapas.md)            | Qué se construyó, qué falta y en qué orden    |
-| [01 — Arquitectura](docs/01-arquitectura.md)                    | Cómo encajan las piezas y por qué             |
-| [02 — Motor de precios](docs/02-motor-de-precios.md)            | Fórmulas, tarifas y cómo cambiarlas           |
-| [03 — Integraciones](docs/03-integraciones.md)                  | Proveedores simulados y reales                |
-| [04 — Seguridad](docs/04-seguridad.md)                          | Análisis de riesgos y controles aplicados     |
-| [05 — Despliegue](docs/05-despliegue.md)                        | Publicación en Vercel y Render                |
-| [06 — Guía de desarrollo](docs/06-guia-de-desarrollo.md)        | Convenciones y flujo de trabajo               |
-| [07 — Cumplimiento en Georgia](docs/07-cumplimiento-georgia.md) | Impuestos, personal, seguros y avisos legales |
-| [Decisiones (ADR)](docs/adr/)                                   | Registro de decisiones técnicas               |
+| Documento                                                       | Contenido                                          |
+| --------------------------------------------------------------- | -------------------------------------------------- |
+| [00 — Alcance y etapas](docs/00-alcance-y-etapas.md)            | Qué se construyó, qué falta y en qué orden         |
+| [01 — Arquitectura](docs/01-arquitectura.md)                    | Cómo encajan las piezas y por qué                  |
+| [02 — Motor de precios](docs/02-motor-de-precios.md)            | Fórmulas, tarifas y cómo cambiarlas                |
+| [03 — Integraciones](docs/03-integraciones.md)                  | Proveedores simulados y reales                     |
+| [04 — Seguridad](docs/04-seguridad.md)                          | Análisis de riesgos y controles aplicados          |
+| [05 — Despliegue](docs/05-despliegue.md)                        | Publicación en Vercel y Render                     |
+| [06 — Guía de desarrollo](docs/06-guia-de-desarrollo.md)        | Convenciones y flujo de trabajo                    |
+| [07 — Cumplimiento en Georgia](docs/07-cumplimiento-georgia.md) | Impuestos, personal, seguros y avisos legales      |
+| [08 — Variables de entorno](docs/08-variables-de-entorno.md)    | Configuración de Render, Vercel, Supabase y Stripe |
+| [Decisiones (ADR)](docs/adr/)                                   | Registro de decisiones técnicas                    |
 
-## Pendiente antes de publicar
+## Pendiente antes de abrir el sitio al público
 
-1. Sustituir teléfono y correo en `apps/landing/src/config/company.ts`.
+Estos puntos **no bloquean el despliegue** (se puede desplegar y probar ya), pero
+sí deben resolverse antes de dirigir tráfico real al sitio. A partir de la
+Etapa 2 se gestionarán desde el panel de administración, no editando archivos.
+
+1. Teléfono y correo reales, hoy marcadores en `apps/landing/src/config/company.ts`.
 2. Revisar y aprobar las tarifas de `packages/pricing/src/config.ts`.
-3. Confirmar con un contador o abogado de Georgia lo indicado en el documento 07.
+3. Verificar que las afirmaciones del sitio son ciertas (ver documento 07): son
+   publicidad, no texto decorativo.
+4. Dominio real de la API en `connect-src` de `apps/landing/vercel.json`.

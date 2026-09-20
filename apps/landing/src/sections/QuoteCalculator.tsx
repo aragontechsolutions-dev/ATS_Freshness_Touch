@@ -112,9 +112,12 @@ export function QuoteCalculator() {
   const showResult = quote !== null;
 
   return (
-    <section id="quote" className="bg-brand-50 py-16 lg:py-20 dark:bg-slate-900">
+    <section id="quote" className="bg-brand-50 py-16 lg:py-20 dark:bg-night-800">
       <div className="ft-container">
-        <h2 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
+        <h2
+          className="ft-rule text-3xl font-bold tracking-tight text-brand-800
+                       dark:text-white"
+        >
           {t('calculator.title')}
         </h2>
         <p className="mt-3 max-w-2xl text-slate-600 dark:text-slate-300">
@@ -162,7 +165,7 @@ export function QuoteCalculator() {
                       className={`rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
                         selected
                           ? 'border-brand-700 bg-brand-700 text-white'
-                          : 'border-slate-300 text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800'
+                          : 'border-slate-300 text-slate-700 hover:bg-slate-50 dark:border-night-600 dark:text-slate-300 dark:hover:bg-night-700'
                       }`}
                     >
                       {t(`frequency.${frequency.code}`)}
@@ -171,7 +174,7 @@ export function QuoteCalculator() {
                           className={
                             selected
                               ? 'ml-1.5 text-brand-100'
-                              : 'ml-1.5 text-brand-700 dark:text-brand-400'
+                              : 'ml-1.5 text-brand-700 dark:text-brand-300'
                           }
                         >
                           −{frequency.discountPercent}%
@@ -244,13 +247,13 @@ export function QuoteCalculator() {
                     <div
                       key={addOn.code}
                       className="flex items-center justify-between gap-3 rounded-lg border
-                                 border-slate-200 px-3 py-2 dark:border-slate-800"
+                                 border-slate-200 px-3 py-2 dark:border-night-600"
                     >
                       <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
                         <input
                           type="checkbox"
                           className="h-4 w-4 rounded border-slate-300 text-brand-700
-                                     focus:ring-brand-600 dark:border-slate-600"
+                                     focus:ring-brand-600 dark:border-night-600"
                           checked={checked}
                           onChange={(event) =>
                             update('addOns', {
@@ -297,7 +300,7 @@ export function QuoteCalculator() {
             </button>
 
             {catalogFailed && (
-              <p className="text-sm text-amber-700 dark:text-amber-400">
+              <p className="text-sm text-sun-700 dark:text-sun-300">
                 {t('calculator.errorNetwork')}
               </p>
             )}
@@ -311,7 +314,7 @@ export function QuoteCalculator() {
                   {t('calculator.errorTitle')}
                 </h3>
                 <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">{t(errorKey)}</p>
-                <a href={company.phoneHref} className="ft-btn-secondary mt-4 w-full">
+                <a href={company.phoneHref} className="ft-btn-outline mt-4 w-full">
                   <PhoneIcon className="h-4 w-4" />
                   {company.phoneDisplay}
                 </a>
@@ -389,7 +392,7 @@ function QuoteResult({ quote, locale }: { quote: QuoteResponse; locale: Locale }
         <p className="mt-3 text-sm text-slate-600 dark:text-slate-400">
           {t('calculator.manualReviewBody')}
         </p>
-        <a href={company.phoneHref} className="ft-btn-primary mt-4 w-full">
+        <a href={company.phoneHref} className="ft-btn-secondary mt-4 w-full">
           {t('calculator.requestCallback')}
         </a>
       </div>
@@ -397,7 +400,7 @@ function QuoteResult({ quote, locale }: { quote: QuoteResponse; locale: Locale }
   }
 
   return (
-    <div className="ft-card divide-y divide-slate-200 dark:divide-slate-800">
+    <div className="ft-card divide-y divide-slate-200 dark:divide-night-600">
       <div className="p-6">
         <p className="text-sm font-medium text-slate-500 dark:text-slate-400">
           {t('calculator.estimatedTotal')}
@@ -423,7 +426,7 @@ function QuoteResult({ quote, locale }: { quote: QuoteResponse; locale: Locale }
             <span
               className={`shrink-0 font-medium ${
                 line.amountCents < 0
-                  ? 'text-brand-700 dark:text-brand-400'
+                  ? 'text-brand-700 dark:text-brand-300'
                   : 'text-slate-900 dark:text-white'
               }`}
             >
@@ -453,7 +456,7 @@ function QuoteResult({ quote, locale }: { quote: QuoteResponse; locale: Locale }
 
       <div className="space-y-2 p-6">
         {quote.manualReview.reasonKeys.map((key) => (
-          <p key={key} className="text-xs text-amber-700 dark:text-amber-400">
+          <p key={key} className="text-xs text-sun-700 dark:text-sun-300">
             {t(key)}
           </p>
         ))}
