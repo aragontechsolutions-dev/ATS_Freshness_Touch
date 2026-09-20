@@ -19,9 +19,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # La version de pnpm NO se indica aqui: se toma del campo
+      # "packageManager" de package.json. Declararla en los dos sitios hace
+      # fallar la accion con "Multiple versions of pnpm specified".
       - uses: pnpm/action-setup@v4
-        with:
-          version: 10
 
       - uses: actions/setup-node@v4
         with:
