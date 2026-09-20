@@ -82,36 +82,53 @@ peticiones a dominios ajenos.
 
 ## Logotipo
 
-`apps/landing/src/components/Logo.tsx` expone dos piezas:
+El isotipo oficial (girasol, hogar y onda sobre el círculo azul) lo entregó la
+empresa como imagen. `apps/landing/src/components/Logo.tsx` expone:
 
-- `LogoMark` — el isotipo en SVG (girasol, tejado y onda).
+- `LogoMark` — el isotipo oficial.
 - `Logo` — el conjunto: isotipo + "Freshness Touch" + "CLEANING SERVICES",
   con el eslogan opcional.
 
-Decisiones deliberadas:
+### El nombre es texto, no parte de la imagen
 
-1. **El isotipo es SVG, no imagen.** Escala sin perder nitidez, pesa unos pocos
-   kilobytes y adapta sus colores al tema.
-2. **El nombre es texto HTML, no parte del SVG.** Así lo lee un lector de
-   pantalla, se puede seleccionar y cambia de color con el tema.
-3. **La composición se eligió midiendo, no por gusto.** Se renderizaron tres
-   variantes a 36, 56 y 96 píxeles sobre fondo claro y oscuro. Las que llevaban
-   arco envolvente y ventana se descartaron: a 36 px —el tamaño real de la
-   cabecera— se emborronaban.
-4. **El eslogan "Fresh Spaces. A Touch Above." no se traduce.** Forma parte del
-   logotipo, como cualquier eslogan de marca.
+Deliberado, por tres razones:
 
-## Iconos de la aplicación
+1. **Accesibilidad:** un lector de pantalla lo lee, y se puede seleccionar y buscar.
+2. **Modo oscuro:** "Touch" es casi negro en claro pero **blanco** en oscuro. Si
+   fuera parte de la imagen, desaparecería sobre el fondo negro.
+3. **Nitidez y peso:** el texto se ve perfecto a cualquier tamaño y no añade
+   kilobytes de descarga.
 
-| Archivo                | Tamaño     | Contenido                                          |
-| ---------------------- | ---------- | -------------------------------------------------- |
-| `favicon.svg`          | cualquiera | Girasol y onda sobre azul, esquinas redondeadas    |
-| `apple-touch-icon.png` | 180×180    | Isotipo completo, a sangre (iOS aplica su máscara) |
+Cuando el nombre aparece al lado, el isotipo lleva `alt=""` porque es
+decorativo: anunciarlo dos veces molesta a quien usa lector de pantalla.
 
-El favicon es **más simple** que el logotipo a propósito: se comprobó
-renderizando ambas opciones a 16, 32, 48 y 180 px, y a 16 px la versión con
-tejado se volvía ilegible. Es la práctica habitual en sistemas de marca:
-marca simplificada en tamaños pequeños, completa en grandes.
+### Activos de marca
+
+| Archivo                                     | Uso                                                                            |
+| ------------------------------------------- | ------------------------------------------------------------------------------ |
+| `src/assets/logo-mark.webp` (256 px, 20 kB) | Isotipo en la interfaz; Vite le pone huella para cachearlo                     |
+| `public/brand/logo-full.webp` (900 px)      | **Lockup horizontal completo**, con el nombre y el eslogan dentro de la imagen |
+| `public/favicon-32.png` · `favicon-192.png` | Pestaña del navegador y Android                                                |
+| `public/apple-touch-icon.png` (180 px)      | Pantalla de inicio de iOS                                                      |
+
+El lockup completo **no se usa en la interfaz**: lleva fondo blanco y texto
+negro fijos, así que en modo oscuro dejaría un recuadro blanco. Se conserva
+como activo de marca para correos, facturas, prensa y documentos impresos.
+
+Los favicons conservan la transparencia de las esquinas del círculo. El icono
+de iOS, en cambio, va sobre fondo blanco, porque iOS no admite transparencia y
+las esquinas saldrían negras.
+
+Los archivos derivados se generaron redimensionando el original dentro del
+navegador, ya que el entorno no tiene ninguna librería de imagen instalada.
+
+### El logotipo y el contraste
+
+Un logotipo está **exento** de los mínimos de contraste de WCAG (el criterio
+1.4.11 excluye expresamente los logotipos). El círculo azul del isotipo sobre
+el fondo casi negro del modo oscuro da 2.47:1, por debajo de lo que se exigiría
+a un control, y aun así es correcto: su contenido interior (girasol amarillo,
+tejado blanco) es brillante y la marca se reconoce sin dificultad.
 
 ## Jerarquía de botones
 
