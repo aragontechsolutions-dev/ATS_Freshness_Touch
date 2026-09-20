@@ -14,15 +14,15 @@ export function Hero() {
       <div className="ft-container grid gap-10 py-16 lg:grid-cols-2 lg:items-center lg:py-24">
         <div>
           <p
-            className="inline-flex items-center gap-2 rounded-full bg-brand-100 px-3 py-1 text-xs
-                        font-semibold text-brand-800 dark:bg-brand-900/50 dark:text-brand-200"
+            className="inline-flex items-center gap-2 rounded-full bg-brand-100 px-3 py-1.5 text-xs
+                        font-semibold text-brand-800 dark:bg-night-700 dark:text-sun-300"
           >
             <ShieldIcon className="h-4 w-4" />
             {t('hero.badge')}
           </p>
 
           <h1
-            className="mt-5 text-4xl font-extrabold tracking-tight text-slate-900 sm:text-5xl
+            className="mt-5 text-4xl font-extrabold tracking-tight text-brand-800 sm:text-5xl
                          dark:text-white"
           >
             {t('hero.title')}
@@ -38,7 +38,7 @@ export function Hero() {
                 key={point}
                 className="flex items-start gap-2 text-sm text-slate-700 dark:text-slate-300"
               >
-                <CheckIcon className="mt-0.5 h-4 w-4 shrink-0 text-brand-600 dark:text-brand-400" />
+                <CheckIcon className="mt-0.5 h-4 w-4 shrink-0 text-brand-600 dark:text-brand-300" />
                 {point}
               </li>
             ))}
@@ -48,7 +48,7 @@ export function Hero() {
             <a href="#quote" className="ft-btn-primary">
               {t('hero.primaryCta')}
             </a>
-            <a href="#services" className="ft-btn-secondary">
+            <a href="#services" className="ft-btn-outline">
               {t('hero.secondaryCta')}
             </a>
           </div>
@@ -69,7 +69,7 @@ export function Hero() {
               <div
                 key={row.label}
                 className="flex items-center justify-between border-b border-dashed
-                           border-slate-200 pb-2 dark:border-slate-800"
+                           border-slate-200 pb-2 dark:border-night-600"
               >
                 <span className="text-slate-600 dark:text-slate-400">{row.label}</span>
                 <span className="font-semibold text-slate-900 dark:text-white">{row.value}</span>

@@ -15,7 +15,7 @@ export function ThemeToggle() {
       title={label}
       aria-label={label}
       className="rounded-lg border border-slate-300 p-2 text-slate-600 transition-colors
-                 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+                 hover:bg-slate-100 dark:border-night-600 dark:text-slate-300 dark:hover:bg-night-700"
     >
       {theme === 'dark' ? <SunIcon className="h-4 w-4" /> : <MoonIcon className="h-4 w-4" />}
     </button>

@@ -12,11 +12,11 @@ export function StickyMobileCta() {
 
   return (
     <div
-      className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/95 p-3
-                    backdrop-blur sm:hidden dark:border-slate-800 dark:bg-slate-950/95"
+      className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-canvas/95 p-3
+                    backdrop-blur sm:hidden dark:border-night-600 dark:bg-night-900/95"
     >
       <div className="flex gap-2">
-        <a href={company.phoneHref} className="ft-btn-secondary flex-1 py-2.5">
+        <a href={company.phoneHref} className="ft-btn-outline flex-1 py-2.5">
           <PhoneIcon className="h-4 w-4" />
           {t('common.callUs')}
         </a>

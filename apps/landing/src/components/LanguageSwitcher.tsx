@@ -15,7 +15,7 @@ export function LanguageSwitcher() {
 
   return (
     <div
-      className="inline-flex rounded-lg border border-slate-300 p-0.5 dark:border-slate-700"
+      className="inline-flex rounded-lg border border-slate-300 p-0.5 dark:border-night-600"
       role="group"
       aria-label={t('common.language')}
     >
@@ -28,7 +28,7 @@ export function LanguageSwitcher() {
           className={`rounded-md px-2.5 py-1 text-xs font-semibold uppercase transition-colors ${
             current === locale
               ? 'bg-brand-700 text-white'
-              : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'
+              : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-night-700'
           }`}
         >
           {locale}

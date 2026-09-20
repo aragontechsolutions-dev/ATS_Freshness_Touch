@@ -9,9 +9,12 @@ export function Faq() {
   const { t } = useTranslation();
 
   return (
-    <section id="faq" className="bg-slate-50 py-16 lg:py-20 dark:bg-slate-900">
+    <section id="faq" className="bg-brand-50 py-16 lg:py-20 dark:bg-night-800">
       <div className="ft-container max-w-3xl">
-        <h2 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
+        <h2
+          className="ft-rule text-3xl font-bold tracking-tight text-brand-800
+                       dark:text-white"
+        >
           {t('faq.title')}
         </h2>
 
@@ -26,7 +29,7 @@ export function Faq() {
                   {t(`faq.${key}.q`)}
                   <span
                     className="text-brand-700 transition-transform group-open:rotate-45
-                                   dark:text-brand-400"
+                                   dark:text-brand-300"
                     aria-hidden="true"
                   >
                     +

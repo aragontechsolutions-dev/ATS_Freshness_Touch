@@ -12,9 +12,12 @@ export function WhyUs() {
   const { t } = useTranslation();
 
   return (
-    <section id="why-us" className="bg-slate-50 py-16 lg:py-20 dark:bg-slate-900">
+    <section id="why-us" className="bg-brand-50 py-16 lg:py-20 dark:bg-night-800">
       <div className="ft-container">
-        <h2 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
+        <h2
+          className="ft-rule text-3xl font-bold tracking-tight text-brand-800
+                       dark:text-white"
+        >
           {t('whyUs.title')}
         </h2>
 
@@ -23,7 +26,7 @@ export function WhyUs() {
             <div key={key}>
               <span
                 className="inline-flex rounded-lg bg-white p-2 text-brand-700 shadow-sm
-                               dark:bg-slate-950 dark:text-brand-400"
+                               dark:bg-night-900 dark:text-brand-300"
               >
                 <Icon className="h-5 w-5" />
               </span>

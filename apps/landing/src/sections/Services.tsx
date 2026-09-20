@@ -2,7 +2,7 @@ import { useTranslation } from 'react-i18next';
 import type { Locale, ServiceType } from '@freshness/types';
 import { useCatalog } from '../hooks/useCatalog';
 import { formatCentsCompact } from '../lib/format';
-import { SparkleIcon } from '../components/Icons';
+import { SunflowerIcon } from '../components/Icons';
 
 const SERVICE_ORDER: ServiceType[] = [
   'STANDARD',
@@ -21,7 +21,10 @@ export function Services() {
   return (
     <section id="services" className="py-16 lg:py-20">
       <div className="ft-container">
-        <h2 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
+        <h2
+          className="ft-rule text-3xl font-bold tracking-tight text-brand-800
+                       dark:text-white"
+        >
           {t('services.title')}
         </h2>
         <p className="mt-3 max-w-2xl text-slate-600 dark:text-slate-300">
@@ -35,10 +38,10 @@ export function Services() {
             return (
               <article key={code} className="ft-card flex flex-col p-6">
                 <span
-                  className="w-fit rounded-lg bg-brand-100 p-2 text-brand-700
-                                 dark:bg-brand-900/50 dark:text-brand-300"
+                  className="w-fit rounded-xl bg-brand-50 p-2.5 text-brand-700
+                                 dark:bg-night-700 dark:text-sun-400"
                 >
-                  <SparkleIcon className="h-5 w-5" />
+                  <SunflowerIcon className="h-5 w-5" />
                 </span>
 
                 <h3 className="mt-4 text-lg font-semibold text-slate-900 dark:text-white">
@@ -48,7 +51,7 @@ export function Services() {
                   {t(`services.${code}.description`)}
                 </p>
 
-                <p className="mt-5 text-sm font-semibold text-brand-700 dark:text-brand-400">
+                <p className="mt-5 text-sm font-semibold text-brand-700 dark:text-brand-300">
                   {entry === undefined
                     ? ' '
                     : entry.instantQuote

@@ -1,33 +1,66 @@
 @import 'tailwindcss';
 
 /*
- * Modo oscuro por clase (no por media query) para que el usuario pueda
- * elegirlo explicitamente. El script de index.html aplica la clase antes
- * del primer pintado para que no haya parpadeo.
+ * ============================================================================
+ * IDENTIDAD VISUAL DE FRESHNESS TOUCH
+ * ============================================================================
+ * Colores oficiales de marca:
+ *   Azul primario    #145788  confianza / profesionalidad
+ *   Amarillo girasol #F9C400  energia / frescura
+ *   Casi negro       #111111  elegancia / contraste
+ *   Blanco roto      #F7F9FC  limpieza / espacio
+ *
+ * REGLA DE CONTRASTE (medida, no estimada):
+ *   - El azul #145788 da 7.24:1 sobre el blanco roto, pero solo 2.47:1 sobre
+ *     el casi negro. Sirve como color de texto en modo CLARO, nunca en oscuro.
+ *   - El amarillo #F9C400 da 1.54:1 sobre blanco (ilegible) y 11.62:1 sobre
+ *     negro. NUNCA se usa como color de texto sobre fondo claro: solo como
+ *     relleno con texto casi negro encima, o como texto en modo oscuro.
+ *   - Por eso el azul lidera el modo claro y el amarillo el modo oscuro.
+ *
+ * Todos los pares en uso estan verificados contra WCAG AA (4.5:1 en texto,
+ * 3:1 en bordes y controles). Ver docs/09-identidad-visual.md.
  */
+
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
-  /* Paleta de marca: verde azulado "limpio y fresco". */
-  --color-brand-50: #f0fdfa;
-  --color-brand-100: #ccfbf1;
-  --color-brand-200: #99f6e4;
-  --color-brand-300: #5eead4;
-  --color-brand-400: #2dd4bf;
-  --color-brand-500: #14b8a6;
-  --color-brand-600: #0d9488;
-  --color-brand-700: #0f766e;
-  --color-brand-800: #115e59;
-  --color-brand-900: #134e4a;
-  --color-brand-950: #042f2e;
+  /* --- Azul de marca (ancla: 700 = #145788) --- */
+  --color-brand-50: #eff6fb;
+  --color-brand-100: #d9e9f4;
+  --color-brand-200: #b3d2e9;
+  --color-brand-300: #7fb3d9; /* texto/acento en modo oscuro: 8.41:1 */
+  --color-brand-400: #4a90c4; /* anillo de foco en ambos modos */
+  --color-brand-500: #2a73a9; /* relleno de boton en modo oscuro: 3.71:1 */
+  --color-brand-600: #1b6294;
+  --color-brand-700: #145788; /* AZUL OFICIAL DE MARCA */
+  --color-brand-800: #10456c;
+  --color-brand-900: #0c3552;
+  --color-brand-950: #071f31;
 
-  /*
-   * Tipografia del sistema: sin fuentes externas. Evita una peticion a un
-   * tercero (privacidad del visitante), acelera la carga y simplifica la CSP.
-   */
-  --font-sans:
-    ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
-    'Noto Sans', sans-serif;
+  /* --- Amarillo girasol (ancla: 400 = #F9C400) --- */
+  --color-sun-50: #fff9e5;
+  --color-sun-100: #fff0bf;
+  --color-sun-200: #fde380;
+  --color-sun-300: #fbd340; /* avisos en modo oscuro */
+  --color-sun-400: #f9c400; /* AMARILLO OFICIAL DE MARCA */
+  --color-sun-500: #dcac00;
+  --color-sun-600: #a88200; /* borde del boton amarillo: 3.40:1 sobre claro */
+  --color-sun-700: #8a6b00; /* unico amarillo legible como texto en claro */
+  --color-sun-800: #5c4700;
+  --color-sun-900: #3d2f00;
+
+  /* --- Neutros de marca --- */
+  --color-ink: #111111; /* casi negro oficial */
+  --color-canvas: #f7f9fc; /* blanco roto oficial */
+  --color-night-900: #111111; /* fondo de pagina en oscuro */
+  --color-night-800: #1b1f24; /* tarjetas en oscuro */
+  --color-night-700: #242a31; /* campos y superficies elevadas */
+  --color-night-600: #2f3740; /* bordes en oscuro */
+
+  /* --- Tipografia de marca (autoalojada, sin peticiones a terceros) --- */
+  --font-sans: 'Inter Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-display: 'Montserrat Variable', 'Inter Variable', ui-sans-serif, system-ui, sans-serif;
 }
 
 @layer base {
@@ -36,16 +69,28 @@
   }
 
   body {
-    @apply bg-white text-slate-800 antialiased;
+    @apply bg-canvas text-slate-900 antialiased;
   }
 
   .dark body {
-    @apply bg-slate-950 text-slate-200;
+    @apply bg-night-900 text-slate-100;
   }
 
-  /* Foco visible y consistente: requisito de accesibilidad. */
+  /* Los titulares usan Montserrat; el cuerpo, Inter. */
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-family: var(--font-display);
+    font-weight: 700;
+    letter-spacing: -0.015em;
+  }
+
+  /* Foco visible y consistente: 3.28:1 en claro y 5.46:1 en oscuro. */
   :focus-visible {
-    @apply outline-2 outline-offset-2 outline-brand-600;
+    @apply outline-2 outline-offset-2 outline-brand-400;
   }
 }
 
@@ -59,40 +104,80 @@
   }
 
   .dark .ft-card {
-    @apply border-slate-800 bg-slate-900;
+    @apply border-night-600 bg-night-800;
   }
 
   .ft-input {
-    @apply w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900
-           shadow-sm transition-colors placeholder:text-slate-400
-           focus:border-brand-600 focus:ring-2 focus:ring-brand-600/30 focus:outline-none;
+    @apply w-full rounded-lg border border-slate-400 bg-white px-3 py-2 text-slate-900
+           shadow-sm transition-colors placeholder:text-slate-500
+           focus:border-brand-700 focus:ring-2 focus:ring-brand-400/40 focus:outline-none;
   }
 
   .dark .ft-input {
-    @apply border-slate-700 bg-slate-950 text-slate-100 placeholder:text-slate-500;
+    @apply border-night-600 bg-night-700 text-slate-100 placeholder:text-slate-400
+           focus:border-brand-300;
   }
 
   .ft-label {
-    @apply mb-1.5 block text-sm font-medium text-slate-700;
+    @apply mb-1.5 block text-sm font-semibold text-slate-700;
   }
 
   .dark .ft-label {
     @apply text-slate-300;
   }
 
-  .ft-btn-primary {
-    @apply inline-flex items-center justify-center gap-2 rounded-lg bg-brand-700 px-5 py-3
-           text-sm font-semibold text-white transition-colors hover:bg-brand-800
-           disabled:cursor-not-allowed disabled:opacity-60;
+  /*
+   * Botones segun la identidad visual:
+   *   PRIMARIO   amarillo girasol con texto casi negro ("Get a Free Quote")
+   *   SECUNDARIO azul de marca con texto blanco ("Book a Cleaning")
+   *   TERCIARIO  contorno azul ("Contact Us")
+   */
+  /*
+   * Base comun de los botones. Se agrupan los selectores en vez de aplicar
+   * una clase propia con @apply, porque Tailwind 4 solo permite @apply de
+   * utilidades suyas, no de clases definidas por el proyecto.
+   */
+  .ft-btn,
+  .ft-btn-primary,
+  .ft-btn-secondary,
+  .ft-btn-outline {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-5 py-3 text-sm
+           font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-60;
+    font-family: var(--font-display);
   }
 
+  /* PRIMARIO: amarillo girasol con texto casi negro ("Get a Free Quote").
+     El borde mas oscuro (3.40:1) hace que el boton se distinga del fondo claro. */
+  .ft-btn-primary {
+    @apply border border-sun-600 bg-sun-400 text-ink hover:bg-sun-300;
+  }
+
+  .dark .ft-btn-primary {
+    @apply border-sun-400 hover:bg-sun-300;
+  }
+
+  /* SECUNDARIO: azul de marca con texto blanco ("Book a Cleaning"). */
   .ft-btn-secondary {
-    @apply inline-flex items-center justify-center gap-2 rounded-lg border border-slate-300
-           bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition-colors
-           hover:bg-slate-50;
+    @apply bg-brand-700 text-white hover:bg-brand-800;
   }
 
   .dark .ft-btn-secondary {
-    @apply border-slate-700 bg-slate-900 text-slate-200 hover:bg-slate-800;
+    /* El azul de marca solo da 2.47:1 sobre el fondo negro: se aclara al 500. */
+    @apply bg-brand-500 hover:bg-brand-400 hover:text-ink;
+  }
+
+  /* TERCIARIO: contorno azul ("Contact Us"). */
+  .ft-btn-outline {
+    @apply border border-brand-700 bg-white text-brand-700 hover:bg-brand-50;
+  }
+
+  .dark .ft-btn-outline {
+    @apply border-brand-300 bg-transparent text-brand-300 hover:bg-night-700;
+  }
+
+  /* Subrayado corto en amarillo, recurso grafico del manual de marca. */
+  .ft-rule::after {
+    content: '';
+    @apply mt-3 block h-1 w-14 rounded-full bg-sun-400;
   }
 }
