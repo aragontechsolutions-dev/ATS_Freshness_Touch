@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { CheckIcon, RefreshIcon, ShieldIcon, TagIcon } from '../components/Icons';
+import { Reveal } from '../components/Reveal';
 
 const ITEMS = [
   { key: 'insured', Icon: ShieldIcon },
@@ -22,8 +23,8 @@ export function WhyUs() {
         </h2>
 
         <div className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-          {ITEMS.map(({ key, Icon }) => (
-            <div key={key}>
+          {ITEMS.map(({ key, Icon }, indice) => (
+            <Reveal key={key} delayMs={indice * 90}>
               <span
                 className="inline-flex rounded-lg bg-white p-2 text-brand-700 shadow-sm
                                dark:bg-night-900 dark:text-brand-300"
@@ -36,7 +37,7 @@ export function WhyUs() {
               <p className="mt-1.5 text-sm leading-relaxed text-slate-600 dark:text-slate-400">
                 {t(`whyUs.${key}.body`)}
               </p>
-            </div>
+            </Reveal>
           ))}
         </div>
       </div>

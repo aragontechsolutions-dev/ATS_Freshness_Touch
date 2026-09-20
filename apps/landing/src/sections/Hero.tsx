@@ -22,17 +22,25 @@ export function Hero() {
           </p>
 
           <h1
-            className="mt-5 text-4xl font-extrabold tracking-tight text-brand-800 sm:text-5xl
-                         dark:text-white"
+            className="ft-enter mt-5 text-4xl font-extrabold tracking-tight text-brand-800
+                       sm:text-5xl dark:text-white"
+            style={{ '--ft-delay': '80ms' } as React.CSSProperties}
           >
             {t('hero.title')}
           </h1>
 
-          <p className="mt-5 max-w-xl text-lg leading-relaxed text-slate-600 dark:text-slate-300">
+          <p
+            className="ft-enter mt-5 max-w-xl text-lg leading-relaxed text-slate-600
+                       dark:text-slate-300"
+            style={{ '--ft-delay': '160ms' } as React.CSSProperties}
+          >
             {t('hero.subtitle')}
           </p>
 
-          <ul className="mt-6 space-y-2">
+          <ul
+            className="ft-enter mt-6 space-y-2"
+            style={{ '--ft-delay': '240ms' } as React.CSSProperties}
+          >
             {points.map((point) => (
               <li
                 key={point}
@@ -44,7 +52,10 @@ export function Hero() {
             ))}
           </ul>
 
-          <div className="mt-8 flex flex-wrap gap-3">
+          <div
+            className="ft-enter mt-8 flex flex-wrap gap-3"
+            style={{ '--ft-delay': '320ms' } as React.CSSProperties}
+          >
             <a href="#quote" className="ft-btn-primary">
               {t('hero.primaryCta')}
             </a>
@@ -55,7 +66,10 @@ export function Hero() {
         </div>
 
         {/* Tarjeta ilustrativa: muestra de un vistazo como se compone el precio. */}
-        <div className="ft-card p-6 lg:p-8">
+        <div
+          className="ft-enter ft-card p-6 lg:p-8"
+          style={{ '--ft-delay': '400ms' } as React.CSSProperties}
+        >
           <p className="text-sm font-semibold text-slate-500 dark:text-slate-400">
             {t('calculator.breakdown')}
           </p>

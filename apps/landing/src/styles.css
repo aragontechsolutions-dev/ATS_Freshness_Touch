@@ -68,6 +68,11 @@
     scroll-padding-top: 5rem; /* para que el header fijo no tape los anclajes */
   }
 
+  /* El desplazamiento suave tambien es movimiento: solo si esta permitido. */
+  html.ft-motion {
+    scroll-behavior: smooth;
+  }
+
   body {
     @apply bg-canvas text-slate-900 antialiased;
   }
@@ -179,5 +184,152 @@
   .ft-rule::after {
     content: '';
     @apply mt-3 block h-1 w-14 rounded-full bg-sun-400;
+  }
+}
+
+/* ===========================================================================
+ * MOVIMIENTO
+ * ===========================================================================
+ * Reglas que gobiernan todas las animaciones del sitio:
+ *
+ * 1. NADA SE MUEVE SIN PERMISO. Todo cuelga de la clase `ft-motion`, que el
+ *    script de arranque solo anade si el sistema NO pide reducir el
+ *    movimiento. Para quien lo pidio, o si JavaScript falla, el contenido se
+ *    ve completo y quieto: nunca invisible.
+ *
+ * 2. SOLO SE ANIMAN `opacity` Y `transform`. Son las dos propiedades que el
+ *    navegador puede componer sin recalcular el diseno de la pagina, asi que
+ *    no provocan tirones ni en moviles modestos.
+ *
+ * 3. RECORRIDOS CORTOS Y RAPIDOS. Entre 12 y 16 pixeles y menos de medio
+ *    segundo. Una animacion que se nota es una animacion que estorba.
+ * =========================================================================== */
+
+@layer components {
+  /* --- Aparicion al entrar en pantalla --- */
+  .ft-motion .ft-reveal {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+
+  .ft-motion .ft-reveal.is-visible {
+    opacity: 1;
+    transform: none;
+    transition:
+      opacity 0.5s ease-out,
+      transform 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+    /* Retardo en cascada, para que una fila de tarjetas no aparezca de golpe. */
+    transition-delay: var(--ft-delay, 0ms);
+  }
+
+  /* --- Entrada de la portada, sin esperar al desplazamiento --- */
+  .ft-motion .ft-enter {
+    animation: ft-fade-up 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
+    animation-delay: var(--ft-delay, 0ms);
+  }
+
+  /* --- Elevacion al pasar el raton sobre una tarjeta --- */
+  .ft-card-interactive {
+    transition:
+      transform 0.25s ease-out,
+      box-shadow 0.25s ease-out,
+      border-color 0.25s ease-out;
+  }
+
+  .ft-motion .ft-card-interactive:hover {
+    transform: translateY(-4px);
+    @apply border-brand-200 shadow-lg;
+  }
+
+  .dark .ft-motion .ft-card-interactive:hover {
+    @apply border-brand-700;
+  }
+
+  /* --- Respuesta al pulsar un boton --- */
+  .ft-motion .ft-btn-primary:active,
+  .ft-motion .ft-btn-secondary:active,
+  .ft-motion .ft-btn-outline:active {
+    transform: scale(0.97);
+  }
+
+  .ft-btn-primary,
+  .ft-btn-secondary,
+  .ft-btn-outline {
+    transition:
+      background-color 0.2s ease,
+      border-color 0.2s ease,
+      color 0.2s ease,
+      transform 0.12s ease-out,
+      box-shadow 0.2s ease;
+  }
+
+  /* --- Destello al cambiar el precio --- */
+  /* Sin esto, el total se actualiza en silencio y el cambio pasa inadvertido. */
+  .ft-motion .ft-flash {
+    animation: ft-flash 0.9s ease-out;
+  }
+
+  /* --- Espera mientras se calcula --- */
+  .ft-skeleton {
+    @apply rounded-md bg-slate-200;
+  }
+
+  .dark .ft-skeleton {
+    @apply bg-night-700;
+  }
+
+  .ft-motion .ft-skeleton {
+    animation: ft-pulse 1.4s ease-in-out infinite;
+  }
+
+  /* --- Sombra de la cabecera al desplazar --- */
+  .ft-header-scrolled {
+    @apply shadow-sm;
+  }
+}
+
+@keyframes ft-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes ft-flash {
+  0% {
+    background-color: color-mix(in oklab, var(--color-sun-400) 45%, transparent);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
+@keyframes ft-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+
+/*
+ * Cinturon de seguridad: aunque algo se escape de las reglas anteriores, el
+ * sistema operativo manda. Se deja 0.01ms en vez de 0 porque hay navegadores
+ * que no disparan el evento de fin de animacion con duracion exactamente cero.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }

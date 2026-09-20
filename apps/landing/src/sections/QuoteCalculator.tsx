@@ -11,6 +11,7 @@ import type {
 import { company } from '../config/company';
 import { useCatalog } from '../hooks/useCatalog';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
+import { useFlashOnChange } from '../hooks/useFlashOnChange';
 import { ApiClientError, requestQuote } from '../lib/api';
 import { formatCents, formatDate, formatMiles } from '../lib/format';
 import { PhoneIcon } from '../components/Icons';
@@ -321,9 +322,28 @@ export function QuoteCalculator() {
               </div>
             )}
 
-            {!errorKey && !showResult && (
+            {!errorKey && !showResult && !loading && (
               <div className="ft-card p-6 text-sm text-slate-600 dark:text-slate-400">
                 {t('calculator.subtitle')}
+              </div>
+            )}
+
+            {/*
+              Mientras se calcula el primer precio se muestra la FORMA del
+              resultado. Un texto de "cargando" deja la columna vacia y el
+              salto posterior resulta brusco; asi el usuario ya sabe que va
+              a aparecer y donde.
+            */}
+            {!errorKey && !showResult && loading && (
+              <div className="ft-card space-y-4 p-6" aria-hidden="true">
+                <div className="ft-skeleton h-3 w-24" />
+                <div className="ft-skeleton h-9 w-40" />
+                <div className="ft-skeleton h-3 w-52" />
+                <div className="space-y-2 pt-4">
+                  <div className="ft-skeleton h-3 w-full" />
+                  <div className="ft-skeleton h-3 w-5/6" />
+                  <div className="ft-skeleton h-3 w-4/6" />
+                </div>
               </div>
             )}
 
@@ -377,6 +397,9 @@ function clampNumber(value: number, min: number, max: number): number {
 
 function QuoteResult({ quote, locale }: { quote: QuoteResponse; locale: Locale }) {
   const { t } = useTranslation();
+  // Sin esta senal, al cambiar el formulario el total se actualiza en
+  // silencio y no queda claro si ya refleja lo que se acaba de tocar.
+  const destello = useFlashOnChange(quote.totals.totalCents);
 
   if (quote.manualReview.required && quote.totals.totalCents === 0) {
     return (
@@ -400,12 +423,15 @@ function QuoteResult({ quote, locale }: { quote: QuoteResponse; locale: Locale }
   }
 
   return (
-    <div className="ft-card divide-y divide-slate-200 dark:divide-night-600">
+    <div className="ft-enter ft-card divide-y divide-slate-200 dark:divide-night-600">
       <div className="p-6">
         <p className="text-sm font-medium text-slate-500 dark:text-slate-400">
           {t('calculator.estimatedTotal')}
         </p>
-        <p className="mt-1 text-4xl font-extrabold tracking-tight text-slate-900 dark:text-white">
+        <p
+          className={`mt-1 inline-block rounded-lg text-4xl font-extrabold tracking-tight
+                      text-slate-900 dark:text-white ${destello}`}
+        >
           {formatCents(quote.totals.totalCents, locale)}
         </p>
         <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
