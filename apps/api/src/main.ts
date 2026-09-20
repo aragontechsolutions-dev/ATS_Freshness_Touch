@@ -5,6 +5,7 @@ import { NestFactory } from '@nestjs/core';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
+import { applyBodyParsers } from './common/body-parsers';
 import type { Env } from './common/config/env';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 
@@ -13,6 +14,10 @@ async function bootstrap(): Promise<void> {
 
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     bodyParser: true,
+    // Conserva los bytes originales de cada peticion. El webhook de pagos los
+    // necesita: su firma se calcula sobre ellos y cualquier reserializacion la
+    // invalidaria.
+    rawBody: true,
   });
 
   const config = app.get(ConfigService<Env, true>);
@@ -43,9 +48,7 @@ async function bootstrap(): Promise<void> {
   });
 
   // --- Limite de tamano del cuerpo ------------------------------------------
-  // Una cotizacion valida ocupa menos de 1 KB; 16 KB es margen de sobra y
-  // evita que alguien intente saturar el servidor con cuerpos enormes.
-  app.useBodyParser('json', { limit: '16kb' });
+  applyBodyParsers(app, config.get('API_PREFIX', { infer: true }));
 
   // Render (y cualquier proxy) reenvia la IP real en X-Forwarded-For.
   // Sin esto el limitador de peticiones veria una sola IP para todo el mundo.
@@ -64,6 +67,7 @@ async function bootstrap(): Promise<void> {
 
   logger.log(`Freshness Touch API escuchando en el puerto ${port} (entorno: ${nodeEnv})`);
   logger.log(`Proveedor de distancia: ${config.get('DISTANCE_PROVIDER', { infer: true })}`);
+  logger.log(`Proveedor de pago: ${config.get('PAYMENT_PROVIDER', { infer: true })}`);
   logger.log(`Origenes CORS permitidos: ${corsOrigins.join(', ')}`);
 }
 

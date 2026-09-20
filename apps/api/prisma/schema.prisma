@@ -112,9 +112,16 @@ enum PaymentKind {
   REFUND
 }
 
+/// Debe mantenerse en paralelo con PaymentStatusSchema de @freshness/types.
 enum PaymentStatus {
+  /// Falta la tarjeta.
   REQUIRES_PAYMENT_METHOD
+  /// Hay tarjeta y falta confirmarla.
   REQUIRES_CONFIRMATION
+  /// El banco pide una verificacion adicional al titular (3D Secure).
+  REQUIRES_ACTION
+  /// En curso en el banco. Ni aprobado ni rechazado todavia.
+  PROCESSING
   /// Autorizado y a la espera de captura: el estado del deposito retenido.
   REQUIRES_CAPTURE
   SUCCEEDED
@@ -389,9 +396,14 @@ model RecurringSeries {
 // Pagos
 // ---------------------------------------------------------------------------
 
-/// Reflejo local de cada movimiento en Stripe. Stripe es la fuente de verdad
-/// del dinero; esta tabla existe para poder consultar el estado sin llamar a
-/// su API y para conciliar.
+/// Reflejo local de cada movimiento de dinero. El proveedor de pago es la
+/// fuente de verdad; esta tabla existe para poder consultar el estado sin
+/// llamar a su API y para conciliar.
+///
+/// No dice "stripe" en ningun sitio: igual que con la distancia, el proveedor
+/// se elige por configuracion. Asi el simulador puede guardar sus propios
+/// movimientos sin ensuciar el modelo con identificadores que no son de quien
+/// dicen ser.
 model Payment {
   id String @id @default(uuid()) @db.Uuid
 
@@ -401,12 +413,15 @@ model Payment {
   kind   PaymentKind
   status PaymentStatus
 
-  stripePaymentIntentId String  @unique
-  stripeCustomerId      String?
+  /// Proveedor que custodia el movimiento: "mock" o "stripe".
+  provider                String @db.VarChar(20)
+  /// Identificador del movimiento en ese proveedor (pi_... en Stripe).
+  providerPaymentIntentId String
+  providerCustomerId      String?
   /// Ultimos cuatro digitos y marca, solo para mostrarlos. NUNCA se guarda
-  /// el numero de tarjeta: lo custodia Stripe.
-  cardBrand             String?
-  cardLast4             String? @db.VarChar(4)
+  /// el numero de tarjeta: lo custodia el proveedor.
+  cardBrand               String?
+  cardLast4               String? @db.VarChar(4)
 
   amountAuthorizedCents Int
   amountCapturedCents   Int @default(0)
@@ -420,25 +435,28 @@ model Payment {
   /// capturar y hay que volver a pedir la tarjeta.
   expiresAt    DateTime? @db.Timestamptz(3)
 
-  /// Ultimo error devuelto por Stripe, para soporte.
+  /// Ultimo error devuelto por el proveedor, para soporte.
   lastErrorCode    String?
   lastErrorMessage String?
 
   createdAt DateTime @default(now()) @db.Timestamptz(3)
   updatedAt DateTime @updatedAt @db.Timestamptz(3)
 
+  /// Un mismo identificador puede existir en dos proveedores distintos (el
+  /// simulador imita el formato de Stripe), asi que la unicidad es del par.
+  @@unique([provider, providerPaymentIntentId])
   @@index([bookingId])
   @@index([status])
   @@map("payments")
 }
 
-/// Registro de eventos recibidos de Stripe.
+/// Registro de eventos recibidos del proveedor de pago.
 ///
-/// Stripe reenvia el mismo evento si no responde un 2xx a tiempo. Sin esta
+/// El proveedor reenvia el mismo evento si no recibe un 2xx a tiempo. Sin esta
 /// tabla, un reintento podria capturar dos veces el mismo deposito. La clave
 /// primaria es el identificador del evento: procesarlo dos veces es imposible.
 model WebhookEvent {
-  /// Identificador del evento en Stripe (evt_...).
+  /// Identificador del evento en el proveedor (evt_... en Stripe).
   id String @id
 
   provider    String   @default("stripe")

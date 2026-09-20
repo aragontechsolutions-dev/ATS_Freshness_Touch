@@ -13,3 +13,4 @@ haya que adivinar por qué las cosas están hechas así.
 | [0003](0003-dinero-en-centavos.md)            | El dinero se maneja en centavos enteros     | Aceptada |
 | [0004](0004-adaptadores-de-proveedores.md)    | Proveedores externos detrás de una interfaz | Aceptada |
 | [0005](0005-cotizacion-solo-codigo-postal.md) | La cotización pide solo el código postal    | Aceptada |
+| [0006](0006-idempotencia-de-webhooks.md)      | Idempotencia del webhook por `processedAt`  | Aceptada |

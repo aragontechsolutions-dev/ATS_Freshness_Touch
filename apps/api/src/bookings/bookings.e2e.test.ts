@@ -64,7 +64,16 @@ const TRABAJO = {
 
 beforeAll(async () => {
   db = await PGlite.create();
-  socket = new PGLiteSocketServer({ db, port: PORT, host: '127.0.0.1' });
+  socket = new PGLiteSocketServer({
+    db,
+    port: PORT,
+    host: '127.0.0.1',
+    // Por defecto solo admite UNA conexion, y el grupo de conexiones de la
+    // aplicacion abre varias en cuanto llegan dos peticiones a la vez. Sin
+    // esto no se podria probar la concurrencia, que es justo donde estan los
+    // errores dificiles.
+    maxConnections: 10,
+  });
   await socket.start();
 
   const migraciones = readdirSync(MIGRATIONS_DIR, { withFileTypes: true })
@@ -112,6 +121,36 @@ describe('consulta de disponibilidad', () => {
     expect(response.body.timezone).toBe('America/New_York');
     expect(response.body.durationMinutes).toBeGreaterThan(0);
     expect(response.body.slots.some((slot: { available: boolean }) => slot.available)).toBe(true);
+  });
+
+  it('los extras llegan por la URL y alargan el trabajo', async () => {
+    /*
+     * Express 5 analiza la cadena de consulta en modo simple: no entiende
+     * "addOns[0][code]=...", asi que un array de objetos se perderia en
+     * silencio. La duracion saldria corta y se ofrecerian franjas en las que
+     * el trabajo no cabe, dejando al equipo trabajando fuera de horario.
+     */
+    const dia = proximoDiaLaborable();
+    const sinExtras = await request(app.getHttpServer())
+      .get('/api/v1/availability')
+      .query({ date: dia, ...TRABAJO, addOns: [] })
+      .expect(200);
+
+    const conExtras = await request(app.getHttpServer())
+      .get('/api/v1/availability')
+      .query({ date: dia, ...TRABAJO, addOns: 'INSIDE_OVEN:1,INTERIOR_WINDOWS:4' })
+      .expect(200);
+
+    expect(conExtras.body.durationMinutes).toBeGreaterThan(sinExtras.body.durationMinutes);
+  });
+
+  it('rechaza un extra que no existe en vez de ignorarlo', async () => {
+    const response = await request(app.getHttpServer())
+      .get('/api/v1/availability')
+      .query({ date: proximoDiaLaborable(), ...TRABAJO, addOns: 'NO_EXISTE:1' })
+      .expect(400);
+
+    expect(response.body.code).toBe('VALIDATION_ERROR');
   });
 
   it('el servicio comercial no se puede agendar desde la web', async () => {

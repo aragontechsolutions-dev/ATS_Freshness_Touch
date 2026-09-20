@@ -1,12 +1,22 @@
 import {
   API_ERROR_CODES,
   ApiErrorSchema,
+  AvailabilityResponseSchema,
+  BookingResponseSchema,
   CatalogResponseSchema,
+  MockPaymentConfirmResponseSchema,
   QuoteResponseSchema,
   type ApiError,
+  type AvailabilityResponse,
+  type BookingRequestInput,
+  type BookingResponse,
   type CatalogResponse,
+  type MockPaymentConfirmRequestInput,
+  type MockPaymentConfirmResponse,
+  type QuoteAddOnInput,
   type QuoteRequestInput,
   type QuoteResponse,
+  type ServiceType,
 } from '@freshness/types';
 
 /** Prefijo de version que sirve la API. */
@@ -139,6 +149,103 @@ export function requestQuote(
     (payload) => {
       const parsed = QuoteResponseSchema.safeParse(payload);
       if (!parsed.success) throw new ApiClientError('BAD_CONTRACT', 'calculator.errorGeneric');
+      return parsed.data;
+    },
+  );
+}
+
+/** Consulta de franjas libres para un dia y un trabajo concretos. */
+export interface AvailabilityQuery {
+  /** AAAA-MM-DD en la zona horaria de la empresa. */
+  date: string;
+  service: ServiceType;
+  bedrooms: number;
+  bathrooms: number;
+  squareFeet: number;
+  addOns: QuoteAddOnInput[];
+}
+
+/**
+ * Los extras viajan como "INSIDE_OVEN:1,LAUNDRY:2".
+ *
+ * La API analiza la cadena de consulta en modo simple y no entiende la
+ * notacion con corchetes, asi que un array de objetos se perderia por el
+ * camino y la duracion estimada saldria corta.
+ */
+function encodeAddOns(addOns: QuoteAddOnInput[]): string {
+  return addOns.map((addOn) => `${addOn.code}:${addOn.quantity}`).join(',');
+}
+
+export function fetchAvailability(
+  query: AvailabilityQuery,
+  signal?: AbortSignal,
+): Promise<AvailabilityResponse> {
+  const params = new URLSearchParams({
+    date: query.date,
+    service: query.service,
+    bedrooms: String(query.bedrooms),
+    bathrooms: String(query.bathrooms),
+    squareFeet: String(query.squareFeet),
+  });
+
+  if (query.addOns.length > 0) {
+    params.set('addOns', encodeAddOns(query.addOns));
+  }
+
+  return request(`/availability?${params.toString()}`, { method: 'GET', signal }, (payload) => {
+    const parsed = AvailabilityResponseSchema.safeParse(payload);
+    if (!parsed.success) throw new ApiClientError('BAD_CONTRACT', 'calculator.errorGeneric');
+    return parsed.data;
+  });
+}
+
+/**
+ * Crea la reserva.
+ *
+ * El cuerpo NO lleva precios: solo las caracteristicas del trabajo, la franja,
+ * la direccion y el contacto. El importe y el deposito los calcula el servidor.
+ */
+export function createBooking(
+  body: BookingRequestInput,
+  signal?: AbortSignal,
+): Promise<BookingResponse> {
+  return request(
+    '/bookings',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      signal,
+    },
+    (payload) => {
+      const parsed = BookingResponseSchema.safeParse(payload);
+      if (!parsed.success) throw new ApiClientError('BAD_CONTRACT', 'booking.errorTitle');
+      return parsed.data;
+    },
+  );
+}
+
+/**
+ * Confirma la tarjeta cuando el proveedor activo es el simulador.
+ *
+ * Con Stripe este endpoint no existe (responde 404) y quien confirma la
+ * tarjeta es el navegador contra los servidores de Stripe.
+ */
+export function confirmMockPayment(
+  body: MockPaymentConfirmRequestInput,
+  signal?: AbortSignal,
+): Promise<MockPaymentConfirmResponse> {
+  return request(
+    '/payments/mock/confirm',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      signal,
+    },
+    (payload) => {
+      const parsed = MockPaymentConfirmResponseSchema.safeParse(payload);
+      if (!parsed.success) throw new ApiClientError('BAD_CONTRACT', 'booking.errorTitle');
       return parsed.data;
     },
   );

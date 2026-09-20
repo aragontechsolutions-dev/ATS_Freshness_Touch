@@ -9,6 +9,7 @@ import { BookingsModule } from './bookings/bookings.module';
 import { DatabaseModule } from './database/database.module';
 import { DistanceModule } from './distance/distance.module';
 import { HealthModule } from './health/health.module';
+import { PaymentsModule } from './payments/payments.module';
 import { QuotesModule } from './quotes/quotes.module';
 import { SchedulingModule } from './scheduling/scheduling.module';
 
@@ -49,6 +50,7 @@ import { SchedulingModule } from './scheduling/scheduling.module';
     DistanceModule,
     QuotesModule,
     SchedulingModule,
+    PaymentsModule,
     BookingsModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],

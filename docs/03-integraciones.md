@@ -67,9 +67,31 @@ postales distintos.
 
 ---
 
-## Pagos — Stripe (Etapa 2, no implementado)
+## Pagos (implementado)
 
-Plan acordado, documentado aquí para que la etapa siguiente no empiece de cero:
+Mismo patrón que la distancia: una interfaz `PaymentProvider` y dos
+implementaciones que se eligen con `PAYMENT_PROVIDER`.
+
+### Modo `mock` (activo por defecto)
+
+`MockPaymentProvider` simula el proveedor sin mover dinero. Permite desarrollar
+y probar el flujo completo —reserva, retención, aviso, confirmación— sin cuenta
+de Stripe.
+
+No guarda estado a propósito: la fuente de verdad de lo que pasó con cada
+depósito es nuestra tabla `payments`, no el simulador. Una simulación con
+memoria en el proceso mentiría en cuanto la API se reiniciara.
+
+Sus webhooks se firman con HMAC-SHA256 sobre el cuerpo crudo
+(`PAYMENT_MOCK_WEBHOOK_SECRET`, cabecera `x-mock-signature`), así que la
+verificación de firma se ejercita de verdad y no se queda sin probar hasta el
+día en que se conecte Stripe.
+
+> ⚠️ Con este modo activo en producción **no se retiene dinero real**. La API
+> escribe un error en los registros en cada arranque para que no pase
+> inadvertido.
+
+### Modo `stripe` (implementado, pendiente de credenciales)
 
 | Necesidad                               | Solución                                       |
 | --------------------------------------- | ---------------------------------------------- |
@@ -79,16 +101,37 @@ Plan acordado, documentado aquí para que la etapa siguiente no empiece de cero:
 | Cobro presencial                        | Stripe Terminal (2,7 % + 0,05 USD)             |
 | Pagar al personal por la plataforma     | Stripe Connect, solo si llega a hacer falta    |
 
-Reglas que deberán respetarse:
+Decisiones tomadas en la implementación:
 
-- **Nunca** se almacenan números de tarjeta. Se usan los componentes de Stripe
-  para que los datos no pasen por nuestro servidor (ámbito PCI mínimo, SAQ-A).
-- Todos los webhooks se verifican con `stripe.webhooks.constructEvent`. Un
-  webhook sin verificar es una puerta abierta para falsificar pagos.
+- **Solo tarjeta** (`payment_method_types: ['card']`). Los demás métodos que
+  ofrece Stripe no admiten retener y capturar después, que es justo lo que este
+  depósito necesita.
+- **No se fija `apiVersion` a mano.** La librería usa la versión con la que se
+  generaron sus propios tipos, así que código y tipos no pueden desincronizarse
+  al actualizar.
+- **Clave de idempotencia derivada** de la reserva y el importe, no aleatoria:
+  un reintento tras un fallo de red devuelve la retención que ya existe en vez
+  de bloquear los fondos dos veces.
+- **Estados sin colapsar.** `requires_action` (el banco pide verificar al
+  titular) y `processing` (el banco aún decide) tienen su propio valor en el
+  modelo. Guardar cualquiera de los dos como «pendiente de confirmar» haría que
+  soporte leyera una situación distinta de la real.
+
+Reglas que se respetan:
+
+- **Nunca** se almacenan números de tarjeta. El navegador los envía
+  directamente a Stripe con el `client_secret` (ámbito PCI mínimo, SAQ-A). Solo
+  se guardan marca y últimos cuatro dígitos, y solo para mostrarlos.
+- Todos los webhooks se verifican con `stripe.webhooks.constructEvent` sobre el
+  **cuerpo crudo**. Un webhook sin verificar es una puerta abierta para
+  falsificar pagos.
 - Una retención solo se puede capturar una vez y no se puede aumentar: si el
   precio final supera lo autorizado, se cobra la diferencia aparte.
-- Las retenciones caducan a los 7 días (ampliables a 30 con autorizaciones
-  extendidas). El calendario de reservas debe tenerlo en cuenta.
+- Las retenciones caducan a los 7 días. El calendario de reservas lo tiene en
+  cuenta (`PAYMENT_AUTHORIZATION_DAYS`).
+
+El detalle del flujo y de la idempotencia está en
+`docs/12-pagos-y-deposito.md`.
 
 ## Notificaciones (Etapa 3, no implementado)
 

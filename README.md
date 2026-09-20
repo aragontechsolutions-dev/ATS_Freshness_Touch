@@ -86,6 +86,10 @@ proveedor de distancia funciona en modo simulado por defecto.
 | [06 — Guía de desarrollo](docs/06-guia-de-desarrollo.md)        | Convenciones y flujo de trabajo                    |
 | [07 — Cumplimiento en Georgia](docs/07-cumplimiento-georgia.md) | Impuestos, personal, seguros y avisos legales      |
 | [08 — Variables de entorno](docs/08-variables-de-entorno.md)    | Configuración de Render, Vercel, Supabase y Stripe |
+| [09 — Identidad visual](docs/09-identidad-visual.md)            | Colores, tipografías y uso del logotipo            |
+| [10 — Modelo de datos](docs/10-modelo-de-datos.md)              | Tablas, migraciones y reglas de integridad         |
+| [11 — Flujo de reserva](docs/11-flujo-de-reserva.md)            | De la cotización a la cita, y la doble reserva     |
+| [12 — Pagos y depósito](docs/12-pagos-y-deposito.md)            | Retención en tarjeta, webhook y su seguridad       |
 | [Decisiones (ADR)](docs/adr/)                                   | Registro de decisiones técnicas                    |
 
 ## Pendiente antes de abrir el sitio al público

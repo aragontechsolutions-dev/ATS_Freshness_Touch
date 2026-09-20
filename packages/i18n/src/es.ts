@@ -144,14 +144,112 @@ export const es: TranslationResources = {
   },
 
   booking: {
+    /* ----------------------------- Llamada ----------------------------- */
+    cta: 'Reservar esta limpieza',
+    title: 'Reserva tu limpieza',
+    close: 'Cerrar',
+    back: 'Atrás',
+    next: 'Continuar',
+    stepOf: 'Paso {{current}} de {{total}}',
+    steps: {
+      schedule: 'Fecha y hora',
+      details: 'Tus datos',
+      payment: 'Tarjeta',
+    },
+
+    /* ------------------------- 1. Fecha y hora ------------------------- */
+    schedule: {
+      title: 'Elige día y hora',
+      dateLabel: 'Fecha',
+      loading: 'Consultando disponibilidad…',
+      closed: 'Ese día no abrimos. Elige otro, por favor.',
+      none: 'No quedan horas libres ese día. Elige otro, por favor.',
+      duration: 'Este trabajo dura unas {{duration}}.',
+      timezone: 'Todas las horas son de Georgia (hora del Este).',
+      leadTime: 'Necesitamos al menos 24 horas para preparar al equipo.',
+      fullyBooked: 'Sin equipo libre',
+      tooSoon: 'Demasiado pronto',
+      doesNotFit: 'No da tiempo ese día',
+    },
+
+    /* --------------------- 2. Direccion y contacto --------------------- */
+    details: {
+      title: 'Dónde y quién',
+      addressTitle: 'Dirección del servicio',
+      contactTitle: 'Datos de contacto',
+      firstName: 'Nombre',
+      lastName: 'Apellidos',
+      email: 'Correo electrónico',
+      phone: 'Teléfono',
+      line1: 'Calle y número',
+      line2: 'Apartamento, suite, unidad (opcional)',
+      city: 'Ciudad',
+      state: 'Estado',
+      postalCode: 'Código postal',
+      postalCodeLocked: 'Viene de tu cotización. Cámbialo allí para calcular otra zona.',
+      accessNotes: 'Instrucciones de acceso (opcional)',
+      accessNotesHelp:
+        'Código del portón, dónde está la llave, si hay perro en el jardín. Solo lo ven el equipo asignado a tu trabajo y nuestra oficina.',
+      customerNotes: '¿Algo más que debamos saber? (opcional)',
+      marketingOptIn: 'Quiero recibir ofertas y consejos de limpieza de vez en cuando.',
+      priceNotice:
+        'El precio final se confirma con la dirección completa, así que puede variar ligeramente respecto a la estimación.',
+    },
+
+    /* ----------------------------- 3. Pago ----------------------------- */
+    payment: {
+      title: 'Asegura tu reserva',
+      depositTitle: 'Depósito de traslado',
+      depositExplainer:
+        'Retenemos {{amount}} en tu tarjeta. No es un cobro: se acredita íntegro contra tu factura final y solo lo cobramos si cancelas cuando nuestro equipo ya va en camino.',
+      holdExpires: 'Tu franja queda reservada hasta las {{time}}.',
+      dueLater: 'A pagar el día del servicio',
+      authorise: 'Autorizar retención de {{amount}}',
+      working: 'Hablando con tu banco…',
+      simulatedTitle: 'Pago simulado',
+      simulatedBody:
+        'El pago con tarjeta todavía no está conectado, así que no se mueve dinero ni se piden datos de tarjeta. Este botón completa la reserva igual que lo hará el de verdad.',
+      simulatedDecline: 'Simular tarjeta rechazada',
+      unavailableTitle: 'El pago con tarjeta no está disponible ahora mismo',
+      unavailableBody:
+        'Tu franja queda reservada. Llámanos al {{phone}} y terminamos la reserva contigo.',
+    },
+
+    /* -------------------------- Confirmacion --------------------------- */
+    done: {
+      title: 'Tu limpieza está reservada',
+      reference: 'Referencia de la reserva',
+      referenceHelp: 'Tenla a mano: es la forma más rápida de que encontremos tu reserva.',
+      when: 'Cuándo',
+      where: 'Dónde',
+      held: 'Retenido en tu tarjeta',
+      dueLater: 'A pagar el día del servicio',
+      contact: 'Te llamaremos al {{phone}} si necesitamos algo antes de la visita.',
+      finish: 'Listo',
+      pendingTitle: 'Reserva recibida, pago pendiente',
+      pendingBody:
+        'No pudimos iniciar la retención en tu tarjeta, así que la reserva aún no está confirmada. Llámanos al {{phone}} y la terminamos contigo.',
+      declinedTitle: 'Tu tarjeta fue rechazada',
+      declinedBody: 'La franja ha quedado libre. Puedes empezar de nuevo con otra tarjeta.',
+      tryAgain: 'Empezar de nuevo',
+    },
+
+    /* ----------------------------- Errores ----------------------------- */
+    errorTitle: 'No pudimos completar tu reserva',
+    errorRequired: 'Este campo es obligatorio.',
+    errorEmail: 'Escribe un correo electrónico válido.',
+    errorPhone: 'Escribe un teléfono de EE. UU. válido.',
+    errorPostalCode: 'Escribe un código postal válido de 5 dígitos.',
+    errorDateRequired: 'Elige una fecha.',
+    errorSlotRequired: 'Elige una hora.',
     errorSlotTaken: 'Acaban de ocupar esa hora. Elige otra franja, por favor.',
     errorAlreadyBooked: 'Ya tienes una reserva a esa hora.',
     errorRequiresWalkthrough:
       'Los trabajos comerciales se agendan tras una visita gratuita. Contáctanos y la organizamos.',
     errorDateOutOfRange: 'Elige una fecha dentro de los próximos 90 días.',
     errorNotBookable: 'No podemos reservar este trabajo en línea. Contáctanos y te ayudamos.',
+    errorPaymentNotFound: 'No encontramos ese pago. Empieza de nuevo, por favor.',
   },
-
   quote: {
     line: {
       service: {

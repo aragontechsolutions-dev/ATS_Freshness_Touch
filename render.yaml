@@ -76,6 +76,33 @@ services:
       - key: DISTANCE_TIMEOUT_MS
         value: '5000'
 
+      # --- Pagos ---
+      # mock | stripe. Con "mock" los depositos se SIMULAN: no se retiene
+      # dinero real. Sirve para desplegar y probar el flujo completo antes de
+      # tener cuenta de Stripe; la API avisa por error en los registros
+      # mientras siga asi en produccion.
+      - key: PAYMENT_PROVIDER
+        value: mock
+      # Secretos: se introducen a mano en el panel, nunca en el repositorio.
+      # STRIPE_SECRET_KEY:     clave secreta de la cuenta (sk_live_... ).
+      # STRIPE_WEBHOOK_SECRET: secreto del endpoint de webhook (whsec_...),
+      #                        que es DISTINTO de la clave secreta. Sin el, no
+      #                        hay forma de comprobar que un aviso de "deposito
+      #                        autorizado" viene de verdad de Stripe.
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+      - key: STRIPE_TIMEOUT_MS
+        value: '10000'
+      # Dias que dura la retencion. Siete es el maximo de las redes de tarjetas.
+      - key: PAYMENT_AUTHORIZATION_DAYS
+        value: '7'
+      # Texto que ve el cliente en su extracto bancario. Si no lo reconoce,
+      # reclama al banco, y eso cuesta dinero y reputacion.
+      - key: PAYMENT_STATEMENT_DESCRIPTOR
+        value: FRESHNESS
+
       - key: RATE_LIMIT_TTL_SECONDS
         value: '60'
       - key: RATE_LIMIT_MAX

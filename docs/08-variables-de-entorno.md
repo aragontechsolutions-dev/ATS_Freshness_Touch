@@ -17,23 +17,30 @@ por qué el plan gratuito no sirve).
 Si importas `render.yaml` como Blueprint, la mayoría ya viene puesta y solo
 tendrás que rellenar las marcadas como **"a mano"**.
 
-| Variable                     | Valor                         | Nota                                                                                                |
-| ---------------------------- | ----------------------------- | --------------------------------------------------------------------------------------------------- |
-| `NODE_VERSION`               | `22`                          |                                                                                                     |
-| `NODE_ENV`                   | `production`                  |                                                                                                     |
-| `API_PREFIX`                 | `api/v1`                      |                                                                                                     |
-| `CORS_ORIGINS`               | `https://TU-SITIO.vercel.app` | **A mano.** Dominios del sitio separados por coma, sin espacios ni barra final. Nunca `*`           |
-| `DISTANCE_PROVIDER`          | `mock`                        | Cambiar a `google` cuando haya clave y facturación                                                  |
-| `GOOGLE_MAPS_API_KEY`        | _(vacío)_                     | **A mano**, solo si usas `google`. Si pones `google` sin clave, la API **no arranca** (a propósito) |
-| `DISTANCE_CACHE_TTL_SECONDS` | `86400`                       | 24 h                                                                                                |
-| `DISTANCE_CACHE_MAX_ENTRIES` | `5000`                        |                                                                                                     |
-| `DISTANCE_TIMEOUT_MS`        | `5000`                        |                                                                                                     |
-| `RATE_LIMIT_TTL_SECONDS`     | `60`                          |                                                                                                     |
-| `RATE_LIMIT_MAX`             | `60`                          | Peticiones por IP y minuto                                                                          |
-| `QUOTE_RATE_LIMIT_MAX`       | `10`                          | Cotizaciones por IP y minuto                                                                        |
-| `COMPANY_BASE_CITY`          | `Atlanta`                     | **A mano.** Base real de operaciones                                                                |
-| `COMPANY_BASE_STATE`         | `GA`                          | **A mano.** Exactamente 2 letras                                                                    |
-| `COMPANY_BASE_POSTAL_CODE`   | `30303`                       | **A mano.** Exactamente 5 dígitos                                                                   |
+| Variable                       | Valor                         | Nota                                                                                                |
+| ------------------------------ | ----------------------------- | --------------------------------------------------------------------------------------------------- |
+| `NODE_VERSION`                 | `22`                          |                                                                                                     |
+| `NODE_ENV`                     | `production`                  |                                                                                                     |
+| `API_PREFIX`                   | `api/v1`                      |                                                                                                     |
+| `CORS_ORIGINS`                 | `https://TU-SITIO.vercel.app` | **A mano.** Dominios del sitio separados por coma, sin espacios ni barra final. Nunca `*`           |
+| `DISTANCE_PROVIDER`            | `mock`                        | Cambiar a `google` cuando haya clave y facturación                                                  |
+| `GOOGLE_MAPS_API_KEY`          | _(vacío)_                     | **A mano**, solo si usas `google`. Si pones `google` sin clave, la API **no arranca** (a propósito) |
+| `DISTANCE_CACHE_TTL_SECONDS`   | `86400`                       | 24 h                                                                                                |
+| `DISTANCE_CACHE_MAX_ENTRIES`   | `5000`                        |                                                                                                     |
+| `DISTANCE_TIMEOUT_MS`          | `5000`                        |                                                                                                     |
+| `PAYMENT_PROVIDER`             | `mock`                        | Cambiar a `stripe` cuando haya cuenta. Con `mock` **no se retiene dinero real**                     |
+| `STRIPE_SECRET_KEY`            | _(vacío)_                     | **A mano**, solo si usas `stripe`. Sin ella la API **no arranca** (a propósito)                     |
+| `STRIPE_WEBHOOK_SECRET`        | _(vacío)_                     | **A mano**, solo si usas `stripe`. Es el secreto del _endpoint_, **no** la clave secreta            |
+| `STRIPE_TIMEOUT_MS`            | `10000`                       |                                                                                                     |
+| `PAYMENT_AUTHORIZATION_DAYS`   | `7`                           | Días que dura la retención. 7 es el máximo de las redes de tarjetas                                 |
+| `PAYMENT_STATEMENT_DESCRIPTOR` | `FRESHNESS`                   | Lo que ve el cliente en su extracto. Solo letras, números y espacios; máximo 10                     |
+| `PAYMENT_MOCK_WEBHOOK_SECRET`  | _(no hace falta)_             | Solo para desarrollo y pruebas con el simulador                                                     |
+| `RATE_LIMIT_TTL_SECONDS`       | `60`                          |                                                                                                     |
+| `RATE_LIMIT_MAX`               | `60`                          | Peticiones por IP y minuto                                                                          |
+| `QUOTE_RATE_LIMIT_MAX`         | `10`                          | Cotizaciones por IP y minuto                                                                        |
+| `COMPANY_BASE_CITY`            | `Atlanta`                     | **A mano.** Base real de operaciones                                                                |
+| `COMPANY_BASE_STATE`           | `GA`                          | **A mano.** Exactamente 2 letras                                                                    |
+| `COMPANY_BASE_POSTAL_CODE`     | `30303`                       | **A mano.** Exactamente 5 dígitos                                                                   |
 
 ### Qué NO hay que configurar
 
@@ -59,11 +66,17 @@ Health: /health
 
 **Root Directory:** `apps/landing` · El resto lo define `vercel.json`.
 
-| Variable            | Valor                                |
-| ------------------- | ------------------------------------ |
-| `VITE_API_BASE_URL` | `https://TU-API.onrender.com/api/v1` |
+| Variable                      | Valor                                | Cuándo                       |
+| ----------------------------- | ------------------------------------ | ---------------------------- |
+| `VITE_API_BASE_URL`           | `https://TU-API.onrender.com/api/v1` | Siempre                      |
+| `VITE_STRIPE_PUBLISHABLE_KEY` | `pk_test_...` / `pk_live_...`        | Solo al activar pagos reales |
 
-Es la única. Aplícala a los tres entornos (Production, Preview, Development).
+Aplícalas a los tres entornos (Production, Preview, Development).
+
+Sin `VITE_STRIPE_PUBLISHABLE_KEY` el sitio **no se rompe**: el paso de la
+tarjeta muestra el teléfono de la empresa y la reserva queda pendiente de
+gestión manual. Es deliberado, para que una variable sin rellenar no deje una
+pantalla rota.
 
 > ⚠️ **Las variables `VITE_*` se incrustan en el archivo que descarga el
 > navegador.** Cualquiera puede leerlas viendo el código fuente de la página.
@@ -172,16 +185,50 @@ VITE_SUPABASE_ANON_KEY=...
 > de datos. Va solo en Render, nunca en Vercel, nunca en un archivo del
 > repositorio, nunca en una variable `VITE_*`.
 
-## 5. Stripe (Etapa 2 — preparación)
+## 5. Stripe (implementado — activación pendiente)
+
+El módulo de pagos ya funciona de punta a punta con el proveedor simulado. Para
+pasar a cobros reales hacen falta tres cosas, en este orden:
+
+**1. Claves de la cuenta** (Stripe → Developers → API keys):
 
 ```bash
-STRIPE_SECRET_KEY=sk_test_...          # solo servidor
-STRIPE_WEBHOOK_SECRET=whsec_...        # solo servidor, para verificar firmas
+STRIPE_SECRET_KEY=sk_test_...            # solo Render, nunca en el navegador
 VITE_STRIPE_PUBLISHABLE_KEY=pk_test_...  # navegador, es pública por diseño
 ```
 
+**2. Endpoint de webhook** (Stripe → Developers → Webhooks → Add endpoint):
+
+| Campo   | Valor                                                                                                                              |
+| ------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| URL     | `https://TU-API.onrender.com/api/v1/payments/webhook`                                                                              |
+| Eventos | `payment_intent.amount_capturable_updated`, `payment_intent.succeeded`, `payment_intent.payment_failed`, `payment_intent.canceled` |
+
+Stripe muestra entonces un **secreto de firma** (`whsec_...`) que es **distinto**
+de la clave secreta de la cuenta:
+
+```bash
+STRIPE_WEBHOOK_SECRET=whsec_...
+```
+
+> 🔒 Sin ese secreto no hay manera de comprobar que un aviso de «depósito
+> autorizado» viene de verdad de Stripe: cualquiera podría confirmar reservas
+> que nadie ha pagado. Por eso la API **se niega a arrancar** con
+> `PAYMENT_PROVIDER=stripe` si falta.
+
+**3. Cambiar el proveedor:**
+
+```bash
+PAYMENT_PROVIDER=stripe
+```
+
 Empezar siempre en modo de prueba (`sk_test_` / `pk_test_`) y no pasar a claves
-reales hasta que el flujo completo de depósito y cobro esté verificado.
+reales hasta que el flujo completo de depósito y cobro esté verificado con las
+tarjetas de prueba de Stripe.
+
+**Mientras tanto**, con `PAYMENT_PROVIDER=mock` todo el flujo funciona pero **no
+se retiene dinero real**. La API escribe un error en los registros de Render en
+cada arranque para que esa situación no pase inadvertida en producción.
 
 ---
 
@@ -193,6 +240,8 @@ reales hasta que el flujo completo de depósito y cobro esté verificado.
 | `SUPABASE_SERVICE_ROLE_KEY`   | ✅     | ❌     | ❌          |
 | `DATABASE_URL` / `DIRECT_URL` | ✅     | ❌     | ❌          |
 | `STRIPE_SECRET_KEY`           | ✅     | ❌     | ❌          |
+| `STRIPE_WEBHOOK_SECRET`       | ✅     | ❌     | ❌          |
+| `VITE_STRIPE_PUBLISHABLE_KEY` | ❌     | ✅     | ❌          |
 | Clave pública de Supabase     | ✅     | ✅     | ❌          |
 | `VITE_API_BASE_URL`           | ❌     | ✅     | ❌          |
 

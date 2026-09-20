@@ -37,8 +37,8 @@ Vive en `apps/api/prisma/schema.prisma`.
 | `quotes`              | Cotizaciones emitidas (antes no se guardaba ninguna)   |
 | `bookings`            | Citas y trabajos, con el precio pactado congelado      |
 | `recurring_series`    | Series recurrentes como objeto propio                  |
-| `payments`            | Reflejo local de cada movimiento en Stripe             |
-| `webhook_events`      | Eventos de Stripe ya procesados (idempotencia)         |
+| `payments`            | Reflejo local de cada movimiento de dinero             |
+| `webhook_events`      | Eventos del proveedor de pago (idempotencia)           |
 | `staff`               | Personal, lo mínimo para asignar trabajos              |
 | `booking_assignments` | Qué persona atiende qué trabajo                        |
 | `business_settings`   | Configuración editable desde el panel                  |
@@ -53,9 +53,24 @@ código postal, `customerId` es nulo hasta que la persona deja sus datos.
 
 ### Por qué `webhook_events` es crítica
 
-Stripe reenvía el mismo evento si no recibe un `2xx` a tiempo. Sin esta tabla,
-un reintento podría **capturar dos veces el mismo depósito**. Su clave primaria
-es el identificador del evento, así que procesarlo dos veces es imposible.
+El proveedor de pago reenvía el mismo evento si no recibe un `2xx` a tiempo.
+Sin esta tabla, un reintento podría **capturar dos veces el mismo depósito**.
+
+Un evento se considera procesado solo cuando tiene `processedAt`, no por el
+mero hecho de existir la fila: si el procesamiento falla, la transacción se
+deshace y el reintento vuelve a intentarlo de verdad. El razonamiento completo
+está en `docs/12-pagos-y-deposito.md`.
+
+### Por qué `payments` no menciona a Stripe
+
+La tabla nació con columnas `stripePaymentIntentId` y `stripeCustomerId`. Con
+el módulo de pagos por adaptadores eso dejó de ser cierto: el simulador también
+guarda movimientos ahí, y escribir sus identificadores en una columna que dice
+«stripe» sería guardar un dato que miente sobre su origen.
+
+Hoy son `provider`, `providerPaymentIntentId` y `providerCustomerId`, con
+unicidad del **par** `(provider, providerPaymentIntentId)`. Un test falla si
+alguna columna vuelve a llamarse `stripe*`.
 
 ### Por qué las series recurrentes son un objeto propio
 
@@ -84,7 +99,8 @@ equipo asignado a ese trabajo y administración, nunca un listado general. Al
 implementar los permisos hay que tratarlo como caso aparte.
 
 `payments` **nunca** guarda números de tarjeta, solo marca y últimos cuatro
-dígitos para mostrarlos. La tarjeta la custodia Stripe.
+dígitos para mostrarlos. La tarjeta la custodia el proveedor de pago: el
+navegador se la envía directamente y no pasa por nuestro servidor.
 
 ## Cómo se verifica
 
@@ -93,9 +109,10 @@ un **PostgreSQL real compilado a WebAssembly** (PGlite). No hace falta servidor
 ni credenciales, así que se ejecuta también en la integración continua.
 
 Comprueba que el SQL es válido y congela las reglas de integridad: correo único
-por cliente, no hay direcciones huérfanas, no se procesa dos veces un evento de
-Stripe, no se borra un cliente con historial, todo el dinero es entero y todas
-las fechas llevan zona horaria.
+por cliente, no hay direcciones huérfanas, no se procesa dos veces un evento del
+proveedor de pago, no se borra un cliente con historial, cada pago declara quién
+lo custodia, ninguna columna da por supuesto un proveedor concreto, todo el
+dinero es entero y todas las fechas llevan zona horaria.
 
 ## Cómo aplicar la migración
 
