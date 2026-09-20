@@ -1,6 +1,7 @@
 import { Logger, Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import type { Env } from '../common/config/env';
+import { MockPaymentsController } from './mock-payments.controller';
 import { PaymentsService } from './payments.service';
 import { PAYMENT_PROVIDER, type PaymentProvider } from './payments.types';
 import { MockPaymentProvider } from './providers/mock-payment.provider';
@@ -14,7 +15,7 @@ import { WebhooksService } from './webhooks.service';
  */
 @Module({
   imports: [ConfigModule],
-  controllers: [WebhooksController],
+  controllers: [WebhooksController, MockPaymentsController],
   providers: [
     {
       provide: PAYMENT_PROVIDER,

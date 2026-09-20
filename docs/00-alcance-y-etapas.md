@@ -78,7 +78,10 @@ Progreso:
 - ✅ **Pagos y depósito** (`docs/12-pagos-y-deposito.md`): retención del
   depósito al reservar, webhook con verificación de firma e idempotencia, y
   proveedor simulado que permite probarlo todo sin cuenta de Stripe.
-- ⬜ Formulario de reserva en el sitio web, con el paso de tarjeta.
+- ✅ **Formulario de reserva en el sitio** (`docs/11-flujo-de-reserva.md`):
+  tres pasos, accesible con teclado, bilingüe y verificado en navegador real.
+- ⬜ Probar el pago real con credenciales de Stripe (el código está, falta
+  recorrerlo con tarjetas de prueba).
 - ⬜ Autenticación y panel de administración.
 - ⬜ Captura del importe final y devoluciones desde el panel.
 - ⬜ Avisos por correo y SMS.

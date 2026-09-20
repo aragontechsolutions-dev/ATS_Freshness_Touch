@@ -49,3 +49,33 @@ export const PaymentIntentSchema = z.strictObject({
   expiresAt: z.iso.datetime().nullable(),
 });
 export type PaymentIntent = z.infer<typeof PaymentIntentSchema>;
+
+/**
+ * CONFIRMACION SIMULADA
+ * ---------------------
+ * Con el proveedor real, el navegador confirma la tarjeta contra sus
+ * servidores y estos nos avisan por webhook. El simulador no tiene servidores,
+ * asi que la API expone el equivalente: un endpoint que hace de "el cliente
+ * acaba de confirmar su tarjeta" y dispara el mismo procesamiento.
+ *
+ * Solo existe cuando el proveedor activo es el simulador. Con Stripe la ruta
+ * responde 404, como si no estuviera escrita.
+ */
+export const MockPaymentConfirmRequestSchema = z.strictObject({
+  /** La misma credencial que recibio el navegador al crear la reserva. */
+  clientSecret: z.string().trim().min(10).max(200),
+  /**
+   * Permite simular tambien el rechazo del banco. Sin esto solo se podria
+   * probar el camino feliz, que es justo el que nunca falla en produccion.
+   */
+  outcome: z.enum(['AUTHORIZE', 'DECLINE']).default('AUTHORIZE'),
+});
+export type MockPaymentConfirmRequest = z.infer<typeof MockPaymentConfirmRequestSchema>;
+export type MockPaymentConfirmRequestInput = z.input<typeof MockPaymentConfirmRequestSchema>;
+
+export const MockPaymentConfirmResponseSchema = z.strictObject({
+  status: PaymentStatusSchema,
+  /** Estado en que queda la reserva tras la confirmacion. */
+  bookingStatus: z.enum(['PENDING_PAYMENT', 'CONFIRMED', 'CANCELLED']),
+});
+export type MockPaymentConfirmResponse = z.infer<typeof MockPaymentConfirmResponseSchema>;

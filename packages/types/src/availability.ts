@@ -11,6 +11,32 @@ import { QuoteAddOnInputSchema } from './quote';
  * consulta lleva los datos del servicio y no solo la fecha.
  */
 
+/**
+ * Extras en la cadena de consulta: "INSIDE_OVEN:1,LAUNDRY:2".
+ *
+ * Express 5 analiza la URL en modo simple y NO entiende la notacion con
+ * corchetes (`addOns[0][code]=...`), asi que un array de objetos nunca
+ * llegaria al servidor: los extras se perderian en silencio y la duracion
+ * estimada saldria corta, ofreciendo franjas en las que el trabajo no cabe.
+ *
+ * Se sigue aceptando el array tal cual, para quien llame con JSON.
+ */
+export const AddOnsQuerySchema = z
+  .preprocess((value) => {
+    if (typeof value !== 'string') return value;
+    if (value.trim() === '') return [];
+
+    return value.split(',').map((item) => {
+      const [code, quantity] = item.split(':');
+      return {
+        code: code?.trim(),
+        // Sin cantidad se asume una: "INSIDE_OVEN" equivale a "INSIDE_OVEN:1".
+        ...(quantity === undefined ? {} : { quantity: Number(quantity) }),
+      };
+    });
+  }, z.array(QuoteAddOnInputSchema).max(20))
+  .default([]);
+
 export const AvailabilityRequestSchema = z.strictObject({
   /** Dia a consultar, en la zona horaria de la empresa (AAAA-MM-DD). */
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'La fecha debe tener el formato AAAA-MM-DD'),
@@ -18,7 +44,7 @@ export const AvailabilityRequestSchema = z.strictObject({
   bedrooms: z.coerce.number().int().min(0).max(12),
   bathrooms: z.coerce.number().int().min(0).max(12),
   squareFeet: z.coerce.number().int().min(200).max(20000),
-  addOns: z.array(QuoteAddOnInputSchema).max(20).default([]),
+  addOns: AddOnsQuerySchema,
 });
 export type AvailabilityRequest = z.infer<typeof AvailabilityRequestSchema>;
 export type AvailabilityRequestInput = z.input<typeof AvailabilityRequestSchema>;

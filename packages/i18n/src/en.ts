@@ -139,14 +139,112 @@ export const en = {
   },
 
   booking: {
+    /* ----------------------------- Llamada ----------------------------- */
+    cta: 'Book this cleaning',
+    title: 'Book your cleaning',
+    close: 'Close',
+    back: 'Back',
+    next: 'Continue',
+    stepOf: 'Step {{current}} of {{total}}',
+    steps: {
+      schedule: 'Date & time',
+      details: 'Your details',
+      payment: 'Card',
+    },
+
+    /* ------------------------- 1. Fecha y hora ------------------------- */
+    schedule: {
+      title: 'Pick a date and time',
+      dateLabel: 'Date',
+      loading: 'Checking availability…',
+      closed: 'We are closed that day. Please pick another one.',
+      none: 'No times left that day. Please pick another one.',
+      duration: 'This job takes about {{duration}}.',
+      timezone: 'All times are Georgia time (US Eastern).',
+      leadTime: 'We need at least 24 hours to get a team ready.',
+      fullyBooked: 'Fully booked',
+      tooSoon: 'Too soon',
+      doesNotFit: 'Not enough time left that day',
+    },
+
+    /* --------------------- 2. Direccion y contacto --------------------- */
+    details: {
+      title: 'Where and who',
+      addressTitle: 'Service address',
+      contactTitle: 'Contact details',
+      firstName: 'First name',
+      lastName: 'Last name',
+      email: 'Email',
+      phone: 'Phone',
+      line1: 'Street address',
+      line2: 'Apartment, suite, unit (optional)',
+      city: 'City',
+      state: 'State',
+      postalCode: 'ZIP code',
+      postalCodeLocked: 'Taken from your quote. Change it there to price a different area.',
+      accessNotes: 'Access instructions (optional)',
+      accessNotesHelp:
+        'Gate code, where the key is, a dog in the yard. Only the team assigned to your job and our office can see this.',
+      customerNotes: 'Anything else we should know? (optional)',
+      marketingOptIn: 'Send me occasional offers and cleaning tips.',
+      priceNotice:
+        'Your final price is confirmed with the full address, so it may differ slightly from the estimate.',
+    },
+
+    /* ----------------------------- 3. Pago ----------------------------- */
+    payment: {
+      title: 'Secure your booking',
+      depositTitle: 'Travel deposit',
+      depositExplainer:
+        'We place a hold of {{amount}} on your card. It is not a charge: it is credited in full against your final invoice, and we only take it if you cancel once our team is already on the way.',
+      holdExpires: 'Your slot is held until {{time}}.',
+      dueLater: 'Due on the day of service',
+      authorise: 'Authorise {{amount}} hold',
+      working: 'Talking to your bank…',
+      simulatedTitle: 'Simulated payment',
+      simulatedBody:
+        'Card payments are not connected yet, so no money moves and no card details are asked for. This button finishes the booking exactly as the real one will.',
+      simulatedDecline: 'Simulate a declined card',
+      unavailableTitle: 'Card payments are not available right now',
+      unavailableBody:
+        'Your slot is held. Call us on {{phone}} and we will finish the booking with you.',
+    },
+
+    /* -------------------------- Confirmacion --------------------------- */
+    done: {
+      title: 'Your cleaning is booked',
+      reference: 'Booking reference',
+      referenceHelp: 'Keep it handy: it is the fastest way for us to find your booking.',
+      when: 'When',
+      where: 'Where',
+      held: 'Held on your card',
+      dueLater: 'Due on the day of service',
+      contact: 'We will call you on {{phone}} if we need anything before the visit.',
+      finish: 'Done',
+      pendingTitle: 'Booking received, payment pending',
+      pendingBody:
+        'We could not start the card hold, so your booking is not confirmed yet. Call us on {{phone}} and we will finish it with you.',
+      declinedTitle: 'Your card was declined',
+      declinedBody: 'The slot has been released. You can start again with a different card.',
+      tryAgain: 'Start again',
+    },
+
+    /* ----------------------------- Errores ----------------------------- */
+    errorTitle: 'We could not complete your booking',
+    errorRequired: 'This field is required.',
+    errorEmail: 'Enter a valid email address.',
+    errorPhone: 'Enter a valid US phone number.',
+    errorPostalCode: 'Enter a valid 5-digit ZIP code.',
+    errorDateRequired: 'Pick a date.',
+    errorSlotRequired: 'Pick a time.',
     errorSlotTaken: 'That time was just taken. Please pick another slot.',
     errorAlreadyBooked: 'You already have a booking at that time.',
     errorRequiresWalkthrough:
       'Commercial jobs are scheduled after a free on-site walkthrough. Contact us and we will arrange it.',
     errorDateOutOfRange: 'Please choose a date within the next 90 days.',
     errorNotBookable: 'We cannot book this job online. Contact us and we will help you.',
+    errorPaymentNotFound: 'We could not find that payment. Please start again.',
   },
-
   quote: {
     line: {
       service: {

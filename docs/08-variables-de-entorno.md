@@ -66,11 +66,17 @@ Health: /health
 
 **Root Directory:** `apps/landing` · El resto lo define `vercel.json`.
 
-| Variable            | Valor                                |
-| ------------------- | ------------------------------------ |
-| `VITE_API_BASE_URL` | `https://TU-API.onrender.com/api/v1` |
+| Variable                      | Valor                                | Cuándo                       |
+| ----------------------------- | ------------------------------------ | ---------------------------- |
+| `VITE_API_BASE_URL`           | `https://TU-API.onrender.com/api/v1` | Siempre                      |
+| `VITE_STRIPE_PUBLISHABLE_KEY` | `pk_test_...` / `pk_live_...`        | Solo al activar pagos reales |
 
-Es la única. Aplícala a los tres entornos (Production, Preview, Development).
+Aplícalas a los tres entornos (Production, Preview, Development).
+
+Sin `VITE_STRIPE_PUBLISHABLE_KEY` el sitio **no se rompe**: el paso de la
+tarjeta muestra el teléfono de la empresa y la reserva queda pendiente de
+gestión manual. Es deliberado, para que una variable sin rellenar no deje una
+pantalla rota.
 
 > ⚠️ **Las variables `VITE_*` se incrustan en el archivo que descarga el
 > navegador.** Cualquiera puede leerlas viendo el código fuente de la página.

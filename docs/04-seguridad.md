@@ -18,27 +18,30 @@ guarda nada. Lo que hay que proteger es, por tanto:
 
 ## Amenazas y controles
 
-| #   | Amenaza                                                  | Control aplicado                                                                                        | Dónde                                |
-| --- | -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- | ------------------------------------ |
-| 1   | Manipular el precio desde el navegador                   | El cálculo ocurre solo en el servidor; el front únicamente muestra                                      | `apps/api/src/quotes/`               |
-| 2   | Inyectar campos no previstos (_mass assignment_)         | Esquemas Zod estrictos: cualquier clave desconocida rechaza la petición                                 | `zod-validation.pipe.ts`             |
-| 3   | Valores fuera de rango (−5 baños, 10⁹ pies²)             | Rangos declarados en el esquema y recorte de cantidades en el motor                                     | `packages/types`, `packages/pricing` |
-| 4   | Abuso del endpoint para agotar la cuota de Google        | Doble límite por IP: 60/min general y 10/min en cotizaciones                                            | `app.module.ts`                      |
-| 5   | Agotar la memoria con claves de caché distintas          | Caché con máximo de entradas y expulsión de la más antigua                                              | `ttl-cache.ts`                       |
-| 6   | Cuerpos de petición enormes                              | Límite de 16 KB en el analizador JSON (64 KB en el webhook de pagos), con respuesta `413` y no `500`    | `common/body-parsers.ts`             |
-| 7   | Uso de la API desde sitios de terceros                   | CORS con lista blanca explícita; sin comodines                                                          | `main.ts`                            |
-| 8   | Filtración de detalles internos en errores               | Filtro global: solo código estable y clave de traducción; los detalles quedan en el log del servidor    | `all-exceptions.filter.ts`           |
-| 9   | Robo de la clave de Google                               | La clave solo existe en el servidor; nunca se envía al navegador                                        | `google-distance.provider.ts`        |
-| 10  | Arrancar con configuración incorrecta                    | El entorno se valida con Zod al inicio; si falta algo, la aplicación no levanta                         | `common/config/env.ts`               |
-| 11  | Ataques de encabezado y _clickjacking_                   | Helmet en la API; cabeceras de seguridad y CSP estricta en el sitio                                     | `main.ts`, `vercel.json`             |
-| 12  | Scripts inyectados en la página                          | CSP con `script-src 'self'`, sin `unsafe-inline`                                                        | `vercel.json`                        |
-| 13  | Rastreo de visitantes por terceros                       | Sin fuentes, analíticas ni recursos externos                                                            | `styles.css`, `index.html`           |
-| 14  | Falsificación del identificador de petición en los logs  | El id entrante solo se reutiliza si cumple un patrón seguro                                             | `request-id.middleware.ts`           |
-| 15  | **Confirmar reservas sin pagar falsificando un webhook** | Firma sobre el cuerpo crudo, comprobada antes de tocar la base de datos y comparada en tiempo constante | `payments/webhooks.controller.ts`    |
-| 16  | Duplicar movimientos de dinero reenviando un evento      | Idempotencia por `processedAt` más bloqueo por evento; un fallo deshace la transacción entera           | `payments/webhooks.service.ts`       |
-| 17  | Descubrir qué identificadores de pago existen            | El webhook responde siempre lo mismo, se reconozca el pago o no                                         | `payments/webhooks.controller.ts`    |
-| 18  | Manipular el importe del depósito                        | Lo calcula el motor en el servidor; el navegador nunca envía importes                                   | `bookings/bookings.service.ts`       |
-| 19  | Robo de datos de tarjeta                                 | Nunca pasan por nuestro servidor; solo se guardan marca y últimos cuatro dígitos                        | `payments/`                          |
+| #   | Amenaza                                                  | Control aplicado                                                                                        | Dónde                                  |
+| --- | -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- | -------------------------------------- |
+| 1   | Manipular el precio desde el navegador                   | El cálculo ocurre solo en el servidor; el front únicamente muestra                                      | `apps/api/src/quotes/`                 |
+| 2   | Inyectar campos no previstos (_mass assignment_)         | Esquemas Zod estrictos: cualquier clave desconocida rechaza la petición                                 | `zod-validation.pipe.ts`               |
+| 3   | Valores fuera de rango (−5 baños, 10⁹ pies²)             | Rangos declarados en el esquema y recorte de cantidades en el motor                                     | `packages/types`, `packages/pricing`   |
+| 4   | Abuso del endpoint para agotar la cuota de Google        | Doble límite por IP: 60/min general y 10/min en cotizaciones                                            | `app.module.ts`                        |
+| 5   | Agotar la memoria con claves de caché distintas          | Caché con máximo de entradas y expulsión de la más antigua                                              | `ttl-cache.ts`                         |
+| 6   | Cuerpos de petición enormes                              | Límite de 16 KB en el analizador JSON (64 KB en el webhook de pagos), con respuesta `413` y no `500`    | `common/body-parsers.ts`               |
+| 7   | Uso de la API desde sitios de terceros                   | CORS con lista blanca explícita; sin comodines                                                          | `main.ts`                              |
+| 8   | Filtración de detalles internos en errores               | Filtro global: solo código estable y clave de traducción; los detalles quedan en el log del servidor    | `all-exceptions.filter.ts`             |
+| 9   | Robo de la clave de Google                               | La clave solo existe en el servidor; nunca se envía al navegador                                        | `google-distance.provider.ts`          |
+| 10  | Arrancar con configuración incorrecta                    | El entorno se valida con Zod al inicio; si falta algo, la aplicación no levanta                         | `common/config/env.ts`                 |
+| 11  | Ataques de encabezado y _clickjacking_                   | Helmet en la API; cabeceras de seguridad y CSP estricta en el sitio                                     | `main.ts`, `vercel.json`               |
+| 12  | Scripts inyectados en la página                          | CSP con `script-src 'self'`, sin `unsafe-inline`                                                        | `vercel.json`                          |
+| 13  | Rastreo de visitantes por terceros                       | Sin fuentes, analíticas ni recursos externos. El único dominio ajeno es Stripe, y solo al pagar         | `styles.css`, `index.html`             |
+| 14  | Falsificación del identificador de petición en los logs  | El id entrante solo se reutiliza si cumple un patrón seguro                                             | `request-id.middleware.ts`             |
+| 15  | **Confirmar reservas sin pagar falsificando un webhook** | Firma sobre el cuerpo crudo, comprobada antes de tocar la base de datos y comparada en tiempo constante | `payments/webhooks.controller.ts`      |
+| 16  | Duplicar movimientos de dinero reenviando un evento      | Idempotencia por `processedAt` más bloqueo por evento; un fallo deshace la transacción entera           | `payments/webhooks.service.ts`         |
+| 17  | Descubrir qué identificadores de pago existen            | El webhook responde siempre lo mismo, se reconozca el pago o no                                         | `payments/webhooks.controller.ts`      |
+| 18  | Manipular el importe del depósito                        | Lo calcula el motor en el servidor; el navegador nunca envía importes                                   | `bookings/bookings.service.ts`         |
+| 19  | Robo de datos de tarjeta                                 | Nunca pasan por nuestro servidor; solo se guardan marca y últimos cuatro dígitos                        | `payments/`                            |
+| 20  | **Confirmar reservas con el atajo del simulador**        | Con un proveedor real la ruta responde 404, indistinguible de una que no existe; hay un test dedicado   | `payments/mock-payments.controller.ts` |
+| 21  | Scripts de terceros al abrir el formulario de reserva    | Stripe.js se importa desde `/pure`: solo se descarga si de verdad se va a pagar                         | `booking/StripePaymentForm.tsx`        |
+| 22  | Manipular la reserva desde el navegador                  | El cuerpo no lleva importes; precio, distancia y franja se recalculan en el servidor                    | `bookings/bookings.service.ts`         |
 
 ## Privacidad desde el diseño
 
@@ -192,6 +195,8 @@ Cuando entren autenticación, datos de clientes y pagos:
   manipulado después de firmar (`docs/12-pagos-y-deposito.md`).
 - ~~Nunca almacenar números de tarjeta~~ — **hecho**: el navegador los envía
   directamente al proveedor (ámbito PCI SAQ-A).
+- Recorrer el pago real con las tarjetas de prueba de Stripe: el código está
+  escrito, pero **nunca se ha ejecutado una confirmación de tarjeta real**.
 - Captura y devolución desde el panel, con registro de auditoría de quién las
   ordenó.
 - Sesiones cortas con rotación de tokens y revocación al cerrar sesión.

@@ -6,7 +6,7 @@ import { Test } from '@nestjs/testing';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { DateTime } from 'luxon';
 import request from 'supertest';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { AppModule } from '../app.module';
 import { applyBodyParsers } from '../common/body-parsers';
 import { PAYMENT_PROVIDER } from './payments.types';
@@ -25,9 +25,19 @@ import type { MockPaymentProvider } from './providers/mock-payment.provider';
  * podria reservar sin pagar.
  */
 
+/*
+ * El entorno que debe ver la validacion de configuracion se fija ANTES de los
+ * imports: `ConfigModule.forRoot()` lee process.env cuando se importa
+ * app.module, no cuando corre beforeAll. Una variable con valor por defecto
+ * (como esta) quedaria congelada en ese valor si se cambiase despues.
+ */
+vi.hoisted(() => {
+  process.env.PAYMENT_MOCK_WEBHOOK_SECRET = 'secreto-de-webhook-para-pruebas';
+  process.env.PAYMENT_PROVIDER = 'mock';
+});
+
 const PORT = 55434;
 const MIGRATIONS_DIR = join(import.meta.dirname, '../../prisma/migrations');
-const SECRETO = 'secreto-de-webhook-para-pruebas';
 const RUTA = '/api/v1/payments/webhook';
 
 let db: PGlite;
@@ -112,7 +122,16 @@ function eventoDePago(
 
 beforeAll(async () => {
   db = await PGlite.create();
-  socket = new PGLiteSocketServer({ db, port: PORT, host: '127.0.0.1' });
+  socket = new PGLiteSocketServer({
+    db,
+    port: PORT,
+    host: '127.0.0.1',
+    // Por defecto solo admite UNA conexion, y el grupo de conexiones de la
+    // aplicacion abre varias en cuanto llegan dos peticiones a la vez. Sin
+    // esto no se podria probar la concurrencia, que es justo donde estan los
+    // errores dificiles.
+    maxConnections: 10,
+  });
   await socket.start();
 
   for (const migracion of readdirSync(MIGRATIONS_DIR, { withFileTypes: true })
@@ -124,8 +143,6 @@ beforeAll(async () => {
   process.env.NODE_ENV = 'test';
   process.env.CORS_ORIGINS = 'http://localhost:5173';
   process.env.DATABASE_URL = `postgresql://postgres:postgres@127.0.0.1:${PORT}/postgres`;
-  process.env.PAYMENT_PROVIDER = 'mock';
-  process.env.PAYMENT_MOCK_WEBHOOK_SECRET = SECRETO;
   process.env.QUOTE_RATE_LIMIT_MAX = '200';
   process.env.RATE_LIMIT_MAX = '400';
 
@@ -354,5 +371,94 @@ describe('deposito rechazado', () => {
     // Sin deposito no hay cita: el hueco vuelve a estar disponible.
     expect(fila.rows[0]?.status).toBe('CANCELLED');
     expect(fila.rows[0]?.cancelledBy).toBe('SYSTEM');
+  });
+});
+
+describe('confirmacion simulada de la tarjeta', () => {
+  /*
+   * Es el equivalente del simulador a "el navegador confirma la tarjeta
+   * contra Stripe". Sin el, el formulario de reserva no se podria probar
+   * entero: la reserva se quedaria siempre pendiente de pago.
+   */
+  const RUTA_MOCK = '/api/v1/payments/mock/confirm';
+
+  it('confirma la reserva a partir del clientSecret', async () => {
+    const reserva = await reservar('confirmar@example.com', proximoDiaLaborable(5));
+    expect(reserva.body.status).toBe('PENDING_PAYMENT');
+
+    const respuesta = await request(app.getHttpServer())
+      .post(RUTA_MOCK)
+      .send({ clientSecret: reserva.body.payment.clientSecret })
+      .expect(200);
+
+    expect(respuesta.body).toEqual({ status: 'REQUIRES_CAPTURE', bookingStatus: 'CONFIRMED' });
+
+    const fila = await db.query<{ status: string }>(`SELECT status FROM bookings WHERE id = $1`, [
+      reserva.body.bookingId,
+    ]);
+    expect(fila.rows[0]?.status).toBe('CONFIRMED');
+  });
+
+  it('pulsar dos veces "pagar" no procesa el pago dos veces', async () => {
+    const reserva = await reservar('doble@example.com', proximoDiaLaborable(6));
+    const cuerpo = { clientSecret: reserva.body.payment.clientSecret };
+
+    // Se envian a la vez, como haria un doble clic real.
+    const [uno, dos] = await Promise.all([
+      request(app.getHttpServer()).post(RUTA_MOCK).send(cuerpo),
+      request(app.getHttpServer()).post(RUTA_MOCK).send(cuerpo),
+    ]);
+
+    expect(uno.status).toBe(200);
+    expect(dos.status).toBe(200);
+
+    const eventos = await db.query<{ n: number }>(
+      `SELECT count(*)::int AS n FROM webhook_events WHERE payload->>'simulated' = 'true'`,
+    );
+    // Un unico evento por (pago, resultado): la clave no es aleatoria.
+    expect(eventos.rows[0]?.n).toBeGreaterThan(0);
+
+    const pagos = await db.query<{ n: number }>(
+      `SELECT count(*)::int AS n FROM payments WHERE "bookingId" = $1`,
+      [reserva.body.bookingId],
+    );
+    expect(pagos.rows[0]?.n).toBe(1);
+  });
+
+  it('una tarjeta rechazada cancela la reserva y libera la franja', async () => {
+    const reserva = await reservar('rechazo-mock@example.com', proximoDiaLaborable(7));
+
+    const respuesta = await request(app.getHttpServer())
+      .post(RUTA_MOCK)
+      .send({ clientSecret: reserva.body.payment.clientSecret, outcome: 'DECLINE' })
+      .expect(200);
+
+    expect(respuesta.body).toEqual({ status: 'FAILED', bookingStatus: 'CANCELLED' });
+  });
+
+  it('no confirma un pago que no existe', async () => {
+    const respuesta = await request(app.getHttpServer())
+      .post(RUTA_MOCK)
+      .send({ clientSecret: 'pi_mock_inventado_secret_x' });
+
+    expect(respuesta.status).toBe(404);
+  });
+
+  it('no acepta un identificador que no sea del simulador', async () => {
+    // Evita que una credencial de Stripe acabe pasando por aqui por error.
+    const respuesta = await request(app.getHttpServer())
+      .post(RUTA_MOCK)
+      .send({ clientSecret: 'pi_3Real000000_secret_abcdef' });
+
+    expect(respuesta.status).toBe(404);
+  });
+
+  it('rechaza un cuerpo con campos de mas', async () => {
+    const respuesta = await request(app.getHttpServer())
+      .post(RUTA_MOCK)
+      .send({ clientSecret: 'pi_mock_x_secret_y', amountCents: 1 });
+
+    expect(respuesta.status).toBe(400);
+    expect(respuesta.body.code).toBe('VALIDATION_ERROR');
   });
 });

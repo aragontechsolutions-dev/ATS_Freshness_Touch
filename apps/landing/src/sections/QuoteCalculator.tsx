@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type {
   AddOnCode,
@@ -15,6 +15,17 @@ import { useFlashOnChange } from '../hooks/useFlashOnChange';
 import { ApiClientError, requestQuote } from '../lib/api';
 import { formatCents, formatDate, formatMiles } from '../lib/format';
 import { PhoneIcon } from '../components/Icons';
+import type { BookingJob } from '../components/BookingDialog';
+
+/*
+ * El formulario de reserva (con el componente de pago de Stripe dentro) pesa
+ * mas que toda la portada. La mayoria de las visitas no llegan a reservar, asi
+ * que se descarga solo cuando alguien pulsa el boton: la pagina abre antes
+ * para todo el mundo.
+ */
+const BookingDialog = lazy(() =>
+  import('../components/BookingDialog').then((module) => ({ default: module.BookingDialog })),
+);
 
 interface FormState {
   service: ServiceType;
@@ -39,6 +50,13 @@ const INITIAL_FORM: FormState = {
 
 const POSTAL_CODE_PATTERN = /^\d{5}$/;
 
+/** Extras seleccionados, en el formato que esperan la API y la reserva. */
+function selectedAddOns(form: FormState): { code: AddOnCode; quantity: number }[] {
+  return Object.entries(form.addOns)
+    .filter(([, quantity]) => (quantity ?? 0) > 0)
+    .map(([code, quantity]) => ({ code: code as AddOnCode, quantity: quantity as number }));
+}
+
 function toRequest(form: FormState, locale: Locale): QuoteRequestInput {
   return {
     service: form.service,
@@ -46,9 +64,7 @@ function toRequest(form: FormState, locale: Locale): QuoteRequestInput {
     bedrooms: form.bedrooms,
     bathrooms: form.bathrooms,
     squareFeet: form.squareFeet,
-    addOns: Object.entries(form.addOns)
-      .filter(([, quantity]) => (quantity ?? 0) > 0)
-      .map(([code, quantity]) => ({ code: code as AddOnCode, quantity: quantity as number })),
+    addOns: selectedAddOns(form),
     destination: { postalCode: form.postalCode },
     locale,
   };
@@ -63,6 +79,16 @@ export function QuoteCalculator() {
   const [quote, setQuote] = useState<QuoteResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [errorKey, setErrorKey] = useState<string | null>(null);
+  const [bookingOpen, setBookingOpen] = useState(false);
+
+  /*
+   * El trabajo que se envia a la reserva se congela al abrir el dialogo: si
+   * el cliente toca el formulario con el dialogo abierto, la franja que ya
+   * eligio podria dejar de encajar en la duracion y acabaria reservando algo
+   * distinto de lo que vio.
+   */
+  const [bookingJob, setBookingJob] = useState<BookingJob | null>(null);
+  const [bookingQuote, setBookingQuote] = useState<QuoteResponse | null>(null);
 
   const requestRef = useRef<AbortController | null>(null);
   // Solo se recalcula automaticamente si el usuario ya pidio un precio una vez.
@@ -111,6 +137,31 @@ export function QuoteCalculator() {
 
   const limits = catalog?.limits;
   const showResult = quote !== null;
+
+  /*
+   * Los servicios sin cotizacion instantanea (el comercial) se agendan tras
+   * una visita previa: ofrecer el boton de reservar llevaria a un error del
+   * servidor en vez de a una cita.
+   */
+  const servicioAgendable = useMemo(
+    () => catalog?.services.find((item) => item.code === form.service)?.instantQuote ?? false,
+    [catalog, form.service],
+  );
+
+  const abrirReserva = (): void => {
+    if (!quote) return;
+    setBookingJob({
+      service: form.service,
+      frequency: form.frequency,
+      bedrooms: form.bedrooms,
+      bathrooms: form.bathrooms,
+      squareFeet: form.squareFeet,
+      addOns: selectedAddOns(form),
+      postalCode: form.postalCode,
+    });
+    setBookingQuote(quote);
+    setBookingOpen(true);
+  };
 
   return (
     <section id="quote" className="bg-brand-50 py-12 sm:py-16 lg:py-20 dark:bg-night-800">
@@ -347,10 +398,29 @@ export function QuoteCalculator() {
               </div>
             )}
 
-            {!errorKey && quote && <QuoteResult quote={quote} locale={locale} />}
+            {!errorKey && quote && (
+              <QuoteResult
+                quote={quote}
+                locale={locale}
+                canBook={servicioAgendable}
+                onBook={abrirReserva}
+              />
+            )}
           </div>
         </div>
       </div>
+
+      {bookingJob && bookingQuote && (
+        <Suspense fallback={null}>
+          <BookingDialog
+            open={bookingOpen}
+            job={bookingJob}
+            quote={bookingQuote}
+            locale={locale}
+            onClose={() => setBookingOpen(false)}
+          />
+        </Suspense>
+      )}
     </section>
   );
 }
@@ -395,7 +465,15 @@ function clampNumber(value: number, min: number, max: number): number {
 
 /* -------------------------------------------------------------------------- */
 
-function QuoteResult({ quote, locale }: { quote: QuoteResponse; locale: Locale }) {
+interface QuoteResultProps {
+  quote: QuoteResponse;
+  locale: Locale;
+  /** false para los servicios que requieren visita previa. */
+  canBook: boolean;
+  onBook: () => void;
+}
+
+function QuoteResult({ quote, locale, canBook, onBook }: QuoteResultProps) {
   const { t } = useTranslation();
   // Sin esta senal, al cambiar el formulario el total se actualiza en
   // silencio y no queda claro si ya refleja lo que se acaba de tocar.
@@ -495,6 +573,14 @@ function QuoteResult({ quote, locale }: { quote: QuoteResponse; locale: Locale }
           {t('calculator.validUntil', { date: formatDate(quote.expiresAt, locale) })}
         </p>
       </div>
+
+      {canBook && (
+        <div className="p-6">
+          <button type="button" className="ft-btn-primary w-full" onClick={onBook}>
+            {t('booking.cta')}
+          </button>
+        </div>
+      )}
     </div>
   );
 }

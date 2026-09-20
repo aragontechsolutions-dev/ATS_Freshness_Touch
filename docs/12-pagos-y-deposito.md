@@ -224,11 +224,82 @@ falsificada rechazada → firma válida confirma → reenvío ignorado.
 
 ---
 
-## 7. Pendiente
+## 7. Cómo paga el navegador
+
+### Con Stripe
+
+El navegador recibe `payment.clientSecret` al crear la reserva y confirma la
+tarjeta **directamente contra Stripe**, dentro de un marco servido por ellos.
+Los datos de la tarjeta no pasan por nuestro código ni por nuestro servidor.
+
+El éxito aquí es `requires_capture`, no `succeeded`: el depósito quedó
+**retenido**, no cobrado. Esperar `succeeded` sería esperar algo que no va a
+pasar hasta que termine el servicio.
+
+Stripe.js se importa desde **`@stripe/stripe-js/pure`**, no desde la raíz del
+paquete. El paquete normal descarga Stripe.js nada más cargarse el módulo,
+aunque nunca se llegue a pagar: se detectó contactando con `js.stripe.com` con
+el simulador activo y sin clave configurada. Además de innecesario,
+contradecía la promesa del sitio de no cargar recursos externos.
+
+La política de seguridad de contenido (`apps/landing/vercel.json`) permite lo
+justo para que funcione:
+
+| Directiva     | Añadido                                          | Por qué                                               |
+| ------------- | ------------------------------------------------ | ----------------------------------------------------- |
+| `script-src`  | `https://js.stripe.com`                          | Stripe no permite alojar su script por nuestra cuenta |
+| `connect-src` | `https://api.stripe.com`                         | Ahí envía el navegador los datos de la tarjeta        |
+| `frame-src`   | `https://js.stripe.com https://hooks.stripe.com` | Los campos de la tarjeta viven dentro de ese marco    |
+
+`Permissions-Policy` mantiene `payment=()`: solo se acepta tarjeta
+(`payment_method_types: ['card']`), no monederos, así que la API de pago del
+navegador no hace falta y se deja cerrada.
+
+### Con el simulador
+
+El simulador no tiene servidores, así que la API expone su equivalente:
+
+```
+POST /api/v1/payments/mock/confirm   { clientSecret, outcome }
+```
+
+Hace exactamente lo que haría Stripe: construye el evento y lo mete por el
+**mismo** procesamiento que los webhooks auténticos, con su idempotencia y su
+sincronización de la reserva. Lo que se prueba es el camino de verdad, no un
+atajo. Admite `outcome: 'DECLINE'` para simular también el rechazo del banco,
+que es el caso que nunca se prueba y siempre falla.
+
+> 🔒 Con `PAYMENT_PROVIDER=stripe` esta ruta responde **404**, indistinguible
+> de una ruta que no existe: no revela siquiera que el sistema tiene un modo
+> simulado. Hay un test dedicado que lo comprueba
+> (`mock-payments-disabled.e2e.test.ts`), porque si algún día respondiera sería
+> una puerta para confirmar reservas sin pagar.
+
+La interfaz avisa de que el pago es simulado con un aviso imposible de pasar
+por alto: nadie debe creer que ha pagado algo.
+
+---
+
+## 8. Lo que NO está verificado
+
+Honestidad sobre el alcance de las pruebas:
+
+- **El pago real con Stripe no se ha probado con credenciales.** El código está
+  escrito y compila, y degrada correctamente cuando no hay clave (muestra el
+  teléfono en vez de romperse), pero **una confirmación de tarjeta real no se
+  ha ejecutado nunca**. Antes de cobrar a un cliente hay que recorrer el flujo
+  con las tarjetas de prueba de Stripe (`4242 4242 4242 4242` para el camino
+  feliz, `4000 0000 0000 0002` para un rechazo, `4000 0025 0000 3155` para
+  3D Secure).
+- Todo lo demás de este documento está probado, y la sección 6 dice con qué.
+
+---
+
+## 9. Pendiente
 
 | Tarea                                           | Etapa |
 | ----------------------------------------------- | ----- |
-| Formulario de reserva con el paso de tarjeta    | 2.2b  |
+| Probar el pago real con credenciales de Stripe  | 2.2c  |
 | Captura y devolución desde el panel             | 2.3   |
 | Liberar franjas cuyo `holdExpiresAt` ya venció  | 2.3   |
 | Reintentar la retención de una reserva sin pago | 2.3   |
