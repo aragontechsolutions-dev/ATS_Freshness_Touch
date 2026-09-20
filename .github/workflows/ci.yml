@@ -4,6 +4,14 @@ on:
   push:
     branches: [main]
   pull_request:
+  # Permite lanzar la verificacion a mano desde la pestana Actions.
+  #
+  # Hace falta porque GitHub NO dispara workflows por eventos que genera una
+  # aplicacion (abrir un pull request desde la API con el token de una app),
+  # asi que un pull request cuyos commits se subieron ANTES de abrirlo se
+  # quedaba sin ejecutar CI y sin forma de lanzarla salvo empujando otro
+  # commit.
+  workflow_dispatch:
 
 # Cancela ejecuciones antiguas de la misma rama para no gastar minutos.
 concurrency:
