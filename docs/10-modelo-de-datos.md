@@ -89,12 +89,32 @@ las fechas llevan zona horaria.
 Las credenciales **no están en el repositorio ni las conoce nadie más que la
 empresa**. La migración se aplica desde tu máquina:
 
-```bash
-cd apps/api
-export DIRECT_URL="postgresql://...:5432/postgres"   # conexión DIRECTA, no la agrupada
+**Windows (PowerShell)** — `export` no existe en PowerShell, se usa `$env:`:
+
+```powershell
+cd apps\api
+$env:DIRECT_URL = "postgresql://USUARIO:CONTRASENA@HOST:5432/postgres"
 pnpm db:status     # qué migraciones faltan
 pnpm db:deploy     # aplicarlas
 ```
+
+**macOS y Linux:**
+
+```bash
+cd apps/api
+export DIRECT_URL="postgresql://USUARIO:CONTRASENA@HOST:5432/postgres"
+pnpm db:status
+pnpm db:deploy
+```
+
+Dos avisos sobre la contraseña:
+
+- Si contiene caracteres como `@`, `:`, `/`, `#` o `?`, hay que **codificarlos**
+  o la cadena se interpretará mal (`@` es `%40`, `#` es `%23`, y así).
+- La variable queda en el historial de la terminal. Si se pega una contraseña
+  real en un chat, un ticket o una captura, hay que **rotarla** en Supabase
+  (Settings → Database → Reset database password): una contraseña que salió de
+  la máquina ya no es secreta.
 
 Se usa la conexión **directa** (puerto 5432) y no la agrupada (6543) porque el
 agrupador en modo transacción no admite las sentencias preparadas que necesita

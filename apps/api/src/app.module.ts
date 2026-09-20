@@ -4,6 +4,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { validateEnv, type Env } from './common/config/env';
 import { RequestIdMiddleware } from './common/middleware/request-id.middleware';
+import { THROTTLER_NAMES } from './common/throttling';
 import { DatabaseModule } from './database/database.module';
 import { DistanceModule } from './distance/distance.module';
 import { HealthModule } from './health/health.module';
@@ -29,12 +30,12 @@ import { QuotesModule } from './quotes/quotes.module';
       inject: [ConfigService],
       useFactory: (config: ConfigService<Env, true>) => [
         {
-          name: 'global',
+          name: THROTTLER_NAMES[0],
           ttl: config.get('RATE_LIMIT_TTL_SECONDS', { infer: true }) * 1000,
           limit: config.get('RATE_LIMIT_MAX', { infer: true }),
         },
         {
-          name: 'quotes',
+          name: THROTTLER_NAMES[1],
           ttl: config.get('RATE_LIMIT_TTL_SECONDS', { infer: true }) * 1000,
           limit: config.get('QUOTE_RATE_LIMIT_MAX', { infer: true }),
         },

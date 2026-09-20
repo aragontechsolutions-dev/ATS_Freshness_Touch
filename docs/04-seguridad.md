@@ -64,6 +64,30 @@ Comprobado en ejecución real contra la API levantada:
 | Cabeceras de la API                                  | CSP, `nosniff`, `Referrer-Policy`, HSTS presentes        |
 | Sitio en navegador real                              | Sin errores de consola                                   |
 
+## Incidente resuelto: la sonda de salud quedaba limitada
+
+Detectado en los registros de Render, ya corregido. Merece quedar escrito
+porque es un error fácil de repetir.
+
+**Qué pasaba.** La API define dos limitadores con nombre propio, `global` y
+`quotes`. El decorador `@SkipThrottle()` **sin argumentos no exime de nada**
+cuando los limitadores tienen nombre: solo omite uno llamado `default`. Así que
+la sonda de salud estaba sujeta al límite estricto de 10 peticiones por minuto.
+
+**Consecuencia.** Render consulta `/health` cada 5 segundos, es decir 12 veces
+por minuto. A partir de la petición 11 recibía `429` y daba el servicio por
+caído, con reinicios en bucle de una API que funcionaba perfectamente.
+
+**Arreglo.** Los nombres de los limitadores viven ahora en una sola lista
+(`src/common/throttling.ts`) y la exención se **deriva** de ella. Añadir un
+limitador nuevo lo incluye automáticamente, así que el error no se puede
+repetir por olvido.
+
+**Lección.** Los tests unitarios no podían detectarlo: el fallo estaba en cómo
+interactúan el guardia, los decoradores y las rutas. Por eso se añadieron
+pruebas que levantan la aplicación entera y le hacen peticiones HTTP reales,
+incluida una que llama 30 veces a la sonda y exige que todas respondan 200.
+
 ## Pendiente (etapas siguientes)
 
 Cuando entren autenticación, datos de clientes y pagos:

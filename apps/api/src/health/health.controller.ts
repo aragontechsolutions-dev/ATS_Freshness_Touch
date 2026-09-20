@@ -1,6 +1,7 @@
 import { Controller, Get, HttpCode, HttpStatus } from '@nestjs/common';
 import { SkipThrottle } from '@nestjs/throttler';
 import { PrismaService } from '../database/prisma.service';
+import { SKIP_ALL_THROTTLERS } from '../common/throttling';
 
 interface HealthResponse {
   status: 'ok';
@@ -29,7 +30,9 @@ interface ReadinessResponse {
  * que describe el stack le facilita el trabajo a un atacante.
  */
 @Controller('health')
-@SkipThrottle()
+// Exenta de TODOS los limitadores: Render la consulta cada 5 segundos y con
+// un limite de 10 por minuto daba 429 y el servicio por caido.
+@SkipThrottle(SKIP_ALL_THROTTLERS)
 export class HealthController {
   constructor(private readonly prisma: PrismaService) {}
 

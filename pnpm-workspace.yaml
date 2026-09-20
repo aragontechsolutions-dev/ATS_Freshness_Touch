@@ -6,5 +6,8 @@ packages:
 # Solo autorizamos los paquetes que realmente necesitan compilar binarios.
 onlyBuiltDependencies:
   - esbuild
+  # Compilador nativo que usan los tests HTTP para emitir los metadatos de
+  # los decoradores, que es lo que necesita la inyeccion de dependencias.
+  - '@swc/core'
   - '@tailwindcss/oxide'
   - unrs-resolver
