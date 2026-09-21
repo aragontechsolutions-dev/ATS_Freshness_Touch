@@ -84,6 +84,43 @@ export const EnvSchema = z
      * "local" emite y verifica sus propios tokens para poder desarrollar sin
      * un proyecto de Supabase. En produccion esta PROHIBIDO (ver mas abajo).
      */
+    /**
+     * AVISOS
+     * ------
+     * "log" no envia nada: escribe el correo en el registro del servidor. Es
+     * el valor por defecto para que el sistema arranque y se pueda probar de
+     * punta a punta sin cuenta de ningun proveedor. En produccion, "resend".
+     */
+    EMAIL_PROVIDER: z.enum(['log', 'resend']).default('log'),
+    RESEND_API_KEY: z.string().min(1).optional(),
+    /**
+     * Remitente, con nombre: `Freshness Touch <hola@freshnesstouch.com>`.
+     * El dominio debe estar verificado en el proveedor o los correos acaban
+     * en la carpeta de no deseado, que es indistinguible de no enviarlos.
+     */
+    EMAIL_FROM: z.string().min(1).optional(),
+    /** A donde responde el cliente si contesta. Si falta, se usa EMAIL_FROM. */
+    EMAIL_REPLY_TO: z.string().email().optional(),
+    EMAIL_TIMEOUT_MS: z.coerce.number().int().min(1000).default(10000),
+
+    /**
+     * Token del bot de Telegram, tal y como lo entrega BotFather.
+     *
+     * ES UNA CREDENCIAL y por eso vive aqui y no en el panel: quien la tiene
+     * ES el bot. Lo que si se configura desde el panel es a que chat avisar,
+     * que sin este token no sirve para enviar nada.
+     *
+     * Sin token no se avisa por Telegram y el sistema funciona igual: queda
+     * anotado como omitido en el registro de avisos.
+     */
+    TELEGRAM_BOT_TOKEN: z.string().min(1).optional(),
+    TELEGRAM_TIMEOUT_MS: z.coerce.number().int().min(1000).default(10000),
+    /**
+     * Direccion base de la API de Telegram. Solo se cambia para apuntar a un
+     * servidor propio de su API, o a uno local en las pruebas de punta a punta.
+     */
+    TELEGRAM_API_BASE: z.url().default('https://api.telegram.org'),
+
     AUTH_PROVIDER: z.enum(['local', 'supabase']).default('local'),
     /** Direccion del proyecto de Supabase: https://<ref>.supabase.co */
     SUPABASE_URL: z.string().url().optional(),
@@ -108,6 +145,16 @@ export const EnvSchema = z
   .refine((env) => env.DISTANCE_PROVIDER !== 'google' || Boolean(env.GOOGLE_MAPS_API_KEY), {
     message: 'GOOGLE_MAPS_API_KEY es obligatoria cuando DISTANCE_PROVIDER=google',
     path: ['GOOGLE_MAPS_API_KEY'],
+  })
+  .refine((env) => env.EMAIL_PROVIDER !== 'resend' || Boolean(env.RESEND_API_KEY), {
+    message: 'RESEND_API_KEY es obligatoria cuando EMAIL_PROVIDER=resend',
+    path: ['RESEND_API_KEY'],
+  })
+  .refine((env) => env.EMAIL_PROVIDER !== 'resend' || Boolean(env.EMAIL_FROM), {
+    message:
+      'EMAIL_FROM es obligatoria cuando EMAIL_PROVIDER=resend: el proveedor rechaza los ' +
+      'envios sin remitente verificado',
+    path: ['EMAIL_FROM'],
   })
   .refine((env) => env.PAYMENT_PROVIDER !== 'stripe' || Boolean(env.STRIPE_SECRET_KEY), {
     message: 'STRIPE_SECRET_KEY es obligatoria cuando PAYMENT_PROVIDER=stripe',

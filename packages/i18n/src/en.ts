@@ -273,6 +273,36 @@ export const en = {
       lastChange: 'Last changed by {{who}} on {{when}}.',
       unknownAuthor: 'someone no longer on the team',
     },
+    /* -------------------------- Avisos ----------------------------- */
+    notifications: {
+      title: 'Notifications',
+      intro: 'What we send, and where it goes.',
+
+      customerEmails: 'Emails to the customer',
+      emailBookingConfirmed: 'Send a confirmation when a booking is paid',
+      emailBookingConfirmedHelp:
+        'The customer gets their reference, date, address and what was held on their card. Turning this off means a customer who just paid receives nothing in writing.',
+      emailBookingCancelled: 'Send an email when a booking is cancelled',
+      emailBookingCancelledHelp:
+        'Never includes the internal reason written by the team — only that the booking was cancelled.',
+
+      internal: 'Alerts for your team',
+      internalEmail: 'Copy customer emails to',
+      internalEmailHelp: 'This mailbox receives the same email the customer got.',
+      internalEmailEmpty: 'No copy is sent.',
+      internalEmailInvalid: 'Enter a valid email address.',
+      telegramOnNewBooking: 'Send a Telegram message for each new booking',
+      telegramOnNewBookingHelp:
+        'Only for bookings that are confirmed and paid. Abandoned forms are not reported, so the alert stays worth reading.',
+      telegramChatId: 'Telegram chat',
+      telegramChatIdHelp:
+        'The numeric chat id. Write to your bot, then open api.telegram.org/bot<token>/getUpdates to read it.',
+      telegramChatIdInvalid: 'The chat id is a number, for example 123456789.',
+
+      credentialsNote:
+        'The email API key and the Telegram bot token are set on the server, not here. Credentials stored in the database end up in every backup, so they stay in the server environment alongside the payment keys.',
+    },
+
     /* --------------------------- Errores --------------------------- */
     errorSessionExpired: 'Your session has ended. Please sign in again.',
     errorNoAccess: 'This account does not have access to the admin panel.',

@@ -278,6 +278,36 @@ export const es: TranslationResources = {
       unknownAuthor: 'alguien que ya no esta en el equipo',
     },
 
+    /* -------------------------- Avisos ----------------------------- */
+    notifications: {
+      title: 'Avisos',
+      intro: 'Qué se envía y a dónde llega.',
+
+      customerEmails: 'Correos al cliente',
+      emailBookingConfirmed: 'Enviar confirmación cuando se paga una reserva',
+      emailBookingConfirmedHelp:
+        'El cliente recibe su referencia, la fecha, la dirección y lo retenido en su tarjeta. Si lo apagas, quien acaba de pagar no recibe nada por escrito.',
+      emailBookingCancelled: 'Enviar correo cuando se cancela una reserva',
+      emailBookingCancelledHelp:
+        'Nunca incluye el motivo interno que escribe el equipo: solo que la reserva quedó cancelada.',
+
+      internal: 'Avisos para tu equipo',
+      internalEmail: 'Copiar los correos del cliente a',
+      internalEmailHelp: 'Ese buzón recibe el mismo correo que recibió el cliente.',
+      internalEmailEmpty: 'No se envía copia.',
+      internalEmailInvalid: 'Escribe un correo válido.',
+      telegramOnNewBooking: 'Enviar un mensaje de Telegram por cada reserva nueva',
+      telegramOnNewBookingHelp:
+        'Solo de las reservas confirmadas y pagadas. Los formularios abandonados no se avisan, para que el aviso siga mereciendo la pena leerlo.',
+      telegramChatId: 'Chat de Telegram',
+      telegramChatIdHelp:
+        'El identificador numérico del chat. Escribe a tu bot y ábrelo en api.telegram.org/bot<token>/getUpdates para leerlo.',
+      telegramChatIdInvalid: 'El identificador de chat es un número, por ejemplo 123456789.',
+
+      credentialsNote:
+        'La clave del proveedor de correo y el token del bot se configuran en el servidor, no aquí. Una credencial guardada en la base de datos acaba en cada copia de seguridad, así que viven en el entorno del servidor junto a las claves de pago.',
+    },
+
     /* --------------------------- Errores --------------------------- */
     errorSessionExpired: 'Tu sesión ha terminado. Vuelve a iniciar sesión.',
     errorNoAccess: 'Esta cuenta no tiene acceso al panel de administración.',

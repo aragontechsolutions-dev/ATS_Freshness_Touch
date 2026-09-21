@@ -5,7 +5,10 @@ import { BookingActionsService } from './booking-actions.service';
 import { BookingActionsController, BookingsAdminController } from './bookings-admin.controller';
 import { BookingsAdminService } from './bookings-admin.service';
 import { SessionController } from './session.controller';
-import { SettingsAdminController } from './settings-admin.controller';
+import {
+  NotificationSettingsController,
+  SettingsAdminController,
+} from './settings-admin.controller';
 
 @Module({
   imports: [PaymentsModule, SettingsModule],
@@ -14,6 +17,7 @@ import { SettingsAdminController } from './settings-admin.controller';
     BookingsAdminController,
     BookingActionsController,
     SettingsAdminController,
+    NotificationSettingsController,
   ],
   providers: [BookingsAdminService, BookingActionsService],
 })

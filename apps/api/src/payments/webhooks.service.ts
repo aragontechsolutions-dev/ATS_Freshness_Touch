@@ -1,5 +1,6 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import type { Prisma } from '../generated/prisma/client';
 import { PaymentsService } from './payments.service';
 import {
@@ -9,6 +10,12 @@ import {
 } from './payments.types';
 
 export type WebhookOutcome = 'processed' | 'duplicate' | 'ignored';
+
+/** Cambio de estado que de verdad ocurrio, para avisar despues de consolidar. */
+interface BookingTransition {
+  bookingId: string;
+  to: 'CONFIRMED' | 'CANCELLED';
+}
 
 /**
  * PROCESAMIENTO DE EVENTOS DEL PROVEEDOR DE PAGO
@@ -36,6 +43,7 @@ export class WebhooksService {
     @Inject(PAYMENT_PROVIDER) private readonly provider: PaymentProvider,
     private readonly payments: PaymentsService,
     private readonly prisma: PrismaService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   /** Verifica la firma. Lanza WebhookSignatureError si no es autentica. */
@@ -45,7 +53,7 @@ export class WebhooksService {
 
   async handle(event: ProviderWebhookEvent): Promise<WebhookOutcome> {
     try {
-      return await this.prisma.db.$transaction(async (tx) => {
+      const procesado = await this.prisma.db.$transaction(async (tx) => {
         await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`webhook:${event.id}`}))`;
 
         const previo = await tx.webhookEvent.findUnique({
@@ -55,7 +63,7 @@ export class WebhooksService {
 
         if (previo?.processedAt) {
           this.logger.log(`Evento ${event.id} ya procesado: se ignora el reenvio`);
-          return 'duplicate';
+          return { outcome: 'duplicate', transicion: null } as const;
         }
 
         await tx.webhookEvent.upsert({
@@ -74,17 +82,35 @@ export class WebhooksService {
           ? await this.payments.applyProviderState(tx, event.payment)
           : null;
 
-        if (resultado) {
-          await this.syncBooking(tx, resultado.bookingId, resultado.status);
-        }
+        const transicion = resultado
+          ? await this.syncBooking(tx, resultado.bookingId, resultado.status)
+          : null;
 
         await tx.webhookEvent.update({
           where: { id: event.id },
           data: { processedAt: new Date() },
         });
 
-        return resultado ? 'processed' : 'ignored';
+        return { outcome: resultado ? 'processed' : 'ignored', transicion } as const;
       });
+
+      /*
+       * LOS AVISOS SALEN AQUI, YA FUERA DE LA TRANSACCION, y no es un detalle
+       * de estilo. Dentro, un proveedor de correo caido desharia la
+       * confirmacion de una reserva cuyo deposito YA esta retenido en la
+       * tarjeta del cliente: se quedaria con el dinero bloqueado y sin cita.
+       *
+       * El servicio de avisos no lanza nunca, asi que este `await` no puede
+       * afectar a la respuesta del webhook. Se espera igualmente para que el
+       * envio no quede colgando cuando el proceso termine.
+       */
+      if (procesado.transicion?.to === 'CONFIRMED') {
+        await this.notifications.bookingConfirmed(procesado.transicion.bookingId);
+      } else if (procesado.transicion?.to === 'CANCELLED') {
+        await this.notifications.bookingCancelled(procesado.transicion.bookingId);
+      }
+
+      return procesado.outcome;
     } catch (error) {
       // La transaccion se deshizo, asi que el evento no quedo registrado. Se
       // anota fuera de ella para dejar rastro sin impedir el reintento.
@@ -105,7 +131,7 @@ export class WebhooksService {
     tx: Prisma.TransactionClient,
     bookingId: string,
     paymentStatus: string,
-  ): Promise<void> {
+  ): Promise<BookingTransition | null> {
     if (paymentStatus === 'REQUIRES_CAPTURE' || paymentStatus === 'SUCCEEDED') {
       const { count } = await tx.booking.updateMany({
         where: { id: bookingId, status: 'PENDING_PAYMENT' },
@@ -113,8 +139,9 @@ export class WebhooksService {
       });
       if (count > 0) {
         this.logger.log(`Reserva ${bookingId} confirmada: deposito retenido`);
+        return { bookingId, to: 'CONFIRMED' };
       }
-      return;
+      return null;
     }
 
     if (paymentStatus === 'CANCELED' || paymentStatus === 'FAILED') {
@@ -130,8 +157,11 @@ export class WebhooksService {
       });
       if (count > 0) {
         this.logger.warn(`Reserva ${bookingId} cancelada: el deposito no se retuvo`);
+        return { bookingId, to: 'CANCELLED' };
       }
     }
+
+    return null;
   }
 
   private async recordFailure(event: ProviderWebhookEvent, motivo: string): Promise<void> {

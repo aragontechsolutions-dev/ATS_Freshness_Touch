@@ -298,6 +298,55 @@ cada arranque para que esa situación no pase inadvertida en producción.
 
 ---
 
+## 5.b Avisos: correo y Telegram (Etapa 2.5)
+
+Ver `docs/14-avisos.md` para el porqué de cada decisión.
+
+### Correo (Resend)
+
+| Variable           | Valor                                   | Obligatoria     |
+| ------------------ | --------------------------------------- | --------------- |
+| `EMAIL_PROVIDER`   | `log` (por defecto) o `resend`          | No              |
+| `RESEND_API_KEY`   | `re_...`                                | Sí, si `resend` |
+| `EMAIL_FROM`       | `Freshness Touch <hola@tu-dominio.com>` | Sí, si `resend` |
+| `EMAIL_REPLY_TO`   | A dónde responde el cliente             | No              |
+| `EMAIL_TIMEOUT_MS` | 10000 por defecto                       | No              |
+
+**El dominio de `EMAIL_FROM` hay que verificarlo en Resend** (registros SPF y
+DKIM en tu DNS). Sin verificar, los correos acaban en la carpeta de no
+deseado, que para el cliente es indistinguible de no enviarlos.
+
+La API **no arranca** con `EMAIL_PROVIDER=resend` si falta la clave o el
+remitente: es preferible un fallo al desplegar que descubrirlo por un cliente
+que no recibió su confirmación.
+
+### Telegram
+
+1. Habla con **@BotFather** en Telegram y usa `/newbot`. Te da un token con la
+   forma `123456789:AAH...`.
+2. Escríbele algo a tu bot recién creado (si no, no puede contestarte).
+3. Abre `https://api.telegram.org/bot<TU-TOKEN>/getUpdates` y copia el
+   `chat.id` que aparece.
+
+| Variable              | Valor                               | Obligatoria |
+| --------------------- | ----------------------------------- | ----------- |
+| `TELEGRAM_BOT_TOKEN`  | El token de BotFather               | No          |
+| `TELEGRAM_TIMEOUT_MS` | 10000 por defecto                   | No          |
+| `TELEGRAM_API_BASE`   | Solo para servidor propio o pruebas | No          |
+
+**El identificador de chat NO va aquí**: se configura desde el panel, en
+Datos del negocio → Avisos. Sin el token no sirve para enviar nada, así que no
+es un secreto.
+
+Sin `TELEGRAM_BOT_TOKEN` el sistema funciona igual: el intento queda anotado
+como fallido con el motivo, visible en el registro de avisos.
+
+> **El token ES el bot.** Quien lo tiene puede leer y escribir todo lo que el
+> bot alcance. Por eso no se edita desde el panel: acabaría en la base de datos
+> y, con ella, en cada copia de seguridad.
+
+---
+
 ## 6. Resumen de qué va dónde
 
 | Secreto                       | Render | Vercel | Repositorio |
@@ -311,6 +360,8 @@ cada arranque para que esa situación no pase inadvertida en producción.
 | `STRIPE_SECRET_KEY`           | ✅     | ❌     | ❌          |
 | `STRIPE_WEBHOOK_SECRET`       | ✅     | ❌     | ❌          |
 | `VITE_STRIPE_PUBLISHABLE_KEY` | ❌     | ✅     | ❌          |
+| `RESEND_API_KEY`              | ✅     | ❌     | ❌          |
+| `TELEGRAM_BOT_TOKEN`          | ✅     | ❌     | ❌          |
 | Clave pública de Supabase     | ✅     | ✅     | ❌          |
 | `VITE_API_BASE_URL`           | ❌     | ✅     | ❌          |
 

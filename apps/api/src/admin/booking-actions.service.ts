@@ -15,6 +15,7 @@ import {
   type BookingStatus,
 } from '@freshness/types';
 import { AuditService } from '../audit/audit.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../database/prisma.service';
 import { PaymentsService } from '../payments/payments.service';
 
@@ -33,6 +34,7 @@ export class BookingActionsService {
     private readonly prisma: PrismaService,
     private readonly payments: PaymentsService,
     private readonly audit: AuditService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   /**
@@ -97,6 +99,21 @@ export class BookingActionsService {
         `Reserva ${booking.reference}: ${booking.status} -> ${change.status} por ${staff.email}`,
       );
     });
+
+    /*
+     * El aviso sale DESPUES de consolidar la transaccion, igual que en el
+     * webhook del proveedor de pago. Dentro, un fallo del proveedor de correo
+     * desharia un cambio de estado que el equipo ya dio por hecho.
+     *
+     * Solo se avisa de la cancelacion: es la unica transicion que el cliente
+     * necesita saber por escrito. Que el equipo haya llegado a la casa o
+     * marcado el trabajo como terminado es informacion interna, y un correo
+     * por cada paso convertiria las confirmaciones en ruido que se archiva
+     * sin leer.
+     */
+    if (change.status === 'CANCELLED') {
+      await this.notifications.bookingCancelled(bookingId);
+    }
   }
 
   /** Cobra el depósito retenido. */

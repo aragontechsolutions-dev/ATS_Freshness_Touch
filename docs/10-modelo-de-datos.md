@@ -33,6 +33,7 @@ Vive en `apps/api/prisma/schema.prisma`.
 | Tabla                 | Para qué                                               |
 | --------------------- | ------------------------------------------------------ |
 | `customers`           | Clientes, con o sin cuenta                             |
+| `notifications`       | Cada aviso enviado, con su resultado                   |
 | `addresses`           | Direcciones de servicio, con la distancia ya calculada |
 | `quotes`              | Cotizaciones emitidas (antes no se guardaba ninguna)   |
 | `bookings`            | Citas y trabajos, con el precio pactado congelado      |
