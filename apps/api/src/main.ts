@@ -40,8 +40,15 @@ async function bootstrap(): Promise<void> {
   // --- CORS: lista blanca explicita, nunca "*" -------------------------------
   app.enableCors({
     origin: corsOrigins,
-    methods: ['GET', 'POST', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Accept', 'X-Request-Id'],
+    // PATCH lo necesita el panel para cambiar el estado de una reserva.
+    methods: ['GET', 'POST', 'PATCH', 'OPTIONS'],
+    /*
+     * "Authorization" es imprescindible para el panel: sin declararla aqui el
+     * navegador rechaza la peticion despues del preflight, aunque el servidor
+     * responda 204. Es un fallo que solo se ve en un navegador de verdad, no
+     * con curl ni en los tests de la API.
+     */
+    allowedHeaders: ['Authorization', 'Content-Type', 'Accept', 'X-Request-Id'],
     exposedHeaders: ['X-Request-Id'],
     credentials: false,
     maxAge: 86400,

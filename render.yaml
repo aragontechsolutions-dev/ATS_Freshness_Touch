@@ -76,6 +76,23 @@ services:
       - key: DISTANCE_TIMEOUT_MS
         value: '5000'
 
+      # --- Identidad del personal (panel de administracion) ---
+      # local | supabase. "local" emite sus propios tokens para desarrollar
+      # sin Supabase, y la API SE NIEGA A ARRANCAR con el en produccion:
+      # quien conozca AUTH_LOCAL_SECRET podria entrar como administrador.
+      - key: AUTH_PROVIDER
+        value: supabase
+      # https://<ref>.supabase.co — obligatoria con AUTH_PROVIDER=supabase.
+      - key: SUPABASE_URL
+        sync: false
+      # Solo para proyectos ANTIGUOS de Supabase, que todavia firman con un
+      # secreto compartido. Los proyectos actuales usan claves asimetricas y
+      # no la necesitan: dejarla vacia es lo correcto.
+      - key: SUPABASE_JWT_SECRET
+        sync: false
+      - key: AUTH_TIMEOUT_MS
+        value: '5000'
+
       # --- Pagos ---
       # mock | stripe. Con "mock" los depositos se SIMULAN: no se retiene
       # dinero real. Sirve para desplegar y probar el flujo completo antes de

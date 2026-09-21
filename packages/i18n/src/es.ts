@@ -143,6 +143,12 @@ export const es: TranslationResources = {
       'Demasiadas cotizaciones en poco tiempo. Espera un momento e inténtalo de nuevo.',
   },
 
+  admin: {
+    errorSessionExpired: 'Tu sesión ha terminado. Vuelve a iniciar sesión.',
+    errorNoAccess: 'Esta cuenta no tiene acceso al panel de administración.',
+    errorBookingNotFound: 'No encontramos esa reserva.',
+  },
+
   booking: {
     /* ----------------------------- Llamada ----------------------------- */
     cta: 'Reservar esta limpieza',

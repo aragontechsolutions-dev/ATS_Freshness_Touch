@@ -5,6 +5,9 @@ import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { validateEnv, type Env } from './common/config/env';
 import { RequestIdMiddleware } from './common/middleware/request-id.middleware';
 import { THROTTLER_NAMES } from './common/throttling';
+import { AdminModule } from './admin/admin.module';
+import { AuditModule } from './audit/audit.module';
+import { AuthModule } from './auth/auth.module';
 import { BookingsModule } from './bookings/bookings.module';
 import { DatabaseModule } from './database/database.module';
 import { DistanceModule } from './distance/distance.module';
@@ -46,12 +49,15 @@ import { SchedulingModule } from './scheduling/scheduling.module';
     }),
 
     DatabaseModule,
+    AuthModule,
+    AuditModule,
     HealthModule,
     DistanceModule,
     QuotesModule,
     SchedulingModule,
     PaymentsModule,
     BookingsModule,
+    AdminModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })

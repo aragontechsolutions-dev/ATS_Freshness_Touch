@@ -82,7 +82,9 @@ Progreso:
   tres pasos, accesible con teclado, bilingüe y verificado en navegador real.
 - ⬜ Probar el pago real con credenciales de Stripe (el código está, falta
   recorrerlo con tarjetas de prueba).
-- ⬜ Autenticación y panel de administración.
+- 🔄 **Autenticación y panel de administración** (`docs/13-panel-y-permisos.md`):
+  hecho el control de acceso por rol y las vistas de lectura de la agenda;
+  faltan las acciones que cambian datos y el panel en sí.
 - ⬜ Captura del importe final y devoluciones desde el panel.
 - ⬜ Avisos por correo y SMS.
 - Calendario de disponibilidad y reserva en línea.

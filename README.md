@@ -90,6 +90,7 @@ proveedor de distancia funciona en modo simulado por defecto.
 | [10 — Modelo de datos](docs/10-modelo-de-datos.md)              | Tablas, migraciones y reglas de integridad         |
 | [11 — Flujo de reserva](docs/11-flujo-de-reserva.md)            | De la cotización a la cita, y la doble reserva     |
 | [12 — Pagos y depósito](docs/12-pagos-y-deposito.md)            | Retención en tarjeta, webhook y su seguridad       |
+| [13 — Panel y permisos](docs/13-panel-y-permisos.md)            | Identidad, autoridad y privacidad del panel        |
 | [Decisiones (ADR)](docs/adr/)                                   | Registro de decisiones técnicas                    |
 
 ## Pendiente antes de abrir el sitio al público
