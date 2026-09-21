@@ -90,10 +90,10 @@ En la Etapa 1 nada de esto aplica todavía porque no se guarda información.
 
 El sitio contiene afirmaciones comerciales que deben ser **verdaderas**:
 
-| Texto                                       | Qué hay que confirmar                                                         |
-| ------------------------------------------- | ----------------------------------------------------------------------------- |
-| "Con licencia · Asegurados · Afianzados"    | Que existan licencia local, póliza de responsabilidad civil y fianza vigentes |
-| "Personal con verificación de antecedentes" | Que el proceso de verificación esté realmente implantado                      |
-| "Garantía de repaso" (24 horas)             | Que la empresa acepte esa política                                            |
-| "Lunes a sábado, 8:00 AM - 6:00 PM"         | Horario real                                                                  |
-| Teléfono y correo                           | Hoy son marcadores de posición en `apps/landing/src/config/company.ts`        |
+| Texto                                       | Qué hay que confirmar                                                                                           |
+| ------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| "Con licencia · Asegurados · Afianzados"    | Que existan licencia local, póliza de responsabilidad civil y fianza vigentes                                   |
+| "Personal con verificación de antecedentes" | Que el proceso de verificación esté realmente implantado                                                        |
+| "Garantía de repaso" (24 horas)             | Que la empresa acepte esa política                                                                              |
+| Horario publicado                           | Se edita desde el panel y es **el mismo** que usa la agenda: no puede anunciarse uno y aceptar reservas en otro |
+| Teléfono y correo                           | Se editan desde el panel. Sin configurar, el sitio **no muestra** nada: no hay números de relleno               |

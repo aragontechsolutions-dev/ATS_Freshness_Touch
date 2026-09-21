@@ -35,3 +35,18 @@ export function todayInTimezone(timeZone: string): string {
     day: '2-digit',
   }).format(new Date());
 }
+
+/**
+ * Marca de tiempo en la zona horaria de quien mira.
+ *
+ * A diferencia de una cita —que se ensena SIEMPRE en la zona de la empresa,
+ * porque es la hora a la que el equipo se presenta en una casa— esto es el
+ * registro de cuando alguien pulso un boton. Ahi lo util es "hace un rato"
+ * desde donde esta quien lee, no una hora de Georgia que tiene que traducir.
+ */
+export function formatTimestamp(iso: string, locale: Locale = 'en'): string {
+  return new Intl.DateTimeFormat(localeTag[locale], {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  }).format(new Date(iso));
+}

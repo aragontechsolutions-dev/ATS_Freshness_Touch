@@ -17,6 +17,7 @@ import { Prisma } from '../generated/prisma/client';
 import { DistanceService } from '../distance/distance.service';
 import { PaymentsService } from '../payments/payments.service';
 import { AvailabilityService } from '../scheduling/availability.service';
+import type { SchedulingConfig } from '../scheduling/scheduling.config';
 import { isSlotStillAvailable } from '../scheduling/slots';
 
 @Injectable()
@@ -58,7 +59,7 @@ export class BookingsService {
   async create(request: BookingRequest, now: Date = new Date()): Promise<BookingResponse> {
     const durationMinutes = this.availability.durationFor(request);
     const startsAt = new Date(request.startsAt);
-    const schedulingConfig = this.availability.config;
+    const schedulingConfig = await this.availability.schedulingConfig();
 
     const localDate = DateTime.fromJSDate(startsAt)
       .setZone(schedulingConfig.timezone)
@@ -89,6 +90,7 @@ export class BookingsService {
         durationMinutes,
         now,
         holdExpiresAt,
+        schedulingConfig,
       });
     } catch (error) {
       /*
@@ -180,8 +182,18 @@ export class BookingsService {
     durationMinutes: number;
     now: Date;
     holdExpiresAt: Date;
+    /**
+     * Las reglas de agenda YA RESUELTAS, con el horario vigente.
+     *
+     * Se pasan en vez de volver a leerlas aqui para que la comprobacion final
+     * de la franja use exactamente el mismo horario que la primera. Si se
+     * leyeran otra vez, un cambio de horario hecho en ese instante podria
+     * tumbar una reserva que acababa de darse por buena.
+     */
+    schedulingConfig: SchedulingConfig;
   }): Promise<Omit<BookingResponse, 'payment'>> {
     const { request, quote, startsAt, endsAt, durationMinutes, now, holdExpiresAt } = args;
+    const { schedulingConfig } = args;
 
     /*
      * Con la tarifa actual el deposito minimo son 30 dolares, asi que siempre
@@ -192,7 +204,7 @@ export class BookingsService {
     const requierePago = quote.deposit.amountCents > 0;
 
     const localDate = DateTime.fromJSDate(startsAt)
-      .setZone(this.availability.config.timezone)
+      .setZone(schedulingConfig.timezone)
       .toFormat('yyyy-MM-dd');
 
     return this.prisma.db.$transaction(async (tx) => {
@@ -211,7 +223,7 @@ export class BookingsService {
         durationMinutes,
         now,
         occupied,
-        config: this.availability.config,
+        config: schedulingConfig,
       });
 
       if (!libre) {
@@ -318,7 +330,7 @@ export class BookingsService {
           addOns: request.addOns,
           scheduledStart: startsAt,
           scheduledEnd: endsAt,
-          timezone: this.availability.config.timezone,
+          timezone: schedulingConfig.timezone,
           distanceMiles: quote.distance.miles,
           zone: quote.distance.zone,
           lines: quote.lines,

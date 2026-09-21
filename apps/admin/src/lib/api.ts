@@ -1,6 +1,7 @@
 import {
   AdminBookingDetailSchema,
   AdminBookingListSchema,
+  AdminBusinessSettingsSchema,
   API_ERROR_CODES,
   ApiErrorSchema,
   AuthenticatedStaffSchema,
@@ -9,8 +10,10 @@ import {
   type AdminBookingQueryInput,
   type AdminCaptureDepositInput,
   type AdminReleaseDepositInput,
+  type AdminBusinessSettings,
   type AdminStatusChangeInput,
   type ApiError,
+  type BusinessSettings,
   type AuthenticatedStaff,
 } from '@freshness/types';
 import { auth } from './supabase';
@@ -72,7 +75,7 @@ export function isSessionError(error: unknown): boolean {
 async function request<T>(
   path: string,
   parse: (payload: unknown) => T,
-  init: { method: 'GET' | 'PATCH' | 'POST'; body?: unknown } = { method: 'GET' },
+  init: { method: 'GET' | 'PATCH' | 'POST' | 'PUT'; body?: unknown } = { method: 'GET' },
 ): Promise<T> {
   if (!auth) {
     throw new ApiClientError(API_ERROR_CODES.UNAUTHORIZED, 'admin.errorNotConfigured', 401);
@@ -206,5 +209,39 @@ export function releaseDeposit(
     `/admin/bookings/${bookingId}/payment/release`,
     parseDetail('liberacion del deposito'),
     { method: 'POST', body },
+  );
+}
+
+/**
+ * Configuracion del negocio, con quien la cambio por ultima vez.
+ *
+ * La API responde 403 a todo lo que no sea administracion, asi que el panel
+ * ni siquiera ofrece la pantalla al resto. Eso es comodidad, no seguridad: la
+ * puerta la cierra el servidor.
+ */
+export function fetchSettings(): Promise<AdminBusinessSettings> {
+  return request('/admin/settings', (payload) => {
+    const parsed = AdminBusinessSettingsSchema.safeParse(payload);
+    if (!parsed.success) throw contractError('/admin/settings', parsed.error.issues);
+    return parsed.data;
+  });
+}
+
+/**
+ * Guarda la configuracion completa.
+ *
+ * Va entera y no por campos: el horario es un bloque de siete dias que se
+ * edita junto, y los cambios parciales acabarian fusionando por detras la
+ * semana de dos personas distintas.
+ */
+export function saveSettings(settings: BusinessSettings): Promise<AdminBusinessSettings> {
+  return request(
+    '/admin/settings',
+    (payload) => {
+      const parsed = AdminBusinessSettingsSchema.safeParse(payload);
+      if (!parsed.success) throw contractError('guardado de configuracion', parsed.error.issues);
+      return parsed.data;
+    },
+    { method: 'PUT', body: settings },
   );
 }

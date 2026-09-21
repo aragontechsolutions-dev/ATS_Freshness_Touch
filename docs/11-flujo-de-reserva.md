@@ -89,8 +89,11 @@ En `apps/api/src/scheduling/scheduling.config.ts`:
 | Reserva máxima      | 90 días            |
 | Retención sin pago  | 30 minutos         |
 
-Pasa a la tabla `business_settings` en el bloque 2.3, para que la empresa
-cambie su horario sin desplegar.
+El **horario comercial** ya no está en esta tabla: se guarda en
+`business_settings` y se edita desde el panel, y el motor de agenda lo lee en
+cada petición (ver `docs/13-panel-y-permisos.md` §12). El resto de valores
+sigue en el código a propósito: cambiarlos altera lo que el sistema le promete
+al cliente.
 
 ### El cambio de hora no es un detalle
 

@@ -7,6 +7,7 @@ import {
   type AvailabilityResponse,
 } from '@freshness/types';
 import { PrismaService } from '../database/prisma.service';
+import { BusinessSettingsService } from '../settings/business-settings.service';
 import type { Prisma } from '../generated/prisma/client';
 import { BookingStatus } from '../generated/prisma/enums';
 import { defaultSchedulingConfig, type SchedulingConfig } from './scheduling.config';
@@ -14,9 +15,30 @@ import { generateSlots, type OccupiedInterval } from './slots';
 
 @Injectable()
 export class AvailabilityService {
+  /**
+   * Reglas que NO se editan desde el panel: zona horaria, equipos, antelacion
+   * minima y plazos. El horario que trae es solo el de partida; para agendar
+   * se usa `schedulingConfig()`, que lee el vigente.
+   */
   readonly config: SchedulingConfig = defaultSchedulingConfig;
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly settings: BusinessSettingsService,
+  ) {}
+
+  /**
+   * Las reglas fijas con el horario que la empresa tiene puesto ahora mismo.
+   *
+   * Se resuelve en cada peticion y no se guarda en el servicio: si se
+   * calculara una sola vez al arrancar, cambiar el horario desde el panel no
+   * tendria efecto hasta el siguiente despliegue, que es exactamente lo que
+   * este trabajo viene a evitar. La lectura esta cacheada en el servicio de
+   * configuracion, asi que no cuesta una consulta por peticion.
+   */
+  async schedulingConfig(): Promise<SchedulingConfig> {
+    return { ...this.config, businessHours: await this.settings.hours() };
+  }
 
   async getAvailability(
     request: AvailabilityRequest,
@@ -25,13 +47,14 @@ export class AvailabilityService {
     const durationMinutes = this.durationFor(request);
     this.assertDateInRange(request.date, now);
 
+    const config = await this.schedulingConfig();
     const occupied = await this.findOccupied(request.date, now);
     const { businessOpen, slots } = generateSlots({
       date: request.date,
       durationMinutes,
       now,
       occupied,
-      config: this.config,
+      config,
     });
 
     return {

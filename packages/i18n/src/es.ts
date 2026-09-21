@@ -236,6 +236,48 @@ export const es: TranslationResources = {
       FAILED: 'Rechazado',
     },
 
+    /* ----------------------- Configuracion ------------------------- */
+    settings: {
+      title: 'Datos del negocio',
+      backToAgenda: 'Volver a la agenda',
+      intro: 'Estos datos salen en la web publica. Los cambios aparecen alli en unos minutos.',
+
+      contact: 'Contacto',
+      phone: 'Telefono',
+      phoneSaved: 'Se guardara como {{value}}',
+      phoneEmpty: 'Sin telefono. La web no mostrara boton de llamar.',
+      email: 'Correo electronico',
+      emailHelp: 'Aparece en la seccion de contacto de la web.',
+      emailEmpty: 'Sin correo. La web no mostrara enlace de correo.',
+
+      hours: 'Horario',
+      hoursHelp:
+        'Este horario decide a que horas puede reservar un cliente. Cerrar un dia no cancela las reservas que ya haya ese dia.',
+      open: 'Abierto',
+      closed: 'Cerrado',
+      opensAt: 'Hora de apertura del {{day}}',
+      closesAt: 'Hora de cierre del {{day}}',
+      day: {
+        1: 'Lunes',
+        2: 'Martes',
+        3: 'Miercoles',
+        4: 'Jueves',
+        5: 'Viernes',
+        6: 'Sabado',
+        7: 'Domingo',
+      },
+
+      phoneInvalid: 'Escribe un telefono valido, por ejemplo (404) 555-0123.',
+      emailInvalid: 'Escribe un correo valido.',
+      hoursInvalid: 'Revisa este horario: la hora de cierre debe ser posterior a la de apertura.',
+
+      save: 'Guardar cambios',
+      saving: 'Guardando…',
+      saved: 'Guardado.',
+      lastChange: 'Ultimo cambio: {{who}}, el {{when}}.',
+      unknownAuthor: 'alguien que ya no esta en el equipo',
+    },
+
     /* --------------------------- Errores --------------------------- */
     errorSessionExpired: 'Tu sesión ha terminado. Vuelve a iniciar sesión.',
     errorNoAccess: 'Esta cuenta no tiene acceso al panel de administración.',
@@ -320,6 +362,8 @@ export const es: TranslationResources = {
       unavailableTitle: 'El pago con tarjeta no está disponible ahora mismo',
       unavailableBody:
         'Tu franja queda reservada. Llámanos al {{phone}} y terminamos la reserva contigo.',
+      unavailableBodyNoPhone:
+        'Tu franja queda reservada. Te escribiremos por correo para terminar la reserva contigo.',
     },
 
     /* -------------------------- Confirmacion --------------------------- */
@@ -332,10 +376,13 @@ export const es: TranslationResources = {
       held: 'Retenido en tu tarjeta',
       dueLater: 'A pagar el día del servicio',
       contact: 'Te llamaremos al {{phone}} si necesitamos algo antes de la visita.',
+      contactNoPhone: 'Te escribiremos por correo si necesitamos algo antes de la visita.',
       finish: 'Listo',
       pendingTitle: 'Reserva recibida, pago pendiente',
       pendingBody:
         'No pudimos iniciar la retención en tu tarjeta, así que la reserva aún no está confirmada. Llámanos al {{phone}} y la terminamos contigo.',
+      pendingBodyNoPhone:
+        'No pudimos iniciar la retención en tu tarjeta, así que la reserva aún no está confirmada. Te escribiremos por correo para terminarla contigo.',
       declinedTitle: 'Tu tarjeta fue rechazada',
       declinedBody: 'La franja ha quedado libre. Puedes empezar de nuevo con otra tarjeta.',
       tryAgain: 'Empezar de nuevo',
@@ -483,7 +530,16 @@ export const es: TranslationResources = {
     phone: 'Teléfono',
     email: 'Correo',
     hours: 'Horario',
-    hoursValue: 'Lunes a sábado, 8:00 AM - 6:00 PM',
+    closed: 'Cerrado',
+    day: {
+      1: 'Lunes',
+      2: 'Martes',
+      3: 'Miércoles',
+      4: 'Jueves',
+      5: 'Viernes',
+      6: 'Sábado',
+      7: 'Domingo',
+    },
     serviceArea: 'Con base en {{city}}, {{state}}',
   },
 

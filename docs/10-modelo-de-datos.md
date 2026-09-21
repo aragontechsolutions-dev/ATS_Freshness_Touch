@@ -41,8 +41,26 @@ Vive en `apps/api/prisma/schema.prisma`.
 | `webhook_events`      | Eventos del proveedor de pago (idempotencia)           |
 | `staff`               | Personal, lo mínimo para asignar trabajos              |
 | `booking_assignments` | Qué persona atiende qué trabajo                        |
-| `business_settings`   | Configuración editable desde el panel                  |
+| `business_settings`   | Configuración editable desde el panel (ver más abajo)  |
 | `audit_logs`          | Quién hizo qué                                         |
+
+### Por qué `business_settings` guarda una sola fila
+
+La tabla es de clave y valor (`key`, `value` JSON, `updatedAt`, `updatedBy`),
+pero hoy solo se usa **una clave**: `business`, con el teléfono, el correo y el
+horario juntos.
+
+No es pereza. Los tres cambian a la vez desde la misma pantalla, y **una
+escritura de una fila no puede quedarse a medias**. Repartidos en tres filas,
+un fallo entre la segunda y la tercera dejaría el negocio con el horario nuevo
+y el teléfono viejo, sin que nadie se enterara.
+
+El formato de clave y valor se conserva porque lo que viene después (textos del
+sitio, zona de servicio) sí son bloques independientes que se editarán por
+separado.
+
+Lo guardado se valida contra el contrato **al leerlo**, no solo al escribirlo:
+una fila de una versión anterior del contrato no debe tumbar el sitio público.
 
 ### Por qué `quotes` existe ahora
 

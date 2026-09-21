@@ -1,19 +1,22 @@
+import { DEFAULT_BUSINESS_SETTINGS, type WeeklyHours } from '@freshness/types';
+
 /**
  * CONFIGURACION DE AGENDA
  * -----------------------
- * Horario comercial, capacidad y reglas de reserva.
+ * Capacidad y reglas de reserva.
  *
- * Vive aqui como constante mientras no exista el panel de administracion.
- * En la Etapa 2.3 pasara a la tabla `business_settings`, para que la empresa
- * pueda cambiar su horario sin tocar codigo ni desplegar.
+ * QUE SE EDITA Y QUE NO. El horario comercial ya NO vive aqui: se guarda en
+ * `business_settings` y se cambia desde el panel, porque es una decision del
+ * negocio que cambia con las estaciones. Lo que queda en este fichero son
+ * reglas cuya modificacion cambia lo que el sistema le PROMETE al cliente
+ * (cuanto se tarda en avisar al equipo, cuantas citas caben a la vez, cuanto
+ * se retiene una tarjeta), y eso merece un cambio pensado y revisado, no un
+ * campo de formulario.
+ *
+ * La zona horaria tampoco se edita, y es la que mas tentacion da: cambiarla
+ * reinterpretaria la hora local de TODAS las citas ya guardadas, incluidas
+ * las que ya estan confirmadas con el cliente.
  */
-
-export interface BusinessHours {
-  /** Hora local de apertura, HH:MM en 24 horas. */
-  open: string;
-  /** Hora local de cierre. El trabajo debe TERMINAR antes de esta hora. */
-  close: string;
-}
 
 export interface SchedulingConfig {
   /**
@@ -23,8 +26,12 @@ export interface SchedulingConfig {
    */
   timezone: string;
 
-  /** Horario por dia de la semana: 1 = lunes ... 7 = domingo. null = cerrado. */
-  businessHours: Record<number, BusinessHours | null>;
+  /**
+   * Horario por dia de la semana: 1 = lunes ... 7 = domingo. null = cerrado.
+   * Se resuelve en cada peticion desde `BusinessSettingsService`; el valor de
+   * esta constante es solo el punto de partida de una instalacion nueva.
+   */
+  businessHours: WeeklyHours;
 
   /** Cada cuantos minutos se ofrece una hora de inicio. */
   slotIntervalMinutes: number;
@@ -56,15 +63,9 @@ export interface SchedulingConfig {
 export const defaultSchedulingConfig: SchedulingConfig = {
   timezone: 'America/New_York',
 
-  businessHours: {
-    1: { open: '08:00', close: '18:00' },
-    2: { open: '08:00', close: '18:00' },
-    3: { open: '08:00', close: '18:00' },
-    4: { open: '08:00', close: '18:00' },
-    5: { open: '08:00', close: '18:00' },
-    6: { open: '09:00', close: '16:00' },
-    7: null, // domingo cerrado
-  },
+  // Una sola fuente de verdad con el contrato compartido: si el horario de
+  // partida cambia, cambia en un sitio y lo ven la API y el panel a la vez.
+  businessHours: DEFAULT_BUSINESS_SETTINGS.hours,
 
   slotIntervalMinutes: 30,
   crews: 2,

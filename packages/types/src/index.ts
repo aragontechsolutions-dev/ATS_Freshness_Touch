@@ -7,4 +7,5 @@ export * from './booking';
 export * from './payment';
 export * from './booking-transitions';
 export * from './admin';
+export * from './business-settings';
 export * from './errors';

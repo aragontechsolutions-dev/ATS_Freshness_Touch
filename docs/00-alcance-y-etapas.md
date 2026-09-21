@@ -82,11 +82,12 @@ Progreso:
   tres pasos, accesible con teclado, bilingüe y verificado en navegador real.
 - ⬜ Probar el pago real con credenciales de Stripe (el código está, falta
   recorrerlo con tarjetas de prueba).
-- 🔄 **Autenticación y panel de administración** (`docs/13-panel-y-permisos.md`):
-  hechos el control de acceso por rol, la aplicación del panel, la agenda con
-  su detalle y las acciones sobre la reserva (cambio de estado, cobro y
-  liberación del depósito, todo con auditoría). Falta la configuración del
-  negocio editable desde el panel.
+- ✅ **Autenticación y panel de administración** (`docs/13-panel-y-permisos.md`):
+  control de acceso por rol, aplicación del panel, agenda con su detalle,
+  acciones sobre la reserva (cambio de estado, cobro y liberación del
+  depósito) y configuración del negocio editable —teléfono, correo y
+  horario—, todo con auditoría. Quedan fuera de esta etapa la asignación de
+  equipo y la vista propia del personal de limpieza.
 - 🔄 **Dinero desde el panel**: hechos el cobro y la liberación del depósito; faltan el cobro del importe final y las devoluciones.
 - ⬜ Avisos por correo y SMS.
 - Calendario de disponibilidad y reserva en línea.
@@ -96,8 +97,10 @@ Progreso:
 - Panel de administración: clientes, trabajos, calendario y asignación de personal.
 - **Configuración del negocio desde el panel**, para que la empresa no dependa
   del equipo técnico en el día a día:
-  - Datos de contacto (teléfono, correo, horario), hoy en
-    `apps/landing/src/config/company.ts`.
+  - ✅ Datos de contacto y horario: hechos en la Etapa 2.3
+    (`docs/13-panel-y-permisos.md` §12). El horario que se guarda es además el
+    que usa el motor de agenda, así que no puede desajustarse de lo que se
+    anuncia.
   - Textos y afirmaciones del sitio que deben mantenerse veraces
     (seguros, verificación de antecedentes, garantía).
   - Zona de servicio y, más adelante, las tarifas: pasarlas de archivo a base

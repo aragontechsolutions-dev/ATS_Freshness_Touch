@@ -100,7 +100,9 @@ Estos puntos **no bloquean el despliegue** (se puede desplegar y probar ya), per
 sí deben resolverse antes de dirigir tráfico real al sitio. A partir de la
 Etapa 2 se gestionarán desde el panel de administración, no editando archivos.
 
-1. Teléfono y correo reales, hoy marcadores en `apps/landing/src/config/company.ts`.
+1. Teléfono, correo y horario reales. Ya **no** se editan en el código: se
+   ponen desde el panel (Datos del negocio). Mientras no se configuren, el
+   sitio no muestra teléfono ni correo, que es preferible a mostrar uno falso.
 2. Revisar y aprobar las tarifas de `packages/pricing/src/config.ts`.
 3. Verificar que las afirmaciones del sitio son ciertas (ver documento 07): son
    publicidad, no texto decorativo.

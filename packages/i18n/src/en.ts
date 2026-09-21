@@ -231,6 +231,48 @@ export const en = {
       FAILED: 'Declined',
     },
 
+    /* ----------------------- Configuracion ------------------------- */
+    settings: {
+      title: 'Business settings',
+      backToAgenda: 'Back to agenda',
+      intro:
+        'These details appear on the public website. Changes show up there within a few minutes.',
+
+      contact: 'Contact',
+      phone: 'Phone number',
+      phoneSaved: 'Will be saved as {{value}}',
+      phoneEmpty: 'No phone number. The website will not show a call button.',
+      email: 'Email address',
+      emailHelp: 'Shown on the contact section of the website.',
+      emailEmpty: 'No email address. The website will not show an email link.',
+
+      hours: 'Business hours',
+      hoursHelp:
+        'These hours decide which times customers can book. Closing a day does not cancel bookings already made for that day.',
+      open: 'Open',
+      closed: 'Closed',
+      opensAt: '{{day}} opening time',
+      closesAt: '{{day}} closing time',
+      day: {
+        1: 'Monday',
+        2: 'Tuesday',
+        3: 'Wednesday',
+        4: 'Thursday',
+        5: 'Friday',
+        6: 'Saturday',
+        7: 'Sunday',
+      },
+
+      phoneInvalid: 'Enter a valid phone number, for example (404) 555-0123.',
+      emailInvalid: 'Enter a valid email address.',
+      hoursInvalid: 'Check these hours: the closing time must be after the opening time.',
+
+      save: 'Save changes',
+      saving: 'Saving…',
+      saved: 'Saved.',
+      lastChange: 'Last changed by {{who}} on {{when}}.',
+      unknownAuthor: 'someone no longer on the team',
+    },
     /* --------------------------- Errores --------------------------- */
     errorSessionExpired: 'Your session has ended. Please sign in again.',
     errorNoAccess: 'This account does not have access to the admin panel.',
@@ -315,6 +357,10 @@ export const en = {
       unavailableTitle: 'Card payments are not available right now',
       unavailableBody:
         'Your slot is held. Call us on {{phone}} and we will finish the booking with you.',
+      // Variante sin telefono: la empresa puede no tener uno configurado, y
+      // "llamanos al" seguido de nada deja al cliente sin saber que hacer.
+      unavailableBodyNoPhone:
+        'Your slot is held. We will email you to finish the booking with you.',
     },
 
     /* -------------------------- Confirmacion --------------------------- */
@@ -327,10 +373,13 @@ export const en = {
       held: 'Held on your card',
       dueLater: 'Due on the day of service',
       contact: 'We will call you on {{phone}} if we need anything before the visit.',
+      contactNoPhone: 'We will email you if we need anything before the visit.',
       finish: 'Done',
       pendingTitle: 'Booking received, payment pending',
       pendingBody:
         'We could not start the card hold, so your booking is not confirmed yet. Call us on {{phone}} and we will finish it with you.',
+      pendingBodyNoPhone:
+        'We could not start the card hold, so your booking is not confirmed yet. We will email you to finish it with you.',
       declinedTitle: 'Your card was declined',
       declinedBody: 'The slot has been released. You can start again with a different card.',
       tryAgain: 'Start again',
@@ -476,7 +525,21 @@ export const en = {
     phone: 'Phone',
     email: 'Email',
     hours: 'Hours',
-    hoursValue: 'Monday to Saturday, 8:00 AM - 6:00 PM',
+    closed: 'Closed',
+    /*
+     * El horario ya NO es un texto: se compone desde los datos que la empresa
+     * guarda en el panel. Solo quedan aqui los nombres de los dias, que si
+     * son traduccion.
+     */
+    day: {
+      1: 'Monday',
+      2: 'Tuesday',
+      3: 'Wednesday',
+      4: 'Thursday',
+      5: 'Friday',
+      6: 'Saturday',
+      7: 'Sunday',
+    },
     serviceArea: 'Based in {{city}}, {{state}}',
   },
 

@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { company } from '../config/company';
+import { useBusinessContact } from '../hooks/useBusinessSettings';
 import { ArrowRightIcon, PhoneIcon } from './Icons';
 
 /**
@@ -17,6 +17,7 @@ import { ArrowRightIcon, PhoneIcon } from './Icons';
  */
 export function StickyMobileCta() {
   const { t } = useTranslation();
+  const contacto = useBusinessContact();
 
   return (
     <div
@@ -25,13 +26,17 @@ export function StickyMobileCta() {
       style={{ paddingBottom: 'max(0.625rem, env(safe-area-inset-bottom))' }}
     >
       <div className="flex items-stretch gap-2">
-        <a
-          href={company.phoneHref}
-          className="ft-btn-outline min-h-11 flex-1 px-3 py-2 text-sm whitespace-nowrap"
-        >
-          <PhoneIcon className="h-4 w-4 shrink-0" />
-          {t('common.callUs')}
-        </a>
+        {/* Sin telefono, cotizar ocupa toda la barra en vez de dejar un hueco
+            o un boton de llamar que no llama a nadie. */}
+        {contacto.phoneHref && (
+          <a
+            href={contacto.phoneHref}
+            className="ft-btn-outline min-h-11 flex-1 px-3 py-2 text-sm whitespace-nowrap"
+          >
+            <PhoneIcon className="h-4 w-4 shrink-0" />
+            {t('common.callUs')}
+          </a>
+        )}
 
         <a
           href="#quote"
