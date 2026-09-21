@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import type { BookingResponse, Locale } from '@freshness/types';
-import { company } from '../../config/company';
+import { useBusinessContact } from '../../hooks/useBusinessSettings';
 import type { BookingDetailsForm } from '../../lib/booking-validation';
 import { formatCents, formatDateTimeLong } from '../../lib/format';
 import { CheckIcon, PhoneIcon } from '../Icons';
@@ -30,6 +30,7 @@ interface DoneStepProps {
  */
 export function DoneStep({ booking, details, outcome, locale, onClose, onRestart }: DoneStepProps) {
   const { t } = useTranslation();
+  const contacto = useBusinessContact();
 
   if (outcome === 'DECLINED') {
     return (
@@ -50,13 +51,22 @@ export function DoneStep({ booking, details, outcome, locale, onClose, onRestart
       <Aviso
         tono="aviso"
         title={t('booking.done.pendingTitle')}
-        body={t('booking.done.pendingBody', { phone: company.phoneDisplay })}
+        body={
+          // Sin telefono la frase "llamanos al ..." se queda a medias, asi
+          // que se usa la version que promete un correo, que si podemos
+          // cumplir: el correo del cliente lo tenemos de la reserva.
+          contacto.phoneDisplay
+            ? t('booking.done.pendingBody', { phone: contacto.phoneDisplay })
+            : t('booking.done.pendingBodyNoPhone')
+        }
       >
         <Referencia reference={booking.reference} />
-        <a href={company.phoneHref} className="ft-btn-secondary w-full">
-          <PhoneIcon className="h-4 w-4" />
-          {company.phoneDisplay}
-        </a>
+        {contacto.phoneHref && (
+          <a href={contacto.phoneHref} className="ft-btn-secondary w-full">
+            <PhoneIcon className="h-4 w-4" />
+            {contacto.phoneDisplay}
+          </a>
+        )}
       </Aviso>
     );
   }
@@ -98,7 +108,9 @@ export function DoneStep({ booking, details, outcome, locale, onClose, onRestart
       </dl>
 
       <p className="text-sm text-slate-600 dark:text-slate-400">
-        {t('booking.done.contact', { phone: company.phoneDisplay })}
+        {contacto.phoneDisplay
+          ? t('booking.done.contact', { phone: contacto.phoneDisplay })
+          : t('booking.done.contactNoPhone')}
       </p>
 
       <button type="button" className="ft-btn-primary w-full" onClick={onClose}>

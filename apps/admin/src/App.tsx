@@ -6,12 +6,13 @@ import { useStaffSession } from './hooks/useStaffSession';
 import { Agenda } from './pages/Agenda';
 import { BookingDetailPage } from './pages/BookingDetail';
 import { Login } from './pages/Login';
+import { SettingsPage } from './pages/Settings';
 import { persistLocale } from './i18n';
 
 /**
  * PANEL DE ADMINISTRACION
  * -----------------------
- * Sin enrutador: hay dos vistas y la navegacion cabe en un estado. Anadir una
+ * Sin enrutador: son tres vistas y la navegacion cabe en un estado. Anadir una
  * libreria de rutas para esto seria peso y complejidad a cambio de nada;
  * cuando el panel crezca, entrara.
  */
@@ -20,6 +21,7 @@ export default function App() {
   const locale = (i18n.resolvedLanguage ?? 'en') as Locale;
   const { state, signOut, refresh } = useStaffSession();
   const [openBookingId, setOpenBookingId] = useState<string | null>(null);
+  const [enAjustes, setEnAjustes] = useState(false);
 
   const dentro = state.status === 'signed-in';
 
@@ -52,6 +54,13 @@ export default function App() {
     return <Login reason={state.reason} onSignedIn={() => void refresh()} />;
   }
 
+  /*
+   * La configuracion solo se ofrece a administracion. Es comodidad, no
+   * seguridad: la API responde 403 a cualquier otro rol aunque se llame
+   * directamente. Esconder un boton nunca ha protegido nada.
+   */
+  const puedeConfigurar = state.staff.role === 'ADMIN';
+
   return (
     <div className="min-h-dvh">
       <header className="border-b border-slate-200 bg-white dark:border-night-600 dark:bg-night-800">
@@ -64,6 +73,23 @@ export default function App() {
           </div>
 
           <div className="flex shrink-0 items-center gap-2">
+            {puedeConfigurar && (
+              <button
+                type="button"
+                className="ft-btn-ghost"
+                aria-pressed={enAjustes}
+                onClick={() => {
+                  // Al ir a configuracion se cierra el detalle abierto: volver
+                  // despues a una reserva que ya no se estaba mirando
+                  // desconcierta mas de lo que ahorra.
+                  setOpenBookingId(null);
+                  setEnAjustes((valor) => !valor);
+                }}
+              >
+                {enAjustes ? t('admin.settings.backToAgenda') : t('admin.settings.title')}
+              </button>
+            )}
+
             <button type="button" className="ft-btn-ghost" onClick={cambiarIdioma}>
               {locale === 'en' ? 'ES' : 'EN'}
             </button>
@@ -75,7 +101,9 @@ export default function App() {
       </header>
 
       <main className="mx-auto max-w-5xl px-4 py-6">
-        {openBookingId ? (
+        {enAjustes && puedeConfigurar ? (
+          <SettingsPage locale={locale} onSessionLost={alPerderSesion} />
+        ) : openBookingId ? (
           <BookingDetailPage
             bookingId={openBookingId}
             staff={state.staff}

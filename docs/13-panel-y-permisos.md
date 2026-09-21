@@ -179,14 +179,21 @@ se ve en un navegador, no con curl ni en los tests de la API).
 
 ## 9. Pendiente
 
-| Tarea                                                   | Bloque |
-| ------------------------------------------------------- | ------ |
-| Cambiar estado, asignar equipo                          | 2.3.b  |
-| Capturar y liberar el depósito desde el panel           | 2.3.b  |
-| Configuración del negocio (contacto, horarios) editable | 2.3.b  |
-| Liberar franjas cuyo `holdExpiresAt` ya venció          | 2.3.b  |
-| Vista propia del personal de limpieza                   | 2.3.b  |
-| El panel en sí (aplicación web)                         | 2.3.c  |
+Lo que queda al cerrar la Etapa 2.3:
+
+| Tarea                                 | Por qué no está hecho                                                                                                             |
+| ------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| Asignar equipo a una reserva          | La tabla `booking_assignments` existe y el detalle ya muestra quién está asignado, pero no hay forma de cambiarlo desde el panel. |
+| Vista propia del personal de limpieza | El rol `CLEANER` no tiene acceso: hoy solo ve un 403. Necesita su propia pantalla, con lo justo para trabajar.                    |
+
+Ya **no** está pendiente lo que decía este apartado antes: cambiar estado,
+cobrar y liberar el depósito (§11) y la configuración del negocio (§12).
+
+> **Lo que no hace falta.** Este apartado listaba «liberar franjas cuyo
+> `holdExpiresAt` ya venció». Se comprobó y **no hace falta ninguna tarea de
+> fondo**: `findOccupied` solo cuenta las reservas pendientes de pago dentro
+> del plazo, así que el hueco vuelve a ofrecerse solo. Se deja escrito para
+> que nadie vuelva a plantearlo.
 
 ---
 
@@ -406,3 +413,195 @@ retenido, ni una caducada; y las acciones también exigen sesión.
 equipo llegado, retención liberada, trabajo completado— comprobando que al
 final no queda ninguna acción disponible y que los botones de dinero solo
 aparecen para administración.
+
+---
+
+## 12. Configuración del negocio
+
+> Tercer y último bloque de la Etapa 2.3. Código: `apps/api/src/settings/`,
+> `apps/admin/src/pages/Settings.tsx`, `packages/types/src/business-settings.ts`.
+
+El teléfono, el correo y el horario dejan de estar escritos en el código y
+pasan a editarse desde el panel.
+
+### 12.1. Por qué esto no era un capricho
+
+Hasta ahora, `apps/landing/src/config/company.ts` contenía esto:
+
+```ts
+// TODO: telefono real de la empresa
+phoneDisplay: '+1 (000) 000-0000',
+// TODO: correo real de la empresa
+email: 'contact@example.com',
+```
+
+Dos marcadores inventados esperando a que alguien se acordara de sustituirlos
+**antes de publicar**. Y aunque se hubieran sustituido, cada corrección
+posterior habría exigido tocar código y desplegar.
+
+Peor todavía: el horario comercial estaba **duplicado** en dos sitios que
+nadie garantizaba que coincidieran —la constante que usa el motor de agenda y
+una frase traducida (`'Monday to Saturday, 8:00 AM - 6:00 PM'`) en cada
+idioma—. Anunciar un horario distinto del que de verdad acepta reservas es
+peor que no anunciar ninguno.
+
+### 12.2. Tres decisiones del contrato
+
+**1. El teléfono se guarda una sola vez, en formato internacional.**
+
+De `+14045550123` se derivan lo que se ve (`+1 (404) 555-0123`) y lo que se
+marca (`tel:+14045550123`). Guardar los dos por separado invita al fallo más
+caro posible: que el sitio **enseñe** un número y **marque** otro porque
+alguien editó uno y olvidó el otro.
+
+**2. No hay valores de relleno.** Un teléfono sin configurar es `null`, no
+`'+1 (000) 000-0000'`. El sitio esconde el botón de llamar. No dar teléfono es
+molesto; dar uno falso destruye la confianza y puede acabar en el teléfono de
+un tercero que no tiene nada que ver.
+
+**3. El horario es dato, no texto traducido.** La frase se compone en pantalla
+a partir de las horas reales, agrupando días seguidos que comparten horario:
+
+```
+Monday – Friday: 8:00 AM – 6:00 PM        Lunes – Viernes: 8:00 a.m. – 6:00 p.m.
+Saturday: 9:00 AM – 4:00 PM               Sábado: 9:00 a.m. – 4:00 p.m.
+Sunday: Closed                            Domingo: Cerrado
+```
+
+### 12.3. Qué se edita y qué no
+
+| Dato                                      | ¿Editable? | Razón                                                                                                                             |
+| ----------------------------------------- | :--------: | --------------------------------------------------------------------------------------------------------------------------------- |
+| Teléfono, correo                          |     Sí     | Datos de contacto. Cambian y no afectan a ningún cálculo.                                                                         |
+| Horario comercial                         |     Sí     | Decisión del negocio que cambia con las estaciones.                                                                               |
+| Zona horaria                              |   **No**   | Cambiarla reinterpretaría la hora local de **todas** las citas ya guardadas, incluidas las confirmadas con el cliente.            |
+| Equipos, antelación mínima, plazo de pago |   **No**   | Modificarlos cambia lo que el sistema le **promete** al cliente. Merecen un cambio pensado y revisado, no un campo de formulario. |
+| Ciudad y estado de la base de operaciones |   **No**   | Es el origen desde el que se calculan distancias y recargos por zona: moverla cambia todos los precios.                           |
+
+### 12.4. Permisos: solo administración, también para leer
+
+| Acción                                          | ADMIN | DISPATCHER | CLEANER |
+| ----------------------------------------------- | :---: | :--------: | :-----: |
+| Leer el teléfono público (`/business-settings`) |  ✅   |     ✅     |   ✅    |
+| Abrir la pantalla de configuración              |  ✅   |     ❌     |   ❌    |
+| Guardar cambios                                 |  ✅   |     ❌     |   ❌    |
+
+Que solo administración pueda **escribir** es lo evidente: quien pudiera
+cambiar el teléfono podría desviar las llamadas de todos los clientes a otro
+número, y el sitio lo anunciaría con total naturalidad. Es una suplantación de
+la empresa hecha desde dentro, y no tiene nada que ver con coordinar una
+agenda.
+
+Que solo administración pueda **leer la pantalla** es menos evidente, porque
+el teléfono es público. La diferencia es lo que lo acompaña: esa pantalla dice
+además **quién lo cambió y cuándo**, y eso sí es información interna. Quien
+solo necesita el teléfono lo tiene en el endpoint público.
+
+### 12.5. Dónde se guarda
+
+Todo vive en **una sola fila** de `business_settings`, con la clave
+`business`. La tabla es de clave y valor, así que se podría repartir; se
+guarda junto porque los tres datos cambian a la vez y **una escritura de una
+fila no puede quedarse a medias**. Con tres filas, un fallo entre la segunda y
+la tercera dejaría el negocio con el horario nuevo y el teléfono viejo, y
+nadie se enteraría.
+
+El cambio y su auditoría van en la misma transacción. El registro guarda **qué
+campos** cambiaron, no solo que «se guardó algo»: ante una reclamación, lo
+primero responde y lo segundo obliga a comparar dos volcados a mano.
+
+### 12.6. Nunca tumba el sitio público
+
+`BusinessSettingsService.get()` **no falla jamás**. Si la fila no existe, si
+tiene datos de una versión anterior del contrato o si la base no responde,
+devuelve los valores de partida y deja constancia en el log del servidor.
+
+El sitio público hace lo mismo por su lado: si la API no contesta, pinta la
+página entera con el horario de partida y **sin teléfono**. Está comprobado
+cortando toda comunicación con la API en un navegador real: portada,
+cotizador y contacto siguen visibles, sin un solo error de JavaScript.
+
+El motivo es duro pero claro: ésta es la página que genera los ingresos.
+Tumbarla porque no se pudo leer un número de teléfono sería un intercambio
+pésimo.
+
+Se lee con una caché en memoria de 30 segundos, porque el motor de agenda
+consulta el horario en **cada** petición de disponibilidad. Es por instancia:
+con varias instancias, 30 segundos es el retardo máximo hasta que todas ven un
+cambio.
+
+### 12.7. El horario manda de verdad sobre la agenda
+
+No es decorativo. `AvailabilityService.schedulingConfig()` resuelve el horario
+guardado en cada petición, y `BookingsService` lo recibe **ya resuelto** para
+que la comprobación final de la franja use el mismo horario que la primera. Si
+se volviera a leer dentro de la transacción, un cambio hecho en ese instante
+podría tumbar una reserva que acababa de darse por buena.
+
+> **Cerrar un día NO cancela lo ya agendado.** Es deliberado, y la pantalla lo
+> avisa. Una reserva confirmada es un compromiso con un cliente; el horario
+> decide qué se puede reservar **a partir de ahora**. Sin ese aviso, alguien
+> cierra el domingo dando por hecho que las citas de ese domingo desaparecen.
+
+### 12.8. Seguridad: el teléfono acaba dentro de un enlace
+
+Éste es el riesgo real de la funcionalidad. El valor guardado termina en
+`href={`tel:${phone}`}` en todas las páginas del sitio. Si se admitiera texto
+libre, alguien con acceso al panel podría guardar `javascript:...` y convertir
+el botón de llamar del sitio entero en un ataque contra cada visitante que lo
+pulse.
+
+Por eso el esquema exige `^\+[1-9]\d{7,14}$`: empieza por `+` y sigue con
+dígitos. **No existe forma de colar otro esquema de URL.** Hay pruebas con las
+formas que un atacante intentaría de verdad, no solo con «texto feo»:
+
+```
+javascript:alert(1)   tel:+14045550123   "><script>alert(1)</script>
+```
+
+El correo sigue el mismo criterio, validado y normalizado a minúsculas.
+
+**Normalizar no es validar.** El campo acepta `(404) 555-0123` porque es como
+lo escribe una persona, y lo convierte al guardar. Pero lo que sale de esa
+conversión **pasa igualmente por el esquema**. Hay una prueba dedicada a
+recordarlo, porque confundir las dos cosas es exactamente como se cuelan
+valores que «parecían limpios».
+
+### 12.9. Un fallo que sólo se ve en un navegador
+
+Los primeros guardados fallaban con «no se pudo contactar con el servidor»,
+como si la API estuviera caída. No lo estaba: **`PUT` no figuraba en los
+métodos permitidos de CORS**. El navegador bloqueaba la petición tras el
+preflight y la aplicación solo veía un fallo de red.
+
+Ni `curl` ni las pruebas de la API lo detectan, porque ninguno de los dos hace
+preflight. Es el segundo fallo de esta familia en el proyecto (el primero fue
+la cabecera `Authorization`, en §10). Ambos sólo aparecen probando en un
+navegador de verdad.
+
+Al arreglarlo salió un segundo problema visible en la misma pantalla: los
+errores de validación se mostraban **con el texto del esquema, en español**, a
+alguien con el panel en inglés. Ahora el formulario traduce por campo; los
+mensajes del esquema son para quien programa.
+
+### 12.10. Qué está probado
+
+**Contra PostgreSQL real** (28 pruebas): coordinación no puede guardar aunque
+tenga sesión válida (403) ni ver quién cambió qué; un intento rechazado no
+deja el cambio a medias; la auditoría registra qué campos cambiaron; se
+rechazan teléfono con otro esquema, correo inválido, cierre anterior a la
+apertura, horas imposibles (`25:00`), semana incompleta y campos que no
+existen en el contrato; el endpoint público **no** filtra quién lo cambió; una
+fila corrupta no tumba el sitio ni la agenda, y guardar de nuevo la repara.
+
+**Del contrato** (47 pruebas en `@freshness/types`): formato del teléfono,
+normalización de lo que se teclea, agrupación de días y formato de horas por
+idioma.
+
+**En navegador real**: coordinación no ve el botón de configuración y
+administración sí; se teclea `(404) 555-0123` y la pantalla anuncia que
+guardará `+1 (404) 555-0123`; un teléfono imposible se rechaza antes de
+enviarse, con el mensaje en el idioma del panel; al guardar aparece quién lo
+cambió y cuándo; **cerrar el lunes deja ese día con cero franjas mientras el
+martes conserva 17**; y el sitio público recoge teléfono, correo y horario sin
+desplegar nada, en inglés y en español.

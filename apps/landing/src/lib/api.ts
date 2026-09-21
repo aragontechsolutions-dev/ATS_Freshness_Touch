@@ -2,6 +2,7 @@ import {
   API_ERROR_CODES,
   ApiErrorSchema,
   AvailabilityResponseSchema,
+  BusinessSettingsSchema,
   BookingResponseSchema,
   CatalogResponseSchema,
   MockPaymentConfirmResponseSchema,
@@ -9,6 +10,7 @@ import {
   type ApiError,
   type AvailabilityResponse,
   type BookingRequestInput,
+  type BusinessSettings,
   type BookingResponse,
   type CatalogResponse,
   type MockPaymentConfirmRequestInput,
@@ -249,4 +251,23 @@ export function confirmMockPayment(
       return parsed.data;
     },
   );
+}
+
+/**
+ * Telefono, correo y horario que la empresa tiene puestos ahora mismo.
+ *
+ * Si la respuesta no cumple el contrato se lanza, igual que el resto: quien
+ * llama decide que hacer. En la pagina publica esa decision es seguir con los
+ * valores de partida y no molestar al visitante, porque ninguno de estos
+ * datos impide reservar.
+ */
+export function fetchBusinessSettings(signal?: AbortSignal): Promise<BusinessSettings> {
+  return request('/business-settings', { method: 'GET', signal }, (payload) => {
+    const parsed = BusinessSettingsSchema.safeParse(payload);
+    if (!parsed.success) {
+      console.error('[Freshness Touch] Configuracion del negocio inesperada:', parsed.error.issues);
+      throw new ApiClientError('BAD_CONTRACT', 'calculator.errorGeneric');
+    }
+    return parsed.data;
+  });
 }

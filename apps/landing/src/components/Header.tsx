@@ -6,6 +6,7 @@ import { ThemeToggle } from './ThemeToggle';
 import { CloseIcon, MenuIcon, PhoneIcon } from './Icons';
 import { Logo } from './Logo';
 import { useScrolled } from '../hooks/useScrolled';
+import { useBusinessContact } from '../hooks/useBusinessSettings';
 import { hasStaffModifiers, openStaffEntrance } from '../lib/staff-entrance';
 
 const NAV_ITEMS = [
@@ -28,6 +29,7 @@ const NAV_ITEMS = [
  */
 export function Header() {
   const { t } = useTranslation();
+  const contacto = useBusinessContact();
   const [open, setOpen] = useState(false);
   const desplazada = useScrolled();
 
@@ -110,14 +112,18 @@ export function Header() {
         </nav>
 
         <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
-          <a
-            href={company.phoneHref}
-            className="hidden items-center gap-2 text-sm font-semibold text-slate-700 xl:inline-flex
-                       dark:text-slate-200"
-          >
-            <PhoneIcon className="h-4 w-4 text-brand-700 dark:text-brand-300" />
-            {company.phoneDisplay}
-          </a>
+          {/* Sin telefono configurado no se pinta nada: un enlace `tel:`
+              vacio abre la aplicacion del telefono sin numero. */}
+          {contacto.phoneHref && (
+            <a
+              href={contacto.phoneHref}
+              className="hidden items-center gap-2 text-sm font-semibold text-slate-700
+                         xl:inline-flex dark:text-slate-200"
+            >
+              <PhoneIcon className="h-4 w-4 text-brand-700 dark:text-brand-300" />
+              {contacto.phoneDisplay}
+            </a>
+          )}
 
           <LanguageSwitcher />
           <ThemeToggle />
@@ -162,12 +168,14 @@ export function Header() {
             ))}
           </ul>
 
-          <div className="ft-container pb-4">
-            <a href={company.phoneHref} className="ft-btn-secondary w-full">
-              <PhoneIcon className="h-4 w-4" />
-              {company.phoneDisplay}
-            </a>
-          </div>
+          {contacto.phoneHref && (
+            <div className="ft-container pb-4">
+              <a href={contacto.phoneHref} className="ft-btn-secondary w-full">
+                <PhoneIcon className="h-4 w-4" />
+                {contacto.phoneDisplay}
+              </a>
+            </div>
+          )}
         </nav>
       )}
     </header>

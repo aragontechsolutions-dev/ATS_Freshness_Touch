@@ -8,7 +8,7 @@ import type {
   QuoteResponse,
   ServiceType,
 } from '@freshness/types';
-import { company } from '../config/company';
+import { useBusinessContact } from '../hooks/useBusinessSettings';
 import { useCatalog } from '../hooks/useCatalog';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { useFlashOnChange } from '../hooks/useFlashOnChange';
@@ -72,6 +72,7 @@ function toRequest(form: FormState, locale: Locale): QuoteRequestInput {
 
 export function QuoteCalculator() {
   const { t, i18n } = useTranslation();
+  const contacto = useBusinessContact();
   const locale = (i18n.resolvedLanguage ?? 'en') as Locale;
   const { catalog, failed: catalogFailed } = useCatalog();
 
@@ -366,10 +367,12 @@ export function QuoteCalculator() {
                   {t('calculator.errorTitle')}
                 </h3>
                 <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">{t(errorKey)}</p>
-                <a href={company.phoneHref} className="ft-btn-outline mt-4 w-full">
-                  <PhoneIcon className="h-4 w-4" />
-                  {company.phoneDisplay}
-                </a>
+                {contacto.phoneHref && (
+                  <a href={contacto.phoneHref} className="ft-btn-outline mt-4 w-full">
+                    <PhoneIcon className="h-4 w-4" />
+                    {contacto.phoneDisplay}
+                  </a>
+                )}
               </div>
             )}
 
@@ -475,6 +478,7 @@ interface QuoteResultProps {
 
 function QuoteResult({ quote, locale, canBook, onBook }: QuoteResultProps) {
   const { t } = useTranslation();
+  const contacto = useBusinessContact();
   // Sin esta senal, al cambiar el formulario el total se actualiza en
   // silencio y no queda claro si ya refleja lo que se acaba de tocar.
   const destello = useFlashOnChange(quote.totals.totalCents);
@@ -493,7 +497,7 @@ function QuoteResult({ quote, locale, canBook, onBook }: QuoteResultProps) {
         <p className="mt-3 text-sm text-slate-600 dark:text-slate-400">
           {t('calculator.manualReviewBody')}
         </p>
-        <a href={company.phoneHref} className="ft-btn-secondary mt-4 w-full">
+        <a href={contacto.phoneHref ?? '#contact'} className="ft-btn-secondary mt-4 w-full">
           {t('calculator.requestCallback')}
         </a>
       </div>

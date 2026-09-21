@@ -1,25 +1,26 @@
 /**
- * DATOS DE CONTACTO DE LA EMPRESA
- * -------------------------------
- * PENDIENTE: sustituir los valores marcados con "TODO" por los datos reales
- * de Freshness Touch antes de publicar el sitio. Se dejan como marcadores
- * evidentes a proposito: publicar un telefono o correo inventado seria peor
- * que no publicar ninguno.
+ * DATOS FIJOS DE LA EMPRESA
+ * -------------------------
+ * Aqui solo queda lo que NO cambia sin un cambio de codigo.
+ *
+ * El telefono, el correo y el horario ya no estan en este fichero: se guardan
+ * en la base de datos y se editan desde el panel. Hasta la Etapa 2.3 vivian
+ * aqui como marcadores inventados ("+1 (000) 000-0000"), esperando a que
+ * alguien se acordara de sustituirlos antes de publicar. Ese es exactamente
+ * el tipo de espera que acaba en una web publicada con un telefono falso.
+ *
+ * Ver `hooks/useBusinessSettings.tsx`.
  */
 export const company = {
   name: 'Freshness Touch',
 
-  // TODO: telefono real de la empresa
-  phoneDisplay: '+1 (000) 000-0000',
-  phoneHref: 'tel:+10000000000',
-
-  // TODO: correo real de la empresa
-  email: 'contact@example.com',
-
-  // Base de operaciones. Debe coincidir con COMPANY_BASE_* de la API.
+  /*
+   * Base de operaciones. Debe coincidir con COMPANY_BASE_* de la API, que es
+   * desde donde se calculan las distancias y los recargos por zona. No se
+   * edita desde el panel a proposito: cambiarla moveria el origen de todos
+   * los precios, y eso es una decision con consecuencias economicas, no un
+   * dato de contacto.
+   */
   city: 'Atlanta',
   state: 'GA',
-
-  // TODO: enlaces reales a redes sociales y perfiles de resenas.
-  social: {} as Record<string, string>,
 } as const;

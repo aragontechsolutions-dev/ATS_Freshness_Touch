@@ -15,6 +15,7 @@ import { HealthModule } from './health/health.module';
 import { PaymentsModule } from './payments/payments.module';
 import { QuotesModule } from './quotes/quotes.module';
 import { SchedulingModule } from './scheduling/scheduling.module';
+import { SettingsModule } from './settings/settings.module';
 
 @Module({
   imports: [
@@ -53,6 +54,7 @@ import { SchedulingModule } from './scheduling/scheduling.module';
     AuditModule,
     HealthModule,
     DistanceModule,
+    SettingsModule,
     QuotesModule,
     SchedulingModule,
     PaymentsModule,

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { BookingResponse, Locale } from '@freshness/types';
-import { company } from '../../config/company';
+import { useBusinessContact } from '../../hooks/useBusinessSettings';
 import { ApiClientError, confirmMockPayment } from '../../lib/api';
 import { formatCents, formatTimeInZone } from '../../lib/format';
 import { PhoneIcon } from '../Icons';
@@ -101,6 +101,7 @@ export function PaymentStep({ booking, locale, onResolved }: PaymentStepProps) {
 
 function Unavailable() {
   const { t } = useTranslation();
+  const contacto = useBusinessContact();
 
   return (
     <div className="rounded-xl border border-sun-400 bg-sun-50 p-4 dark:border-sun-600 dark:bg-night-700">
@@ -108,12 +109,16 @@ function Unavailable() {
         {t('booking.payment.unavailableTitle')}
       </p>
       <p className="mt-1 text-sm text-slate-700 dark:text-slate-300">
-        {t('booking.payment.unavailableBody', { phone: company.phoneDisplay })}
+        {contacto.phoneDisplay
+          ? t('booking.payment.unavailableBody', { phone: contacto.phoneDisplay })
+          : t('booking.payment.unavailableBodyNoPhone')}
       </p>
-      <a href={company.phoneHref} className="ft-btn-outline mt-3 w-full">
-        <PhoneIcon className="h-4 w-4" />
-        {company.phoneDisplay}
-      </a>
+      {contacto.phoneHref && (
+        <a href={contacto.phoneHref} className="ft-btn-outline mt-3 w-full">
+          <PhoneIcon className="h-4 w-4" />
+          {contacto.phoneDisplay}
+        </a>
+      )}
     </div>
   );
 }

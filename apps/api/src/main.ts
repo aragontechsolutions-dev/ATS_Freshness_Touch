@@ -40,8 +40,17 @@ async function bootstrap(): Promise<void> {
   // --- CORS: lista blanca explicita, nunca "*" -------------------------------
   app.enableCors({
     origin: corsOrigins,
-    // PATCH lo necesita el panel para cambiar el estado de una reserva.
-    methods: ['GET', 'POST', 'PATCH', 'OPTIONS'],
+    /*
+     * PATCH lo necesita el panel para cambiar el estado de una reserva, y PUT
+     * para guardar la configuracion del negocio.
+     *
+     * Un metodo que falta aqui NO da un error claro: el navegador bloquea la
+     * peticion tras el preflight y la aplicacion solo ve "no se pudo contactar
+     * con el servidor", como si estuviera caido. Se descubrio asi, probando el
+     * guardado en un navegador de verdad; ni curl ni las pruebas de la API lo
+     * detectan, porque ninguno de los dos hace preflight.
+     */
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'OPTIONS'],
     /*
      * "Authorization" es imprescindible para el panel: sin declararla aqui el
      * navegador rechaza la peticion despues del preflight, aunque el servidor
