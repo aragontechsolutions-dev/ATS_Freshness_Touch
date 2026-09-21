@@ -166,6 +166,25 @@ export const en = {
     back: 'Back to agenda',
     durationMinutes: '{{minutes}} min on site',
 
+    actions: 'Actions',
+    noActions: 'There is nothing left to do on this booking.',
+    reason: 'Reason',
+    reasonPlaceholder: 'Why are you doing this?',
+    reasonHelp: 'It is saved with your name in the audit log.',
+    reasonRequired: 'Add a reason first.',
+    depositHeld: '{{amount}} is held on the card, not charged.',
+    captureDeposit: 'Charge the deposit',
+    releaseDeposit: 'Release the hold',
+    depositHelp:
+      'Charge it only if the customer cancelled once the team was on the way or was not home. Otherwise release it.',
+    action: {
+      CONFIRMED: 'Mark as confirmed',
+      IN_PROGRESS: 'Team has arrived',
+      COMPLETED: 'Mark as completed',
+      CANCELLED: 'Cancel booking',
+      NO_SHOW: 'Customer was not there',
+      PENDING_PAYMENT: 'Back to awaiting payment',
+    },
     status: {
       PENDING_PAYMENT: 'Awaiting payment',
       CONFIRMED: 'Confirmed',
@@ -216,6 +235,11 @@ export const en = {
     errorSessionExpired: 'Your session has ended. Please sign in again.',
     errorNoAccess: 'This account does not have access to the admin panel.',
     errorBookingNotFound: 'We could not find that booking.',
+    errorInvalidTransition:
+      'That change is not possible from the current status. Someone may have just updated it.',
+    errorPaymentNotCapturable: 'There is no hold on this booking that can be charged or released.',
+    errorHoldExpired: 'The card hold has expired and can no longer be charged.',
+    errorCaptureTooLarge: 'You cannot charge more than the amount held.',
     errorInvalidCredentials: 'Those details are not correct.',
     errorNetwork: 'We could not reach the server. Check your connection.',
     errorGeneric: 'Something went wrong. Please try again.',

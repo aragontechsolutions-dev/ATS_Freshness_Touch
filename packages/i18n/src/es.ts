@@ -171,6 +171,25 @@ export const es: TranslationResources = {
     back: 'Volver a la agenda',
     durationMinutes: '{{minutes}} min en el domicilio',
 
+    actions: 'Acciones',
+    noActions: 'No queda nada por hacer en esta reserva.',
+    reason: 'Motivo',
+    reasonPlaceholder: '¿Por qué haces esto?',
+    reasonHelp: 'Se guarda con tu nombre en el registro de auditoría.',
+    reasonRequired: 'Escribe antes un motivo.',
+    depositHeld: 'Hay {{amount}} retenidos en la tarjeta, sin cobrar.',
+    captureDeposit: 'Cobrar el depósito',
+    releaseDeposit: 'Liberar la retención',
+    depositHelp:
+      'Cóbralo solo si el cliente canceló con el equipo ya en camino o no estaba en casa. Si no, libéralo.',
+    action: {
+      CONFIRMED: 'Marcar como confirmada',
+      IN_PROGRESS: 'El equipo ha llegado',
+      COMPLETED: 'Marcar como completada',
+      CANCELLED: 'Cancelar la reserva',
+      NO_SHOW: 'El cliente no estaba',
+      PENDING_PAYMENT: 'Volver a pendiente de pago',
+    },
     status: {
       PENDING_PAYMENT: 'Pendiente de pago',
       CONFIRMED: 'Confirmada',
@@ -221,6 +240,11 @@ export const es: TranslationResources = {
     errorSessionExpired: 'Tu sesión ha terminado. Vuelve a iniciar sesión.',
     errorNoAccess: 'Esta cuenta no tiene acceso al panel de administración.',
     errorBookingNotFound: 'No encontramos esa reserva.',
+    errorInvalidTransition:
+      'Ese cambio no es posible desde el estado actual. Puede que alguien acabe de cambiarlo.',
+    errorPaymentNotCapturable: 'Esta reserva no tiene una retención sobre la que se pueda actuar.',
+    errorHoldExpired: 'La retención en la tarjeta ha caducado y ya no se puede cobrar.',
+    errorCaptureTooLarge: 'No se puede cobrar más de lo que se retuvo.',
     errorInvalidCredentials: 'Esos datos no son correctos.',
     errorNetwork: 'No pudimos contactar con el servidor. Revisa tu conexión.',
     errorGeneric: 'Algo salió mal. Inténtalo de nuevo.',

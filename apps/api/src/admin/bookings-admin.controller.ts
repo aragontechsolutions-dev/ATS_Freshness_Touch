@@ -1,12 +1,34 @@
-import { Controller, Get, Param, ParseUUIDPipe, Query, UsePipes } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  ParseUUIDPipe,
+  Patch,
+  Post,
+  Query,
+  Req,
+  UsePipes,
+} from '@nestjs/common';
 import {
   AdminBookingQuerySchema,
+  AdminCaptureDepositSchema,
+  AdminReleaseDepositSchema,
+  AdminStatusChangeSchema,
   type AdminBookingDetail,
   type AdminBookingList,
   type AdminBookingQuery,
+  type AdminCaptureDeposit,
+  type AdminReleaseDeposit,
+  type AdminStatusChange,
+  type AuthenticatedStaff,
 } from '@freshness/types';
-import { ADMIN_ROUTE, Roles } from '../auth/auth.decorators';
+import type { Request } from 'express';
+import { ADMIN_ROUTE, CurrentStaff, Roles } from '../auth/auth.decorators';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
+import { BookingActionsService } from './booking-actions.service';
 import { BookingsAdminService } from './bookings-admin.service';
 
 /**
@@ -46,6 +68,83 @@ export class BookingsAdminController {
   detail(
     @Param('bookingId', new ParseUUIDPipe({ version: '4' })) bookingId: string,
   ): Promise<AdminBookingDetail> {
+    return this.bookings.detail(bookingId);
+  }
+}
+
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Acciones que CAMBIAN algo.
+ *
+ * Van en su propio controlador para que los permisos se lean de un vistazo:
+ * mover una cita es una cosa y mover dinero es otra.
+ *
+ * Todas dejan rastro en el registro de auditoria, dentro de la misma
+ * transaccion que el cambio.
+ */
+@Controller(`${ADMIN_ROUTE}/bookings/:bookingId`)
+export class BookingActionsController {
+  constructor(
+    private readonly actions: BookingActionsService,
+    private readonly bookings: BookingsAdminService,
+  ) {}
+
+  /** Cambia el estado de la reserva. Coordinacion tambien puede. */
+  @Patch('status')
+  @Roles('ADMIN', 'DISPATCHER')
+  async changeStatus(
+    @Param('bookingId', new ParseUUIDPipe({ version: '4' })) bookingId: string,
+    /*
+     * El esquema se aplica AL CUERPO, no al metodo entero. Con @UsePipes a
+     * nivel de metodo, Nest se lo aplica tambien al parametro de la ruta y el
+     * identificador falla la validacion: todo responde 400 sin llegar nunca
+     * al controlador.
+     */
+    @Body(new ZodValidationPipe<AdminStatusChange>(AdminStatusChangeSchema))
+    change: AdminStatusChange,
+    @CurrentStaff() staff: AuthenticatedStaff,
+    @Req() request: Request,
+  ): Promise<AdminBookingDetail> {
+    await this.actions.changeStatus(bookingId, change, staff, request.ip ?? null);
+    // Se devuelve la reserva ya actualizada: asi el panel no tiene que
+    // adivinar el nuevo estado ni hacer una segunda peticion.
+    return this.bookings.detail(bookingId);
+  }
+
+  /**
+   * Cobra el deposito retenido.
+   *
+   * SOLO ADMINISTRACION. Coordinacion mueve la agenda, no el dinero de la
+   * tarjeta de un cliente: quien puede cambiar una cita no tiene por que poder
+   * cobrarle.
+   */
+  @Post('payment/capture')
+  @HttpCode(HttpStatus.OK)
+  @Roles('ADMIN')
+  async captureDeposit(
+    @Param('bookingId', new ParseUUIDPipe({ version: '4' })) bookingId: string,
+    @Body(new ZodValidationPipe<AdminCaptureDeposit>(AdminCaptureDepositSchema))
+    body: AdminCaptureDeposit,
+    @CurrentStaff() staff: AuthenticatedStaff,
+    @Req() request: Request,
+  ): Promise<AdminBookingDetail> {
+    await this.actions.captureDeposit(bookingId, body, staff, request.ip ?? null);
+    return this.bookings.detail(bookingId);
+  }
+
+  /** Libera la retencion sin cobrar. Tambien solo administracion. */
+  @Post('payment/release')
+  @HttpCode(HttpStatus.OK)
+  @Roles('ADMIN')
+  async releaseDeposit(
+    @Param('bookingId', new ParseUUIDPipe({ version: '4' })) bookingId: string,
+    @Body(new ZodValidationPipe<AdminReleaseDeposit>(AdminReleaseDepositSchema))
+    body: AdminReleaseDeposit,
+    @CurrentStaff() staff: AuthenticatedStaff,
+    @Req() request: Request,
+  ): Promise<AdminBookingDetail> {
+    await this.actions.releaseDeposit(bookingId, body, staff, request.ip ?? null);
     return this.bookings.detail(bookingId);
   }
 }

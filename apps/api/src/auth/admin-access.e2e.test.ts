@@ -485,3 +485,256 @@ describe('listado y detalle de reservas', () => {
     expect(respuesta.status).toBe(404);
   });
 });
+
+describe('acciones sobre la reserva', () => {
+  let bookingId: string;
+  let admin: string;
+  let coordinacion: string;
+
+  /** Deja una reserva en el estado indicado para probar desde ahi. */
+  const ponerEstado = (id: string, estado: string): Promise<unknown> =>
+    db.exec(`UPDATE bookings SET status = '${estado}' WHERE id = '${id}'`);
+
+  beforeAll(async () => {
+    admin = await provider.issue(ADMIN_AUTH_ID, 'ada@example.com');
+    coordinacion = await provider.issue(DISPATCHER_AUTH_ID, 'beto@example.com');
+
+    const dia = new Date(Date.now() + 9 * 86_400_000).toISOString().slice(0, 10);
+    const disponibilidad = await request(app.getHttpServer())
+      .get('/api/v1/availability')
+      .query({ date: dia, service: 'STANDARD', bedrooms: 2, bathrooms: 1, squareFeet: 1100 });
+
+    const franja = disponibilidad.body.slots?.find((s: { available: boolean }) => s.available);
+    if (!franja) throw new Error('el dia elegido no tiene franjas libres');
+
+    const creada = await request(app.getHttpServer())
+      .post('/api/v1/bookings')
+      .send({
+        service: 'STANDARD',
+        bedrooms: 2,
+        bathrooms: 1,
+        squareFeet: 1100,
+        startsAt: franja.startsAt,
+        address: { line1: '5 Auburn Ave', city: 'Atlanta', state: 'GA', postalCode: '30303' },
+        contact: {
+          firstName: 'Luis',
+          lastName: 'Ramos',
+          email: 'luis.acciones@example.com',
+          phone: '+1 404 555 0155',
+        },
+      })
+      .expect(201);
+
+    bookingId = creada.body.bookingId;
+  }, 60_000);
+
+  describe('cambio de estado', () => {
+    it('rechaza una transicion imposible con 409', async () => {
+      // De "pendiente de pago" a "completada" sin pasar por el trabajo.
+      const respuesta = await request(app.getHttpServer())
+        .patch(`/api/v1/admin/bookings/${bookingId}/status`)
+        .set('authorization', `Bearer ${admin}`)
+        .send({ status: 'COMPLETED' });
+
+      expect(respuesta.status).toBe(409);
+      expect(respuesta.body.code).toBe('INVALID_TRANSITION');
+    });
+
+    it('exige motivo al cancelar', async () => {
+      /*
+       * Cancelar es de los dos casos que el cliente puede discutir despues.
+       * Sin nota de quien y por que, la reclamacion se resuelve de memoria.
+       */
+      const respuesta = await request(app.getHttpServer())
+        .patch(`/api/v1/admin/bookings/${bookingId}/status`)
+        .set('authorization', `Bearer ${admin}`)
+        .send({ status: 'CANCELLED' });
+
+      expect(respuesta.status).toBe(400);
+      expect(respuesta.body.code).toBe('VALIDATION_ERROR');
+    });
+
+    it('confirma la reserva y devuelve el detalle ya actualizado', async () => {
+      const respuesta = await request(app.getHttpServer())
+        .patch(`/api/v1/admin/bookings/${bookingId}/status`)
+        .set('authorization', `Bearer ${admin}`)
+        .send({ status: 'CONFIRMED' })
+        .expect(200);
+
+      // Sin segunda peticion: el panel no tiene que adivinar el nuevo estado.
+      expect(respuesta.body.status).toBe('CONFIRMED');
+    });
+
+    it('deja rastro de quien lo hizo', async () => {
+      const fila = await db.query<{ action: string; actorId: string; metadata: unknown }>(
+        `SELECT action, "actorId", metadata FROM audit_logs
+         WHERE "entityId" = $1 AND action LIKE 'booking.status%' ORDER BY "createdAt" DESC LIMIT 1`,
+        [bookingId],
+      );
+
+      expect(fila.rows[0]?.action).toBe('booking.status.confirmed');
+      expect(fila.rows[0]?.actorId).toBe('aaaaaaaa-1111-4111-8111-111111111111');
+      expect(fila.rows[0]?.metadata).toMatchObject({ from: 'PENDING_PAYMENT', to: 'CONFIRMED' });
+    });
+
+    it('coordinacion tambien puede mover la agenda', async () => {
+      const respuesta = await request(app.getHttpServer())
+        .patch(`/api/v1/admin/bookings/${bookingId}/status`)
+        .set('authorization', `Bearer ${coordinacion}`)
+        .send({ status: 'IN_PROGRESS' })
+        .expect(200);
+
+      expect(respuesta.body.status).toBe('IN_PROGRESS');
+    });
+
+    it('anota la marca de tiempo del estado', async () => {
+      const fila = await db.query<{ startedAt: Date | null }>(
+        `SELECT "startedAt" FROM bookings WHERE id = $1`,
+        [bookingId],
+      );
+      expect(fila.rows[0]?.startedAt).not.toBeNull();
+    });
+  });
+
+  describe('dinero: solo administracion', () => {
+    it('coordinacion NO puede cobrar el deposito', async () => {
+      /*
+       * Quien puede mover una cita no tiene por que poder cobrarle a un
+       * cliente. Es la separacion que evita que un error de agenda se
+       * convierta en un cargo indebido.
+       */
+      const respuesta = await request(app.getHttpServer())
+        .post(`/api/v1/admin/bookings/${bookingId}/payment/capture`)
+        .set('authorization', `Bearer ${coordinacion}`)
+        .send({ reason: 'el cliente no estaba' });
+
+      expect(respuesta.status).toBe(403);
+    });
+
+    it('coordinacion NO puede liberar la retencion', async () => {
+      const respuesta = await request(app.getHttpServer())
+        .post(`/api/v1/admin/bookings/${bookingId}/payment/release`)
+        .set('authorization', `Bearer ${coordinacion}`)
+        .send({ reason: 'servicio prestado' });
+
+      expect(respuesta.status).toBe(403);
+    });
+
+    it('exige un motivo para mover dinero', async () => {
+      const respuesta = await request(app.getHttpServer())
+        .post(`/api/v1/admin/bookings/${bookingId}/payment/capture`)
+        .set('authorization', `Bearer ${admin}`)
+        .send({});
+
+      expect(respuesta.status).toBe(400);
+    });
+
+    it('no se puede cobrar una retencion que aun no esta autorizada', async () => {
+      // La reserva de esta prueba nunca llego a confirmar la tarjeta: su
+      // deposito sigue en "falta confirmar", no en "autorizado".
+      const respuesta = await request(app.getHttpServer())
+        .post(`/api/v1/admin/bookings/${bookingId}/payment/capture`)
+        .set('authorization', `Bearer ${admin}`)
+        .send({ reason: 'el cliente no estaba' });
+
+      expect(respuesta.status).toBe(409);
+      expect(respuesta.body.code).toBe('PAYMENT_NOT_CAPTURABLE');
+    });
+
+    it('cobra el deposito cuando si esta autorizado, y deja rastro', async () => {
+      await db.exec(
+        `UPDATE payments SET status = 'REQUIRES_CAPTURE' WHERE "bookingId" = '${bookingId}'`,
+      );
+
+      const respuesta = await request(app.getHttpServer())
+        .post(`/api/v1/admin/bookings/${bookingId}/payment/capture`)
+        .set('authorization', `Bearer ${admin}`)
+        .send({ reason: 'el cliente no estaba en casa' })
+        .expect(200);
+
+      expect(respuesta.body.payment.status).toBe('SUCCEEDED');
+      expect(respuesta.body.payment.amountCapturedCents).toBe(
+        respuesta.body.payment.amountAuthorizedCents,
+      );
+
+      const auditoria = await db.query<{ action: string; metadata: { reason: string } }>(
+        `SELECT action, metadata FROM audit_logs
+         WHERE "entityId" = $1 AND action = 'payment.captured' LIMIT 1`,
+        [bookingId],
+      );
+      expect(auditoria.rows[0]?.metadata.reason).toBe('el cliente no estaba en casa');
+    });
+
+    it('la auditoria del cobro NO guarda credenciales del proveedor', async () => {
+      const auditoria = await db.query<{ metadata: unknown }>(
+        `SELECT metadata FROM audit_logs WHERE action = 'payment.captured' LIMIT 1`,
+      );
+      expect(JSON.stringify(auditoria.rows[0]?.metadata)).not.toContain('pi_mock');
+    });
+
+    it('no se puede cobrar dos veces el mismo deposito', async () => {
+      const respuesta = await request(app.getHttpServer())
+        .post(`/api/v1/admin/bookings/${bookingId}/payment/capture`)
+        .set('authorization', `Bearer ${admin}`)
+        .send({ reason: 'otra vez' });
+
+      // Ya esta cobrado: su estado ya no admite accion.
+      expect(respuesta.status).toBe(409);
+    });
+
+    it('no se puede cobrar mas de lo retenido', async () => {
+      await db.exec(
+        `UPDATE payments SET status = 'REQUIRES_CAPTURE' WHERE "bookingId" = '${bookingId}'`,
+      );
+
+      const respuesta = await request(app.getHttpServer())
+        .post(`/api/v1/admin/bookings/${bookingId}/payment/capture`)
+        .set('authorization', `Bearer ${admin}`)
+        .send({ amountCents: 999_999, reason: 'intento de cobrar de mas' });
+
+      expect(respuesta.status).toBe(400);
+      expect(respuesta.body.code).toBe('VALIDATION_ERROR');
+    });
+
+    it('no se puede cobrar una retencion caducada', async () => {
+      /*
+       * Una retencion dura 7 dias. Pasada esa fecha el proveedor la
+       * rechazaria igualmente, pero avisar aqui da un mensaje que se entiende.
+       */
+      await db.exec(`UPDATE payments SET status = 'REQUIRES_CAPTURE',
+        "expiresAt" = now() - interval '1 day' WHERE "bookingId" = '${bookingId}'`);
+
+      const respuesta = await request(app.getHttpServer())
+        .post(`/api/v1/admin/bookings/${bookingId}/payment/capture`)
+        .set('authorization', `Bearer ${admin}`)
+        .send({ reason: 'tarde' });
+
+      expect(respuesta.status).toBe(409);
+      expect(respuesta.body.code).toBe('PAYMENT_NOT_CAPTURABLE');
+    });
+
+    it('libera la retencion cuando el servicio se presta con normalidad', async () => {
+      await db.exec(`UPDATE payments SET status = 'REQUIRES_CAPTURE',
+        "expiresAt" = now() + interval '5 days' WHERE "bookingId" = '${bookingId}'`);
+      await ponerEstado(bookingId, 'IN_PROGRESS');
+
+      const respuesta = await request(app.getHttpServer())
+        .post(`/api/v1/admin/bookings/${bookingId}/payment/release`)
+        .set('authorization', `Bearer ${admin}`)
+        .send({ reason: 'servicio prestado sin incidencias' })
+        .expect(200);
+
+      expect(respuesta.body.payment.status).toBe('CANCELED');
+    });
+  });
+
+  describe('la zona sigue cerrada por defecto', () => {
+    it('las acciones tambien exigen sesion', async () => {
+      const respuesta = await request(app.getHttpServer())
+        .patch(`/api/v1/admin/bookings/${bookingId}/status`)
+        .send({ status: 'CANCELLED', reason: 'sin sesion' });
+
+      expect(respuesta.status).toBe(401);
+    });
+  });
+});

@@ -150,3 +150,51 @@ export const AdminBookingDetailSchema = AdminBookingListItemSchema.extend({
   cancellationReason: z.string().nullable(),
 });
 export type AdminBookingDetail = z.infer<typeof AdminBookingDetailSchema>;
+
+/* ========================================================================== */
+/* ACCIONES DEL PANEL                                                         */
+/* ========================================================================== */
+
+/**
+ * Cambio de estado de una reserva.
+ *
+ * El motivo es OBLIGATORIO al cancelar o marcar que no estaban: son los dos
+ * casos que el cliente puede discutir despues, y sin una nota de quien lo hizo
+ * y por que, la reclamacion se resuelve a base de memoria.
+ */
+export const AdminStatusChangeSchema = z
+  .strictObject({
+    status: BookingStatusSchema,
+    reason: z.string().trim().max(500).optional(),
+  })
+  .refine((value) => !['CANCELLED', 'NO_SHOW'].includes(value.status) || Boolean(value.reason), {
+    message: 'Hace falta indicar el motivo para cancelar o marcar que no estaban',
+    path: ['reason'],
+  });
+export type AdminStatusChange = z.infer<typeof AdminStatusChangeSchema>;
+export type AdminStatusChangeInput = z.input<typeof AdminStatusChangeSchema>;
+
+/**
+ * Cobro del deposito retenido.
+ *
+ * Se cobra cuando el cliente cancela con el equipo ya en camino o no esta en
+ * casa: es justo para lo que se retuvo. El motivo es obligatorio porque esto
+ * mueve dinero de verdad de la tarjeta de una persona.
+ */
+export const AdminCaptureDepositSchema = z.strictObject({
+  /**
+   * Importe a cobrar, si es menor que el retenido. Sin indicar, se cobra
+   * entero. Nunca puede superar lo autorizado: el servidor lo comprueba.
+   */
+  amountCents: z.int().positive().optional(),
+  reason: z.string().trim().min(3).max(500),
+});
+export type AdminCaptureDeposit = z.infer<typeof AdminCaptureDepositSchema>;
+export type AdminCaptureDepositInput = z.input<typeof AdminCaptureDepositSchema>;
+
+/** Liberacion de la retencion sin cobrar nada: el caso normal. */
+export const AdminReleaseDepositSchema = z.strictObject({
+  reason: z.string().trim().min(3).max(500),
+});
+export type AdminReleaseDeposit = z.infer<typeof AdminReleaseDepositSchema>;
+export type AdminReleaseDepositInput = z.input<typeof AdminReleaseDepositSchema>;

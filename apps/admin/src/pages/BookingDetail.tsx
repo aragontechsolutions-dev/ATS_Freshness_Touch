@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { AdminBookingDetail, Locale } from '@freshness/types';
+import type { AdminBookingDetail, AuthenticatedStaff, Locale } from '@freshness/types';
 import { ApiClientError, fetchBookingDetail, isSessionError } from '../lib/api';
+import { BookingActions } from '../components/BookingActions';
 import { StatusChip } from '../components/StatusChip';
 import { formatCents, formatDateTime } from '../lib/format';
 
 interface BookingDetailProps {
   bookingId: string;
+  staff: AuthenticatedStaff;
   locale: Locale;
   onBack: () => void;
   onSessionLost: () => void;
@@ -14,6 +16,7 @@ interface BookingDetailProps {
 
 export function BookingDetailPage({
   bookingId,
+  staff,
   locale,
   onBack,
   onSessionLost,
@@ -166,6 +169,16 @@ export function BookingDetailPage({
           </div>
         </dl>
       </section>
+
+      <BookingActions
+        booking={booking}
+        staff={staff}
+        locale={locale}
+        // La respuesta de cada accion trae la reserva ya actualizada, asi que
+        // la pantalla se refresca sin una segunda peticion.
+        onUpdated={setBooking}
+        onSessionLost={onSessionLost}
+      />
 
       {/* --------------------------------- Pago -------------------------------- */}
       <section className="ft-card p-5">

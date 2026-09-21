@@ -78,6 +78,7 @@ export default function App() {
         {openBookingId ? (
           <BookingDetailPage
             bookingId={openBookingId}
+            staff={state.staff}
             locale={locale}
             onBack={() => setOpenBookingId(null)}
             onSessionLost={alPerderSesion}
