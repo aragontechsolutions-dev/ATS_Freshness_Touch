@@ -7,6 +7,7 @@ import { Test } from '@nestjs/testing';
 import type { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { AdminBookingDetailSchema, AdminBookingListSchema } from '@freshness/types';
 import { AppModule } from '../app.module';
 import { ADMIN_ROUTE, Roles } from './auth.decorators';
 import { AUTH_PROVIDER } from './auth.types';
@@ -412,6 +413,34 @@ describe('listado y detalle de reservas', () => {
     expect(crudo).not.toContain('pi_mock');
     expect(crudo).not.toContain('_secret_');
     expect(respuesta.body.payment.status).toBeTruthy();
+  });
+
+  it('la respuesta CUMPLE el contrato que valida el panel', async () => {
+    /*
+     * El panel valida cada respuesta contra estos mismos esquemas, que son
+     * estrictos: un campo de mas la tumba entera y el usuario solo ve "algo
+     * salio mal".
+     *
+     * Paso de verdad: el contrato del panel declaraba una copia recortada de
+     * la linea de precio, y como la reserva guarda la linea COMPLETA, el
+     * detalle no se podia abrir. Los tests de la API pasaban porque miraban
+     * campo a campo en vez de validar la respuesta entera.
+     */
+    const listado = await request(app.getHttpServer())
+      .get('/api/v1/admin/bookings')
+      .set('authorization', `Bearer ${token}`)
+      .expect(200);
+
+    const listaOk = AdminBookingListSchema.safeParse(listado.body);
+    expect(listaOk.success ? [] : listaOk.error.issues).toEqual([]);
+
+    const detalle = await request(app.getHttpServer())
+      .get(`/api/v1/admin/bookings/${bookingId}`)
+      .set('authorization', `Bearer ${token}`)
+      .expect(200);
+
+    const detalleOk = AdminBookingDetailSchema.safeParse(detalle.body);
+    expect(detalleOk.success ? [] : detalleOk.error.issues).toEqual([]);
   });
 
   it('el limite de pagina tiene tope duro', async () => {

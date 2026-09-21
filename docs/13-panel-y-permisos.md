@@ -187,3 +187,110 @@ se ve en un navegador, no con curl ni en los tests de la API).
 | Liberar franjas cuyo `holdExpiresAt` ya venció          | 2.3.b  |
 | Vista propia del personal de limpieza                   | 2.3.b  |
 | El panel en sí (aplicación web)                         | 2.3.c  |
+
+---
+
+## 10. El panel (aplicación `apps/admin`)
+
+> Segundo bloque de la Etapa 2.3.
+
+### Por qué es una aplicación aparte, y no una ruta del sitio público
+
+|                                   | Si viviera en el landing            | Aplicación aparte         |
+| --------------------------------- | ----------------------------------- | ------------------------- |
+| Código de sesión                  | Lo descarga **cada visitante**      | Solo quien entra al panel |
+| Política de contenido del landing | Hay que abrirla a Supabase          | Sigue igual de estricta   |
+| El token                          | Habría que pasarlo entre orígenes   | Nunca sale de su origen   |
+| Indexación                        | El sitio público **debe** indexarse | El panel lleva `noindex`  |
+
+Poner un formulario de acceso en la página de marketing significa que el
+código de autenticación acaba en el paquete de todo el mundo, y que el sitio
+que más superficie de ataque tiene es el que custodia la sesión.
+
+### La puerta de servicio
+
+El panel no aparece en ningún enlace. Se entra con **Shift + Ctrl (o Cmd) +
+clic sobre el logotipo** de la cabecera, o con **Shift + Ctrl + Enter** si el
+logotipo está enfocado (quien no usa ratón también tiene que poder entrar).
+
+> ⚠️ **Esto NO es una medida de seguridad y no debe tratarse como tal.** La
+> dirección del panel viaja en el paquete que descarga el navegador:
+> cualquiera que abra las herramientas de desarrollo la encuentra en un
+> minuto. Lo único que aporta es que el sitio público no enseñe una puerta de
+> personal a los clientes.
+>
+> Lo que protege el panel es lo de las secciones 1 a 3 de este documento. Si
+> eso fallara, ocultar el enlace no salvaría nada.
+
+Detalles que parecen menores y no lo son:
+
+- **Se acepta Ctrl o Cmd.** En macOS `Ctrl + clic` es la forma estándar de
+  abrir el menú contextual; exigir Ctrl allí haría el gesto incómodo o
+  imposible. Además se suprime el menú contextual **solo** cuando los
+  modificadores están pulsados.
+- **Alt queda fuera.** Con Alt, varios navegadores interpretan el clic como
+  «descargar el destino» y el gesto se volvería impredecible.
+- **El clic normal sigue funcionando.** Verificado en navegador: clic normal,
+  solo Shift, solo Ctrl y Shift+Ctrl+Alt se quedan en el landing.
+- **Se navega en la misma pestaña.** `window.open` hacia otro origen deja al
+  panel una referencia a la ventana de origen; navegar directamente evita el
+  problema de raíz y no lo bloquean los bloqueadores de ventanas emergentes.
+
+### Decisiones de seguridad del panel
+
+**La sesión se guarda en `sessionStorage`, no en `localStorage`.** Es lo
+contrario del valor por defecto de la librería, y a propósito: `localStorage`
+sobrevive a cerrar el navegador, así que en un ordenador compartido de oficina
+la siguiente persona entra con la sesión de quien lo usó antes.
+`sessionStorage` muere al cerrar la pestaña.
+
+> Lo honesto: esto **reduce la ventana de exposición, no la elimina**. Un guion
+> inyectado (XSS) puede leer cualquiera de los dos. Contra eso protegen la
+> política de contenido estricta y que React escapa todo lo que pinta.
+
+**Cierre por inactividad a los 30 minutos.** El panel enseña nombres,
+teléfonos, direcciones y códigos de puerta. Una pestaña abierta mientras el
+equipo está fuera es una carpeta abierta encima de la mesa. Recuperar el foco
+de la pestaña **no** cuenta como actividad: si contara, bastaría con pasar por
+encima de ella para mantener la sesión viva indefinidamente.
+
+**El mensaje de acceso fallido es siempre el mismo.** Distinguir «ese correo no
+existe» de «la contraseña es incorrecta» permite averiguar quién trabaja en la
+empresa probando correos, que es el primer paso de cualquier ataque dirigido.
+
+**No hay registro.** Al personal lo da de alta administración. Una cuenta que
+se crea sola nunca llega a tener ficha de personal.
+
+**Solo se usa la parte de autenticación de Supabase** (`@supabase/auth-js`), no
+el cliente completo. El panel nunca lee datos con él —para eso está la API, que
+aplica los permisos— y el cliente completo arrastra consultas a tablas,
+almacenamiento y tiempo real que aquí no se llaman nunca. Medido: 118 KB menos
+que descargar cada mañana.
+
+**Cabeceras propias** (`apps/admin/vercel.json`): `noindex` en todas sus
+formas, `Referrer-Policy: no-referrer`, `Cache-Control: no-store` en el
+documento y una política de contenido que solo permite hablar con la API y con
+Supabase.
+
+### Un fallo que solo apareció al usarlo de verdad
+
+El contrato del panel declaraba una **copia recortada** de la línea de precio
+en vez de reutilizar la del cotizador. Como la reserva guarda la línea
+completa, el esquema estricto rechazaba la respuesta entera y el detalle no se
+podía abrir: en pantalla solo salía «algo salió mal».
+
+Los tests de la API pasaban porque comprobaban campo a campo. Ahora hay uno que
+valida la respuesta **entera** contra el mismo contrato que usa el panel, y el
+cliente escribe en la consola qué campo sobra o falta cuando eso ocurre.
+
+### Qué se verificó en navegador real
+
+Acceso con credenciales incorrectas (mensaje genérico, contraseña borrada),
+cuenta válida **sin ficha de personal** (se queda fuera), personal válido
+(entra con su nombre y rol), búsqueda, detalle con las instrucciones de acceso
+destacadas, cambio a español y cierre de sesión — comprobando que
+`sessionStorage` queda vacío y que no hay ningún token en `localStorage`.
+
+Y la puerta de servicio: los cuatro gestos que **no** deben abrirla, los dos
+que sí, el equivalente de teclado, y que la palabra «admin» no aparece en el
+texto visible del landing ni hay ningún enlace al panel.

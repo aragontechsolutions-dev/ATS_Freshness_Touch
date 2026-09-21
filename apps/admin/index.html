@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" content="#145788" />
+
+    <!--
+      El panel NO debe aparecer en ningun buscador. La cabecera X-Robots-Tag
+      de vercel.json es la que de verdad manda (esta funciona aunque el
+      buscador no ejecute JavaScript), pero se repite aqui como respaldo por
+      si el sitio se sirve alguna vez desde otro sitio sin esa cabecera.
+    -->
+    <meta name="robots" content="noindex, nofollow, noarchive, nosnippet" />
+
+    <title>Freshness Touch · Panel</title>
+    <link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png" />
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

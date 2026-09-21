@@ -144,11 +144,88 @@ export const es: TranslationResources = {
   },
 
   admin: {
+    title: 'Freshness Touch · Panel',
+
+    /* --------------------------- Acceso ---------------------------- */
+    signIn: 'Iniciar sesión',
+    signingIn: 'Entrando…',
+    signOut: 'Cerrar sesión',
+    signInHint: 'Acceso solo para personal.',
+    email: 'Correo electrónico',
+    password: 'Contraseña',
+    signedOut: {
+      manual: 'Has cerrado la sesión.',
+      idle: 'Se cerró tu sesión tras 30 minutos sin actividad.',
+      expired: 'Tu sesión ha terminado. Vuelve a iniciar sesión.',
+      noAccess: 'Esta cuenta no tiene acceso al panel de administración.',
+    },
+
+    /* --------------------------- Agenda ---------------------------- */
+    filterDate: 'Fecha',
+    filterStatus: 'Estado',
+    filterAnyStatus: 'Cualquier estado',
+    filterSearch: 'Buscar',
+    filterSearchPlaceholder: 'Referencia, nombre o correo',
+    noBookings: 'Ninguna reserva coincide con estos filtros.',
+    assignedTo: 'Asignada a {{names}}',
+    back: 'Volver a la agenda',
+    durationMinutes: '{{minutes}} min en el domicilio',
+
+    status: {
+      PENDING_PAYMENT: 'Pendiente de pago',
+      CONFIRMED: 'Confirmada',
+      IN_PROGRESS: 'En curso',
+      COMPLETED: 'Completada',
+      CANCELLED: 'Cancelada',
+      NO_SHOW: 'No estaban',
+    },
+
+    role: {
+      ADMIN: 'Administración',
+      DISPATCHER: 'Coordinación',
+      CLEANER: 'Limpieza',
+    },
+
+    /* --------------------------- Detalle --------------------------- */
+    customer: 'Cliente',
+    name: 'Nombre',
+    phone: 'Teléfono',
+    address: 'Dirección',
+    accessNotes: 'Instrucciones de acceso',
+    accessNotesWarning:
+      'Dato sensible: no lo leas en alto delante de terceros y cierra esta página al levantarte.',
+    customerNotes: 'Notas del cliente',
+    pricing: 'Desglose del precio',
+    total: 'Total',
+    deposit: 'Depósito de traslado',
+    balanceDue: 'A pagar el día del servicio',
+    payment: 'Pago',
+    paymentStatus: 'Estado',
+    held: 'Retenido en la tarjeta',
+    card: 'Tarjeta',
+    holdExpires: 'La retención caduca',
+    noPayment: 'No se llegó a crear ninguna retención para esta reserva.',
+
+    paymentState: {
+      REQUIRES_PAYMENT_METHOD: 'Falta la tarjeta',
+      REQUIRES_CONFIRMATION: 'Falta confirmar',
+      REQUIRES_ACTION: 'Esperando al banco (3D Secure)',
+      PROCESSING: 'En curso en el banco',
+      REQUIRES_CAPTURE: 'Autorizado, sin cobrar',
+      SUCCEEDED: 'Cobrado',
+      CANCELED: 'Liberado',
+      FAILED: 'Rechazado',
+    },
+
+    /* --------------------------- Errores --------------------------- */
     errorSessionExpired: 'Tu sesión ha terminado. Vuelve a iniciar sesión.',
     errorNoAccess: 'Esta cuenta no tiene acceso al panel de administración.',
     errorBookingNotFound: 'No encontramos esa reserva.',
+    errorInvalidCredentials: 'Esos datos no son correctos.',
+    errorNetwork: 'No pudimos contactar con el servidor. Revisa tu conexión.',
+    errorGeneric: 'Algo salió mal. Inténtalo de nuevo.',
+    errorNotConfigured: 'El inicio de sesión no está configurado en este despliegue.',
   },
-
   booking: {
     /* ----------------------------- Llamada ----------------------------- */
     cta: 'Reservar esta limpieza',

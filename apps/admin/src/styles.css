@@ -1,0 +1,156 @@
+@import 'tailwindcss';
+
+/*
+ * ============================================================================
+ * IDENTIDAD VISUAL DE FRESHNESS TOUCH
+ * ============================================================================
+ * Colores oficiales de marca:
+ *   Azul primario    #145788  confianza / profesionalidad
+ *   Amarillo girasol #F9C400  energia / frescura
+ *   Casi negro       #111111  elegancia / contraste
+ *   Blanco roto      #F7F9FC  limpieza / espacio
+ *
+ * REGLA DE CONTRASTE (medida, no estimada):
+ *   - El azul #145788 da 7.24:1 sobre el blanco roto, pero solo 2.47:1 sobre
+ *     el casi negro. Sirve como color de texto en modo CLARO, nunca en oscuro.
+ *   - El amarillo #F9C400 da 1.54:1 sobre blanco (ilegible) y 11.62:1 sobre
+ *     negro. NUNCA se usa como color de texto sobre fondo claro: solo como
+ *     relleno con texto casi negro encima, o como texto en modo oscuro.
+ *   - Por eso el azul lidera el modo claro y el amarillo el modo oscuro.
+ *
+ * Todos los pares en uso estan verificados contra WCAG AA (4.5:1 en texto,
+ * 3:1 en bordes y controles). Ver docs/09-identidad-visual.md.
+ */
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  /* --- Azul de marca (ancla: 700 = #145788) --- */
+  --color-brand-50: #eff6fb;
+  --color-brand-100: #d9e9f4;
+  --color-brand-200: #b3d2e9;
+  --color-brand-300: #7fb3d9; /* texto/acento en modo oscuro: 8.41:1 */
+  --color-brand-400: #4a90c4; /* anillo de foco en ambos modos */
+  --color-brand-500: #2a73a9; /* relleno de boton en modo oscuro: 3.71:1 */
+  --color-brand-600: #1b6294;
+  --color-brand-700: #145788; /* AZUL OFICIAL DE MARCA */
+  --color-brand-800: #10456c;
+  --color-brand-900: #0c3552;
+  --color-brand-950: #071f31;
+
+  /* --- Amarillo girasol (ancla: 400 = #F9C400) --- */
+  --color-sun-50: #fff9e5;
+  --color-sun-100: #fff0bf;
+  --color-sun-200: #fde380;
+  --color-sun-300: #fbd340; /* avisos en modo oscuro */
+  --color-sun-400: #f9c400; /* AMARILLO OFICIAL DE MARCA */
+  --color-sun-500: #dcac00;
+  --color-sun-600: #a88200; /* borde del boton amarillo: 3.40:1 sobre claro */
+  --color-sun-700: #8a6b00; /* unico amarillo legible como texto en claro */
+  --color-sun-800: #5c4700;
+  --color-sun-900: #3d2f00;
+
+  /* --- Neutros de marca --- */
+  --color-ink: #111111; /* casi negro oficial */
+  --color-canvas: #f7f9fc; /* blanco roto oficial */
+  --color-night-900: #111111; /* fondo de pagina en oscuro */
+  --color-night-800: #1b1f24; /* tarjetas en oscuro */
+  --color-night-700: #242a31; /* campos y superficies elevadas */
+  --color-night-600: #2f3740; /* bordes en oscuro */
+
+  /* --- Tipografia de marca (autoalojada, sin peticiones a terceros) --- */
+  --font-sans: 'Inter Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-display: 'Montserrat Variable', 'Inter Variable', ui-sans-serif, system-ui, sans-serif;
+}
+
+@layer base {
+  html {
+    scroll-padding-top: 5rem; /* para que el header fijo no tape los anclajes */
+  }
+
+  /* El desplazamiento suave tambien es movimiento: solo si esta permitido. */
+  html.ft-motion {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-canvas text-slate-900 antialiased;
+  }
+
+  .dark body {
+    @apply bg-night-900 text-slate-100;
+  }
+
+  /* Los titulares usan Montserrat; el cuerpo, Inter. */
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-family: var(--font-display);
+    font-weight: 700;
+    letter-spacing: -0.015em;
+  }
+
+  /* Foco visible y consistente: 3.28:1 en claro y 5.46:1 en oscuro. */
+  :focus-visible {
+    @apply outline-2 outline-offset-2 outline-brand-400;
+  }
+}
+
+@layer components {
+  .ft-card {
+    @apply rounded-xl border border-slate-200 bg-white shadow-sm;
+  }
+
+  .dark .ft-card {
+    @apply border-night-600 bg-night-800;
+  }
+
+  .ft-input {
+    @apply w-full rounded-lg border border-slate-400 bg-white px-3 py-2 text-slate-900
+           placeholder:text-slate-500 focus:border-brand-600 focus:ring-2 focus:ring-brand-400
+           focus:outline-none;
+  }
+
+  .dark .ft-input {
+    @apply border-night-600 bg-night-700 text-slate-100 placeholder:text-slate-400;
+  }
+
+  .ft-label {
+    @apply mb-1.5 block text-sm font-semibold text-slate-700;
+  }
+
+  .dark .ft-label {
+    @apply text-slate-300;
+  }
+
+  .ft-btn-primary,
+  .ft-btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm
+           font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-60;
+  }
+
+  .ft-btn-primary {
+    @apply bg-brand-700 text-white hover:bg-brand-800;
+  }
+
+  .dark .ft-btn-primary {
+    @apply bg-brand-500 hover:bg-brand-400 hover:text-ink;
+  }
+
+  .ft-btn-ghost {
+    @apply border border-slate-300 text-slate-700 hover:bg-slate-100;
+  }
+
+  .dark .ft-btn-ghost {
+    @apply border-night-600 text-slate-300 hover:bg-night-700;
+  }
+
+  /* Etiqueta de estado. El color no es la unica senal: cada estado lleva
+     ademas su propio texto, porque quien no distingue colores solo lee. */
+  .ft-chip {
+    @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold;
+  }
+}

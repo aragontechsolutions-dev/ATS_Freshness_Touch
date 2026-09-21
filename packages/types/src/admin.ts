@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { BookingStatusSchema } from './booking';
 import { FrequencySchema, ServiceTypeSchema, ServiceZoneSchema } from './enums';
+import { QuoteLineSchema } from './quote';
 import { PaymentStatusSchema } from './payment';
 
 /**
@@ -108,15 +109,15 @@ export const AdminBookingDetailSchema = AdminBookingListItemSchema.extend({
     accessNotes: z.string().nullable(),
   }),
 
-  /** Desglose del precio tal y como se le mostro al cliente. */
-  lines: z.array(
-    z.strictObject({
-      code: z.string(),
-      labelKey: z.string(),
-      labelParams: z.record(z.string(), z.unknown()).optional(),
-      amountCents: z.int(),
-    }),
-  ),
+  /**
+   * Desglose del precio tal y como se le mostro al cliente.
+   *
+   * Se REUTILIZA el contrato de linea del cotizador en vez de declarar uno
+   * propio: es el mismo dato, guardado tal cual al crear la reserva. Cuando
+   * aqui habia una copia recortada, el panel rechazaba la respuesta entera
+   * porque el esquema es estricto y llegaban campos de mas.
+   */
+  lines: z.array(QuoteLineSchema),
   serviceCents: z.int(),
   addOnsCents: z.int(),
   surchargesCents: z.int(),

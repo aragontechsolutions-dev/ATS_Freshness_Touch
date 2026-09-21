@@ -139,11 +139,88 @@ export const en = {
   },
 
   admin: {
+    title: 'Freshness Touch · Admin',
+
+    /* --------------------------- Acceso ---------------------------- */
+    signIn: 'Sign in',
+    signingIn: 'Signing in…',
+    signOut: 'Sign out',
+    signInHint: 'Staff access only.',
+    email: 'Email',
+    password: 'Password',
+    signedOut: {
+      manual: 'You have signed out.',
+      idle: 'You were signed out after 30 minutes without activity.',
+      expired: 'Your session has ended. Please sign in again.',
+      noAccess: 'This account does not have access to the admin panel.',
+    },
+
+    /* --------------------------- Agenda ---------------------------- */
+    filterDate: 'Date',
+    filterStatus: 'Status',
+    filterAnyStatus: 'Any status',
+    filterSearch: 'Search',
+    filterSearchPlaceholder: 'Reference, name or email',
+    noBookings: 'No bookings match these filters.',
+    assignedTo: 'Assigned to {{names}}',
+    back: 'Back to agenda',
+    durationMinutes: '{{minutes}} min on site',
+
+    status: {
+      PENDING_PAYMENT: 'Awaiting payment',
+      CONFIRMED: 'Confirmed',
+      IN_PROGRESS: 'In progress',
+      COMPLETED: 'Completed',
+      CANCELLED: 'Cancelled',
+      NO_SHOW: 'No show',
+    },
+
+    role: {
+      ADMIN: 'Administrator',
+      DISPATCHER: 'Dispatcher',
+      CLEANER: 'Cleaner',
+    },
+
+    /* --------------------------- Detalle --------------------------- */
+    customer: 'Customer',
+    name: 'Name',
+    phone: 'Phone',
+    address: 'Address',
+    accessNotes: 'Access instructions',
+    accessNotesWarning:
+      'Sensitive: do not read aloud in front of others and close this page when you step away.',
+    customerNotes: 'Customer notes',
+    pricing: 'Price breakdown',
+    total: 'Total',
+    deposit: 'Travel deposit',
+    balanceDue: 'Due on the day',
+    payment: 'Payment',
+    paymentStatus: 'Status',
+    held: 'Held on card',
+    card: 'Card',
+    holdExpires: 'Hold expires',
+    noPayment: 'No card hold was created for this booking.',
+
+    paymentState: {
+      REQUIRES_PAYMENT_METHOD: 'Waiting for card',
+      REQUIRES_CONFIRMATION: 'Waiting for confirmation',
+      REQUIRES_ACTION: 'Waiting for the bank (3D Secure)',
+      PROCESSING: 'Processing at the bank',
+      REQUIRES_CAPTURE: 'Authorised, not charged',
+      SUCCEEDED: 'Captured',
+      CANCELED: 'Released',
+      FAILED: 'Declined',
+    },
+
+    /* --------------------------- Errores --------------------------- */
     errorSessionExpired: 'Your session has ended. Please sign in again.',
     errorNoAccess: 'This account does not have access to the admin panel.',
     errorBookingNotFound: 'We could not find that booking.',
+    errorInvalidCredentials: 'Those details are not correct.',
+    errorNetwork: 'We could not reach the server. Check your connection.',
+    errorGeneric: 'Something went wrong. Please try again.',
+    errorNotConfigured: 'Sign-in is not configured on this deployment.',
   },
-
   booking: {
     /* ----------------------------- Llamada ----------------------------- */
     cta: 'Book this cleaning',
