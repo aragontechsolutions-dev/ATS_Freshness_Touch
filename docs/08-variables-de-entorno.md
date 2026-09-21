@@ -28,6 +28,10 @@ tendrás que rellenar las marcadas como **"a mano"**.
 | `DISTANCE_CACHE_TTL_SECONDS`   | `86400`                       | 24 h                                                                                                |
 | `DISTANCE_CACHE_MAX_ENTRIES`   | `5000`                        |                                                                                                     |
 | `DISTANCE_TIMEOUT_MS`          | `5000`                        |                                                                                                     |
+| `AUTH_PROVIDER`                | `supabase`                    | **`local` NO arranca en producción**: la API se niega, a propósito                                  |
+| `SUPABASE_URL`                 | `https://<ref>.supabase.co`   | **A mano.** Obligatoria con `AUTH_PROVIDER=supabase`                                                |
+| `SUPABASE_JWT_SECRET`          | _(vacío)_                     | **Solo proyectos antiguos.** Los actuales usan claves asimétricas y no la necesitan                 |
+| `AUTH_TIMEOUT_MS`              | `5000`                        |                                                                                                     |
 | `PAYMENT_PROVIDER`             | `mock`                        | Cambiar a `stripe` cuando haya cuenta. Con `mock` **no se retiene dinero real**                     |
 | `STRIPE_SECRET_KEY`            | _(vacío)_                     | **A mano**, solo si usas `stripe`. Sin ella la API **no arranca** (a propósito)                     |
 | `STRIPE_WEBHOOK_SECRET`        | _(vacío)_                     | **A mano**, solo si usas `stripe`. Es el secreto del _endpoint_, **no** la clave secreta            |
@@ -185,6 +189,40 @@ VITE_SUPABASE_ANON_KEY=...
 > de datos. Va solo en Render, nunca en Vercel, nunca en un archivo del
 > repositorio, nunca en una variable `VITE_*`.
 
+## 4.b Personal del panel (Supabase Auth)
+
+El panel usa Supabase Auth para el inicio de sesión. Un token válido **no
+basta**: hace falta además figurar en la tabla `staff` como personal activo
+(ver `docs/13-panel-y-permisos.md`).
+
+Para dar de alta a alguien hacen falta **dos pasos**, y los dos son necesarios:
+
+1. **Crear el usuario** en Supabase → Authentication → Users → Add user.
+   Supabase muestra su identificador (un UUID).
+2. **Darle la ficha de personal**, con ese identificador en `authUserId`:
+
+```sql
+INSERT INTO staff ("id", "authUserId", "firstName", "lastName", email, role, "isActive", "updatedAt")
+VALUES (gen_random_uuid(), '<UUID-de-Supabase>', 'Nombre', 'Apellidos',
+        'persona@freshnesstouch.com', 'ADMIN', true, now());
+```
+
+Roles posibles: `ADMIN`, `DISPATCHER`, `CLEANER`.
+
+> Sin el paso 2, esa persona puede iniciar sesión en Supabase pero el panel le
+> responde «esta cuenta no tiene acceso». Es lo correcto: así un cliente que se
+> registre nunca alcanza el panel.
+
+**Para dar de baja a alguien**, no hace falta borrar nada ni revocar su token:
+
+```sql
+UPDATE staff SET "isActive" = false WHERE email = 'persona@freshnesstouch.com';
+```
+
+Surte efecto en la siguiente petición.
+
+---
+
 ## 5. Stripe (implementado — activación pendiente)
 
 El módulo de pagos ya funciona de punta a punta con el proveedor simulado. Para
@@ -239,6 +277,9 @@ cada arranque para que esa situación no pase inadvertida en producción.
 | `GOOGLE_MAPS_API_KEY`         | ✅     | ❌     | ❌          |
 | `SUPABASE_SERVICE_ROLE_KEY`   | ✅     | ❌     | ❌          |
 | `DATABASE_URL` / `DIRECT_URL` | ✅     | ❌     | ❌          |
+| `SUPABASE_URL`                | ✅     | ✅     | ❌          |
+| `SUPABASE_JWT_SECRET`         | ✅     | ❌     | ❌          |
+| `AUTH_LOCAL_SECRET`           | ❌     | ❌     | ❌          |
 | `STRIPE_SECRET_KEY`           | ✅     | ❌     | ❌          |
 | `STRIPE_WEBHOOK_SECRET`       | ✅     | ❌     | ❌          |
 | `VITE_STRIPE_PUBLISHABLE_KEY` | ❌     | ✅     | ❌          |

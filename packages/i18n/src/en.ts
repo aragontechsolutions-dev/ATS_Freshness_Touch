@@ -138,6 +138,12 @@ export const en = {
     errorRateLimited: 'Too many quotes in a short time. Please wait a moment and try again.',
   },
 
+  admin: {
+    errorSessionExpired: 'Your session has ended. Please sign in again.',
+    errorNoAccess: 'This account does not have access to the admin panel.',
+    errorBookingNotFound: 'We could not find that booking.',
+  },
+
   booking: {
     /* ----------------------------- Llamada ----------------------------- */
     cta: 'Book this cleaning',

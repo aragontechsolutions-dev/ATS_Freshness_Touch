@@ -78,6 +78,25 @@ export const EnvSchema = z
       .regex(/^[A-Za-z0-9 ]+$/, 'Solo se admiten letras, numeros y espacios')
       .default('FRESHNESS'),
 
+    /**
+     * Identidad del personal que usa el panel.
+     *
+     * "local" emite y verifica sus propios tokens para poder desarrollar sin
+     * un proyecto de Supabase. En produccion esta PROHIBIDO (ver mas abajo).
+     */
+    AUTH_PROVIDER: z.enum(['local', 'supabase']).default('local'),
+    /** Direccion del proyecto de Supabase: https://<ref>.supabase.co */
+    SUPABASE_URL: z.string().url().optional(),
+    /**
+     * Secreto compartido de los proyectos ANTIGUOS de Supabase. Solo hace
+     * falta si el proyecto todavia firma con HS256; los nuevos usan claves
+     * asimetricas y no lo necesitan.
+     */
+    SUPABASE_JWT_SECRET: z.string().min(1).optional(),
+    AUTH_TIMEOUT_MS: z.coerce.number().int().min(500).default(5000),
+    /** Secreto del proveedor local. Solo desarrollo y pruebas. */
+    AUTH_LOCAL_SECRET: z.string().min(1).default('secreto-de-desarrollo-no-usar-en-produccion'),
+
     /** Base de operaciones: origen del calculo de distancia. */
     COMPANY_BASE_CITY: z.string().default('Atlanta'),
     COMPANY_BASE_STATE: z.string().length(2).default('GA'),
@@ -103,6 +122,27 @@ export const EnvSchema = z
   .refine((env) => env.PAYMENT_PROVIDER !== 'stripe' || Boolean(env.STRIPE_WEBHOOK_SECRET), {
     message: 'STRIPE_WEBHOOK_SECRET es obligatoria cuando PAYMENT_PROVIDER=stripe',
     path: ['STRIPE_WEBHOOK_SECRET'],
+  })
+  .refine((env) => env.AUTH_PROVIDER !== 'supabase' || Boolean(env.SUPABASE_URL), {
+    message: 'SUPABASE_URL es obligatoria cuando AUTH_PROVIDER=supabase',
+    path: ['SUPABASE_URL'],
+  })
+  /*
+   * EL PROVEEDOR LOCAL NO ARRANCA EN PRODUCCION.
+   *
+   * Emite tokens con un secreto compartido: quien lo conozca puede fabricarse
+   * uno de administrador y entrar al panel. No es lo mismo que el simulador
+   * de pagos, donde lo peor que pasa es una reserva sin cobrar; aqui seria
+   * entregar los datos de todos los clientes.
+   *
+   * Por eso la aplicacion se NIEGA A ARRANCAR en vez de avisar en el log: un
+   * aviso se pasa por alto, un arranque fallido no.
+   */
+  .refine((env) => env.NODE_ENV !== 'production' || env.AUTH_PROVIDER !== 'local', {
+    message:
+      'AUTH_PROVIDER=local no se admite en produccion: cualquiera que conozca ' +
+      'AUTH_LOCAL_SECRET podria entrar al panel como administrador. Configura AUTH_PROVIDER=supabase',
+    path: ['AUTH_PROVIDER'],
   });
 
 export type Env = z.infer<typeof EnvSchema>;
