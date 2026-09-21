@@ -6,6 +6,7 @@ import { ThemeToggle } from './ThemeToggle';
 import { CloseIcon, MenuIcon, PhoneIcon } from './Icons';
 import { Logo } from './Logo';
 import { useScrolled } from '../hooks/useScrolled';
+import { hasStaffModifiers, openStaffEntrance } from '../lib/staff-entrance';
 
 const NAV_ITEMS = [
   { href: '#services', key: 'nav.services' },
@@ -58,7 +59,40 @@ export function Header() {
                   ${desplazada ? 'ft-header-scrolled' : ''}`}
     >
       <div className="ft-container flex h-16 items-center justify-between gap-2">
-        <a href="#top" aria-label={company.name} className="min-w-0 shrink">
+        <a
+          href="#top"
+          aria-label={company.name}
+          className="min-w-0 shrink"
+          /*
+           * PUERTA DE SERVICIO: Shift + Ctrl (o Cmd) + clic abre el panel.
+           * No es una medida de seguridad, solo evita enseñar una puerta de
+           * personal a los clientes. Ver `lib/staff-entrance.ts`.
+           */
+          onClick={(event) => {
+            if (!hasStaffModifiers(event)) return;
+            // Solo se cancela el clic normal si de verdad se va a navegar:
+            // sin panel configurado, el logotipo sigue llevando arriba.
+            if (openStaffEntrance()) event.preventDefault();
+          }}
+          /*
+           * En macOS, Ctrl + clic abre el menu contextual ANTES de que llegue
+           * el clic. Sin esto, el gesto sacaria un menu en vez de abrir el
+           * panel. Solo se suprime cuando los modificadores estan pulsados:
+           * el menu contextual normal sobre el logotipo sigue funcionando.
+           */
+          onContextMenu={(event) => {
+            if (hasStaffModifiers(event)) event.preventDefault();
+          }}
+          /*
+           * Equivalente de teclado, para quien no usa raton: con el logotipo
+           * enfocado, Shift + Ctrl/Cmd + Enter. Un gesto que solo existe con
+           * raton dejaria fuera a parte del personal.
+           */
+          onKeyDown={(event) => {
+            if (event.key !== 'Enter' || !hasStaffModifiers(event)) return;
+            if (openStaffEntrance()) event.preventDefault();
+          }}
+        >
           <Logo size="sm" />
         </a>
 

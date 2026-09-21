@@ -41,6 +41,7 @@ packages/
   types/      Contratos Zod compartidos (fuente única de verdad del API)
   pricing/    Motor de precios y depósito (lógica pura, sin framework)
   i18n/       Textos EN/ES con paridad de claves garantizada por tipos
+apps/admin/   Panel de administración (acceso solo para personal)
 docs/         Documentación del proyecto (en español)
 ```
 

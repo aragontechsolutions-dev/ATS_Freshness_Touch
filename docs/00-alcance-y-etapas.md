@@ -83,8 +83,9 @@ Progreso:
 - ⬜ Probar el pago real con credenciales de Stripe (el código está, falta
   recorrerlo con tarjetas de prueba).
 - 🔄 **Autenticación y panel de administración** (`docs/13-panel-y-permisos.md`):
-  hecho el control de acceso por rol y las vistas de lectura de la agenda;
-  faltan las acciones que cambian datos y el panel en sí.
+  hechos el control de acceso por rol, la aplicación del panel con inicio de
+  sesión y la agenda con su detalle; faltan las acciones que cambian datos
+  (estados, captura del depósito, configuración del negocio).
 - ⬜ Captura del importe final y devoluciones desde el panel.
 - ⬜ Avisos por correo y SMS.
 - Calendario de disponibilidad y reserva en línea.

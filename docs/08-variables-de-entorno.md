@@ -70,10 +70,11 @@ Health: /health
 
 **Root Directory:** `apps/landing` · El resto lo define `vercel.json`.
 
-| Variable                      | Valor                                | Cuándo                       |
-| ----------------------------- | ------------------------------------ | ---------------------------- |
-| `VITE_API_BASE_URL`           | `https://TU-API.onrender.com/api/v1` | Siempre                      |
-| `VITE_STRIPE_PUBLISHABLE_KEY` | `pk_test_...` / `pk_live_...`        | Solo al activar pagos reales |
+| Variable                      | Valor                                | Cuándo                           |
+| ----------------------------- | ------------------------------------ | -------------------------------- |
+| `VITE_API_BASE_URL`           | `https://TU-API.onrender.com/api/v1` | Siempre                          |
+| `VITE_ADMIN_URL`              | `https://TU-PANEL.vercel.app`        | Destino de la puerta de servicio |
+| `VITE_STRIPE_PUBLISHABLE_KEY` | `pk_test_...` / `pk_live_...`        | Solo al activar pagos reales     |
 
 Aplícalas a los tres entornos (Production, Preview, Development).
 
@@ -220,6 +221,33 @@ UPDATE staff SET "isActive" = false WHERE email = 'persona@freshnesstouch.com';
 ```
 
 Surte efecto en la siguiente petición.
+
+---
+
+## 4.c El panel (aplicación `apps/admin`)
+
+Se despliega como un **proyecto de Vercel aparte**, con `apps/admin` como Root
+Directory. Sus variables:
+
+| Variable                 | Valor                                                |
+| ------------------------ | ---------------------------------------------------- |
+| `VITE_API_BASE_URL`      | `https://TU-API.onrender.com/api/v1`                 |
+| `VITE_SUPABASE_URL`      | `https://<ref>.supabase.co`                          |
+| `VITE_SUPABASE_ANON_KEY` | La clave `anon` del proyecto (es pública por diseño) |
+
+### Tres cosas que hay que hacer a mano
+
+1. **Sustituir el marcador de la política de contenido.** En
+   `apps/admin/vercel.json` hay `https://SUPABASE-REF-PENDIENTE.supabase.co`.
+   Si no lo cambias por tu dominio real, **el navegador bloqueará el inicio de
+   sesión** aunque todo lo demás esté bien. Es intencionado: la lista de
+   destinos permitidos tiene que ser explícita.
+
+2. **Añadir el dominio del panel a `CORS_ORIGINS` en Render**, separado por
+   coma del dominio del sitio público. Sin eso la API rechazará sus peticiones.
+
+3. **Poner `VITE_ADMIN_URL` en el proyecto del sitio público**, que es a donde
+   lleva la puerta de servicio. Sin ella, el gesto no hace nada.
 
 ---
 

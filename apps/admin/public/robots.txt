@@ -1,0 +1,3 @@
+# El panel de administracion no se indexa en ningun buscador.
+User-agent: *
+Disallow: /
