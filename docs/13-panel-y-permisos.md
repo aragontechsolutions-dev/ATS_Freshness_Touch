@@ -294,3 +294,115 @@ destacadas, cambio a español y cierre de sesión — comprobando que
 Y la puerta de servicio: los cuatro gestos que **no** deben abrirla, los dos
 que sí, el equivalente de teclado, y que la palabra «admin» no aparece en el
 texto visible del landing ni hay ningún enlace al panel.
+
+---
+
+## 11. Acciones sobre la reserva
+
+> Tercer bloque de la Etapa 2.3.
+
+### El ciclo de vida está en el contrato, no en los botones
+
+```
+PENDING_PAYMENT ──► CONFIRMED ──► IN_PROGRESS ──► COMPLETED
+       │                │              │
+       └────────────────┴──────────────┴──► CANCELLED
+                        │
+                        └──► NO_SHOW
+```
+
+La tabla vive en `packages/types/src/booking-transitions.ts`, de donde la leen
+**a la vez** el servidor (que la impone) y el panel (que decide qué botones
+pintar). El panel puede equivocarse; el servidor no le deja.
+
+Por qué importa cada regla:
+
+- **Los estados finales no admiten vuelta atrás.** Reabrir una reserva
+  completada descuadra la facturación; revivir una cancelada ocupa un hueco que
+  el sistema ya dio por libre y puede estar vendido. Un error se corrige creando
+  una reserva nueva, y así el histórico sigue contando lo que de verdad pasó.
+- **No se puede saltar la ejecución del trabajo.** De confirmada a completada
+  sin pasar por «en curso» dejaría sin registrar cuándo empezó y acabó el
+  equipo.
+- **«No estaban» solo desde confirmada.** Sin confirmar no hay cita a la que
+  faltar; y si el equipo ya entró, el cliente sí estaba.
+
+Un test comprueba que la tabla cubre **todos** los estados del contrato: si
+mañana se añade uno y se olvida aquí, salta antes de llegar a producción.
+
+### Quién puede qué
+
+| Acción                   | ADMIN | DISPATCHER | CLEANER |
+| ------------------------ | :---: | :--------: | :-----: |
+| Ver la agenda            |  ✅   |     ✅     |   ❌    |
+| Cambiar el estado        |  ✅   |     ✅     |   ❌    |
+| **Cobrar el depósito**   |  ✅   |     ❌     |   ❌    |
+| **Liberar la retención** |  ✅   |     ❌     |   ❌    |
+
+**Mover la agenda y mover dinero son permisos distintos.** Quien puede cambiar
+una cita no tiene por qué poder cobrarle a un cliente: es la separación que
+evita que un error de agenda se convierta en un cargo indebido.
+
+Verificado en navegador: con sesión de coordinación, los botones de dinero
+**no se pintan**; y aunque se llame al endpoint directamente, responde `403`.
+
+### El motivo es obligatorio donde duele
+
+Cancelar, marcar «no estaban», cobrar y liberar **exigen una nota**. Son los
+casos que el cliente puede discutir después, y sin saber quién lo hizo y por
+qué, la reclamación se resuelve a base de memoria.
+
+El botón se queda desactivado hasta que hay motivo, y explica por qué en su
+título: un botón apagado sin explicación es una trampa.
+
+### Auditoría atómica
+
+El cambio y su registro van en la **misma transacción**: o quedan los dos o no
+queda ninguno. Un cambio de estado sin rastro es justo lo que no sirve cuando
+hay una reclamación.
+
+La auditoría guarda el importe y el motivo, **nunca el identificador del
+movimiento en el proveedor**: es una credencial, no información. Hay un test
+que lo comprueba.
+
+### Cobrar y liberar
+
+| Situación                                     | Acción                   |
+| --------------------------------------------- | ------------------------ |
+| El servicio se prestó con normalidad          | **Liberar** la retención |
+| El cliente canceló con el equipo ya en camino | **Cobrar** el depósito   |
+| El cliente no estaba en casa                  | **Cobrar** el depósito   |
+
+Solo se puede actuar sobre una retención **autorizada y sin cobrar**. Una ya
+cobrada no se cobra dos veces y una liberada ya no existe en el proveedor: en
+ambos casos la API responde `409` con un mensaje que se entiende.
+
+Una retención **caduca a los 7 días**. Pasada esa fecha el proveedor la
+rechazaría igualmente, pero se avisa antes para no devolver un error suyo que
+nadie entiende.
+
+Tampoco se puede cobrar **más de lo retenido**: una retención no se amplía. Si
+hiciera falta cobrar más, es un cobro aparte.
+
+### Un fallo del que conviene acordarse
+
+Los primeros endpoints respondían `400` a todo. La causa: `@UsePipes()` a nivel
+de método aplica el esquema **a todos los parámetros**, incluido el
+identificador de la URL, que obviamente no cumple el esquema del cuerpo.
+
+La solución es poner el pipe en el parámetro (`@Body(new ZodValidationPipe(...))`)
+en vez de en el método. Se revisó el resto de controladores: ninguno más
+combinaba `@UsePipes` con `@Param`.
+
+### Qué está probado
+
+**Contra PostgreSQL real**: transición imposible → `409`; cancelar sin motivo →
+`400`; confirmar devuelve el detalle ya actualizado; la auditoría guarda quién,
+desde qué estado y a cuál; coordinación puede mover la agenda pero **no** el
+dinero; no se cobra una retención sin autorizar, ni dos veces, ni más de lo
+retenido, ni una caducada; y las acciones también exigen sesión.
+
+**En navegador real**: el ciclo entero de una reserva —confirmada por el pago,
+equipo llegado, retención liberada, trabajo completado— comprobando que al
+final no queda ninguna acción disponible y que los botones de dinero solo
+aparecen para administración.

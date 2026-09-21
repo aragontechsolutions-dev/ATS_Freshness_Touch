@@ -7,6 +7,9 @@ import {
   type AdminBookingDetail,
   type AdminBookingList,
   type AdminBookingQueryInput,
+  type AdminCaptureDepositInput,
+  type AdminReleaseDepositInput,
+  type AdminStatusChangeInput,
   type ApiError,
   type AuthenticatedStaff,
 } from '@freshness/types';
@@ -66,7 +69,11 @@ export function isSessionError(error: unknown): boolean {
  * renovación se seguiría enviando el viejo y la API respondería 401 con una
  * sesión que en realidad sigue siendo buena.
  */
-async function request<T>(path: string, parse: (payload: unknown) => T): Promise<T> {
+async function request<T>(
+  path: string,
+  parse: (payload: unknown) => T,
+  init: { method: 'GET' | 'PATCH' | 'POST'; body?: unknown } = { method: 'GET' },
+): Promise<T> {
   if (!auth) {
     throw new ApiClientError(API_ERROR_CODES.UNAUTHORIZED, 'admin.errorNotConfigured', 401);
   }
@@ -81,11 +88,13 @@ async function request<T>(path: string, parse: (payload: unknown) => T): Promise
   let response: Response;
   try {
     response = await fetch(`${BASE_URL}${path}`, {
-      method: 'GET',
+      method: init.method,
       headers: {
         Accept: 'application/json',
         Authorization: `Bearer ${token}`,
+        ...(init.body === undefined ? {} : { 'Content-Type': 'application/json' }),
       },
+      ...(init.body === undefined ? {} : { body: JSON.stringify(init.body) }),
       // La API no usa cookies de sesión: el token va en la cabecera. Enviar
       // credenciales de origen cruzado sin necesitarlas abriría la puerta a
       // ataques de petición forzada.
@@ -149,4 +158,53 @@ export function fetchBookingDetail(bookingId: string): Promise<AdminBookingDetai
     if (!parsed.success) throw contractError('/admin/bookings/:id', parsed.error.issues);
     return parsed.data;
   });
+}
+
+/** Respuesta comun de las acciones: la reserva ya actualizada. */
+function parseDetail(contexto: string) {
+  return (payload: unknown): AdminBookingDetail => {
+    const parsed = AdminBookingDetailSchema.safeParse(payload);
+    if (!parsed.success) throw contractError(contexto, parsed.error.issues);
+    return parsed.data;
+  };
+}
+
+/**
+ * Cambia el estado de una reserva.
+ *
+ * Devuelve la reserva ya actualizada, no un "vale": asi el panel pinta el
+ * estado real que decidio el servidor en vez de suponer que hizo lo pedido.
+ */
+export function changeBookingStatus(
+  bookingId: string,
+  change: AdminStatusChangeInput,
+): Promise<AdminBookingDetail> {
+  return request(`/admin/bookings/${bookingId}/status`, parseDetail('cambio de estado'), {
+    method: 'PATCH',
+    body: change,
+  });
+}
+
+/** Cobra el deposito retenido. Solo administracion. */
+export function captureDeposit(
+  bookingId: string,
+  body: AdminCaptureDepositInput,
+): Promise<AdminBookingDetail> {
+  return request(
+    `/admin/bookings/${bookingId}/payment/capture`,
+    parseDetail('cobro del deposito'),
+    { method: 'POST', body },
+  );
+}
+
+/** Libera la retencion sin cobrar. Solo administracion. */
+export function releaseDeposit(
+  bookingId: string,
+  body: AdminReleaseDepositInput,
+): Promise<AdminBookingDetail> {
+  return request(
+    `/admin/bookings/${bookingId}/payment/release`,
+    parseDetail('liberacion del deposito'),
+    { method: 'POST', body },
+  );
 }

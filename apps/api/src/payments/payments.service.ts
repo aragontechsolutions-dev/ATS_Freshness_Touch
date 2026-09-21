@@ -102,6 +102,30 @@ export class PaymentsService {
   }
 
   /**
+   * Cobra el deposito retenido, entero o en parte.
+   *
+   * Se llama cuando el cliente cancela con el equipo ya en camino o no esta en
+   * casa. NO se hace dentro de una transaccion de base de datos: es una
+   * llamada de red a un servidor ajeno, y mantener una transaccion abierta
+   * mientras se espera bloquearia filas durante segundos.
+   */
+  async capture(providerPaymentIntentId: string, amountCents: number): Promise<ProviderPayment> {
+    const resultado = await this.provider.capture(providerPaymentIntentId, amountCents);
+
+    // Se registra el importe, nunca el identificador del movimiento: es una
+    // credencial, no informacion.
+    this.logger.log(`Deposito cobrado: ${amountCents} centavos (${this.provider.name})`);
+    return resultado;
+  }
+
+  /** Libera la retencion sin cobrar nada: el caso normal al terminar bien. */
+  async release(providerPaymentIntentId: string, reason: string): Promise<ProviderPayment> {
+    const resultado = await this.provider.cancel(providerPaymentIntentId, reason);
+    this.logger.log(`Retencion liberada (${this.provider.name})`);
+    return resultado;
+  }
+
+  /**
    * Actualiza la fila de pago con lo que dice el proveedor y devuelve la
    * reserva afectada. Devuelve null si el movimiento no es nuestro: un evento
    * de una cuenta de pruebas, o de otro sistema que comparte la cuenta.

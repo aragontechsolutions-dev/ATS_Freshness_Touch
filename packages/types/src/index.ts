@@ -5,5 +5,6 @@ export * from './catalog';
 export * from './availability';
 export * from './booking';
 export * from './payment';
+export * from './booking-transitions';
 export * from './admin';
 export * from './errors';
