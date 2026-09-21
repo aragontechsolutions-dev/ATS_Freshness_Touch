@@ -11,6 +11,7 @@ import {
   type Weekday,
 } from '@freshness/types';
 import { ApiClientError, fetchSettings, saveSettings } from '../lib/api';
+import { NotificationSettingsForm } from '../components/NotificationSettingsForm';
 import { formatTimestamp } from '../lib/format';
 
 interface SettingsPageProps {
@@ -37,7 +38,75 @@ interface SettingsPageProps {
  *      numero inventado de relleno, que es peor: un cliente lo marca y
  *      termina llamando a un desconocido.
  */
+type Seccion = 'business' | 'notifications';
+
+/**
+ * Dos bloques que se guardan por separado.
+ *
+ * No es un capricho de maquetacion: son dos filas distintas en la base de
+ * datos y dos formularios independientes. Un solo boton de guardar daria a
+ * entender que todo se escribe junto, y al fallar una parte quedaria la duda
+ * de que se guardo.
+ */
 export function SettingsPage({ locale, onSessionLost }: SettingsPageProps) {
+  const [seccion, setSeccion] = useState<Seccion>('business');
+
+  return (
+    <div className="space-y-6">
+      <nav className="flex gap-2" aria-label="Secciones">
+        <Pestana activa={seccion === 'business'} onClick={() => setSeccion('business')}>
+          <TituloNegocio />
+        </Pestana>
+        <Pestana activa={seccion === 'notifications'} onClick={() => setSeccion('notifications')}>
+          <TituloAvisos />
+        </Pestana>
+      </nav>
+
+      {seccion === 'business' ? (
+        <BusinessSettingsForm locale={locale} onSessionLost={onSessionLost} />
+      ) : (
+        <NotificationSettingsForm onSessionLost={onSessionLost} />
+      )}
+    </div>
+  );
+}
+
+function TituloNegocio() {
+  const { t } = useTranslation();
+  return <>{t('admin.settings.title')}</>;
+}
+
+function TituloAvisos() {
+  const { t } = useTranslation();
+  return <>{t('admin.notifications.title')}</>;
+}
+
+function Pestana({
+  activa,
+  onClick,
+  children,
+}: {
+  activa: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-current={activa ? 'page' : undefined}
+      className={
+        activa
+          ? 'rounded-lg bg-brand-700 px-3 py-2 text-sm font-semibold text-white'
+          : 'ft-btn-ghost px-3 py-2 text-sm'
+      }
+    >
+      {children}
+    </button>
+  );
+}
+
+function BusinessSettingsForm({ locale, onSessionLost }: SettingsPageProps) {
   const { t } = useTranslation();
 
   const [cargando, setCargando] = useState(true);

@@ -66,6 +66,28 @@ enum ServiceZone {
   OUT_OF_RANGE
 }
 
+enum NotificationEvent {
+  BOOKING_CONFIRMED
+  BOOKING_CANCELLED
+}
+
+enum NotificationChannel {
+  EMAIL
+  TELEGRAM
+}
+
+enum NotificationAudience {
+  CUSTOMER
+  INTERNAL
+}
+
+/// SKIPPED no es un fallo: es "estaba apagado o sin configurar".
+enum NotificationStatus {
+  SENT
+  FAILED
+  SKIPPED
+}
+
 enum Locale {
   en
   es
@@ -152,11 +174,11 @@ model Customer {
   /// sea invitado: reservar no exige crear cuenta.
   authUserId String? @unique
 
-  email     String  @unique
+  email     String @unique
   firstName String
   lastName  String
   phone     String
-  locale    Locale  @default(en)
+  locale    Locale @default(en)
 
   /// Consentimiento explicito para comunicaciones comerciales. Separado del
   /// correo transaccional, que no necesita consentimiento.
@@ -165,12 +187,12 @@ model Customer {
   /// Notas internas del equipo. Nunca se muestran al cliente.
   internalNotes String?
 
-  addresses  Address[]
-  quotes     Quote[]
-  bookings   Booking[]
-  series     RecurringSeries[]
-  createdAt  DateTime          @default(now()) @db.Timestamptz(3)
-  updatedAt  DateTime          @updatedAt @db.Timestamptz(3)
+  addresses Address[]
+  quotes    Quote[]
+  bookings  Booking[]
+  series    RecurringSeries[]
+  createdAt DateTime          @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime          @updatedAt @db.Timestamptz(3)
 
   @@index([createdAt])
   @@map("customers")
@@ -230,21 +252,21 @@ model Quote {
   locale Locale      @default(en)
 
   // --- Entrada ---
-  service     ServiceType
-  frequency   Frequency
-  bedrooms    Int
-  bathrooms   Int
-  squareFeet  Int
+  service    ServiceType
+  frequency  Frequency
+  bedrooms   Int
+  bathrooms  Int
+  squareFeet Int
   /// Extras solicitados: [{ code, quantity }].
-  addOns      Json        @default("[]")
-  postalCode  String      @db.VarChar(10)
-  state       String      @default("GA") @db.Char(2)
+  addOns     Json        @default("[]")
+  postalCode String      @db.VarChar(10)
+  state      String      @default("GA") @db.Char(2)
 
   // --- Resultado (fotografia del calculo) ---
-  distanceMiles Float
-  zone          ServiceZone
+  distanceMiles   Float
+  zone            ServiceZone
   /// Desglose completo de lineas tal y como se le mostro al cliente.
-  lines         Json
+  lines           Json
   serviceCents    Int
   addOnsCents     Int
   surchargesCents Int
@@ -252,7 +274,7 @@ model Quote {
   taxCents        Int
   totalCents      Int
   depositCents    Int
-  currency        String @default("USD") @db.Char(3)
+  currency        String      @default("USD") @db.Char(3)
 
   /// Version de la configuracion de precios usada. Sin esto, un presupuesto
   /// antiguo no se puede reproducir despues de cambiar las tarifas.
@@ -323,7 +345,7 @@ model Booking {
   depositCents    Int
   /// Total menos deposito: lo que queda por cobrar el dia del servicio.
   balanceDueCents Int
-  currency        String @default("USD") @db.Char(3)
+  currency        String      @default("USD") @db.Char(3)
   pricingVersion  String
 
   /// Indicaciones que deja el cliente al reservar.
@@ -336,8 +358,9 @@ model Booking {
   cancelledBy        CancelledBy?
   cancellationReason String?
 
-  payments    Payment[]
-  assignments BookingAssignment[]
+  payments      Payment[]
+  assignments   BookingAssignment[]
+  notifications Notification[]
 
   createdAt DateTime @default(now()) @db.Timestamptz(3)
   updatedAt DateTime @updatedAt @db.Timestamptz(3)
@@ -375,9 +398,9 @@ model RecurringSeries {
   addOns     Json        @default("[]")
 
   /// 0 = domingo ... 6 = sabado, en la zona horaria de la empresa.
-  dayOfWeek  Int
+  dayOfWeek       Int
   /// Hora local de inicio en formato HH:MM.
-  startTime  String @db.VarChar(5)
+  startTime       String @db.VarChar(5)
   durationMinutes Int
 
   startDate DateTime  @db.Date
@@ -414,7 +437,7 @@ model Payment {
   status PaymentStatus
 
   /// Proveedor que custodia el movimiento: "mock" o "stripe".
-  provider                String @db.VarChar(20)
+  provider                String  @db.VarChar(20)
   /// Identificador del movimiento en ese proveedor (pi_... en Stripe).
   providerPaymentIntentId String
   providerCustomerId      String?
@@ -424,8 +447,8 @@ model Payment {
   cardLast4               String? @db.VarChar(4)
 
   amountAuthorizedCents Int
-  amountCapturedCents   Int @default(0)
-  amountRefundedCents   Int @default(0)
+  amountCapturedCents   Int    @default(0)
+  amountRefundedCents   Int    @default(0)
   currency              String @default("USD") @db.Char(3)
 
   authorizedAt DateTime? @db.Timestamptz(3)
@@ -459,13 +482,13 @@ model WebhookEvent {
   /// Identificador del evento en el proveedor (evt_... en Stripe).
   id String @id
 
-  provider    String   @default("stripe")
-  type        String
-  receivedAt  DateTime @default(now()) @db.Timestamptz(3)
-  processedAt DateTime? @db.Timestamptz(3)
+  provider      String    @default("stripe")
+  type          String
+  receivedAt    DateTime  @default(now()) @db.Timestamptz(3)
+  processedAt   DateTime? @db.Timestamptz(3)
   /// Mensaje de error si el procesamiento fallo, para poder reintentar a mano.
   failureReason String?
-  payload     Json
+  payload       Json
 
   @@index([type])
   @@index([processedAt])
@@ -532,6 +555,38 @@ model BusinessSetting {
   @@map("business_settings")
 }
 
+/// Cada intento de aviso con su resultado. Responde a "¿le llego el correo?"
+/// y, gracias al indice unico parcial, impide que un reenvio del webhook del
+/// proveedor de pago acabe en un segundo correo al cliente.
+model Notification {
+  id String @id @default(uuid()) @db.Uuid
+
+  bookingId String  @db.Uuid
+  booking   Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  event    NotificationEvent
+  channel  NotificationChannel
+  audience NotificationAudience
+  status   NotificationStatus
+
+  /// A donde se envio. El panel lo ensena enmascarado.
+  target            String? @db.VarChar(200)
+  /// Motivo del fallo, para diagnosticar sin abrir los registros del servidor.
+  failureReason     String?
+  /// Identificador del proveedor, para buscar el envio en su panel.
+  providerMessageId String? @db.VarChar(200)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+
+  /// Ademas existe un indice UNICO PARCIAL sobre
+  /// (bookingId, event, channel, audience) limitado a status = SENT, creado en
+  /// la migracion 20260921210000: Prisma no sabe expresar indices parciales.
+  /// Es lo que convierte un reenvio en un error de clave duplicada en vez de
+  /// en un segundo correo.
+  @@index([bookingId, createdAt(sort: Desc)])
+  @@map("notifications")
+}
+
 /// Rastro de quien hizo que. Imprescindible cuando se pueden cambiar precios
 /// y cancelar cobros desde un panel.
 model AuditLog {
@@ -544,7 +599,7 @@ model AuditLog {
   entityType String  @db.VarChar(40)
   entityId   String?
 
-  metadata Json?
+  metadata  Json?
   /// Direccion IP de origen, util para investigar accesos indebidos.
   ipAddress String? @db.Inet
 

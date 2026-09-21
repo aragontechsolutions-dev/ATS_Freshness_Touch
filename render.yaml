@@ -112,6 +112,35 @@ services:
         sync: false
       - key: STRIPE_TIMEOUT_MS
         value: '10000'
+
+      # --- AVISOS (ver docs/14-avisos.md) ---------------------------------
+      # "log" no envia nada: escribe el correo en los registros. Permite
+      # desplegar y probar sin cuenta de proveedor. La API avisa por error en
+      # los registros mientras siga asi en produccion, porque significa que
+      # ningun cliente recibe su confirmacion.
+      - key: EMAIL_PROVIDER
+        value: log
+      # Secretos y remitente: a mano en el panel de Render.
+      # RESEND_API_KEY: clave de la cuenta (re_...).
+      # EMAIL_FROM:     "Freshness Touch <hola@tu-dominio.com>". El dominio
+      #                 debe estar VERIFICADO en Resend (SPF y DKIM) o los
+      #                 correos acaban en la carpeta de no deseado.
+      - key: RESEND_API_KEY
+        sync: false
+      - key: EMAIL_FROM
+        sync: false
+      - key: EMAIL_REPLY_TO
+        sync: false
+      - key: EMAIL_TIMEOUT_MS
+        value: '10000'
+      # Token del bot, tal y como lo entrega BotFather. ES una credencial:
+      # quien lo tiene ES el bot. El chat de destino NO va aqui, se configura
+      # desde el panel. Sin token, el sistema funciona y el aviso queda
+      # anotado como fallido con su motivo.
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: TELEGRAM_TIMEOUT_MS
+        value: '10000'
       # Dias que dura la retencion. Siete es el maximo de las redes de tarjetas.
       - key: PAYMENT_AUTHORIZATION_DAYS
         value: '7'

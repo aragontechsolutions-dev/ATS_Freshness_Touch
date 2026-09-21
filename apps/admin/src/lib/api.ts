@@ -3,6 +3,7 @@ import {
   AdminBookingListSchema,
   AdminBusinessSettingsSchema,
   API_ERROR_CODES,
+  NotificationSettingsSchema,
   ApiErrorSchema,
   AuthenticatedStaffSchema,
   type AdminBookingDetail,
@@ -14,6 +15,7 @@ import {
   type AdminStatusChangeInput,
   type ApiError,
   type BusinessSettings,
+  type NotificationSettings,
   type AuthenticatedStaff,
 } from '@freshness/types';
 import { auth } from './supabase';
@@ -240,6 +242,35 @@ export function saveSettings(settings: BusinessSettings): Promise<AdminBusinessS
     (payload) => {
       const parsed = AdminBusinessSettingsSchema.safeParse(payload);
       if (!parsed.success) throw contractError('guardado de configuracion', parsed.error.issues);
+      return parsed.data;
+    },
+    { method: 'PUT', body: settings },
+  );
+}
+
+/**
+ * Ajustes de avisos.
+ *
+ * Como la configuración del negocio, la API responde 403 a todo lo que no sea
+ * administración. Que el panel no ofrezca la pantalla al resto es comodidad,
+ * no seguridad.
+ */
+export function fetchNotificationSettings(): Promise<NotificationSettings> {
+  return request('/admin/notification-settings', (payload) => {
+    const parsed = NotificationSettingsSchema.safeParse(payload);
+    if (!parsed.success) throw contractError('/admin/notification-settings', parsed.error.issues);
+    return parsed.data;
+  });
+}
+
+export function saveNotificationSettings(
+  settings: NotificationSettings,
+): Promise<NotificationSettings> {
+  return request(
+    '/admin/notification-settings',
+    (payload) => {
+      const parsed = NotificationSettingsSchema.safeParse(payload);
+      if (!parsed.success) throw contractError('guardado de avisos', parsed.error.issues);
       return parsed.data;
     },
     { method: 'PUT', body: settings },

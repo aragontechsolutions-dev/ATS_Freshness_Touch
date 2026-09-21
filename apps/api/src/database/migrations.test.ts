@@ -63,6 +63,7 @@ describe('migraciones', () => {
       'bookings',
       'business_settings',
       'customers',
+      'notifications',
       'payments',
       'quotes',
       'recurring_series',
@@ -230,5 +231,101 @@ describe('seguridad de la base de datos', () => {
     );
 
     expect(result.rows).toEqual([]);
+  });
+});
+
+describe('registro de avisos', () => {
+  /** Crea una reserva minima con la que colgar avisos. */
+  async function sembrarReserva(referencia: string): Promise<string> {
+    const cliente = await db.query<{ id: string }>(
+      `INSERT INTO customers (id, email, "firstName", "lastName", phone, "updatedAt")
+       VALUES (gen_random_uuid(), '${referencia}@example.com', 'Ana', 'Cliente', '+14045550100', now())
+       RETURNING id`,
+    );
+    const customerId = cliente.rows[0].id;
+
+    const direccion = await db.query<{ id: string }>(
+      `INSERT INTO addresses (id, "customerId", line1, city, state, "postalCode", "updatedAt")
+       VALUES (gen_random_uuid(), '${customerId}', '1 Main St', 'Atlanta', 'GA', '30301', now())
+       RETURNING id`,
+    );
+
+    const reserva = await db.query<{ id: string }>(
+      `INSERT INTO bookings (
+         id, reference, "customerId", "addressId", service, frequency,
+         bedrooms, bathrooms, "squareFeet", "scheduledStart", "scheduledEnd",
+         "distanceMiles", zone, lines, "serviceCents", "addOnsCents",
+         "surchargesCents", "discountCents", "taxCents", "totalCents",
+         "depositCents", "balanceDueCents", "pricingVersion", "updatedAt"
+       ) VALUES (
+         gen_random_uuid(), '${referencia}', '${customerId}', '${direccion.rows[0].id}',
+         'STANDARD', 'ONE_TIME', 2, 1, 1200, now(), now() + interval '3 hours',
+         5, 'A', '[]'::jsonb, 10000, 0, 0, 0, 800, 10800, 3000, 7800, 'v1', now()
+       ) RETURNING id`,
+    );
+
+    return reserva.rows[0].id;
+  }
+
+  async function registrar(bookingId: string, status: string): Promise<void> {
+    await db.query(
+      `INSERT INTO notifications (id, "bookingId", event, channel, audience, status)
+       VALUES (gen_random_uuid(), '${bookingId}', 'BOOKING_CONFIRMED', 'EMAIL', 'CUSTOMER', '${status}')`,
+    );
+  }
+
+  /*
+   * LA PRUEBA QUE JUSTIFICA LA TABLA. El proveedor de pago reenvia el mismo
+   * evento si no recibe respuesta a tiempo. Sin esta restriccion, cada
+   * reenvio seria otro correo al cliente por la misma reserva.
+   */
+  it('no deja registrar dos veces el mismo aviso enviado', async () => {
+    const bookingId = await sembrarReserva('FT-DUP-0001');
+    await registrar(bookingId, 'SENT');
+
+    await expect(registrar(bookingId, 'SENT')).rejects.toThrow();
+  });
+
+  /*
+   * El reverso: un intento que no llego a salir DEBE poder repetirse. Si la
+   * restriccion cubriera todos los estados, arreglar la configuracion y
+   * reintentar seria imposible y el cliente se quedaria sin su correo.
+   */
+  it('un intento fallido se puede repetir hasta que salga', async () => {
+    const bookingId = await sembrarReserva('FT-DUP-0002');
+
+    await registrar(bookingId, 'FAILED');
+    await registrar(bookingId, 'FAILED');
+    await registrar(bookingId, 'SKIPPED');
+    await registrar(bookingId, 'SENT');
+
+    const total = await db.query<{ count: string }>(
+      `SELECT count(*) FROM notifications WHERE "bookingId" = '${bookingId}'`,
+    );
+    expect(Number(total.rows[0].count)).toBe(4);
+  });
+
+  it('el mismo hecho por otro canal no choca', async () => {
+    const bookingId = await sembrarReserva('FT-DUP-0003');
+    await registrar(bookingId, 'SENT');
+
+    await expect(
+      db.query(
+        `INSERT INTO notifications (id, "bookingId", event, channel, audience, status)
+         VALUES (gen_random_uuid(), '${bookingId}', 'BOOKING_CONFIRMED', 'TELEGRAM', 'INTERNAL', 'SENT')`,
+      ),
+    ).resolves.toBeDefined();
+  });
+
+  it('al borrar una reserva se lleva sus avisos, sin dejar filas huerfanas', async () => {
+    const bookingId = await sembrarReserva('FT-DUP-0004');
+    await registrar(bookingId, 'SENT');
+
+    await db.query(`DELETE FROM bookings WHERE id = '${bookingId}'`);
+
+    const restantes = await db.query<{ count: string }>(
+      `SELECT count(*) FROM notifications WHERE "bookingId" = '${bookingId}'`,
+    );
+    expect(Number(restantes.rows[0].count)).toBe(0);
   });
 });

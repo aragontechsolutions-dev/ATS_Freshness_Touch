@@ -89,7 +89,11 @@ Progreso:
   horario—, todo con auditoría. Quedan fuera de esta etapa la asignación de
   equipo y la vista propia del personal de limpieza.
 - 🔄 **Dinero desde el panel**: hechos el cobro y la liberación del depósito; faltan el cobro del importe final y las devoluciones.
-- ⬜ Avisos por correo y SMS.
+- ✅ **Avisos por correo y Telegram** (`docs/14-avisos.md`): confirmación y
+  cancelación al cliente en su idioma, y aviso interno por Telegram al entrar
+  una reserva pagada. Configurable desde el panel, con registro de envíos.
+- ⬜ Avisos por SMS y recordatorio de la víspera (este último necesita un
+  programador de tareas).
 - Calendario de disponibilidad y reserva en línea.
 - **Stripe**: retención del depósito con `capture_method: 'manual'` al reservar y
   captura parcial al finalizar el trabajo. Verificación de firma en los webhooks.

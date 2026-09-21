@@ -53,6 +53,13 @@ guarda nada. Lo que hay que proteger es, por tanto:
 | 31  | Colar otro esquema de URL en el enlace de llamar                | El telefono se valida contra E.164 (`+` y digitos): no hay forma de escribir `javascript:`               | `packages/types/src/business-settings.ts`  |
 | 32  | Filtrar quien cambio la configuracion por el endpoint publico   | El publico devuelve solo telefono, correo y horario; autoria y fecha solo salen en la ruta de ADMIN      | `settings/business-settings.controller.ts` |
 | 33  | Tumbar el sitio publico con una fila de configuracion corrupta  | La lectura NUNCA falla: ante cualquier problema sirve los valores de partida y avisa en el log           | `settings/business-settings.service.ts`    |
+| 34  | **Avisar dos veces y cobrar la confianza del cliente**          | Indice unico parcial: un reenvio del webhook choca con la restriccion en vez de mandar otro correo       | `migrations/20260921210000`                |
+| 35  | **Un correo caido deshace una reserva ya pagada**               | Los avisos salen FUERA de la transaccion y el despachador no lanza nunca                                 | `notifications/notifications.service.ts`   |
+| 36  | Reenviar al cliente el codigo de su puerta                      | La consulta de avisos no pide `accessNotes`; hay una prueba que lo verifica en el correo generado        | `notifications/notifications.service.ts`   |
+| 37  | Filtrar al cliente el motivo interno de una cancelacion         | La plantilla de cancelacion no recibe el motivo; hay una prueba dedicada                                 | `templates/booking-emails.ts`              |
+| 38  | Guardar credenciales en la base de datos desde un formulario    | El esquema de ajustes es estricto: un campo de token se rechaza con 400 y nunca llega a escribirse       | `packages/types/src/notifications.ts`      |
+| 39  | Apuntar los avisos a otra ruta de la API del proveedor          | El identificador de chat se valida como numero: no admite barras ni parametros de consulta               | `packages/types/src/notifications.ts`      |
+| 40  | Exponer la lista de clientes avisados por la API de Supabase    | La tabla `notifications` nace con seguridad de fila activada; un test del esquema lo vigila              | `migrations/20260921210000`                |
 
 ## Privacidad desde el diseño
 
@@ -87,6 +94,10 @@ Comprobado en ejecución real contra la API levantada:
 | Endpoint público de configuración                    | No devuelve autoría ni fecha de cambio                       |
 | Fila de configuración corrupta a propósito           | El sitio y la agenda siguen sirviendo los valores de partida |
 | Sitio con la API caída (toda petición cortada)       | Se pinta entero, sin teléfono y sin un solo error            |
+| Confirmar dos veces la misma reserva                 | Un solo correo al cliente                                    |
+| Proveedor de correo que revienta                     | La reserva sigue confirmada; el intento queda en `FAILED`    |
+| Token de Telegram pegado en el formulario del panel  | `400`, no se escribe en la base de datos                     |
+| Correo de confirmación generado                      | No contiene el código de puerta del cliente                  |
 
 > **Sobre CORS.** Dos fallos de esta familia han llegado a producción-en-pruebas
 > en este proyecto: faltaba la cabecera `Authorization` (Etapa 2.3, bloque 2) y

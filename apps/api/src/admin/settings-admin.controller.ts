@@ -2,13 +2,16 @@ import { Body, Controller, Get, Put, Req } from '@nestjs/common';
 import { SkipThrottle } from '@nestjs/throttler';
 import {
   BusinessSettingsSchema,
+  NotificationSettingsSchema,
   type AdminBusinessSettings,
   type AuthenticatedStaff,
   type BusinessSettings,
+  type NotificationSettings,
 } from '@freshness/types';
 import type { Request } from 'express';
 import { ADMIN_ROUTE, CurrentStaff, Roles } from '../auth/auth.decorators';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
+import { NotificationSettingsService } from '../notifications/notification-settings.service';
 import { BusinessSettingsService } from '../settings/business-settings.service';
 
 /**
@@ -62,5 +65,45 @@ export class SettingsAdminController {
   ): Promise<AdminBusinessSettings> {
     await this.settings.update(settings, staff, request.ip);
     return this.settings.getForAdmin();
+  }
+}
+
+/**
+ * AJUSTES DE AVISOS
+ * -----------------
+ * Mismo criterio que la configuracion del negocio: SOLO ADMINISTRACION, y
+ * tambien para leer.
+ *
+ * Aqui se decide a que telefono llega el aviso de cada reserva nueva y a que
+ * buzon la copia de los correos. Quien controla eso puede enterarse de todo
+ * lo que entra, o dejar a la empresa sin enterarse de nada apagandolo.
+ * Coordinacion mueve la agenda; no decide quien recibe los avisos.
+ *
+ * NO SE GUARDA NINGUNA CREDENCIAL. Ni la clave del proveedor de correo ni el
+ * token del bot: esos viven en el entorno del servidor. El esquema es estricto
+ * y rechaza cualquier campo que no conozca, asi que un token no puede colarse
+ * en la base de datos ni por descuido.
+ */
+@Controller(`${ADMIN_ROUTE}/notification-settings`)
+export class NotificationSettingsController {
+  constructor(private readonly notifications: NotificationSettingsService) {}
+
+  @Get()
+  @Roles('ADMIN')
+  @SkipThrottle({ quotes: true })
+  get(): Promise<NotificationSettings> {
+    return this.notifications.get();
+  }
+
+  @Put()
+  @Roles('ADMIN')
+  @SkipThrottle({ quotes: true })
+  update(
+    @Body(new ZodValidationPipe<NotificationSettings>(NotificationSettingsSchema))
+    settings: NotificationSettings,
+    @CurrentStaff() staff: AuthenticatedStaff,
+    @Req() request: Request,
+  ): Promise<NotificationSettings> {
+    return this.notifications.update(settings, staff, request.ip);
   }
 }
