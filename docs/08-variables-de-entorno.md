@@ -334,6 +334,16 @@ que no recibió su confirmación.
 | `TELEGRAM_TIMEOUT_MS` | 10000 por defecto                   | No          |
 | `TELEGRAM_API_BASE`   | Solo para servidor propio o pruebas | No          |
 
+### Recordatorio de la víspera
+
+| Variable                 | Valor                      | Obligatoria |
+| ------------------------ | -------------------------- | ----------- |
+| `REMINDER_SWEEP_MINUTES` | 15 por defecto, 0 lo apaga | No          |
+
+No hace falta ningún servicio de cron en Render: el barrido va dentro de la
+API, que en el plan `starter` no se suspende. Las horas de antelación se
+configuran desde el panel, no aquí.
+
 **El identificador de chat NO va aquí**: se configura desde el panel, en
 Datos del negocio → Avisos. Sin el token no sirve para enviar nada, así que no
 es un secreto.

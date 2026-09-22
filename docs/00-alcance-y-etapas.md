@@ -92,8 +92,10 @@ Progreso:
 - ✅ **Avisos por correo y Telegram** (`docs/14-avisos.md`): confirmación y
   cancelación al cliente en su idioma, y aviso interno por Telegram al entrar
   una reserva pagada. Configurable desde el panel, con registro de envíos.
-- ⬜ Avisos por SMS y recordatorio de la víspera (este último necesita un
-  programador de tareas).
+- ✅ **Recordatorio de la víspera** (`docs/14-avisos.md` §11): barrido cada 15
+  minutos dentro de la propia API, sin servicio de cron aparte. Sobrevive a
+  reinicios y caídas porque recalcula desde la base en cada pasada.
+- ⬜ Avisos por SMS.
 - Calendario de disponibilidad y reserva en línea.
 - **Stripe**: retención del depósito con `capture_method: 'manual'` al reservar y
   captura parcial al finalizar el trabajo. Verificación de firma en los webhooks.

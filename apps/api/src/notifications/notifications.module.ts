@@ -4,6 +4,7 @@ import type { Env } from '../common/config/env';
 import { SettingsModule } from '../settings/settings.module';
 import { NotificationSettingsService } from './notification-settings.service';
 import { NotificationsService } from './notifications.service';
+import { ReminderSweepService } from './reminder-sweep.service';
 import {
   EMAIL_PROVIDER,
   TELEGRAM_PROVIDER,
@@ -82,7 +83,8 @@ import { NoopTelegramProvider } from './providers/noop-telegram.provider';
     },
     NotificationSettingsService,
     NotificationsService,
+    ReminderSweepService,
   ],
-  exports: [NotificationsService, NotificationSettingsService],
+  exports: [NotificationsService, NotificationSettingsService, ReminderSweepService],
 })
 export class NotificationsModule {}

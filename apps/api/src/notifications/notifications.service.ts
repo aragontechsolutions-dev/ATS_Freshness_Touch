@@ -15,6 +15,7 @@ import {
   TELEGRAM_PROVIDER,
   describeFailure,
   type DeliveryResult,
+  type EmailMessage,
   type EmailProvider,
   type TelegramProvider,
 } from './notifications.types';
@@ -22,6 +23,7 @@ import { NotificationSettingsService } from './notification-settings.service';
 import {
   bookingCancelledEmail,
   bookingConfirmedEmail,
+  bookingReminderEmail,
   newBookingTelegramMessage,
   type BookingEmailData,
 } from './templates/booking-emails';
@@ -98,6 +100,11 @@ export class NotificationsService {
     await this.despachar(bookingId, 'BOOKING_CANCELLED');
   }
 
+  /** Recordatorio la vispera. Lo dispara el barrido, no un hecho puntual. */
+  async bookingReminder(bookingId: string): Promise<void> {
+    await this.despachar(bookingId, 'BOOKING_REMINDER');
+  }
+
   private async despachar(bookingId: string, event: NotificationEvent): Promise<void> {
     try {
       const reserva = await this.cargar(bookingId);
@@ -150,8 +157,11 @@ export class NotificationsService {
     destinatario: string,
     datos: BookingEmailData,
   ): Promise<void> {
-    const encendido =
-      event === 'BOOKING_CONFIRMED' ? ajustes.emailBookingConfirmed : ajustes.emailBookingCancelled;
+    const encendido = {
+      BOOKING_CONFIRMED: ajustes.emailBookingConfirmed,
+      BOOKING_CANCELLED: ajustes.emailBookingCancelled,
+      BOOKING_REMINDER: ajustes.emailBookingReminder,
+    }[event];
 
     if (!encendido) {
       await this.registrar({
@@ -167,10 +177,9 @@ export class NotificationsService {
       return;
     }
 
-    const mensaje =
-      event === 'BOOKING_CONFIRMED'
-        ? bookingConfirmedEmail(destinatario, datos)
-        : bookingCancelledEmail(destinatario, datos);
+    if (await this.yaEnviado(bookingId, event, 'EMAIL', 'CUSTOMER')) return;
+
+    const mensaje = this.componer(event, destinatario, datos);
 
     const resultado = await this.enviarSinLanzar(() => this.email.send(mensaje));
 
@@ -185,9 +194,20 @@ export class NotificationsService {
       providerMessageId: resultado.providerMessageId,
     });
 
-    // La copia interna es el MISMO correo a otro buzon: el equipo ve
-    // exactamente lo que recibio el cliente, que es lo util cuando llama.
-    if (ajustes.internalEmail !== null) {
+    /*
+     * La copia interna es el MISMO correo a otro buzon: el equipo ve
+     * exactamente lo que recibio el cliente, que es lo util cuando llama.
+     *
+     * El RECORDATORIO se queda fuera a proposito. Un aviso por cada reserva
+     * del dia siguiente convierte el buzon interno en ruido diario, y el
+     * equipo ya tiene la agenda del panel para saber que hay manana. Se copia
+     * lo excepcional (una reserva nueva, una cancelacion), no lo rutinario.
+     */
+    if (
+      event !== 'BOOKING_REMINDER' &&
+      ajustes.internalEmail !== null &&
+      !(await this.yaEnviado(bookingId, event, 'EMAIL', 'INTERNAL'))
+    ) {
       const copia = await this.enviarSinLanzar(() =>
         this.email.send({ ...mensaje, to: ajustes.internalEmail as string }),
       );
@@ -239,6 +259,8 @@ export class NotificationsService {
       currency: reserva.currency,
     });
 
+    if (await this.yaEnviado(bookingId, 'BOOKING_CONFIRMED', 'TELEGRAM', 'INTERNAL')) return;
+
     const resultado = await this.enviarSinLanzar(() =>
       this.telegram.send(ajustes.telegramChatId as string, texto),
     );
@@ -253,6 +275,67 @@ export class NotificationsService {
       failureReason: resultado.failureReason,
       providerMessageId: resultado.providerMessageId,
     });
+  }
+
+  /** Elige la plantilla que toca. */
+  private componer(
+    event: NotificationEvent,
+    destinatario: string,
+    datos: BookingEmailData,
+  ): EmailMessage {
+    const plantilla = {
+      BOOKING_CONFIRMED: bookingConfirmedEmail,
+      BOOKING_CANCELLED: bookingCancelledEmail,
+      BOOKING_REMINDER: bookingReminderEmail,
+    }[event];
+
+    return plantilla(destinatario, datos);
+  }
+
+  /**
+   * ¿Este aviso ya salio?
+   *
+   * SE COMPRUEBA ANTES DE ENVIAR, Y ESO ES EL PUNTO. El indice unico de la
+   * tabla impide registrar dos veces el mismo envio, pero el registro ocurre
+   * DESPUES del envio: sin esta comprobacion, el segundo intento manda el
+   * correo y solo entonces choca con la restriccion. El cliente ya lo habria
+   * recibido dos veces.
+   *
+   * No es un caso raro. El barrido del recordatorio pasa cada pocos minutos y
+   * ve la misma reserva una y otra vez hasta que llega la cita: sin esto,
+   * serian decenas de correos identicos.
+   *
+   * QUEDA UNA CARRERA ABIERTA, pequena y asumida: dos instancias que entren en
+   * el mismo milisegundo pueden enviar las dos. El indice unico limita el dano
+   * a un unico duplicado y el registro lo deja a la vista. La alternativa
+   * —reservar la fila antes de enviar— cambia ese duplicado improbable por
+   * algo peor: una fila que dice "enviado" de un correo que nunca salio si el
+   * proceso muere entre las dos operaciones.
+   */
+  private async yaEnviado(
+    bookingId: string,
+    event: NotificationEvent,
+    channel: NotificationChannel,
+    audience: NotificationAudience,
+  ): Promise<boolean> {
+    try {
+      const previo = await this.prisma.db.notification.findFirst({
+        where: { bookingId, event, channel, audience, status: 'SENT' },
+        select: { id: true },
+      });
+      return previo !== null;
+    } catch (error) {
+      /*
+       * Si no se puede consultar, se ARRIESGA EL DUPLICADO y se envia. Para un
+       * aviso al cliente es la eleccion menos mala: recibir dos veces la
+       * confirmacion molesta, no recibirla deja a alguien que acaba de pagar
+       * sin nada por escrito.
+       */
+      this.logger.error(
+        `No se pudo comprobar si ${event}/${channel} ya salio: ${describeFailure(error)}`,
+      );
+      return false;
+    }
   }
 
   /**

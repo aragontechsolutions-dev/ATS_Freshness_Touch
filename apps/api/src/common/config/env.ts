@@ -121,6 +121,16 @@ export const EnvSchema = z
      */
     TELEGRAM_API_BASE: z.url().default('https://api.telegram.org'),
 
+    /**
+     * Cada cuantos minutos se buscan reservas a las que mandar el recordatorio
+     * de la vispera. Cero lo apaga.
+     *
+     * Quince minutos es de sobra: la precision del recordatorio la marca la
+     * ventana de horas, no el intervalo. Barrer cada minuto solo anadiria
+     * consultas sin que nadie notara la diferencia.
+     */
+    REMINDER_SWEEP_MINUTES: z.coerce.number().int().min(0).max(1440).default(15),
+
     AUTH_PROVIDER: z.enum(['local', 'supabase']).default('local'),
     /** Direccion del proyecto de Supabase: https://<ref>.supabase.co */
     SUPABASE_URL: z.string().url().optional(),

@@ -89,6 +89,10 @@ describe('ajustes de avisos', () => {
       telegramOnNewBooking: false,
       emailBookingConfirmed: false,
       emailBookingCancelled: false,
+      emailBookingReminder: false,
+      // Las horas siguen siendo obligatorias aunque el recordatorio este
+      // apagado: asi no se pierde el valor configurado al volver a encenderlo.
+      reminderHoursBefore: 24,
     });
 
     expect(resultado.success).toBe(true);
@@ -121,5 +125,54 @@ describe('enmascarado para el panel', () => {
 
   it('un chat demasiado corto se oculta entero', () => {
     expect(maskChatId('123')).toBe('…');
+  });
+});
+
+describe('antelacion del recordatorio', () => {
+  /*
+   * El minimo de 2 horas no es arbitrario. Reservar exige 24 horas de
+   * antelacion, asi que alguien puede reservar para manana mismo; con un valor
+   * muy bajo el recordatorio le llegaria pegado a la confirmacion, y dos
+   * correos casi identicos en cinco minutos se leen como un fallo.
+   */
+  it.each([0, 1, -5])('rechaza %d horas: quedaria pegado a la confirmacion', (horas) => {
+    const resultado = NotificationSettingsSchema.safeParse({
+      ...DEFAULT_NOTIFICATION_SETTINGS,
+      reminderHoursBefore: horas,
+    });
+
+    expect(resultado.success).toBe(false);
+  });
+
+  it('rechaza mas de 72 horas: con cuatro dias ya no es un recordatorio', () => {
+    const resultado = NotificationSettingsSchema.safeParse({
+      ...DEFAULT_NOTIFICATION_SETTINGS,
+      reminderHoursBefore: 96,
+    });
+
+    expect(resultado.success).toBe(false);
+  });
+
+  it('rechaza medias horas: la ventana se cuenta en horas enteras', () => {
+    const resultado = NotificationSettingsSchema.safeParse({
+      ...DEFAULT_NOTIFICATION_SETTINGS,
+      reminderHoursBefore: 24.5,
+    });
+
+    expect(resultado.success).toBe(false);
+  });
+
+  it.each([2, 24, 48, 72])('acepta %d horas', (horas) => {
+    const resultado = NotificationSettingsSchema.safeParse({
+      ...DEFAULT_NOTIFICATION_SETTINGS,
+      reminderHoursBefore: horas,
+    });
+
+    expect(resultado.success).toBe(true);
+  });
+
+  it('el valor de partida es la vispera', () => {
+    expect(DEFAULT_NOTIFICATION_SETTINGS.reminderHoursBefore).toBe(24);
+    expect(DEFAULT_NOTIFICATION_SETTINGS.emailBookingReminder).toBe(true);
   });
 });

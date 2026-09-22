@@ -37,6 +37,9 @@ export function NotificationSettingsForm({ onSessionLost }: Props) {
   // contenido para reescribirlo lo daría por vacío a mitad de camino.
   const [internalEmail, setInternalEmail] = useState('');
   const [telegramChatId, setTelegramChatId] = useState('');
+  const [horasAntes, setHorasAntes] = useState(
+    String(DEFAULT_NOTIFICATION_SETTINGS.reminderHoursBefore),
+  );
 
   const cargar = useCallback(async () => {
     setCargando(true);
@@ -47,6 +50,7 @@ export function NotificationSettingsForm({ onSessionLost }: Props) {
       setValores(datos);
       setInternalEmail(datos.internalEmail ?? '');
       setTelegramChatId(datos.telegramChatId ?? '');
+      setHorasAntes(String(datos.reminderHoursBefore));
     } catch (error) {
       if (error instanceof ApiClientError && error.statusCode === 401) {
         onSessionLost();
@@ -77,6 +81,9 @@ export function NotificationSettingsForm({ onSessionLost }: Props) {
       ...valores,
       internalEmail: internalEmail.trim() === '' ? null : internalEmail.trim(),
       telegramChatId: telegramChatId.trim() === '' ? null : telegramChatId.trim(),
+      // Number('') es 0, que el contrato rechaza por debajo del minimo: el
+      // campo vacio da un error claro en vez de guardarse como cero.
+      reminderHoursBefore: Number(horasAntes),
     };
 
     // Mismo esquema que usa el servidor: el error sale junto al campo que lo
@@ -99,6 +106,7 @@ export function NotificationSettingsForm({ onSessionLost }: Props) {
       setValores(datos);
       setInternalEmail(datos.internalEmail ?? '');
       setTelegramChatId(datos.telegramChatId ?? '');
+      setHorasAntes(String(datos.reminderHoursBefore));
       setGuardado(true);
     } catch (error) {
       if (error instanceof ApiClientError && error.statusCode === 401) {
@@ -147,6 +155,49 @@ export function NotificationSettingsForm({ onSessionLost }: Props) {
           valor={valores.emailBookingCancelled}
           onChange={(v) => marcar('emailBookingCancelled', v)}
         />
+
+        <Interruptor
+          id="aviso-recordatorio"
+          etiqueta={t('admin.notifications.emailBookingReminder')}
+          ayuda={t('admin.notifications.emailBookingReminderHelp')}
+          valor={valores.emailBookingReminder}
+          onChange={(v) => marcar('emailBookingReminder', v)}
+        />
+
+        {/* El campo de horas solo tiene sentido con el recordatorio encendido. */}
+        {valores.emailBookingReminder && (
+          <div className="ml-6">
+            <label className="ft-label" htmlFor="aviso-horas">
+              {t('admin.notifications.reminderHoursBefore')}
+            </label>
+            <input
+              id="aviso-horas"
+              className="ft-input w-32"
+              type="number"
+              inputMode="numeric"
+              /*
+               * SIN `min` NI `max` A PROPOSITO. Con ellos, el navegador
+               * bloquea el envio y ensena SU propio mensaje, en SU idioma:
+               * alguien con el panel en espanol y el navegador en ingles
+               * recibiria "Value must be less than or equal to 72". Los
+               * limites los comprueba el mismo esquema que usa el servidor,
+               * asi que el aviso sale igual, en el idioma del panel y junto
+               * al campo, como en el resto del formulario.
+               */
+              value={horasAntes}
+              onChange={(evento) => {
+                setHorasAntes(evento.target.value);
+                setGuardado(false);
+              }}
+            />
+            <p className="mt-1 text-xs text-slate-600 dark:text-slate-400">
+              {t('admin.notifications.reminderHoursBeforeHelp')}
+            </p>
+            {fieldErrors.reminderHoursBefore && (
+              <p className="mt-1 text-xs text-red-700">{t(fieldErrors.reminderHoursBefore)}</p>
+            )}
+          </div>
+        )}
       </section>
 
       {/* -------------------------- Avisos internos ----------------------- */}
