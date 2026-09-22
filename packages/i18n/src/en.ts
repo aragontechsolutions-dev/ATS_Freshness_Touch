@@ -286,6 +286,14 @@ export const en = {
       emailBookingCancelledHelp:
         'Never includes the internal reason written by the team — only that the booking was cancelled.',
 
+      emailBookingReminder: 'Send a reminder the day before',
+      emailBookingReminderHelp:
+        'Cuts down on no-shows, which are the most wasteful cost in this business: the team drives out, cannot get in, and the slot can no longer be sold.',
+      reminderHoursBefore: 'Hours before',
+      reminderHoursBeforeHelp:
+        'Between 2 and 72. Bookings are made at least 24 hours ahead, so a low number would land the reminder right after the confirmation.',
+      reminderHoursBeforeInvalid: 'Enter a number between 2 and 72.',
+
       internal: 'Alerts for your team',
       internalEmail: 'Copy customer emails to',
       internalEmailHelp: 'This mailbox receives the same email the customer got.',

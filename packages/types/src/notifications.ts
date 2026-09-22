@@ -19,7 +19,11 @@ import { z } from 'zod';
  */
 
 /** Los hechos que merecen un aviso. */
-export const NOTIFICATION_EVENTS = ['BOOKING_CONFIRMED', 'BOOKING_CANCELLED'] as const;
+export const NOTIFICATION_EVENTS = [
+  'BOOKING_CONFIRMED',
+  'BOOKING_CANCELLED',
+  'BOOKING_REMINDER',
+] as const;
 export const NotificationEventSchema = z.enum(NOTIFICATION_EVENTS);
 export type NotificationEvent = z.infer<typeof NotificationEventSchema>;
 
@@ -84,6 +88,28 @@ export const NotificationSettingsSchema = z.strictObject({
 
   /** Correo al cliente cuando su reserva se cancela, sea quien sea quien cancele. */
   emailBookingCancelled: z.boolean(),
+
+  /**
+   * Recordatorio al cliente la vispera del servicio.
+   *
+   * Reduce las ausencias, que son el gasto mas tonto de este negocio: el
+   * equipo se desplaza, no puede entrar y la franja ya no se puede vender.
+   */
+  emailBookingReminder: z.boolean(),
+
+  /**
+   * Cuantas horas antes se avisa.
+   *
+   * El limite inferior son 2 horas por una razon concreta: la antelacion
+   * minima para reservar son 24, asi que alguien puede reservar para manana
+   * mismo. Con un valor muy bajo el recordatorio le llegaria pegado a la
+   * confirmacion, y dos correos casi identicos en cinco minutos se leen como
+   * un fallo del sistema.
+   *
+   * El limite superior son 72 porque mas alla deja de ser un recordatorio:
+   * avisar con cuatro dias no evita que a nadie se le olvide.
+   */
+  reminderHoursBefore: z.number().int().min(2).max(72),
 });
 export type NotificationSettings = z.infer<typeof NotificationSettingsSchema>;
 
@@ -101,6 +127,8 @@ export const DEFAULT_NOTIFICATION_SETTINGS: NotificationSettings = {
   telegramOnNewBooking: true,
   emailBookingConfirmed: true,
   emailBookingCancelled: true,
+  emailBookingReminder: true,
+  reminderHoursBefore: 24,
 };
 
 /** Cómo acabó un envío. */

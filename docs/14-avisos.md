@@ -216,10 +216,6 @@ Correos simulados                   cliente (en español) + copia interna
 
 ## 10. Lo que queda fuera
 
-**El recordatorio de la víspera.** Necesita un programador de tareas en el
-servidor, que hoy no existe, y decidir qué pasa si el servidor estuvo caído a
-esa hora. Es una etapa aparte.
-
 **Reintentos automáticos.** Un envío fallido queda anotado y se puede repetir,
 pero nadie lo repite solo. Con el volumen actual es más sensato verlo en el
 panel y decidir; una cola de reintentos es infraestructura que todavía no se
@@ -227,3 +223,108 @@ justifica.
 
 **Ver los avisos en el detalle de la reserva.** La tabla ya lo registra todo y
 el contrato del panel existe; falta la pantalla que lo muestre.
+
+---
+
+## 11. El recordatorio de la víspera
+
+> Etapa 2.6. Código: `apps/api/src/notifications/reminder-sweep.service.ts`.
+
+Existe para reducir las ausencias, que son el gasto más tonto de este negocio:
+el equipo se desplaza, no puede entrar y la franja ya no se puede vender a
+nadie.
+
+### 11.1. Un barrido, no un temporizador por reserva
+
+Programar un aviso para dentro de tres días exige que el proceso siga vivo tres
+días. **No lo está**: cada despliegue lo reinicia, y una caída se lleva por
+delante todos los temporizadores pendientes sin dejar rastro.
+
+En su lugar, cada 15 minutos se hace la misma pregunta a la base de datos:
+
+```
+¿Qué reservas están CONFIRMADAS,
+   empiezan DESPUÉS de ahora,
+   empiezan DENTRO de la ventana (24 h por defecto),
+   y NO tienen ya un recordatorio enviado?
+```
+
+El barrido **no recuerda, recalcula**. Por eso un reinicio no pierde nada, y
+una caída de seis horas se recupera sola en la siguiente pasada: las reservas
+que debieron avisarse siguen en la ventana y sin registro, así que entran
+solas.
+
+La condición «empieza después de ahora» es la que evita el ridículo de mandar,
+al volver de una caída larga, recordatorios de limpiezas que ya se hicieron.
+
+### 11.2. Por qué va dentro de la API
+
+La API corre en el plan `starter` de Render, que **no se suspende** por
+inactividad (ver el comentario de `render.yaml`). Un servicio de cron aparte
+sería una pieza más que desplegar, vigilar y pagar a cambio de nada.
+
+Si algún día hay varias instancias, tampoco pasa nada: la comprobación previa
+al envío y el índice único impiden el correo repetido.
+
+### 11.3. La ventana
+
+Configurable desde el panel, entre 2 y 72 horas. Los dos límites tienen motivo:
+
+- **Mínimo 2 h.** Reservar exige 24 horas de antelación, así que alguien puede
+  reservar para mañana mismo. Con un valor muy bajo, el recordatorio le
+  llegaría pegado a la confirmación, y dos correos casi idénticos en cinco
+  minutos se leen como un fallo del sistema.
+- **Máximo 72 h.** Más allá deja de ser un recordatorio: avisar con cuatro días
+  no evita que a nadie se le olvide.
+
+Con la ventana por defecto de 24 h y un horario comercial de 08:00 a 18:00, el
+recordatorio **siempre cae dentro del horario laboral**. No hace falta ninguna
+regla de «horas de silencio»: por construcción no puede salir de madrugada.
+
+### 11.4. Dos topes que evitan sorpresas
+
+**100 reservas por pasada.** Un arranque después de mucho tiempo parado
+intentaría enviarlo todo de golpe y agotaría la cuota del proveedor de correo.
+Lo que no entre se recoge en la siguiente pasada.
+
+**Sin solapes.** Si una pasada tarda más que el intervalo, la siguiente se
+salta en vez de acumularse.
+
+### 11.5. El recordatorio no se copia al buzón interno
+
+Un aviso por cada reserva del día siguiente convierte el buzón interno en ruido
+diario, y el equipo ya tiene la agenda del panel. Se copia lo excepcional —una
+reserva nueva, una cancelación—, no lo rutinario.
+
+### 11.6. Un fallo corregido de camino
+
+Al empezar esta etapa se descubrió que el envío **sí podía duplicarse**. El
+orden era: enviar, y después registrar. El índice único bloqueaba el
+_registro_, no el _envío_: el segundo intento mandaba el correo y solo entonces
+chocaba con la restricción.
+
+En el flujo del webhook no llegaba a ocurrir, porque el webhook tiene su propia
+idempotencia aguas arriba. Pero **el barrido lo habría destapado de la peor
+forma**: ve la misma reserva cada 15 minutos, así que un cliente con la
+limpieza a 20 horas vista habría recibido unos ochenta correos idénticos.
+
+Ahora se comprueba **antes** de enviar. Queda una carrera abierta, pequeña y
+asumida: dos instancias que entren en el mismo milisegundo pueden enviar las
+dos, y el índice único limita el daño a un único duplicado. La alternativa
+—reservar la fila antes de enviar— cambiaría ese duplicado improbable por algo
+peor: una fila que dice «enviado» de un correo que nunca salió, si el proceso
+muere entre las dos operaciones.
+
+### 11.7. Qué está probado
+
+**Del barrido, contra PostgreSQL real** (14 pruebas): se avisa a una reserva
+confirmada de mañana y **no** a una de dentro de tres días, ni a una cancelada,
+ni a una pendiente de pago, ni a una que ya pasó; **cuatro pasadas seguidas
+mandan un solo correo**, y la segunda ni siquiera considera la reserva; tras
+una caída de seis horas las pendientes entran solas, pero las que ya ocurrieron
+no; con el recordatorio apagado no se barre nada; la ventana configurable
+decide a quién alcanza; un proveedor caído no rompe el barrido y el
+recordatorio se reintenta en la pasada siguiente.
+
+**Del contrato** (10 nuevas): se rechazan 0, 1, −5 y 96 horas, y las medias
+horas.

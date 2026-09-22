@@ -291,6 +291,14 @@ export const es: TranslationResources = {
       emailBookingCancelledHelp:
         'Nunca incluye el motivo interno que escribe el equipo: solo que la reserva quedó cancelada.',
 
+      emailBookingReminder: 'Enviar un recordatorio la víspera',
+      emailBookingReminderHelp:
+        'Reduce las ausencias, que son el gasto más tonto de este negocio: el equipo se desplaza, no puede entrar y la franja ya no se puede vender.',
+      reminderHoursBefore: 'Horas de antelación',
+      reminderHoursBeforeHelp:
+        'Entre 2 y 72. Las reservas se hacen con 24 horas mínimo, así que un número bajo pondría el recordatorio pegado a la confirmación.',
+      reminderHoursBeforeInvalid: 'Escribe un número entre 2 y 72.',
+
       internal: 'Avisos para tu equipo',
       internalEmail: 'Copiar los correos del cliente a',
       internalEmailHelp: 'Ese buzón recibe el mismo correo que recibió el cliente.',

@@ -69,6 +69,7 @@ enum ServiceZone {
 enum NotificationEvent {
   BOOKING_CONFIRMED
   BOOKING_CANCELLED
+  BOOKING_REMINDER
 }
 
 enum NotificationChannel {
@@ -367,6 +368,9 @@ model Booking {
 
   /// La agenda se consulta casi siempre por fecha y estado.
   @@index([scheduledStart, status])
+  /// Ademas existe un indice PARCIAL sobre (scheduledStart) limitado a las
+  /// reservas CONFIRMED, creado en la migracion 20260922000000, para el
+  /// barrido del recordatorio: Prisma no sabe expresar indices parciales.
   /// Ademas existe un indice unico parcial sobre (customerId, scheduledStart)
   /// para las reservas no canceladas, creado en la migracion
   /// 20260920180000: Prisma no sabe expresar indices parciales.

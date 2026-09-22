@@ -142,6 +142,65 @@ export function bookingCancelledEmail(to: string, data: BookingEmailData): Email
 }
 
 /**
+ * Recordatorio la vispera del servicio.
+ *
+ * Existe para reducir las ausencias, que son el gasto mas tonto de este
+ * negocio: el equipo se desplaza, no puede entrar, y la franja ya no se puede
+ * vender a nadie.
+ *
+ * Por eso el correo es CORTO y dice tres cosas: cuando, donde y cuanto hay
+ * que pagar ese dia. Repetir aqui el desglose entero del precio diluiria justo
+ * lo que interesa que se lea.
+ */
+export function bookingReminderEmail(to: string, data: BookingEmailData): EmailMessage {
+  const es = data.locale === 'es';
+  const cuando = formatearFecha(data.scheduledStart, data.timezone, data.locale);
+  const resto = formatearDinero(data.balanceDueCents, data.currency, data.locale);
+  const donde = `${data.addressLine}, ${data.city}, ${data.state}`;
+
+  const titulo = es ? 'Tu limpieza es manana' : 'Your cleaning is tomorrow';
+
+  const parrafos = es
+    ? [
+        `Hola ${data.customerFirstName}:`,
+        `Un recordatorio de que tu limpieza esta programada para manana.`,
+      ]
+    : [`Hi ${data.customerFirstName},`, `A reminder that your cleaning is scheduled for tomorrow.`];
+
+  const datos: [string, string][] = es
+    ? [
+        ['Referencia', data.reference],
+        ['Cuando', cuando],
+        ['Donde', donde],
+        ['A pagar ese dia', resto],
+      ]
+    : [
+        ['Reference', data.reference],
+        ['When', cuando],
+        ['Where', donde],
+        ['Due that day', resto],
+      ];
+
+  /*
+   * La nota final invita a avisar si algo cambia. Es deliberado: un cliente
+   * que avisa la vispera permite recolocar la franja; uno que no esta cuando
+   * llega el equipo cuesta el desplazamiento entero.
+   */
+  const nota = es
+    ? `Si necesitas cambiar la hora o no vas a estar, avisanos hoy y lo resolvemos.`
+    : `If you need to change the time or will not be home, let us know today and we will sort it out.`;
+
+  return {
+    to,
+    subject: es
+      ? `Recordatorio: tu limpieza es manana · ${data.reference}`
+      : `Reminder: your cleaning is tomorrow · ${data.reference}`,
+    text: comoTexto(titulo, parrafos, datos, nota, data),
+    html: comoHtml(titulo, parrafos, datos, nota, data),
+  };
+}
+
+/**
  * Aviso interno por Telegram.
  *
  * Es texto plano, sin formato, por lo que se explica en el proveedor: un

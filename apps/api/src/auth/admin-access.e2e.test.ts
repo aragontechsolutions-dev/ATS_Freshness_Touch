@@ -315,6 +315,26 @@ describe('el sitio publico sigue abierto', () => {
   });
 });
 
+/**
+ * Primera franja libre a partir de manana, mirando dia a dia.
+ *
+ * Depende del horario real del negocio y no de un calendario supuesto, asi
+ * que sigue funcionando si manana se cierra otro dia de la semana.
+ */
+async function primeraFranjaLibre(): Promise<{ startsAt: string } | null> {
+  for (let dias = 2; dias <= 10; dias += 1) {
+    const dia = new Date(Date.now() + dias * 86_400_000).toISOString().slice(0, 10);
+    const respuesta = await request(app.getHttpServer())
+      .get('/api/v1/availability')
+      .query({ date: dia, service: 'STANDARD', bedrooms: 2, bathrooms: 1, squareFeet: 1200 });
+
+    const libre = respuesta.body.slots?.find((s: { available: boolean }) => s.available);
+    if (libre) return libre;
+  }
+
+  return null;
+}
+
 describe('listado y detalle de reservas', () => {
   let bookingId: string;
   let token: string;
@@ -322,15 +342,18 @@ describe('listado y detalle de reservas', () => {
   beforeAll(async () => {
     token = await provider.issue(ADMIN_AUTH_ID, 'ada@example.com');
 
-    // Una reserva completa, creada por el camino normal para que los datos
-    // sean los que de verdad genera el sistema.
-    const dia = new Date(Date.now() + 5 * 86_400_000).toISOString().slice(0, 10);
-    const disponibilidad = await request(app.getHttpServer())
-      .get('/api/v1/availability')
-      .query({ date: dia, service: 'STANDARD', bedrooms: 2, bathrooms: 1, squareFeet: 1200 });
-
-    const franja = disponibilidad.body.slots?.find((s: { available: boolean }) => s.available);
-    if (!franja) throw new Error('el dia elegido no tiene franjas libres');
+    /*
+     * Una reserva completa, creada por el camino normal para que los datos
+     * sean los que de verdad genera el sistema.
+     *
+     * SE BUSCA EL PRIMER DIA CON HUECO en vez de usar un desplazamiento fijo.
+     * Antes se cogia "hoy + 5 dias", y eso fallaba UN DIA DE CADA SIETE: el
+     * negocio cierra los domingos, asi que cuando el quinto dia caia en
+     * domingo la respuesta no traia ninguna franja y la prueba entera
+     * reventaba sin que nada estuviera roto.
+     */
+    const franja = await primeraFranjaLibre();
+    if (!franja) throw new Error('no hay ninguna franja libre en los proximos 10 dias');
 
     const creada = await request(app.getHttpServer())
       .post('/api/v1/bookings')

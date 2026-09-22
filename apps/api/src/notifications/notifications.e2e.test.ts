@@ -224,6 +224,9 @@ describe('no se avisa dos veces', () => {
     );
 
     expect(alCliente).toHaveLength(1);
+    // Lo que de verdad importa: que el CORREO no salga dos veces. Un registro
+    // unico no sirve de nada si el cliente ya recibio el segundo mensaje.
+    expect(correo.sent).toHaveLength(1);
   });
 
   it('y el segundo intento no lanza ningun error', async () => {
