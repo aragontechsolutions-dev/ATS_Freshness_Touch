@@ -1,9 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  AdminAssignmentsUpdateSchema,
-  AdminStaffOptionSchema,
-  staffFullName,
-} from './assignments';
+import { AdminAssignmentsUpdateSchema, AdminStaffOptionSchema, staffFullName } from './assignments';
 
 const ANA = 'a5a5a5a5-1111-4111-8111-111111111111';
 const BETO = 'b5b5b5b5-2222-4222-8222-222222222222';
