@@ -373,6 +373,46 @@ export const es: TranslationResources = {
       selfNote: 'Esta es tu ficha: no puedes cambiarte el puesto ni darte de baja tú misma.',
     },
 
+    /* ----------------------- Contraseña ----------------------- */
+    passwordReset: {
+      forgot: '¿Has olvidado tu contraseña?',
+      requestTitle: 'Recuperar el acceso',
+      requestIntro:
+        'Escribe tu correo de trabajo y te enviaremos un enlace para elegir una contraseña nueva.',
+      requestSend: 'Enviar enlace',
+      backToSignIn: 'Volver al acceso',
+      /*
+       * EL MISMO MENSAJE EXISTA O NO LA CUENTA. Decir "ese correo no está
+       * registrado" convertiría esta pantalla en una forma de averiguar quién
+       * trabaja aquí, probando direcciones una a una.
+       */
+      requestSent:
+        'Si esa dirección corresponde a una cuenta, en unos minutos llegará un correo con el enlace. Revisa también la carpeta de no deseado.',
+
+      chooseTitleInvite: 'Bienvenida a Freshness Touch',
+      chooseIntroInvite: 'Elige una contraseña para entrar al panel.',
+      chooseTitleRecovery: 'Elige una contraseña nueva',
+      chooseIntroRecovery: 'Este enlace solo sirve una vez.',
+      newPassword: 'Contraseña nueva',
+      repeatPassword: 'Repítela',
+      minLength:
+        'Al menos {{count}} caracteres. Mejor una frase que recuerdes que una palabra con símbolos.',
+      show: 'Ver',
+      hide: 'Ocultar',
+      choose: 'Guardar contraseña',
+      tooShort: 'Necesita al menos {{count}} caracteres.',
+      mismatch: 'Las dos no coinciden.',
+      saved: 'Contraseña guardada.',
+
+      linkExpired:
+        'Este enlace ya no vale: solo sirve una vez y caduca. Pide uno nuevo desde la pantalla de acceso.',
+      linkOtherDevice:
+        'Este enlace hay que abrirlo en el mismo navegador desde el que lo pediste. Pídelo de nuevo desde este dispositivo.',
+      savedNoAccess:
+        'Tu contraseña se ha guardado, pero esta cuenta no tiene acceso al panel. Habla con administración.',
+      notConfigured: 'El acceso no está configurado en este despliegue.',
+    },
+
     /* --------------------------- Errores --------------------------- */
     errorSessionExpired: 'Tu sesión ha terminado. Vuelve a iniciar sesión.',
     errorNoAccess: 'Esta cuenta no tiene acceso al panel de administración.',

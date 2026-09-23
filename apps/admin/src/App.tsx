@@ -1,13 +1,16 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { Locale } from '@freshness/types';
 import { useIdleSignOut } from './hooks/useIdleSignOut';
 import { useStaffSession } from './hooks/useStaffSession';
 import { Agenda } from './pages/Agenda';
 import { BookingDetailPage } from './pages/BookingDetail';
+import { ForgotPassword } from './pages/ForgotPassword';
 import { Login } from './pages/Login';
+import { SetPassword } from './pages/SetPassword';
 import { SettingsPage } from './pages/Settings';
 import { persistLocale } from './i18n';
+import { readPasswordLink, type PasswordLink } from './lib/password-link';
 
 /**
  * PANEL DE ADMINISTRACION
@@ -22,6 +25,20 @@ export default function App() {
   const { state, signOut, refresh } = useStaffSession();
   const [openBookingId, setOpenBookingId] = useState<string | null>(null);
   const [enAjustes, setEnAjustes] = useState(false);
+  const [pidiendoEnlace, setPidiendoEnlace] = useState(false);
+
+  /*
+   * El enlace de correo se lee UNA SOLA VEZ, al arrancar, y se guarda.
+   *
+   * Tiene que leerse antes de que nada mas toque la direccion, y guardarse
+   * porque la pantalla que lo atiende la borra en cuanto la usa: si se
+   * volviera a leer en cada pintado, el segundo ya no encontraria nada y la
+   * pantalla se cerraria a media escritura.
+   */
+  const [enlace, setEnlace] = useState<PasswordLink | null>(() =>
+    typeof window === 'undefined' ? null : readPasswordLink(window.location.href),
+  );
+  const [enlaceAtendido, setEnlaceAtendido] = useState(false);
 
   const dentro = state.status === 'signed-in';
 
@@ -40,6 +57,27 @@ export default function App() {
    * esta pantalla se le decia que volviera a entrar, cosa que no arregla
    * nada y que la deja reintentando indefinidamente.
    */
+  /*
+   * TAMBIEN SE ESCUCHA EL CAMBIO DE FRAGMENTO, y no es rebuscado.
+   *
+   * Si el panel ya esta abierto en la pestana donde se pulsa el enlace del
+   * correo, el navegador NO recarga: la direccion pasa de "/" a
+   * "/#access_token=...", que para el es la misma pagina con otro ancla. Sin
+   * esto, el enlace no haria absolutamente nada y quien lo pulsa se quedaria
+   * mirando la pantalla de acceso sin entender por que.
+   */
+  useEffect(() => {
+    const alCambiarFragmento = (): void => {
+      const leido = readPasswordLink(window.location.href);
+      if (!leido) return;
+      setEnlace(leido);
+      setEnlaceAtendido(false);
+    };
+
+    window.addEventListener('hashchange', alCambiarFragmento);
+    return () => window.removeEventListener('hashchange', alCambiarFragmento);
+  }, []);
+
   const alPerderSesion = useCallback(
     (reason: 'expired' | 'noAccess' = 'expired') => void signOut(reason),
     [signOut],
@@ -59,8 +97,37 @@ export default function App() {
     );
   }
 
+  /*
+   * Elegir contrasena manda sobre todo lo demas, incluso sobre tener sesion
+   * abierta. Quien llega por un enlace de invitacion o de recuperacion viene
+   * a hacer eso; mostrarle la agenda de la sesion anterior seria ignorar
+   * justo lo que acaba de pedir.
+   */
+  if (enlace && !enlaceAtendido) {
+    return (
+      <SetPassword
+        link={enlace}
+        onDone={() => {
+          setEnlaceAtendido(true);
+          void refresh();
+        }}
+        onCancel={() => setEnlaceAtendido(true)}
+      />
+    );
+  }
+
   if (state.status === 'signed-out') {
-    return <Login reason={state.reason} onSignedIn={() => void refresh()} />;
+    if (pidiendoEnlace) {
+      return <ForgotPassword onBack={() => setPidiendoEnlace(false)} />;
+    }
+
+    return (
+      <Login
+        reason={state.reason}
+        onForgot={() => setPidiendoEnlace(true)}
+        onSignedIn={() => void refresh()}
+      />
+    );
   }
 
   /*

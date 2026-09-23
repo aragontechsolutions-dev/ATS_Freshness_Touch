@@ -368,6 +368,39 @@ export const en = {
       selfNote: 'This is your own record: you cannot change your own role or deactivate yourself.',
     },
 
+    /* ----------------------- Contraseña ----------------------- */
+    passwordReset: {
+      forgot: 'Forgot your password?',
+      requestTitle: 'Recover access',
+      requestIntro: 'Enter your work email and we will send you a link to choose a new password.',
+      requestSend: 'Send link',
+      backToSignIn: 'Back to sign in',
+      requestSent:
+        'If that address belongs to an account, an email with the link will arrive in a few minutes. Check your spam folder too.',
+
+      chooseTitleInvite: 'Welcome to Freshness Touch',
+      chooseIntroInvite: 'Choose a password to sign in to the panel.',
+      chooseTitleRecovery: 'Choose a new password',
+      chooseIntroRecovery: 'This link only works once.',
+      newPassword: 'New password',
+      repeatPassword: 'Repeat it',
+      minLength: 'At least {{count}} characters. A phrase you remember beats a word with symbols.',
+      show: 'Show',
+      hide: 'Hide',
+      choose: 'Save password',
+      tooShort: 'It needs at least {{count}} characters.',
+      mismatch: 'The two do not match.',
+      saved: 'Password saved.',
+
+      linkExpired:
+        'This link is no longer valid: it works once and then expires. Request a new one from the sign-in screen.',
+      linkOtherDevice:
+        'This link has to be opened in the same browser you requested it from. Request it again from this device.',
+      savedNoAccess:
+        'Your password has been saved, but this account has no access to the panel. Talk to an administrator.',
+      notConfigured: 'Sign-in is not configured on this deployment.',
+    },
+
     /* --------------------------- Errores --------------------------- */
     errorSessionExpired: 'Your session has ended. Please sign in again.',
     errorNoAccess: 'This account does not have access to the admin panel.',

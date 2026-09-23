@@ -1009,3 +1009,145 @@ correcto; y todo en español a 390 px sin desbordamiento horizontal.
 En la base, tras el recorrido: `staff.created`, `staff.invited` y
 `staff.updated` con el antes y el después, y **ningún identificador de cuenta
 en el registro**.
+
+---
+
+## 15. Elegir contraseña: invitación y recuperación
+
+> Etapa 2.9. Cierra un hueco que dejó la anterior: se podía invitar a alguien,
+> pero el enlace de la invitación no llevaba a ninguna parte, y quien perdía
+> ese correo se quedaba fuera para siempre.
+
+### 15.1. El hueco que dejó la etapa 2.8
+
+El cliente del panel tiene **`detectSessionInUrl: false`**, una decisión de
+seguridad tomada en la etapa 2.3 con este razonamiento: «no hay inicio de
+sesión por enlace, así que desactivarlo evita que un enlace manipulado con
+parámetros de sesión tenga ningún efecto».
+
+Era correcto entonces. Dejó de serlo al añadir las invitaciones, porque **una
+invitación es exactamente eso: un inicio de sesión por enlace**. Con la opción
+apagada, quien recibía la invitación pulsaba el enlace, aterrizaba en el panel
+y **no pasaba nada**.
+
+### 15.2. Se lee a mano, y solo en una pantalla
+
+La salida fácil era encender `detectSessionInUrl`. No se ha hecho, porque
+entonces **cualquier pantalla del panel aceptaría una sesión metida en la
+dirección**: bastaría con mandarle a alguien un enlace a la agenda con un
+token pegado para que se quedara trabajando dentro de la sesión de otra
+persona sin notarlo.
+
+En su lugar, `lib/password-link.ts` lee el enlace **a mano**, y la sesión solo
+se abre en **un sitio y tras una decisión explícita**: la pantalla de elegir
+contraseña. La puerta es estrecha a propósito:
+
+- solo `type=invite` y `type=recovery`; `magiclink`, `signup` y cualquier otro
+  se ignoran;
+- hacen falta **los dos** tokens, el de acceso y el de renovación;
+- y hay una prueba por cada tipo rechazado, porque esa lista es justo lo que
+  alguien ampliaría sin pensarlo.
+
+En el resto del panel, un enlace manipulado **no hace absolutamente nada**, y
+hay una prueba en navegador que lo comprueba: se abre la agenda con un token
+pegado y sigue apareciendo la pantalla de acceso.
+
+### 15.3. Dos caminos, y no son iguales
+
+|                  | Quién lo inicia                       | Cómo vuelve                   | Por qué                                                                  |
+| ---------------- | ------------------------------------- | ----------------------------- | ------------------------------------------------------------------------ |
+| **Invitación**   | el servidor, con la clave de servicio | tokens en el fragmento        | el navegador de quien la recibe no participó, así que no hay verificador |
+| **Recuperación** | la propia persona                     | un `code` que hay que canjear | su navegador sí guardó el verificador                                    |
+
+La recuperación es el camino bueno: **los tokens no viajan nunca en la
+dirección**, así que no quedan en el historial. La invitación no puede usarlo
+por construcción.
+
+De ahí un caso que merece su propio mensaje: si alguien pide el enlace en el
+ordenador y lo abre **en el móvil**, el verificador no está y el canje falla.
+Decirle «caducado» lo mandaría a pedir otro enlace para repetir el mismo
+error, así que se le dice que lo abra en el mismo navegador desde el que lo
+pidió.
+
+Y en cuanto se lee el enlace, **lo primero que se hace es borrarlo de la barra
+de direcciones**: mientras siga ahí, el token está en el historial del
+navegador y en cualquier captura de pantalla.
+
+### 15.4. El mismo mensaje exista o no la cuenta
+
+Pedir el enlace responde **siempre lo mismo**, palabra por palabra, y sin
+mirar lo que contesta el proveedor.
+
+Decir «ese correo no está registrado» convertiría esa pantalla en una forma de
+averiguar quién trabaja aquí, probando direcciones una a una. En una empresa
+pequeña eso no es teórico: con cuatro apellidos se saca la plantilla entera, y
+con la plantilla se sabe a quién suplantar. Es la misma regla que el mensaje
+único de la pantalla de acceso (§10).
+
+Tampoco se distingue un fallo del proveedor. Es tentador («ha fallado el
+envío, reinténtalo»), pero el proveedor limita por dirección: un error
+distinto para un correo que existe y otro para uno que no volvería a filtrar
+lo mismo por la puerta de atrás. Hay una prueba en navegador que compara las
+dos respuestas carácter a carácter.
+
+### 15.5. La regla de la contraseña: largo y nada más
+
+**Doce caracteres, sin exigir mayúsculas, números ni símbolos.**
+
+Esas reglas producen `Password1!` una y otra vez, que es corta y adivinable, y
+empujan a apuntarla en un papel pegado al monitor. Doce caracteres
+cualesquiera resisten mucho más que ocho con adornos, y una frase que se
+recuerda es mejor contraseña que una palabra con signos.
+
+Quien manda de verdad es el proveedor de identidad, que aplica su propio
+mínimo en el servidor. Esto es una **guardia de interfaz**: evita que alguien
+elija algo débil y se entere después, con un error del proveedor en su idioma.
+No sustituye a la comprobación del servidor, la adelanta.
+
+Se pide **dos veces** porque el campo va oculto: una errata al elegirla no se
+ve, y se descubriría al siguiente intento de entrar, cuando ya no hay forma de
+saber qué se tecleó. También hay un botón de ver la contraseña, que es el
+remedio al mismo problema.
+
+### 15.6. Dos detalles pequeños que evitan llamadas
+
+- **Se confirma antes de seguir.** Al guardar, la pantalla dice «contraseña
+  guardada» y espera. Si esta cuenta resultara no ser personal del panel —le
+  puede pasar a quien fue dado de baja después de pedir el enlace— lo
+  siguiente que vería sería la pantalla de acceso diciendo que no tiene
+  permiso, y parecería que la contraseña tampoco se guardó. Se guardó.
+- **Se escucha el cambio de fragmento.** Si el panel ya está abierto en la
+  pestaña donde se pulsa el enlace, el navegador **no recarga**: la dirección
+  pasa de `/` a `/#access_token=…`, que para él es la misma página con otro
+  ancla. Sin esto el enlace no haría nada. Apareció probando en navegador, no
+  razonando.
+
+### 15.7. Qué está probado
+
+**Del contrato** (11 pruebas): el mínimo de doce, que se acepta una de solo
+minúsculas si es larga, el tope alto que evita hacer calcular el hash de
+megabytes, las dos vueltas y que se avisa de la longitud antes que de la
+coincidencia.
+
+**De la lectura del enlace** (15 pruebas, sin navegador porque es una función
+pura sobre una cadena): invitación, recuperación por código, enlace caducado,
+que el error manda sobre cualquier token que venga en el mismo enlace, y
+—**las que importan**— que se ignoran `magiclink`, `signup`, `email_change`,
+un tipo vacío y un fragmento al que le falta el token de renovación.
+
+**En navegador real**, contra un servidor que imita al proveedor: el acceso
+ofrece recuperar; la respuesta es **idéntica carácter a carácter** para un
+correo que existe y para uno que no; un enlace de invitación abre la pantalla
+y **la dirección queda limpia**; una contraseña corta y dos que no coinciden
+se rechazan con su mensaje; el botón de ver funciona; al guardar se confirma;
+un enlace caducado explica qué hacer; **un token pegado a la agenda no abre
+sesión**; y todo en español, en un navegador en español, a 390 px sin
+desbordamiento.
+
+### 15.8. Lo que sigue sin existir
+
+- **No hay segundo factor.** Para un panel que ve los datos de todos los
+  clientes, es la siguiente pieza de seguridad que conviene.
+- **No hay selector de idioma en la pantalla de acceso.** El idioma sale del
+  navegador, que acierta casi siempre, pero quien tenga el navegador en inglés
+  y prefiera español no puede cambiarlo hasta entrar.
