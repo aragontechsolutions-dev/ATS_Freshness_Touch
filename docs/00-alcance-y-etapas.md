@@ -108,6 +108,13 @@ Progreso:
   misma respuesta exista o no la cuenta, y pantalla para elegir contraseña que
   sirve tanto para la invitación como para la recuperación. La sesión del
   enlace solo se acepta ahí, nunca en el resto del panel.
+- ✅ **Correo de invitación propio** (`docs/13-panel-y-permisos.md` §16): el
+  enlace se pide sin correo y la plantilla es nuestra, en el idioma de la
+  persona. La ficha de personal tiene ahora idioma, como los clientes.
+- ✅ **Pantalla del equipo de limpieza** (`docs/13-panel-y-permisos.md` §17):
+  sus trabajos, con dirección, cómo entrar y teléfono, y los botones de «he
+  llegado» y «he terminado». Nunca ve importes ni trabajos ajenos: el filtro
+  va en la consulta, no al pintar.
 - ⬜ Avisos por SMS.
 - Calendario de disponibilidad y reserva en línea.
 - **Stripe**: retención del depósito con `capture_method: 'manual'` al reservar y

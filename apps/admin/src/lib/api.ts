@@ -3,6 +3,8 @@ import {
   AdminBookingListSchema,
   AdminStaffListSchema,
   AdminStaffDirectorySchema,
+  MyJobSchema,
+  MyJobsSchema,
   AdminStaffDirectoryItemSchema,
   AdminBusinessSettingsSchema,
   API_ERROR_CODES,
@@ -19,6 +21,9 @@ import {
   type AdminStaffDirectory,
   type AdminStaffDirectoryItem,
   type AdminStaffList,
+  type MyJob,
+  type MyJobProgress,
+  type MyJobs,
   type StaffCreate,
   type StaffUpdate,
   type AdminStatusChangeInput,
@@ -393,4 +398,30 @@ export function updateStaff(staffId: string, datos: StaffUpdate): Promise<AdminS
 /** Manda la invitacion al panel y vincula la cuenta que se crea. */
 export function inviteStaff(staffId: string): Promise<AdminStaffDirectoryItem> {
   return request(`${DIRECTORIO}/${staffId}/invite`, parseFicha('invitacion'), { method: 'POST' });
+}
+
+/* ------------------------------------------------------------------------ */
+/*  Mis trabajos. El servidor decide cuales son mios a partir de la sesion:  */
+/*  aqui no se manda ningun identificador de persona, a proposito.           */
+/* ------------------------------------------------------------------------ */
+
+export function fetchMyJobs(): Promise<MyJobs> {
+  return request('/admin/my-jobs', (payload) => {
+    const parsed = MyJobsSchema.safeParse(payload);
+    if (!parsed.success) throw contractError('/admin/my-jobs', parsed.error.issues);
+    return parsed.data;
+  });
+}
+
+/** Marca que se ha llegado o que se ha terminado. */
+export function markMyJobProgress(bookingId: string, body: MyJobProgress): Promise<MyJob> {
+  return request(
+    `/admin/my-jobs/${bookingId}/progress`,
+    (payload) => {
+      const parsed = MyJobSchema.safeParse(payload);
+      if (!parsed.success) throw contractError('avance del trabajo', parsed.error.issues);
+      return parsed.data;
+    },
+    { method: 'PATCH', body },
+  );
 }

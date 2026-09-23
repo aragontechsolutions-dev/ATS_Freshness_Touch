@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { StaffRoleSchema } from './auth';
+import { LocaleSchema } from './enums';
 import { PhoneE164Schema } from './business-settings';
 
 /**
@@ -32,6 +33,15 @@ const NombreSchema = z.string().trim().min(1).max(80);
  */
 const CorreoSchema = z.string().trim().toLowerCase().email().max(160);
 
+/**
+ * Idioma en el que se le escribe.
+ *
+ * Se elige en el alta porque el primer correo que recibe esa persona es la
+ * invitacion al panel, y para entonces ya tiene que estar decidido. Por
+ * defecto ingles, como el resto del sistema.
+ */
+const IdiomaSchema = LocaleSchema.default('en');
+
 /** Alta. El puesto se elige desde el principio para no crear a nadie "sin rol". */
 export const StaffCreateSchema = z.strictObject({
   firstName: NombreSchema,
@@ -39,6 +49,7 @@ export const StaffCreateSchema = z.strictObject({
   email: CorreoSchema,
   phone: PhoneE164Schema.nullable(),
   role: StaffRoleSchema,
+  locale: IdiomaSchema,
 });
 export type StaffCreate = z.infer<typeof StaffCreateSchema>;
 export type StaffCreateInput = z.input<typeof StaffCreateSchema>;
@@ -57,6 +68,7 @@ export const StaffUpdateSchema = z.strictObject({
   email: CorreoSchema,
   phone: PhoneE164Schema.nullable(),
   role: StaffRoleSchema,
+  locale: IdiomaSchema,
   isActive: z.boolean(),
 });
 export type StaffUpdate = z.infer<typeof StaffUpdateSchema>;
@@ -97,6 +109,7 @@ export const AdminStaffDirectoryItemSchema = z.strictObject({
   email: z.string(),
   phone: z.string().nullable(),
   role: StaffRoleSchema,
+  locale: LocaleSchema,
   isActive: z.boolean(),
   access: PanelAccessSchema,
   invitedAt: z.iso.datetime().nullable(),

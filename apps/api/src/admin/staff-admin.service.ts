@@ -17,6 +17,9 @@ import {
 } from '@freshness/types';
 import { AuditService } from '../audit/audit.service';
 import { PrismaService } from '../database/prisma.service';
+import { EMAIL_PROVIDER, type EmailProvider } from '../notifications/notifications.types';
+import { staffInviteEmail } from '../notifications/templates/staff-emails';
+import { BusinessSettingsService } from '../settings/business-settings.service';
 import type { Prisma } from '../generated/prisma/client';
 import { STAFF_INVITE_PROVIDER, type StaffInviteProvider } from './staff-invite.types';
 
@@ -28,6 +31,7 @@ const DIRECTORY_SELECT = {
   email: true,
   phone: true,
   role: true,
+  locale: true,
   isActive: true,
   authUserId: true,
   invitedAt: true,
@@ -74,6 +78,8 @@ export class StaffAdminService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     @Inject(STAFF_INVITE_PROVIDER) private readonly invitaciones: StaffInviteProvider,
+    @Inject(EMAIL_PROVIDER) private readonly email: EmailProvider,
+    private readonly business: BusinessSettingsService,
   ) {}
 
   /** Si este despliegue puede invitar. Lo consulta el directorio. */
@@ -113,6 +119,7 @@ export class StaffAdminService {
           email: datos.email,
           phone: datos.phone,
           role: datos.role,
+          locale: datos.locale,
         },
         select: DIRECTORY_SELECT,
       });
@@ -187,6 +194,7 @@ export class StaffAdminService {
           email: datos.email,
           phone: datos.phone,
           role: datos.role,
+          locale: datos.locale,
           isActive: datos.isActive,
         },
         select: DIRECTORY_SELECT,
@@ -302,11 +310,24 @@ export class StaffAdminService {
       });
     }
 
-    const actualizada = await this.prisma.db.$transaction(async (tx) => {
-      const guardada = await tx.staff.update({
+    /*
+     * EL VINCULO SE GUARDA ANTES DE MANDAR EL CORREO, y el orden importa.
+     *
+     * La cuenta YA existe en el proveedor en cuanto se genera el enlace: eso
+     * es un hecho, y no guardarlo dejaria una cuenta huerfana que impide
+     * volver a invitar —el proveedor rechaza el correo repetido— sin que la
+     * ficha muestre nada. Guardandolo, si el correo no llega esa persona
+     * todavia puede entrar por «he olvidado mi contrasena», que lleva a la
+     * misma pantalla de elegir clave.
+     *
+     * `invitedAt` se deja para DESPUES del envio: marca que el correo salio,
+     * no que la cuenta existe. Son dos cosas distintas y conviene poder
+     * distinguirlas al mirar la pantalla.
+     */
+    await this.prisma.db.$transaction(async (tx) => {
+      await tx.staff.update({
         where: { id: staffId },
-        data: { authUserId: resultado.authUserId, invitedAt: new Date() },
-        select: DIRECTORY_SELECT,
+        data: { authUserId: resultado.authUserId },
       });
 
       await this.audit.record(
@@ -317,17 +338,50 @@ export class StaffAdminService {
           entityId: staffId,
           /*
            * Se registra a quien y con que puesto, NUNCA el identificador de
-           * la cuenta creada: el registro de auditoria lo puede leer quien
-           * investigue un incidente, y ese identificador no le ayuda a
-           * entender nada mientras que si ayuda a suplantar.
+           * la cuenta ni el enlace: el registro de auditoria lo puede leer
+           * quien investigue un incidente, y el enlace es una credencial de
+           * un solo uso que serviria para entrar en su lugar.
            */
-          metadata: { email: guardada.email, role: guardada.role },
+          metadata: { email: persona.email, role: persona.role },
           ipAddress,
         },
         tx,
       );
+    });
 
-      return guardada;
+    const negocio = await this.business.get();
+    const envio = await this.email.send(
+      staffInviteEmail(persona.email, {
+        locale: persona.locale,
+        firstName: persona.firstName,
+        role: persona.role,
+        actionLink: resultado.actionLink,
+        companyPhone: negocio.phone,
+        companyEmail: negocio.email,
+      }),
+    );
+
+    if (!envio.ok) {
+      /*
+       * La cuenta quedo creada y vinculada, pero el correo no salio. Se dice
+       * exactamente eso, con la salida concreta: esa persona puede entrar
+       * igualmente pidiendo el enlace desde «he olvidado mi contrasena».
+       *
+       * Callarlo seria peor que el propio fallo: la pantalla diria «invitada»
+       * y nadie sabria por que esa persona nunca entra.
+       */
+      this.logger.error(`La invitacion se genero pero el correo no salio: ${envio.failureReason}`);
+      throw new ServiceUnavailableException({
+        code: API_ERROR_CODES.STAFF_INVITE_FAILED,
+        messageKey: 'admin.errorInviteNotDelivered',
+        fields: [{ path: 'email', message: envio.failureReason ?? '' }],
+      });
+    }
+
+    const actualizada = await this.prisma.db.staff.update({
+      where: { id: staffId },
+      data: { invitedAt: new Date() },
+      select: DIRECTORY_SELECT,
     });
 
     this.logger.log(`Invitacion al panel enviada por ${actor.email}`);
@@ -391,6 +445,7 @@ export function toDirectoryItem(persona: FilaPersonal): AdminStaffDirectoryItem 
     email: persona.email,
     phone: persona.phone,
     role: persona.role,
+    locale: persona.locale,
     isActive: persona.isActive,
     access,
     invitedAt: persona.invitedAt?.toISOString() ?? null,

@@ -351,6 +351,9 @@ export const en = {
       activeHelp:
         'Deactivating stops their panel access immediately and removes them from assignment. The record and its history are kept.',
 
+      locale: 'Language',
+      localeHelp: 'This is the language we write to them in, starting with the invitation email.',
+      localeName: { en: 'English', es: 'Spanish' },
       accessTitle: 'Panel access',
       accessNONE: 'No access',
       accessINVITED: 'Invited',
@@ -401,6 +404,31 @@ export const en = {
       notConfigured: 'Sign-in is not configured on this deployment.',
     },
 
+    /* ------------------------ Mis trabajos ------------------------ */
+    myJobs: {
+      title: 'My jobs',
+      empty: 'You have no jobs assigned. When dispatch assigns you one, it will show up here.',
+      today: 'Today',
+      upcoming: 'Coming up',
+      lead: 'You are the lead',
+      withYou: 'With you',
+      withYouLead: 'Lead',
+      howToGetIn: 'How to get in',
+      howToGetInWarning:
+        'Do not read this aloud in front of anyone, and close the screen when you put your phone away.',
+      customerNotes: 'What the customer asked for',
+      call: 'Call',
+      directions: 'Directions',
+      rooms: '{{bedrooms}} bedrooms · {{bathrooms}} bathrooms',
+      start: 'I have arrived',
+      finish: 'I have finished',
+      started: 'In progress',
+      finished: 'Finished',
+      finishHint:
+        'Tap "I have arrived" when you enter the house. The time is recorded, and it is what backs up your work if anyone asks.',
+      noActions: 'Dispatch handles the rest.',
+    },
+
     /* --------------------------- Errores --------------------------- */
     errorSessionExpired: 'Your session has ended. Please sign in again.',
     errorNoAccess: 'This account does not have access to the admin panel.',
@@ -414,6 +442,8 @@ export const en = {
     errorAlreadyInvited: 'That person already has a linked account.',
     errorInviteInactive: 'You cannot invite someone who is inactive.',
     errorInviteUnavailable: 'Invitation sending is not configured on this deployment.',
+    errorInviteNotDelivered:
+      'The account was created, but the invitation email did not go out. That person can still get in by requesting the link from "Forgot your password?".',
     errorInviteFailed: 'The identity provider rejected the invitation.',
     errorStaffDoubleBooked:
       'That person already has another job at the same time. Remove them from the team or move one of the two bookings.',

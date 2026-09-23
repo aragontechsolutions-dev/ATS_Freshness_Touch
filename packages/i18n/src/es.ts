@@ -356,6 +356,9 @@ export const es: TranslationResources = {
       activeHelp:
         'Al dar de baja, deja de entrar al panel en el acto y no se le puede asignar trabajo. La ficha y su historial se conservan.',
 
+      locale: 'Idioma',
+      localeHelp: 'En este idioma se le escribe, empezando por el correo de invitación.',
+      localeName: { en: 'Inglés', es: 'Español' },
       accessTitle: 'Acceso al panel',
       accessNONE: 'Sin acceso',
       accessINVITED: 'Invitada',
@@ -413,6 +416,31 @@ export const es: TranslationResources = {
       notConfigured: 'El acceso no está configurado en este despliegue.',
     },
 
+    /* ------------------------ Mis trabajos ------------------------ */
+    myJobs: {
+      title: 'Mis trabajos',
+      empty: 'No tienes trabajos asignados. Cuando coordinación te asigne uno, aparecerá aquí.',
+      today: 'Hoy',
+      upcoming: 'Próximos',
+      lead: 'Tú eres la responsable',
+      withYou: 'Contigo va',
+      withYouLead: 'Responsable',
+      howToGetIn: 'Cómo entrar',
+      howToGetInWarning:
+        'No leas esto en alto delante de nadie y cierra la pantalla al guardar el móvil.',
+      customerNotes: 'Lo que pidió el cliente',
+      call: 'Llamar',
+      directions: 'Cómo llegar',
+      rooms: '{{bedrooms}} habitaciones · {{bathrooms}} baños',
+      start: 'He llegado',
+      finish: 'He terminado',
+      started: 'En curso',
+      finished: 'Terminado',
+      finishHint:
+        'Marca «He llegado» al entrar en la casa. Queda la hora, y es lo que respalda tu trabajo si alguien pregunta.',
+      noActions: 'Coordinación se encarga del resto.',
+    },
+
     /* --------------------------- Errores --------------------------- */
     errorSessionExpired: 'Tu sesión ha terminado. Vuelve a iniciar sesión.',
     errorNoAccess: 'Esta cuenta no tiene acceso al panel de administración.',
@@ -426,6 +454,8 @@ export const es: TranslationResources = {
     errorAlreadyInvited: 'Esa persona ya tiene una cuenta vinculada.',
     errorInviteInactive: 'No se puede invitar a alguien que está de baja.',
     errorInviteUnavailable: 'El envío de invitaciones no está configurado en este despliegue.',
+    errorInviteNotDelivered:
+      'Se creó la cuenta, pero el correo de invitación no salió. Esa persona puede entrar igualmente pidiendo el enlace desde «¿Has olvidado tu contraseña?».',
     errorInviteFailed: 'El proveedor de identidad rechazó la invitación.',
     errorStaffDoubleBooked:
       'Esa persona ya tiene otro trabajo a la misma hora. Quítala del equipo o cambia una de las dos citas.',
