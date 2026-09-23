@@ -15,6 +15,12 @@ export const ApiErrorSchema = z.strictObject({
    * Detalle por campo, solo en errores de validacion.
    * `message` es texto tecnico para depuracion: la interfaz muestra al usuario
    * el `messageKey` general y resalta los campos indicados en `path`.
+   *
+   * UNICA EXCEPCION, y deliberada: en STAFF_DOUBLE_BOOKED el `message` lleva
+   * el nombre de la persona y la referencia de la reserva con la que choca,
+   * separados por ` · `. Son DATOS, no una frase, asi que no hay nada que
+   * traducir y se pueden pintar tal cual. Sin ellos, un "no se puede asignar"
+   * a secas obliga a buscar el choque a mano por toda la agenda.
    */
   fields: z.array(z.strictObject({ path: z.string(), message: z.string() })).optional(),
   requestId: z.string().optional(),
@@ -36,6 +42,8 @@ export const API_ERROR_CODES = {
   DUPLICATE_BOOKING: 'DUPLICATE_BOOKING',
   /** El cambio de estado pedido no es valido desde el estado actual. */
   INVALID_TRANSITION: 'INVALID_TRANSITION',
+  /** Esa persona ya tiene otro trabajo que se solapa con este. */
+  STAFF_DOUBLE_BOOKED: 'STAFF_DOUBLE_BOOKED',
   /** La retencion no esta en un estado sobre el que se pueda actuar. */
   PAYMENT_NOT_CAPTURABLE: 'PAYMENT_NOT_CAPTURABLE',
   PAYMENT_UNAVAILABLE: 'PAYMENT_UNAVAILABLE',

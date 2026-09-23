@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { DateTime } from 'luxon';
 import {
+  staffFullName,
   API_ERROR_CODES,
   type AdminBookingDetail,
   type AdminBookingList,
@@ -28,7 +29,11 @@ const LIST_SELECT = {
   createdAt: true,
   customer: { select: { firstName: true, lastName: true } },
   address: { select: { city: true, postalCode: true } },
-  assignments: { select: { staff: { select: { id: true, firstName: true, lastName: true } } } },
+  assignments: {
+    select: { isLead: true, staff: { select: { id: true, firstName: true, lastName: true } } },
+    // El responsable primero: es a quien se llama si hay que preguntar algo.
+    orderBy: [{ isLead: 'desc' as const }, { assignedAt: 'asc' as const }],
+  },
   payments: {
     where: { kind: 'DEPOSIT_HOLD' as const },
     orderBy: { createdAt: 'desc' as const },
@@ -263,7 +268,8 @@ function toListItem(booking: BookingRow): AdminBookingListItem {
     paymentStatus: booking.payments[0]?.status ?? null,
     assignedStaff: booking.assignments.map((a) => ({
       staffId: a.staff.id,
-      name: `${a.staff.firstName} ${a.staff.lastName}`,
+      name: staffFullName(a.staff),
+      isLead: a.isLead,
     })),
     createdAt: booking.createdAt.toISOString(),
   };

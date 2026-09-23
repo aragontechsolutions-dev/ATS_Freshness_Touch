@@ -20,3 +20,21 @@ export type ThrottlerName = (typeof THROTTLER_NAMES)[number];
 export const SKIP_ALL_THROTTLERS: Record<ThrottlerName, boolean> = Object.fromEntries(
   THROTTLER_NAMES.map((name) => [name, true]),
 ) as Record<ThrottlerName, boolean>;
+
+/**
+ * Exime del limitador de cotizaciones, no del global.
+ *
+ * ES LO QUE NECESITA TODO ENDPOINT QUE NO CALCULA COTIZACIONES. El limitador
+ * "quotes" es de 10 peticiones por minuto porque cada cotizacion gasta cuota
+ * de pago del proveedor de distancia, pero se aplica a TODA la API: con
+ * nombres propios, un limitador no se limita a sus rutas, cubre todas las que
+ * no lo desactiven explicitamente.
+ *
+ * Por eso vive aqui y se pone A NIVEL DE CLASE en los controladores del
+ * panel: puesto metodo a metodo, el dia que alguien anade un endpoint nuevo
+ * se olvida, y esa pantalla se cae con un 429 en la undecima peticion del
+ * minuto. Paso exactamente eso con las asignaciones.
+ */
+export const SKIP_QUOTE_THROTTLER: Partial<Record<ThrottlerName, boolean>> = {
+  [THROTTLER_NAMES[1]]: true,
+};

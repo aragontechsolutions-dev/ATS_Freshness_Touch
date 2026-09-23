@@ -8,26 +8,33 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Put,
   Query,
   Req,
   UsePipes,
 } from '@nestjs/common';
+import { SkipThrottle } from '@nestjs/throttler';
 import {
+  AdminAssignmentsUpdateSchema,
   AdminBookingQuerySchema,
   AdminCaptureDepositSchema,
   AdminReleaseDepositSchema,
   AdminStatusChangeSchema,
+  type AdminAssignmentsUpdate,
   type AdminBookingDetail,
   type AdminBookingList,
   type AdminBookingQuery,
   type AdminCaptureDeposit,
   type AdminReleaseDeposit,
+  type AdminStaffList,
   type AdminStatusChange,
   type AuthenticatedStaff,
 } from '@freshness/types';
 import type { Request } from 'express';
 import { ADMIN_ROUTE, CurrentStaff, Roles } from '../auth/auth.decorators';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
+import { SKIP_QUOTE_THROTTLER } from '../common/throttling';
+import { AssignmentsService } from './assignments.service';
 import { BookingActionsService } from './booking-actions.service';
 import { BookingsAdminService } from './bookings-admin.service';
 
@@ -37,6 +44,7 @@ import { BookingsAdminService } from './bookings-admin.service';
  * La guarda global ya exige sesion por estar bajo /admin. Aqui solo se afina
  * QUIEN de dentro puede ver que.
  */
+@SkipThrottle(SKIP_QUOTE_THROTTLER)
 @Controller(`${ADMIN_ROUTE}/bookings`)
 export class BookingsAdminController {
   constructor(private readonly bookings: BookingsAdminService) {}
@@ -83,6 +91,7 @@ export class BookingsAdminController {
  * Todas dejan rastro en el registro de auditoria, dentro de la misma
  * transaccion que el cambio.
  */
+@SkipThrottle(SKIP_QUOTE_THROTTLER)
 @Controller(`${ADMIN_ROUTE}/bookings/:bookingId`)
 export class BookingActionsController {
   constructor(
@@ -146,5 +155,70 @@ export class BookingActionsController {
   ): Promise<AdminBookingDetail> {
     await this.actions.releaseDeposit(bookingId, body, staff, request.ip ?? null);
     return this.bookings.detail(bookingId);
+  }
+}
+
+/**
+ * EQUIPO DE UNA RESERVA
+ * ---------------------
+ * ADMIN y DISPATCHER, igual que el cambio de estado: organizar quien va a
+ * cada casa es coordinacion, no dinero.
+ *
+ * CLEANER queda fuera. No por desconfianza, sino porque asignarse trabajos a
+ * uno mismo cambia quien cobra que y de quien es la responsabilidad si algo
+ * sale mal en esa casa. Esa decision la toma quien coordina.
+ */
+@SkipThrottle(SKIP_QUOTE_THROTTLER)
+@Controller(`${ADMIN_ROUTE}/bookings/:bookingId/assignments`)
+export class AssignmentsController {
+  constructor(
+    private readonly assignments: AssignmentsService,
+    private readonly bookings: BookingsAdminService,
+  ) {}
+
+  /**
+   * Reemplaza el equipo entero.
+   *
+   * Es un PUT y no altas y bajas sueltas: el equipo se decide de golpe, y la
+   * regla de "un solo responsable" solo se puede garantizar sobre el conjunto.
+   *
+   * El esquema va en el parametro del cuerpo, NO en `@UsePipes()`: a nivel de
+   * metodo se aplicaria tambien al identificador de la URL.
+   */
+  @Put()
+  @Roles('ADMIN', 'DISPATCHER')
+  async setTeam(
+    @Param('bookingId', new ParseUUIDPipe({ version: '4' })) bookingId: string,
+    @Body(new ZodValidationPipe<AdminAssignmentsUpdate>(AdminAssignmentsUpdateSchema))
+    body: AdminAssignmentsUpdate,
+    @CurrentStaff() staff: AuthenticatedStaff,
+    @Req() request: Request,
+  ): Promise<AdminBookingDetail> {
+    await this.assignments.setTeam(bookingId, body.assignments, staff, request.ip ?? null);
+    // Se devuelve la reserva ya actualizada, como el resto de acciones: asi el
+    // panel pinta lo que decidio el servidor en vez de suponer que hizo lo pedido.
+    return this.bookings.detail(bookingId);
+  }
+}
+
+/**
+ * PERSONAL AL QUE SE PUEDE ASIGNAR
+ * --------------------------------
+ * Devuelve nombre, apellido, puesto e identificador. NADA MAS.
+ *
+ * Es deliberado: para elegir a quien mandar a una casa basta con eso. Incluir
+ * correo y telefono convertiria una pantalla que se abre a diario en la
+ * agenda de contacto de toda la plantilla, expuesta a cualquiera con acceso
+ * al panel y a cualquier sesion que se quede abierta en un portatil.
+ */
+@SkipThrottle(SKIP_QUOTE_THROTTLER)
+@Controller(`${ADMIN_ROUTE}/staff`)
+export class StaffListController {
+  constructor(private readonly assignments: AssignmentsService) {}
+
+  @Get()
+  @Roles('ADMIN', 'DISPATCHER')
+  list(): Promise<AdminStaffList> {
+    return this.assignments.listStaff();
   }
 }

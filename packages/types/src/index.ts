@@ -9,4 +9,5 @@ export * from './booking-transitions';
 export * from './admin';
 export * from './business-settings';
 export * from './notifications';
+export * from './assignments';
 export * from './errors';
