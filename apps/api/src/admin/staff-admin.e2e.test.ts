@@ -10,6 +10,8 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vites
 import { AdminStaffDirectorySchema } from '@freshness/types';
 import { AppModule } from '../app.module';
 import { AUTH_PROVIDER } from '../auth/auth.types';
+import { EMAIL_PROVIDER } from '../notifications/notifications.types';
+import type { LogEmailProvider } from '../notifications/providers/log-email.provider';
 import type { LocalAuthProvider } from '../auth/providers/local-auth.provider';
 
 /*
@@ -74,6 +76,7 @@ let db: PGlite;
 let socket: PGLiteSocketServer;
 let app: INestApplication;
 let provider: LocalAuthProvider;
+let correo: LogEmailProvider;
 let supabase: Server;
 
 /** Lo que recibio el servidor de mentira en la ultima invitacion. */
@@ -92,6 +95,7 @@ const FICHA = {
   email: 'cleo@example.com',
   phone: '+14045550123',
   role: 'CLEANER',
+  locale: 'es',
 };
 
 async function crear(ficha: Record<string, unknown> = FICHA, token?: string) {
@@ -140,7 +144,12 @@ beforeAll(async () => {
 
       respuesta.writeHead(200, { 'content-type': 'application/json' });
       respuesta.end(
-        JSON.stringify({ id: '99999999-9999-4999-8999-999999999999', email: recibido.email }),
+        JSON.stringify({
+          id: '99999999-9999-4999-8999-999999999999',
+          email: recibido.email,
+          // `generate_link` devuelve el enlace en vez de mandar el correo.
+          action_link: 'https://panel.example.com/#access_token=t&refresh_token=r&type=invite',
+        }),
       );
     });
   });
@@ -164,6 +173,7 @@ beforeAll(async () => {
   await app.init();
 
   provider = app.get<LocalAuthProvider>(AUTH_PROVIDER);
+  correo = app.get<LogEmailProvider>(EMAIL_PROVIDER);
 }, 120_000);
 
 afterAll(async () => {
@@ -175,6 +185,7 @@ afterAll(async () => {
 
 beforeEach(async () => {
   rechazarInvitaciones = false;
+  correo.sent.length = 0;
 
   // Estado de partida: una administradora y coordinacion, nada mas.
   await db.exec(`
@@ -335,6 +346,7 @@ describe('la guardia del ultimo administrador', () => {
           email: 'alba@example.com',
           phone: null,
           role: 'CLEANER',
+          locale: 'en',
           isActive: true,
         },
         tokenAda,
@@ -347,6 +359,7 @@ describe('la guardia del ultimo administrador', () => {
           email: 'ada@example.com',
           phone: null,
           role: 'CLEANER',
+          locale: 'en',
           isActive: true,
         },
         tokenAlba,
@@ -376,6 +389,7 @@ describe('la guardia del ultimo administrador', () => {
       email: 'alba@example.com',
       phone: null,
       role: 'CLEANER',
+      locale: 'en',
       isActive: true,
     });
 
@@ -390,6 +404,7 @@ describe('la guardia del ultimo administrador', () => {
       email: 'ada@example.com',
       phone: null,
       role: 'DISPATCHER',
+      locale: 'en',
       isActive: true,
     });
 
@@ -415,6 +430,7 @@ describe('nadie se cierra la puerta a si mismo', () => {
       email: 'ada@example.com',
       phone: null,
       role: 'DISPATCHER',
+      locale: 'en',
       isActive: true,
     });
 
@@ -434,6 +450,7 @@ describe('nadie se cierra la puerta a si mismo', () => {
       email: 'ada@example.com',
       phone: null,
       role: 'ADMIN',
+      locale: 'en',
       isActive: false,
     });
 
@@ -452,6 +469,7 @@ describe('nadie se cierra la puerta a si mismo', () => {
       email: 'ada@example.com',
       phone: '+14045559999',
       role: 'ADMIN',
+      locale: 'en',
       isActive: true,
     });
 
@@ -493,6 +511,7 @@ describe('dar de baja', () => {
       email: 'bruno@example.com',
       phone: null,
       role: 'DISPATCHER',
+      locale: 'en',
       isActive: false,
     });
 
@@ -584,6 +603,88 @@ describe('invitar al panel', () => {
 
     expect(registros.rows).toHaveLength(1);
     expect(JSON.stringify(registros.rows[0]?.metadata)).not.toContain('99999999');
+  });
+});
+
+describe('el correo de invitacion es nuestro, no el del proveedor', () => {
+  /*
+   * LA PRUEBA QUE JUSTIFICA EL CAMBIO. Antes el proveedor mandaba su propia
+   * plantilla: una sola para todo el mundo y en un solo idioma. Ahora el
+   * enlace se genera sin correo y el correo sale de aqui.
+   */
+  it('sale un correo nuestro con el enlace dentro', async () => {
+    const creada = await crear();
+    await invitar(creada.body.staffId);
+
+    expect(correo.sent).toHaveLength(1);
+    expect(correo.sent[0]?.to).toBe('cleo@example.com');
+    expect(correo.sent[0]?.html).toContain('access_token');
+    expect(correo.sent[0]?.text).toContain('access_token');
+  });
+
+  it('va en el idioma de la persona', async () => {
+    // La ficha de prueba se da de alta en espanol.
+    const creada = await crear();
+    await invitar(creada.body.staffId);
+
+    expect(correo.sent[0]?.subject).toContain('bienvenida');
+  });
+
+  it('y en ingles cuando esa es su ficha', async () => {
+    const creada = await crear({ ...FICHA, email: 'otra@example.com', locale: 'en' });
+    await invitar(creada.body.staffId);
+
+    expect(correo.sent[0]?.subject).toContain('Welcome');
+  });
+
+  /*
+   * No existe tal cosa como una contrasena inicial en este sistema: la
+   * persona elige la suya al abrir el enlace. Si algun dia alguien anadiera
+   * una, este correo es donde acabaria, y se quedaria para siempre en un
+   * buzon.
+   */
+  it('no lleva ninguna contrasena dentro', async () => {
+    const creada = await crear();
+    await invitar(creada.body.staffId);
+
+    const cuerpo = `${correo.sent[0]?.text ?? ''} ${correo.sent[0]?.html ?? ''}`.toLowerCase();
+    expect(cuerpo).not.toContain('contrase\u00f1a inicial');
+    expect(cuerpo).not.toContain('temporary password');
+  });
+});
+
+describe('cuando el correo no sale', () => {
+  /*
+   * EL CASO QUE HABRIA DEJADO A ALGUIEN SIN PODER ENTRAR NUNCA.
+   *
+   * La cuenta ya existe en el proveedor en cuanto se genera el enlace. Si no
+   * se guardara el vinculo, esa ficha quedaria imposible de invitar de nuevo
+   * —el proveedor rechaza el correo repetido— y sin nada que lo indicara.
+   *
+   * Guardandolo, esa persona todavia puede entrar por "he olvidado mi
+   * contrasena", y el error lo dice con esas palabras.
+   */
+  it('la cuenta queda vinculada para que pueda entrar por recuperacion', async () => {
+    const creada = await crear();
+    vi.spyOn(correo, 'send').mockResolvedValueOnce({
+      ok: false,
+      providerMessageId: null,
+      failureReason: 'dominio no verificado',
+    });
+
+    const respuesta = await invitar(creada.body.staffId);
+
+    expect(respuesta.status).toBe(503);
+    expect(respuesta.body.code).toBe('STAFF_INVITE_FAILED');
+
+    const fila = await db.query<{ authUserId: string | null; invitedAt: Date | null }>(
+      `SELECT "authUserId", "invitedAt" FROM staff WHERE id = '${creada.body.staffId}'`,
+    );
+
+    // Vinculada, para que la recuperacion funcione...
+    expect(fila.rows[0]?.authUserId).not.toBeNull();
+    // ...pero NO marcada como invitada: el correo no salio.
+    expect(fila.rows[0]?.invitedAt).toBeNull();
   });
 });
 

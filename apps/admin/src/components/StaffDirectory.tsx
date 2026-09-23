@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
+  LocaleSchema,
   StaffRoleSchema,
   formatPhone,
   normalizePhoneInput,
@@ -32,6 +33,7 @@ interface Borrador {
   email: string;
   phone: string;
   role: string;
+  locale: string;
   isActive: boolean;
 }
 
@@ -41,6 +43,7 @@ const BORRADOR_VACIO: Borrador = {
   email: '',
   phone: '',
   role: 'CLEANER',
+  locale: 'en',
   isActive: true,
 };
 
@@ -135,6 +138,7 @@ export function StaffDirectory({ staff, locale, onSessionLost }: StaffDirectoryP
       email: persona.email,
       phone: persona.phone ?? '',
       role: persona.role,
+      locale: persona.locale,
       isActive: persona.isActive,
     });
     setAbierta(persona.staffId);
@@ -161,6 +165,7 @@ export function StaffDirectory({ staff, locale, onSessionLost }: StaffDirectoryP
     // internacional, y vacio significa "no hay", no cadena vacia.
     const telefono = borrador.phone.trim() ? normalizePhoneInput(borrador.phone) : null;
     const role = StaffRoleSchema.catch('CLEANER').parse(borrador.role);
+    const locale = LocaleSchema.catch('en').parse(borrador.locale);
 
     try {
       if (abierta === 'nueva') {
@@ -170,6 +175,7 @@ export function StaffDirectory({ staff, locale, onSessionLost }: StaffDirectoryP
           email: borrador.email.trim().toLowerCase(),
           phone: telefono,
           role,
+          locale,
         };
         asentar(await createStaff(datos));
       } else if (abierta) {
@@ -179,6 +185,7 @@ export function StaffDirectory({ staff, locale, onSessionLost }: StaffDirectoryP
           email: borrador.email.trim().toLowerCase(),
           phone: telefono,
           role,
+          locale,
           isActive: borrador.isActive,
         };
         asentar(await updateStaff(abierta, datos));
@@ -538,6 +545,28 @@ function Formulario({
             </option>
           ))}
         </select>
+      </div>
+
+      <div>
+        <label className="ft-label" htmlFor="idioma">
+          {t('admin.staff.locale')}
+        </label>
+        <select
+          id="idioma"
+          className="ft-input w-full sm:w-64"
+          value={borrador.locale}
+          disabled={ocupado}
+          onChange={(event) => setBorrador({ ...borrador, locale: event.target.value })}
+        >
+          {LocaleSchema.options.map((idioma) => (
+            <option key={idioma} value={idioma}>
+              {t(`admin.staff.localeName.${idioma}`)}
+            </option>
+          ))}
+        </select>
+        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+          {t('admin.staff.localeHelp')}
+        </p>
       </div>
 
       {conEstado && (

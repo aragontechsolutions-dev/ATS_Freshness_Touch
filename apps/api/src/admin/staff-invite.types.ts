@@ -25,6 +25,13 @@ export type InviteResult =
        * podria entrar con ella.
        */
       authUserId: string;
+      /**
+       * Enlace de un solo uso para elegir contrasena.
+       *
+       * El proveedor NO manda el correo: lo mandamos nosotros con nuestra
+       * plantilla. Es una credencial, asi que no se registra en ningun log.
+       */
+      actionLink: string;
     }
   | { ok: false; reason: string };
 

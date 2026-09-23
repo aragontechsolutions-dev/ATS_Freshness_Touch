@@ -37,6 +37,24 @@ export function todayInTimezone(timeZone: string): string {
 }
 
 /**
+ * El dia de una fecha concreta, en la zona de la empresa.
+ *
+ * Comparable con `todayInTimezone`, y la unica forma correcta de agrupar
+ * trabajos por dia: agruparlos por la fecha del NAVEGADOR contradice lo que
+ * pone en la propia tarjeta, que va en la zona de la empresa. Un trabajo de
+ * las nueve de la noche en Georgia se pinta como "hoy" y caeria bajo
+ * "proximos", porque para el navegador en horario universal ya es manana.
+ */
+export function dateInTimezone(iso: string, timeZone: string): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date(iso));
+}
+
+/**
  * Marca de tiempo en la zona horaria de quien mira.
  *
  * A diferencia de una cita —que se ensena SIEMPRE en la zona de la empresa,

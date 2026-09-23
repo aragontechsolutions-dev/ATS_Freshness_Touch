@@ -23,9 +23,18 @@ export interface SupabaseInviteOptions {
 /**
  * INVITACIONES CON LA API DE ADMINISTRACION DE SUPABASE
  * ----------------------------------------------------
- * `POST /auth/v1/invite` crea la cuenta y le manda un correo con un enlace
- * para elegir contrasena. La respuesta trae el identificador de esa cuenta,
- * que es lo que vincula la ficha de personal con el acceso.
+ * `POST /auth/v1/admin/generate_link` con tipo `invite` crea la cuenta y
+ * DEVUELVE el enlace SIN enviar ningun correo. El correo lo mandamos
+ * nosotros, con nuestra plantilla (ver `templates/staff-emails.ts`).
+ *
+ * POR QUE NO `POST /auth/v1/invite`, que era lo que habia. Ese si manda el
+ * correo, pero con la plantilla del proveedor: una sola para todo el mundo y
+ * en un solo idioma, editable desde un panel web y por tanto fuera del
+ * repositorio, sin revision ni pruebas. El primer correo que recibe alguien
+ * que acaba de entrar en la empresa merece el mismo cuidado que el resto.
+ *
+ * La respuesta trae ademas el identificador de la cuenta, que es lo que
+ * vincula la ficha de personal con el acceso.
  *
  * Se llama con `fetch`, sin libreria, igual que Resend y Telegram: la
  * peticion son veinte lineas y una dependencia mas es superficie de ataque a
@@ -55,7 +64,7 @@ export class SupabaseInviteProvider implements StaffInviteProvider {
       return { ok: false, reason: 'El envio de invitaciones no esta configurado' };
     }
 
-    const destino = new URL('/auth/v1/invite', this.options.url);
+    const destino = new URL('/auth/v1/admin/generate_link', this.options.url);
     if (this.options.redirectTo) destino.searchParams.set('redirect_to', this.options.redirectTo);
 
     const controller = new AbortController();
@@ -71,7 +80,7 @@ export class SupabaseInviteProvider implements StaffInviteProvider {
           Authorization: `Bearer ${this.options.serviceRoleKey}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ type: 'invite', email }),
         signal: controller.signal,
       });
 
@@ -90,18 +99,19 @@ export class SupabaseInviteProvider implements StaffInviteProvider {
       }
 
       const authUserId = extraerId(cuerpo);
+      const actionLink = extraerEnlace(cuerpo);
 
-      if (!authUserId) {
+      if (!authUserId || !actionLink) {
         /*
          * Respondio que si pero sin identificador. Se trata como fallo: sin
          * el no hay nada que vincular, y decir que la invitacion salio bien
          * dejaria una ficha que parece tener acceso y no lo tiene.
          */
-        this.logger.error('Supabase acepto la invitacion pero no devolvio el identificador');
-        return { ok: false, reason: 'La respuesta del proveedor no trae el identificador' };
+        this.logger.error('Supabase genero el enlace pero la respuesta no trae lo esperado');
+        return { ok: false, reason: 'La respuesta del proveedor esta incompleta' };
       }
 
-      return { ok: true, authUserId };
+      return { ok: true, authUserId, actionLink };
     } catch (error) {
       const motivo =
         error instanceof Error && error.name === 'AbortError'
@@ -114,6 +124,21 @@ export class SupabaseInviteProvider implements StaffInviteProvider {
       clearTimeout(temporizador);
     }
   }
+}
+
+/**
+ * El enlace de un solo uso.
+ *
+ * NO se registra en ningun sitio, ni siquiera recortado: quien lo lea antes
+ * que su destinataria entra en su lugar. Es una credencial, no un dato.
+ */
+function extraerEnlace(cuerpo: unknown): string | null {
+  if (typeof cuerpo !== 'object' || cuerpo === null) return null;
+
+  const propiedades = (cuerpo as { properties?: Record<string, unknown> }).properties;
+  const enlace = (cuerpo as Record<string, unknown>).action_link ?? propiedades?.action_link;
+
+  return typeof enlace === 'string' && enlace.length > 0 ? enlace : null;
 }
 
 /** El identificador de la cuenta creada, si la respuesta tiene la forma esperada. */

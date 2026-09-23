@@ -1151,3 +1151,185 @@ desbordamiento.
 - **No hay selector de idioma en la pantalla de acceso.** El idioma sale del
   navegador, que acierta casi siempre, pero quien tenga el navegador en inglés
   y prefiera español no puede cambiarlo hasta entrar.
+
+---
+
+## 16. El correo de invitación es nuestro
+
+> Etapa 2.10.
+
+Hasta aquí la invitación la mandaba el proveedor de identidad con su propia
+plantilla. Ahora se pide el enlace **sin correo** —`POST
+/auth/v1/admin/generate_link` con tipo `invite` lo devuelve en la respuesta— y
+el correo sale de `templates/staff-emails.ts`, junto a los del cliente.
+
+Tres razones, y la tercera es la que de verdad importa:
+
+1. **Se revisa como el código.** Un cambio en lo que le llega a alguien que
+   acaba de entrar en la empresa pasa por la misma puerta que un cambio en el
+   cotizador.
+2. **Se puede probar.** La plantilla del proveedor solo se comprueba
+   mandándose correos a uno mismo.
+3. **Va en el idioma de la persona.** El proveedor tiene una sola plantilla
+   para todo el mundo. En una empresa de limpieza en Georgia, dar la
+   bienvenida en un idioma que la persona no lee es la peor primera impresión
+   posible.
+
+Por eso la ficha de personal tiene ahora `locale`, que los clientes ya tenían
+desde el principio, y se elige al dar de alta.
+
+### 16.1. Qué no lleva ese correo
+
+- **Ninguna contraseña**, ni inicial ni temporal. No existe tal cosa en este
+  sistema: la persona elige la suya al abrir el enlace, y un correo con una
+  contraseña dentro se queda para siempre en un buzón.
+- **Ni una palabra sobre otras personas.** Quién invita, qué clientes hay,
+  cuánta gente trabaja aquí: nada de eso ayuda a entrar y todo ello viaja por
+  servidores ajenos.
+- **El enlace no se registra en ningún log.** Es una credencial de un solo
+  uso: quien la lea antes que su destinataria entra en su lugar.
+
+### 16.2. El orden, otra vez
+
+Se genera el enlace, **se guarda el vínculo**, y después se manda el correo.
+
+El vínculo va antes del envío a propósito. La cuenta ya existe en el proveedor
+en cuanto se genera el enlace: eso es un hecho, y no guardarlo dejaría una
+cuenta huérfana que impide volver a invitar —el proveedor rechaza el correo
+repetido— sin que la ficha muestre nada. Guardándolo, si el correo no llega esa
+persona **todavía puede entrar** por «he olvidado mi contraseña», que lleva a
+la misma pantalla de elegir clave (§15).
+
+`invitedAt` se deja para **después** del envío: marca que el correo salió, no
+que la cuenta existe. Y si el envío falla, el error lo dice con esas palabras,
+incluida la salida concreta. Callarlo sería peor que el propio fallo: la
+pantalla diría «invitada» y nadie sabría por qué esa persona nunca entra.
+
+Este adaptador **sí propaga el fallo**, al contrario que el de avisos
+(`docs/14-avisos.md`), que se los traga. Un correo de confirmación que no sale
+no puede tumbar una reserva ya pagada; una invitación que no sale tiene que
+enterarse quien creía estar dando acceso. Por eso `EMAIL_PROVIDER` se exporta
+del módulo de avisos y **no** se pasa por `NotificationsService`.
+
+---
+
+## 17. La pantalla del equipo de limpieza
+
+> Etapa 2.11. Cierra el último hueco de la 2.8: esas cuentas entraban
+> correctamente y no veían absolutamente nada.
+
+### 17.1. Un contrato aparte, no una versión recortada
+
+`MyJob` es un contrato propio y **no** `AdminBookingDetail` con campos
+quitados al pintar. Suena más simple reutilizarlo y es justo como se filtran
+los datos: el día que alguien añade un campo al detalle del panel, aparece
+también aquí sin que nadie lo decida.
+
+Y va más allá del contrato: **los importes no se leen siquiera de la base**.
+No se puede filtrar al pintar algo que nunca salió, así que un descuido en la
+plantilla no puede enseñar un precio.
+
+| Ve                                           | No ve                                   |
+| -------------------------------------------- | --------------------------------------- |
+| Hora, duración, tipo de servicio             | Cualquier importe, y el estado del pago |
+| Dirección completa, enlazada al mapa         | El apellido del cliente                 |
+| Nombre de pila del cliente y su **teléfono** | El correo del cliente                   |
+| **Instrucciones de acceso**                  | Nada de otras personas salvo su nombre  |
+| Lo que pidió el cliente                      | Cualquier trabajo que no sea suyo       |
+
+El **teléfono sí** porque quien está en la puerta a las ocho y no le abren
+necesita poder llamar; hacerle pasar por la oficina añade un salto que en una
+empresa pequeña no siempre hay quien atienda. Las **instrucciones de acceso
+también**, porque es exactamente para lo que existen: sin ellas quien llega no
+puede entrar. Las dos cosas, solo en sus propios trabajos.
+
+### 17.2. El filtro va en la consulta
+
+Es la pieza crítica, y la diferencia no es de estilo:
+
+- **En la consulta**, los trabajos ajenos nunca salen de la base de datos. Un
+  fallo en el código de más arriba no puede enseñarlos.
+- **Después**, todos viajan hasta el servidor y basta un `return` mal puesto
+  para que acaben en un navegador. Ese fallo **no se ve probando**: la pantalla
+  se ve igual de bien.
+
+Y el identificador por el que se filtra sale de **la sesión**, nunca de la
+petición. Si viniera en la dirección, cualquiera podría pedir los trabajos de
+otra persona cambiando un número.
+
+Un trabajo ajeno responde **404, no 403**. Con un 403 se aprendería que esa
+reserva existe y simplemente no es suya; probando identificadores se podría ir
+dibujando la agenda de la empresa. Para quien limpia, un trabajo que no tiene
+asignado no existe.
+
+### 17.3. Empezar y terminar, nada más
+
+Marcar «he llegado» y «he terminado» es lo que ocurre en la casa y lo sabe
+quien está allí. **Cancelar y «no estaban» no entran**: son los dos casos que
+el cliente discute después y los que mueven dinero, así que los decide
+coordinación, que es quien responde por ellos. El contrato ni siquiera los
+admite.
+
+No se puede terminar sin haber empezado, porque lo dice la tabla de
+transiciones del contrato —la misma que usa el panel, no una lista escrita
+aparte—. Y no es burocracia: sin pasar por «he llegado» no queda la hora de
+entrada, que es el dato que sostiene cualquier discusión sobre si el equipo
+estuvo allí y cuánto.
+
+La auditoría registra `source: 'my-jobs'`, así que se distingue lo que marcó
+limpieza desde su móvil de lo que marcó coordinación desde el panel. Ante un
+«esto se cerró sin hacerse», es la primera pregunta.
+
+### 17.4. Esta pantalla se mira de pie, en la calle, con una mano
+
+No es una frase bonita: manda sobre casi todas las decisiones de forma.
+
+- Una tarjeta por trabajo, **en una sola columna**. A 390 px una tabla obliga a
+  desplazar en horizontal, y eso con guantes puestos no se hace.
+- La dirección es lo más grande después de la hora y es un **enlace al mapa**.
+  Evita teclear una calle conduciendo.
+- Los botones son **grandes y van al final** de la tarjeta, donde llega el
+  pulgar. Y **se pinta uno solo cada vez**: ofrecer los dos invita a pulsar «he
+  terminado» nada más llegar, que es como se pierde la hora de entrada.
+- Las instrucciones de acceso van destacadas **con su aviso**: es el único dato
+  de esta pantalla que no debe leerse en alto.
+
+**Para limpieza esto es todo el panel**, no una pestaña escondida: es la única
+pantalla que su puesto puede abrir, así que se pinta directamente al entrar.
+
+El endpoint, en cambio, **admite a los tres roles**, y parece contradictorio en
+una pantalla «del equipo de limpieza». Es lo correcto: en una empresa pequeña
+quien coordina también limpia, y desde la etapa 2.7 se le puede asignar. Si
+fuera solo para `CLEANER`, esa persona se vería asignada en la agenda y no
+encontraría su propio trabajo en ningún sitio. Y no abre nada de más: quien no
+tenga asignaciones ve una lista vacía.
+
+### 17.5. Un fallo que solo se ve mirando la pantalla
+
+Los trabajos se agrupaban en «Hoy» y «Próximos» usando la fecha **del
+navegador**, mientras que la hora de cada tarjeta se pinta en la zona de la
+empresa. Un trabajo de las nueve de la noche en Georgia salía como «mié 23» y
+caía bajo «Próximos», porque en horario universal ya era día 24.
+
+El encabezado contradiciendo a la tarjeta es de los fallos que nadie sabe
+explicar. Ya existía `todayInTimezone` con el razonamiento escrito al lado; lo
+que faltaba era su pareja para una fecha concreta.
+
+### 17.6. Qué está probado
+
+**Contra PostgreSQL real** (22 pruebas): Cleo ve el suyo y **no** el de Darío;
+las canceladas no aparecen aunque estén asignadas; quien no tiene nada ve una
+lista vacía y no un error; **no aparece ningún importe por ningún lado**; el
+cliente sale por su nombre de pila, sin apellido ni correo; el teléfono y las
+instrucciones de acceso sí llegan; se marca llegada y fin, y quedan las horas;
+un trabajo ajeno responde 404 y **sigue intacto** después del intento; cancelar
+y «no estaban» se rechazan; terminar sin empezar se rechaza; y la auditoría
+distingue que lo marcó limpieza.
+
+**En navegador real, a 390 px**: limpieza entra y ve sus trabajos en vez de la
+agenda; el encabezado dice **HOY** y coincide con la fecha de la tarjeta; no
+hay ni un `$` en toda la pantalla; están el código de la puerta con su aviso,
+la nota del cliente, el teléfono y quién más va; la dirección enlaza al mapa;
+se marca llegada y fin y los botones se turnan; no hay desbordamiento
+horizontal; y todo igual en español. Coordinación sigue viendo su agenda y
+tiene además el botón de «Mis trabajos».

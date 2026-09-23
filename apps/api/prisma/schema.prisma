@@ -518,6 +518,15 @@ model Staff {
   /// con su correo no le abre ninguna puerta por si solo.
   authUserId String? @unique
 
+  /// Idioma en el que se le escribe.
+  ///
+  /// Lo tienen los clientes desde el principio y al personal le faltaba. El
+  /// correo de invitacion es el PRIMER contacto con alguien que acaba de
+  /// entrar en la empresa: mandarselo en un idioma que no lee es la peor
+  /// primera impresion posible, y en una empresa de limpieza en Georgia no
+  /// es un caso raro.
+  locale Locale @default(en)
+
   /// Cuando se le envio la invitacion al panel, si se le envio.
   ///
   /// Se guarda para poder decir en pantalla "invitada el 3 de marzo, todavia

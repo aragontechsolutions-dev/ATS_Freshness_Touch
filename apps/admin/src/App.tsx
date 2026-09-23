@@ -7,6 +7,7 @@ import { Agenda } from './pages/Agenda';
 import { BookingDetailPage } from './pages/BookingDetail';
 import { ForgotPassword } from './pages/ForgotPassword';
 import { Login } from './pages/Login';
+import { MyJobs } from './pages/MyJobs';
 import { SetPassword } from './pages/SetPassword';
 import { SettingsPage } from './pages/Settings';
 import { persistLocale } from './i18n';
@@ -25,6 +26,7 @@ export default function App() {
   const { state, signOut, refresh } = useStaffSession();
   const [openBookingId, setOpenBookingId] = useState<string | null>(null);
   const [enAjustes, setEnAjustes] = useState(false);
+  const [enMisTrabajos, setEnMisTrabajos] = useState(false);
   const [pidiendoEnlace, setPidiendoEnlace] = useState(false);
 
   /*
@@ -137,6 +139,17 @@ export default function App() {
    */
   const puedeConfigurar = state.staff.role === 'ADMIN';
 
+  /*
+   * PARA LIMPIEZA, "MIS TRABAJOS" ES TODO EL PANEL.
+   *
+   * No es una pestana mas escondida entre otras: es la unica pantalla que su
+   * puesto puede abrir, asi que se pinta directamente. Coordinacion y
+   * administracion la tienen tambien —en una empresa pequena quien coordina
+   * tambien limpia, y desde la etapa anterior se le puede asignar— pero para
+   * ellas convive con la agenda.
+   */
+  const soloMisTrabajos = state.staff.role === 'CLEANER';
+
   return (
     <div className="min-h-dvh">
       <header className="border-b border-slate-200 bg-white dark:border-night-600 dark:bg-night-800">
@@ -149,6 +162,21 @@ export default function App() {
           </div>
 
           <div className="flex shrink-0 items-center gap-2">
+            {!soloMisTrabajos && (
+              <button
+                type="button"
+                className="ft-btn-ghost"
+                aria-pressed={enMisTrabajos}
+                onClick={() => {
+                  setOpenBookingId(null);
+                  setEnAjustes(false);
+                  setEnMisTrabajos((valor) => !valor);
+                }}
+              >
+                {enMisTrabajos ? t('admin.back') : t('admin.myJobs.title')}
+              </button>
+            )}
+
             {puedeConfigurar && (
               <button
                 type="button"
@@ -159,6 +187,7 @@ export default function App() {
                   // despues a una reserva que ya no se estaba mirando
                   // desconcierta mas de lo que ahorra.
                   setOpenBookingId(null);
+                  setEnMisTrabajos(false);
                   setEnAjustes((valor) => !valor);
                 }}
               >
@@ -177,7 +206,9 @@ export default function App() {
       </header>
 
       <main className="mx-auto max-w-5xl px-4 py-6">
-        {enAjustes && puedeConfigurar ? (
+        {soloMisTrabajos || enMisTrabajos ? (
+          <MyJobs locale={locale} onSessionLost={alPerderSesion} />
+        ) : enAjustes && puedeConfigurar ? (
           <SettingsPage staff={state.staff} locale={locale} onSessionLost={alPerderSesion} />
         ) : openBookingId ? (
           <BookingDetailPage

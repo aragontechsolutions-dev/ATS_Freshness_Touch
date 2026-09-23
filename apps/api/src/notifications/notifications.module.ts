@@ -85,6 +85,20 @@ import { NoopTelegramProvider } from './providers/noop-telegram.provider';
     NotificationsService,
     ReminderSweepService,
   ],
-  exports: [NotificationsService, NotificationSettingsService, ReminderSweepService],
+  /*
+   * EMAIL_PROVIDER se exporta porque la invitacion al panel manda su propio
+   * correo desde el modulo de administracion (ver `staff-admin.service.ts`).
+   *
+   * No pasa por `NotificationsService` a proposito: aquel NUNCA lanza y se
+   * traga los fallos, porque un aviso que no sale no puede tumbar una reserva
+   * ya pagada. La invitacion es lo contrario: si el correo no sale, quien
+   * creia estar dando acceso TIENE que enterarse.
+   */
+  exports: [
+    NotificationsService,
+    NotificationSettingsService,
+    ReminderSweepService,
+    EMAIL_PROVIDER,
+  ],
 })
 export class NotificationsModule {}

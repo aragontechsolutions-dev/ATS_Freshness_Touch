@@ -111,6 +111,7 @@ describe('despliegue sin invitaciones configuradas', () => {
         email: 'cleo@example.com',
         phone: null,
         role: 'CLEANER',
+        locale: 'en',
       });
 
     expect(respuesta.status).toBe(201);
