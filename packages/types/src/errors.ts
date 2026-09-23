@@ -44,6 +44,24 @@ export const API_ERROR_CODES = {
   INVALID_TRANSITION: 'INVALID_TRANSITION',
   /** Esa persona ya tiene otro trabajo que se solapa con este. */
   STAFF_DOUBLE_BOOKED: 'STAFF_DOUBLE_BOOKED',
+  /** Ya hay personal con ese correo. */
+  STAFF_EMAIL_TAKEN: 'STAFF_EMAIL_TAKEN',
+  /**
+   * El cambio dejaria el sistema sin ningun administrador activo.
+   *
+   * Es la unica puerta que no se puede cerrar desde dentro: sin
+   * administradores nadie puede volver a dar de alta a uno, y la unica salida
+   * seria entrar a la base de datos a mano.
+   */
+  STAFF_LAST_ADMIN: 'STAFF_LAST_ADMIN',
+  /** Nadie puede cambiarse a si mismo el puesto ni darse de baja. */
+  STAFF_SELF_CHANGE: 'STAFF_SELF_CHANGE',
+  /** Esa persona ya tiene cuenta vinculada: invitarla otra vez crearia una segunda. */
+  STAFF_ALREADY_INVITED: 'STAFF_ALREADY_INVITED',
+  /** Este despliegue no tiene configurado el envio de invitaciones. */
+  STAFF_INVITE_UNAVAILABLE: 'STAFF_INVITE_UNAVAILABLE',
+  /** El proveedor de identidad rechazo la invitacion. */
+  STAFF_INVITE_FAILED: 'STAFF_INVITE_FAILED',
   /** La retencion no esta en un estado sobre el que se pueda actuar. */
   PAYMENT_NOT_CAPTURABLE: 'PAYMENT_NOT_CAPTURABLE',
   PAYMENT_UNAVAILABLE: 'PAYMENT_UNAVAILABLE',

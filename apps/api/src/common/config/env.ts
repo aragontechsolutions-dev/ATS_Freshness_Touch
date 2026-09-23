@@ -140,6 +140,28 @@ export const EnvSchema = z
      * asimetricas y no lo necesitan.
      */
     SUPABASE_JWT_SECRET: z.string().min(1).optional(),
+    /**
+     * Clave de servicio del proyecto. Solo se usa para INVITAR personal.
+     *
+     * ES LA CREDENCIAL MAS PODEROSA DEL SISTEMA: salta todas las reglas de
+     * seguridad de la base de datos. Si se filtra, se filtra todo.
+     *
+     * Por eso es OPCIONAL: sin ella la aplicacion arranca igual y lo unico
+     * que no se puede hacer es invitar. Un despliegue que no vaya a dar de
+     * alta personal no tiene por que cargar con esta clave, y la regla
+     * general es que una credencial que no hace falta no se guarda.
+     *
+     * Nunca sale al navegador —el panel llama a esta API y esta API llama a
+     * Supabase— y nunca se escribe en un registro.
+     */
+    SUPABASE_SERVICE_ROLE_KEY: z.string().min(1).optional(),
+    /**
+     * A donde lleva el enlace de la invitacion: la direccion del panel.
+     *
+     * Supabase exige que este en su lista de direcciones permitidas. Si se
+     * deja vacia usa la del proyecto.
+     */
+    SUPABASE_INVITE_REDIRECT_URL: z.string().url().optional(),
     AUTH_TIMEOUT_MS: z.coerce.number().int().min(500).default(5000),
     /** Secreto del proveedor local. Solo desarrollo y pruebas. */
     AUTH_LOCAL_SECRET: z.string().min(1).default('secreto-de-desarrollo-no-usar-en-produccion'),
@@ -182,6 +204,15 @@ export const EnvSchema = z
   })
   .refine((env) => env.AUTH_PROVIDER !== 'supabase' || Boolean(env.SUPABASE_URL), {
     message: 'SUPABASE_URL es obligatoria cuando AUTH_PROVIDER=supabase',
+    path: ['SUPABASE_URL'],
+  })
+  /*
+   * Una clave de servicio sin direccion de proyecto no sirve para nada: no
+   * hay a quien llamar. Es senal de una configuracion a medias, y prefiero
+   * que no arranque a que el boton de invitar falle el dia que se use.
+   */
+  .refine((env) => !env.SUPABASE_SERVICE_ROLE_KEY || Boolean(env.SUPABASE_URL), {
+    message: 'SUPABASE_URL es obligatoria cuando se configura SUPABASE_SERVICE_ROLE_KEY',
     path: ['SUPABASE_URL'],
   })
   /*

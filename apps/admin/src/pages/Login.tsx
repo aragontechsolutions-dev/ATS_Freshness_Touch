@@ -6,6 +6,8 @@ import type { SignOutReason } from '../hooks/useStaffSession';
 interface LoginProps {
   /** Por qué se volvió aquí, si se venía de una sesión cerrada. */
   reason: SignOutReason | null;
+  /** Lleva a pedir un enlace para elegir contraseña. */
+  onForgot: () => void;
   onSignedIn: () => void;
 }
 
@@ -23,7 +25,7 @@ interface LoginProps {
  *    cuenta que se crea sola nunca llega a tener ficha de personal, así que
  *    solo serviría para llenar la base de usuarios inútiles.
  */
-export function Login({ reason, onSignedIn }: LoginProps) {
+export function Login({ reason, onForgot, onSignedIn }: LoginProps) {
   const { t } = useTranslation();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -128,6 +130,19 @@ export function Login({ reason, onSignedIn }: LoginProps) {
             disabled={working || !supabaseIsConfigured}
           >
             {working ? t('admin.signingIn') : t('admin.signIn')}
+          </button>
+
+          {/*
+            Va DENTRO del formulario y debajo del boton, donde se mira cuando
+            algo no funciona. Es `type="button"` para que no envie el
+            formulario al pulsarlo.
+          */}
+          <button
+            type="button"
+            className="w-full text-sm font-semibold text-brand-700 underline dark:text-sun-300"
+            onClick={onForgot}
+          >
+            {t('admin.passwordReset.forgot')}
           </button>
         </form>
       </div>

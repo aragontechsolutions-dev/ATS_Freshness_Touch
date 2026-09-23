@@ -807,3 +807,347 @@ sembrados a propósito:
 Y en la base de datos, tras el recorrido: **un** registro `booking.team_changed`
 con `before: []`, el `after` correcto y la IP; el intento rechazado no dejó
 rastro.
+
+---
+
+## 14. Dar de alta personal e invitarlo al panel
+
+> Etapa 2.8. Hasta aquí, la única forma de que alguien existiera en el sistema
+> era meterlo a mano en la base de datos. La etapa 2.7 dejó asignar equipos,
+> pero no había a quién.
+
+### 14.1. Existir y poder entrar son dos cosas distintas
+
+Es la distinción que sostiene toda esta etapa, igual que «identidad y
+autoridad» (§1) sostiene el acceso:
+
+|                                | Qué hace falta                              | Quién lo concede      |
+| ------------------------------ | ------------------------------------------- | --------------------- |
+| **Recibir trabajos asignados** | una ficha en `staff`                        | el alta               |
+| **Entrar al panel**            | además, una cuenta vinculada (`authUserId`) | la invitación, aparte |
+
+**`authUserId` nulo es un estado legítimo, no un dato a medias.** Una
+limpiadora necesita existir para que se le asignen trabajos, no para iniciar
+sesión. Hoy, de hecho, no tiene ninguna pantalla que mirar.
+
+Y la sesión se resuelve **por ese identificador, nunca por el correo**. Dar de
+alta a alguien con su correo **no le abre ninguna puerta por sí solo**. Merece
+la pena tenerlo claro también en sentido contrario: cambiarle el correo a
+alguien que ya entra **no le revoca nada**, porque no es su llave. Para eso
+está darle de baja.
+
+### 14.2. Alta e invitación son dos botones, y el segundo pregunta
+
+Crear una ficha es decir «esta persona trabaja aquí». Invitarla es decir
+«esta persona puede ver los datos de todos los clientes». Son decisiones de
+peso muy distinto.
+
+Si fueran el mismo formulario, la segunda se tomaría **por inercia de estar
+rellenando campos**, que es exactamente como se reparten accesos sin querer.
+Por eso el alta no pide nada relacionado con credenciales —no hay contraseña
+que escribir en ninguna pantalla— e invitar es una acción aparte que además
+**pide confirmación**, porque no tiene deshacer: la cuenta queda creada en el
+proveedor aunque luego se dé de baja la ficha.
+
+El botón de invitar solo se pinta donde tiene sentido: alguien **activo**, **sin
+cuenta todavía**, y en un despliegue que **pueda** mandar invitaciones.
+
+### 14.3. Por qué invitar y no vincular por correo
+
+Se valoraron tres caminos para conceder acceso:
+
+| Camino                               | Coste                                       | Riesgo                                                                                 |
+| ------------------------------------ | ------------------------------------------- | -------------------------------------------------------------------------------------- |
+| **Invitar desde el panel** ✅        | guardar la clave de servicio en el servidor | esa clave salta todas las reglas de la base; si se filtra, se filtra todo              |
+| Vincular por correo al primer acceso | ninguno                                     | depende de dos ajustes **fuera del código** (confirmación de correo, registro cerrado) |
+| Pegar el identificador a mano        | ninguno                                     | obliga a entrar en Supabase cada vez, y es justo la dependencia que el panel elimina   |
+
+Se eligió **invitar**. El motivo de descartar la vinculación por correo no es
+que sea insegura hoy, sino que **su seguridad vive fuera del repositorio**:
+basta con que alguien active el registro público en el proyecto para que
+cualquiera pueda reclamar la ficha de un empleado. Invitando, la cuenta la
+crea la API y no hay ningún correo en el que confiar.
+
+La clave de servicio vive **solo** en el entorno del servidor, como la de
+Stripe (`docs/08-variables-de-entorno.md`), nunca llega al navegador y **no se
+escribe jamás en un registro**, ni siquiera recortada.
+
+### 14.4. Qué pasa sin la clave configurada
+
+La aplicación **arranca igual**. La clave es opcional a propósito: el alta de
+personal, las asignaciones y todo lo demás funcionan, y lo único que no se
+puede es invitar. El directorio devuelve `canInvite: false`, el panel esconde
+el botón y explica por qué, y llamar al endpoint directamente responde `503`
+con un motivo claro en vez de un error del proveedor.
+
+**No existe un «proveedor simulado de invitaciones»**, y es deliberado: uno
+así podría quedarse encendido en producción y vincularía fichas a cuentas
+inventadas que _parecen_ tener acceso y no lo tienen. Las pruebas apuntan
+`SUPABASE_URL` a un servidor de mentira y recorren el mismo código que
+producción.
+
+### 14.5. El orden importa: primero invitar, después guardar
+
+Se manda la invitación y **solo si sale bien** se guarda el vínculo. Al revés,
+un fallo del proveedor dejaría una ficha marcada como «con acceso» sin cuenta
+detrás, y nadie se enteraría hasta que esa persona intentara entrar, que suele
+ser el peor día posible.
+
+Por el mismo motivo, este adaptador **sí propaga el fallo**, al contrario que
+el de correo (`docs/14-avisos.md`), que se los traga: un correo que no sale no
+puede tumbar una reserva ya pagada, pero una invitación que no sale tiene que
+enterarse quien creía estar dando acceso.
+
+### 14.6. No quedarse sin administración
+
+Todas las demás puertas de este panel se pueden volver a abrir desde dentro:
+si cancelas una reserva por error la vuelves a crear, si apagas un aviso lo
+enciendes. **Quedarse sin ningún administrador activo no se deshace desde el
+panel**, porque hace falta ser administrador para crear otro, y la única
+salida sería entrar a la base de datos a mano.
+
+Se protege con **tres capas**, y conviene saber cuál salta:
+
+1. **Nadie se cambia a sí mismo el puesto ni se da de baja.** Esto solo ya
+   basta para cualquier petición suelta: quien pide el cambio es
+   administración activa y sigue siéndolo después. (Sí puede corregir su
+   propio nombre, teléfono o correo: la guardia cierra lo que te deja fuera,
+   no la edición de tu ficha.)
+2. **El recuento posterior a la escritura**, con las filas de administración
+   bloqueadas, cubre la carrera: dos administradoras degradándose a la vez.
+   Se cuenta **después** de escribir y no antes, porque contar antes obliga a
+   simular mentalmente el efecto del cambio, y esa simulación es justo donde
+   se cuelan los casos no previstos.
+3. **La comprobación de rol relee la ficha en cada petición**, así que quien
+   acaba de dejar de ser administradora ni siquiera llega al servicio.
+
+La segunda es **defensa en profundidad**: con la primera y la tercera en pie
+no se ha conseguido provocar que salte, y la prueba de concurrencia no fija
+cuál de las tres responde —eso sería fijar una carrera— sino la propiedad que
+importa: **una de las dos peticiones pasa, la otra no, y queda alguien que
+pueda administrar**. Se mantiene porque las tres protegen cosas distintas y la
+primera es la candidata evidente a relajarse el día que alguien quiera «ceder
+la administración a otra persona».
+
+### 14.7. Dar de baja, no borrar
+
+`isActive: false` conserva la ficha y su historial. Borrar dejaría trabajos
+pasados sin responsable y el registro de auditoría contaría una historia
+incompleta.
+
+La baja **cierra el acceso en la petición siguiente**, sin esperar a que
+caduque ningún token, porque la sesión comprueba `isActive` cada vez (§1). Y
+esa persona desaparece del selector de asignación, aunque sus asignaciones
+antiguas se conservan (§13.5).
+
+### 14.8. Privacidad: tres pantallas, tres niveles
+
+| Pantalla                       | Quién              | Qué ve                                     |
+| ------------------------------ | ------------------ | ------------------------------------------ |
+| Selector de asignación (§13.5) | ADMIN + DISPATCHER | nombre, apellido, puesto                   |
+| Directorio de personal         | **solo ADMIN**     | además correo, teléfono y estado de acceso |
+| —                              | nadie              | el identificador de la cuenta              |
+
+Que el directorio sea **solo de administración incluso para leer** es menos
+evidente que lo demás, porque coordinación ya ve los nombres de la plantilla.
+La diferencia es **quién tiene acceso al panel**: eso es un mapa de qué
+cuentas existen, que es por donde empieza quien quiera colarse.
+
+El **identificador de la cuenta no sale nunca**. Se traduce a un estado —«sin
+acceso», «invitada», «con acceso»— antes de responder: al panel no le sirve
+para pintar nada y en cambio ayuda a suplantar. Tampoco se guarda en el
+registro de auditoría, que registra a quién se invitó y con qué puesto.
+
+### 14.9. Un mensaje que mentía
+
+Al probar esto en un navegador apareció un fallo anterior. Una cuenta de
+limpieza **entra correctamente** —es personal activo— pero cada pantalla del
+panel le responde `403` porque ninguna es para su puesto. El panel la
+expulsaba diciendo **«tu sesión ha terminado, vuelve a iniciar sesión»**.
+
+Volver a entrar no arregla nada: la deja reintentando ante una puerta que no
+se le va a abrir. El texto correcto ya existía sin usar
+(`admin.signedOut.noAccess`), y el enganche de sesión ya distinguía bien los
+dos casos; lo que estaba fijo en «caducada» era el contenedor del panel.
+
+Ahora el motivo lo decide quien recibe el error: `401` es «tu sesión ha
+caducado» y `403` es «tu cuenta no puede ver esto». Es un arreglo del mensaje,
+**no** de la causa: el personal de limpieza seguirá sin tener a dónde ir hasta
+que exista su vista propia.
+
+### 14.10. Qué está probado
+
+**Contra PostgreSQL real** (37 pruebas en dos ficheros): coordinación no ve el
+directorio ni puede dar de alta o invitar; el alta **nace sin acceso**; el
+correo se normaliza y el repetido se rechaza; un alta que traiga
+`authUserId` se rechaza; nadie se cambia su propio puesto ni se da de baja,
+pero sí corrige su nombre; dos administradoras degradándose a la vez dejan
+siempre una en pie; un rechazo no deja el cambio a medias; la baja cierra el
+acceso en la petición siguiente; la invitación manda la clave en las dos
+cabeceras y guarda el identificador; no se invita dos veces ni a quien está de
+baja; **si el proveedor rechaza, la ficha se queda sin acceso**; la auditoría
+no guarda el identificador de la cuenta; y el directorio nunca lo devuelve.
+
+**Sin la clave configurada** (fichero aparte, porque la configuración se
+congela al importar): la aplicación arranca, el directorio avisa con
+`canInvite: false`, invitar responde `503` con motivo claro, y **dar de alta
+sigue funcionando**.
+
+**Del contrato** (19 pruebas): normalización de correo y nombre, teléfono en
+formato internacional, y —lo que importa— que por el alta y la edición **no
+pueda colarse `password`, `authUserId`, `isActive` ni `invitedAt`**.
+
+**En navegador real**, con PostgreSQL y un servidor que imita la API de
+administración de Supabase: se da de alta tecleando `DARIO@Example.COM` y
+`(404) 555-0199`, y se guarda normalizado; la ficha nace diciendo «sin
+acceso»; el correo repetido se rechaza con su mensaje; al invitar pasa a
+«Invitada el …» y el botón desaparece; en la propia ficha el puesto y la
+casilla de activa están bloqueados; dar de baja a coordinación la mueve a «De
+baja» y **esa cuenta deja de entrar en el acto**, viendo ahora el mensaje
+correcto; y todo en español a 390 px sin desbordamiento horizontal.
+
+En la base, tras el recorrido: `staff.created`, `staff.invited` y
+`staff.updated` con el antes y el después, y **ningún identificador de cuenta
+en el registro**.
+
+---
+
+## 15. Elegir contraseña: invitación y recuperación
+
+> Etapa 2.9. Cierra un hueco que dejó la anterior: se podía invitar a alguien,
+> pero el enlace de la invitación no llevaba a ninguna parte, y quien perdía
+> ese correo se quedaba fuera para siempre.
+
+### 15.1. El hueco que dejó la etapa 2.8
+
+El cliente del panel tiene **`detectSessionInUrl: false`**, una decisión de
+seguridad tomada en la etapa 2.3 con este razonamiento: «no hay inicio de
+sesión por enlace, así que desactivarlo evita que un enlace manipulado con
+parámetros de sesión tenga ningún efecto».
+
+Era correcto entonces. Dejó de serlo al añadir las invitaciones, porque **una
+invitación es exactamente eso: un inicio de sesión por enlace**. Con la opción
+apagada, quien recibía la invitación pulsaba el enlace, aterrizaba en el panel
+y **no pasaba nada**.
+
+### 15.2. Se lee a mano, y solo en una pantalla
+
+La salida fácil era encender `detectSessionInUrl`. No se ha hecho, porque
+entonces **cualquier pantalla del panel aceptaría una sesión metida en la
+dirección**: bastaría con mandarle a alguien un enlace a la agenda con un
+token pegado para que se quedara trabajando dentro de la sesión de otra
+persona sin notarlo.
+
+En su lugar, `lib/password-link.ts` lee el enlace **a mano**, y la sesión solo
+se abre en **un sitio y tras una decisión explícita**: la pantalla de elegir
+contraseña. La puerta es estrecha a propósito:
+
+- solo `type=invite` y `type=recovery`; `magiclink`, `signup` y cualquier otro
+  se ignoran;
+- hacen falta **los dos** tokens, el de acceso y el de renovación;
+- y hay una prueba por cada tipo rechazado, porque esa lista es justo lo que
+  alguien ampliaría sin pensarlo.
+
+En el resto del panel, un enlace manipulado **no hace absolutamente nada**, y
+hay una prueba en navegador que lo comprueba: se abre la agenda con un token
+pegado y sigue apareciendo la pantalla de acceso.
+
+### 15.3. Dos caminos, y no son iguales
+
+|                  | Quién lo inicia                       | Cómo vuelve                   | Por qué                                                                  |
+| ---------------- | ------------------------------------- | ----------------------------- | ------------------------------------------------------------------------ |
+| **Invitación**   | el servidor, con la clave de servicio | tokens en el fragmento        | el navegador de quien la recibe no participó, así que no hay verificador |
+| **Recuperación** | la propia persona                     | un `code` que hay que canjear | su navegador sí guardó el verificador                                    |
+
+La recuperación es el camino bueno: **los tokens no viajan nunca en la
+dirección**, así que no quedan en el historial. La invitación no puede usarlo
+por construcción.
+
+De ahí un caso que merece su propio mensaje: si alguien pide el enlace en el
+ordenador y lo abre **en el móvil**, el verificador no está y el canje falla.
+Decirle «caducado» lo mandaría a pedir otro enlace para repetir el mismo
+error, así que se le dice que lo abra en el mismo navegador desde el que lo
+pidió.
+
+Y en cuanto se lee el enlace, **lo primero que se hace es borrarlo de la barra
+de direcciones**: mientras siga ahí, el token está en el historial del
+navegador y en cualquier captura de pantalla.
+
+### 15.4. El mismo mensaje exista o no la cuenta
+
+Pedir el enlace responde **siempre lo mismo**, palabra por palabra, y sin
+mirar lo que contesta el proveedor.
+
+Decir «ese correo no está registrado» convertiría esa pantalla en una forma de
+averiguar quién trabaja aquí, probando direcciones una a una. En una empresa
+pequeña eso no es teórico: con cuatro apellidos se saca la plantilla entera, y
+con la plantilla se sabe a quién suplantar. Es la misma regla que el mensaje
+único de la pantalla de acceso (§10).
+
+Tampoco se distingue un fallo del proveedor. Es tentador («ha fallado el
+envío, reinténtalo»), pero el proveedor limita por dirección: un error
+distinto para un correo que existe y otro para uno que no volvería a filtrar
+lo mismo por la puerta de atrás. Hay una prueba en navegador que compara las
+dos respuestas carácter a carácter.
+
+### 15.5. La regla de la contraseña: largo y nada más
+
+**Doce caracteres, sin exigir mayúsculas, números ni símbolos.**
+
+Esas reglas producen `Password1!` una y otra vez, que es corta y adivinable, y
+empujan a apuntarla en un papel pegado al monitor. Doce caracteres
+cualesquiera resisten mucho más que ocho con adornos, y una frase que se
+recuerda es mejor contraseña que una palabra con signos.
+
+Quien manda de verdad es el proveedor de identidad, que aplica su propio
+mínimo en el servidor. Esto es una **guardia de interfaz**: evita que alguien
+elija algo débil y se entere después, con un error del proveedor en su idioma.
+No sustituye a la comprobación del servidor, la adelanta.
+
+Se pide **dos veces** porque el campo va oculto: una errata al elegirla no se
+ve, y se descubriría al siguiente intento de entrar, cuando ya no hay forma de
+saber qué se tecleó. También hay un botón de ver la contraseña, que es el
+remedio al mismo problema.
+
+### 15.6. Dos detalles pequeños que evitan llamadas
+
+- **Se confirma antes de seguir.** Al guardar, la pantalla dice «contraseña
+  guardada» y espera. Si esta cuenta resultara no ser personal del panel —le
+  puede pasar a quien fue dado de baja después de pedir el enlace— lo
+  siguiente que vería sería la pantalla de acceso diciendo que no tiene
+  permiso, y parecería que la contraseña tampoco se guardó. Se guardó.
+- **Se escucha el cambio de fragmento.** Si el panel ya está abierto en la
+  pestaña donde se pulsa el enlace, el navegador **no recarga**: la dirección
+  pasa de `/` a `/#access_token=…`, que para él es la misma página con otro
+  ancla. Sin esto el enlace no haría nada. Apareció probando en navegador, no
+  razonando.
+
+### 15.7. Qué está probado
+
+**Del contrato** (11 pruebas): el mínimo de doce, que se acepta una de solo
+minúsculas si es larga, el tope alto que evita hacer calcular el hash de
+megabytes, las dos vueltas y que se avisa de la longitud antes que de la
+coincidencia.
+
+**De la lectura del enlace** (15 pruebas, sin navegador porque es una función
+pura sobre una cadena): invitación, recuperación por código, enlace caducado,
+que el error manda sobre cualquier token que venga en el mismo enlace, y
+—**las que importan**— que se ignoran `magiclink`, `signup`, `email_change`,
+un tipo vacío y un fragmento al que le falta el token de renovación.
+
+**En navegador real**, contra un servidor que imita al proveedor: el acceso
+ofrece recuperar; la respuesta es **idéntica carácter a carácter** para un
+correo que existe y para uno que no; un enlace de invitación abre la pantalla
+y **la dirección queda limpia**; una contraseña corta y dos que no coinciden
+se rechazan con su mensaje; el botón de ver funciona; al guardar se confirma;
+un enlace caducado explica qué hacer; **un token pegado a la agenda no abre
+sesión**; y todo en español, en un navegador en español, a 390 px sin
+desbordamiento.
+
+### 15.8. Lo que sigue sin existir
+
+- **No hay segundo factor.** Para un panel que ve los datos de todos los
+  clientes, es la siguiente pieza de seguridad que conviene.
+- **No hay selector de idioma en la pantalla de acceso.** El idioma sale del
+  navegador, que acierta casi siempre, pero quien tenga el navegador en inglés
+  y prefiera español no puede cambiarlo hasta entrar.

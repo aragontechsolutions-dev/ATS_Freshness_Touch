@@ -6,7 +6,7 @@ import type {
   BookingStatus,
   Locale,
 } from '@freshness/types';
-import { ApiClientError, fetchBookings, isSessionError } from '../lib/api';
+import { ApiClientError, fetchBookings, isSessionError, sessionLostReason } from '../lib/api';
 import { StatusChip } from '../components/StatusChip';
 import { formatCents, formatDateTime, todayInTimezone } from '../lib/format';
 
@@ -24,7 +24,7 @@ const ESTADOS: BookingStatus[] = [
 interface AgendaProps {
   locale: Locale;
   onOpenBooking: (bookingId: string) => void;
-  onSessionLost: () => void;
+  onSessionLost: (reason?: 'expired' | 'noAccess') => void;
 }
 
 /**
@@ -63,7 +63,7 @@ export function Agenda({ locale, onOpenBooking, onSessionLost }: AgendaProps) {
       setItems(respuesta.items);
     } catch (error) {
       if (isSessionError(error)) {
-        onSessionLost();
+        onSessionLost(sessionLostReason(error));
         return;
       }
       setErrorKey(error instanceof ApiClientError ? error.messageKey : 'admin.errorGeneric');

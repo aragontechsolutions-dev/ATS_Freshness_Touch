@@ -10,4 +10,6 @@ export * from './admin';
 export * from './business-settings';
 export * from './notifications';
 export * from './assignments';
+export * from './staff';
+export * from './panel-password';
 export * from './errors';

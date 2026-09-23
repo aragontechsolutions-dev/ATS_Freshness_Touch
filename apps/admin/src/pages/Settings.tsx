@@ -7,16 +7,23 @@ import {
   formatPhone,
   normalizePhoneInput,
   type AdminBusinessSettings,
+  type AuthenticatedStaff,
   type Locale,
   type Weekday,
 } from '@freshness/types';
 import { ApiClientError, fetchSettings, saveSettings } from '../lib/api';
 import { NotificationSettingsForm } from '../components/NotificationSettingsForm';
+import { StaffDirectory } from '../components/StaffDirectory';
 import { formatTimestamp } from '../lib/format';
 
 interface SettingsPageProps {
   locale: Locale;
   onSessionLost: () => void;
+}
+
+interface SettingsShellProps extends SettingsPageProps {
+  /** Hace falta para saber cual de las fichas es la de quien esta mirando. */
+  staff: AuthenticatedStaff;
 }
 
 /**
@@ -38,7 +45,7 @@ interface SettingsPageProps {
  *      numero inventado de relleno, que es peor: un cliente lo marca y
  *      termina llamando a un desconocido.
  */
-type Seccion = 'business' | 'notifications';
+type Seccion = 'business' | 'notifications' | 'staff';
 
 /**
  * Dos bloques que se guardan por separado.
@@ -48,7 +55,7 @@ type Seccion = 'business' | 'notifications';
  * entender que todo se escribe junto, y al fallar una parte quedaria la duda
  * de que se guardo.
  */
-export function SettingsPage({ locale, onSessionLost }: SettingsPageProps) {
+export function SettingsPage({ staff, locale, onSessionLost }: SettingsShellProps) {
   const [seccion, setSeccion] = useState<Seccion>('business');
 
   return (
@@ -60,12 +67,17 @@ export function SettingsPage({ locale, onSessionLost }: SettingsPageProps) {
         <Pestana activa={seccion === 'notifications'} onClick={() => setSeccion('notifications')}>
           <TituloAvisos />
         </Pestana>
+        <Pestana activa={seccion === 'staff'} onClick={() => setSeccion('staff')}>
+          <TituloPersonal />
+        </Pestana>
       </nav>
 
       {seccion === 'business' ? (
         <BusinessSettingsForm locale={locale} onSessionLost={onSessionLost} />
-      ) : (
+      ) : seccion === 'notifications' ? (
         <NotificationSettingsForm onSessionLost={onSessionLost} />
+      ) : (
+        <StaffDirectory staff={staff} locale={locale} onSessionLost={onSessionLost} />
       )}
     </div>
   );
@@ -79,6 +91,11 @@ function TituloNegocio() {
 function TituloAvisos() {
   const { t } = useTranslation();
   return <>{t('admin.notifications.title')}</>;
+}
+
+function TituloPersonal() {
+  const { t } = useTranslation();
+  return <>{t('admin.staff.title')}</>;
 }
 
 function Pestana({
