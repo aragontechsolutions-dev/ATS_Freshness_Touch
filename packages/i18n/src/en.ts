@@ -327,10 +327,61 @@ export const en = {
         'The email API key and the Telegram bot token are set on the server, not here. Credentials stored in the database end up in every backup, so they stay in the server environment alongside the payment keys.',
     },
 
+    /* --------------------------- Personal --------------------------- */
+    staff: {
+      title: 'Staff',
+      intro:
+        'Who works here. Adding someone lets you assign them jobs; panel access is separate and granted with an invitation.',
+      add: 'Add someone',
+      edit: 'Edit',
+      save: 'Save',
+      discard: 'Discard',
+      empty: 'Nobody has been added yet.',
+      inactiveHeading: 'Inactive',
+
+      firstName: 'First name',
+      lastName: 'Last name',
+      email: 'Email',
+      emailHelp:
+        'This is their contact address and where the invitation goes. Changing it does not change which account they sign in with.',
+      phone: 'Phone',
+      phoneOptional: 'Phone (optional)',
+      role: 'Role',
+      active: 'Active',
+      activeHelp:
+        'Deactivating stops their panel access immediately and removes them from assignment. The record and its history are kept.',
+
+      accessTitle: 'Panel access',
+      accessNONE: 'No access',
+      accessINVITED: 'Invited',
+      accessLINKED: 'Has access',
+      accessNoneHelp: 'Can be assigned jobs, but cannot sign in to the panel.',
+      accessInvitedHelp:
+        'Invited on {{date}}. They can sign in once they open the emailed link and choose a password.',
+      accessLinkedHelp: 'Has a linked account and can sign in to the panel.',
+      invite: 'Invite to the panel',
+      inviteConfirm:
+        'They will get an email to create a password and will be able to see every customer\u2019s details. Continue?',
+      inviteUnavailable:
+        'This deployment has no invitation sending configured. The service key is missing on the server.',
+      inviteSent: 'Invitation sent.',
+      selfNote: 'This is your own record: you cannot change your own role or deactivate yourself.',
+    },
+
     /* --------------------------- Errores --------------------------- */
     errorSessionExpired: 'Your session has ended. Please sign in again.',
     errorNoAccess: 'This account does not have access to the admin panel.',
     errorBookingNotFound: 'We could not find that booking.',
+    errorStaffNotFound: 'We could not find that staff record.',
+    errorStaffEmailTaken: 'Someone is already registered with that email.',
+    errorStaffLastAdmin:
+      'Not possible: the system would be left with no active administrator and nobody could get back in.',
+    errorStaffSelfChange:
+      'You cannot change your own role or deactivate yourself: you would lock yourself out.',
+    errorAlreadyInvited: 'That person already has a linked account.',
+    errorInviteInactive: 'You cannot invite someone who is inactive.',
+    errorInviteUnavailable: 'Invitation sending is not configured on this deployment.',
+    errorInviteFailed: 'The identity provider rejected the invitation.',
     errorStaffDoubleBooked:
       'That person already has another job at the same time. Remove them from the team or move one of the two bookings.',
     errorStaffNotAssignable:

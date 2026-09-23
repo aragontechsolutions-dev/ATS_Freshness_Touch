@@ -31,6 +31,8 @@ tendrás que rellenar las marcadas como **"a mano"**.
 | `AUTH_PROVIDER`                | `supabase`                    | **`local` NO arranca en producción**: la API se niega, a propósito                                  |
 | `SUPABASE_URL`                 | `https://<ref>.supabase.co`   | **A mano.** Obligatoria con `AUTH_PROVIDER=supabase`                                                |
 | `SUPABASE_JWT_SECRET`          | _(vacío)_                     | **Solo proyectos antiguos.** Los actuales usan claves asimétricas y no la necesitan                 |
+| `SUPABASE_SERVICE_ROLE_KEY`    | _(vacío)_                     | **A mano**, solo para invitar personal al panel. **Opcional**: sin ella todo funciona menos invitar |
+| `SUPABASE_INVITE_REDIRECT_URL` | _(vacío)_                     | A dónde lleva el enlace de la invitación: la dirección del panel. Vacía usa la del proyecto         |
 | `AUTH_TIMEOUT_MS`              | `5000`                        |                                                                                                     |
 | `PAYMENT_PROVIDER`             | `mock`                        | Cambiar a `stripe` cuando haya cuenta. Con `mock` **no se retiene dinero real**                     |
 | `STRIPE_SECRET_KEY`            | _(vacío)_                     | **A mano**, solo si usas `stripe`. Sin ella la API **no arranca** (a propósito)                     |
@@ -173,6 +175,7 @@ aplicación se conecte a la base de datos.
 ```bash
 SUPABASE_URL=https://<ref>.supabase.co
 SUPABASE_SERVICE_ROLE_KEY=...        # NUNCA en Vercel ni en el navegador
+SUPABASE_INVITE_REDIRECT_URL=https://<panel>/           # opcional
 SUPABASE_JWT_SECRET=...
 DATABASE_URL=postgresql://...:6543/postgres?pgbouncer=true&connection_limit=1
 DIRECT_URL=postgresql://...:5432/postgres
@@ -358,6 +361,24 @@ como fallido con el motivo, visible en el registro de avisos.
 ---
 
 ## 6. Resumen de qué va dónde
+
+### La clave de servicio, en particular
+
+`SUPABASE_SERVICE_ROLE_KEY` es **la credencial más poderosa del sistema**:
+salta todas las reglas de seguridad de la base de datos. La API la usa para
+una sola cosa —invitar personal al panel (`docs/13-panel-y-permisos.md`
+§14)— y nunca sale del servidor: el panel llama a la API y la API llama a
+Supabase.
+
+Es **opcional a propósito**. Sin ella la aplicación arranca igual y lo único
+que no se puede hacer es invitar; el alta de personal, las asignaciones y
+todo lo demás siguen funcionando. Un despliegue que no vaya a dar de alta
+personal no tiene por qué cargar con esta clave, y la regla general de este
+proyecto es que **una credencial que no hace falta no se guarda**.
+
+Si se configura sin `SUPABASE_URL`, la API **no arranca**: es señal de una
+configuración a medias, y es mejor que falle al desplegar que el día que
+alguien pulse el botón de invitar.
 
 | Secreto                       | Render | Vercel | Repositorio |
 | ----------------------------- | ------ | ------ | ----------- |

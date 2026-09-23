@@ -2,6 +2,8 @@ import {
   AdminBookingDetailSchema,
   AdminBookingListSchema,
   AdminStaffListSchema,
+  AdminStaffDirectorySchema,
+  AdminStaffDirectoryItemSchema,
   AdminBusinessSettingsSchema,
   API_ERROR_CODES,
   NotificationSettingsSchema,
@@ -14,7 +16,11 @@ import {
   type AdminCaptureDepositInput,
   type AdminReleaseDepositInput,
   type AdminBusinessSettings,
+  type AdminStaffDirectory,
+  type AdminStaffDirectoryItem,
   type AdminStaffList,
+  type StaffCreate,
+  type StaffUpdate,
   type AdminStatusChangeInput,
   type ApiError,
   type BusinessSettings,
@@ -73,9 +79,24 @@ export class ApiClientError extends Error {
   }
 }
 
-/** true cuando la API dice que la sesión ya no vale. */
+/** true cuando la API dice que esta sesión ya no sirve para seguir aquí. */
 export function isSessionError(error: unknown): boolean {
   return error instanceof ApiClientError && (error.statusCode === 401 || error.statusCode === 403);
+}
+
+/**
+ * Por qué deja de servir, que NO es lo mismo y no da igual.
+ *
+ *   401 — tu sesión ha caducado. Vuelve a entrar y sigues.
+ *   403 — has entrado bien, pero tu cuenta no puede ver esto. Volver a entrar
+ *         no arregla nada.
+ *
+ * Confundirlas manda a alguien a reescribir su contraseña una y otra vez ante
+ * una puerta que nunca se le va a abrir. Le pasa al personal de limpieza, que
+ * tiene cuenta válida y todavía no tiene pantalla propia.
+ */
+export function sessionLostReason(error: unknown): 'expired' | 'noAccess' {
+  return error instanceof ApiClientError && error.statusCode === 403 ? 'noAccess' : 'expired';
 }
 
 /**
@@ -325,4 +346,51 @@ export function saveAssignments(
     method: 'PUT',
     body: { assignments },
   });
+}
+
+/* ------------------------------------------------------------------------ */
+/*  Directorio de personal. Solo administracion: la API responde 403 al       */
+/*  resto, y el panel ni ofrece la pantalla. Eso es comodidad, no seguridad.  */
+/* ------------------------------------------------------------------------ */
+
+const DIRECTORIO = '/admin/staff-directory';
+
+/** Respuesta comun de alta, edicion e invitacion: la ficha ya actualizada. */
+function parseFicha(contexto: string) {
+  return (payload: unknown): AdminStaffDirectoryItem => {
+    const parsed = AdminStaffDirectoryItemSchema.safeParse(payload);
+    if (!parsed.success) throw contractError(contexto, parsed.error.issues);
+    return parsed.data;
+  };
+}
+
+export function fetchStaffDirectory(): Promise<AdminStaffDirectory> {
+  return request(DIRECTORIO, (payload) => {
+    const parsed = AdminStaffDirectorySchema.safeParse(payload);
+    if (!parsed.success) throw contractError(DIRECTORIO, parsed.error.issues);
+    return parsed.data;
+  });
+}
+
+/**
+ * Da de alta a alguien.
+ *
+ * NO concede acceso al panel: la ficha nace sin cuenta vinculada. Dar acceso
+ * es `inviteStaff`, una accion aparte y deliberada.
+ */
+export function createStaff(datos: StaffCreate): Promise<AdminStaffDirectoryItem> {
+  return request(DIRECTORIO, parseFicha('alta de personal'), { method: 'POST', body: datos });
+}
+
+/** Guarda la ficha entera, el estado de alta o baja incluido. */
+export function updateStaff(staffId: string, datos: StaffUpdate): Promise<AdminStaffDirectoryItem> {
+  return request(`${DIRECTORIO}/${staffId}`, parseFicha('edicion de personal'), {
+    method: 'PUT',
+    body: datos,
+  });
+}
+
+/** Manda la invitacion al panel y vincula la cuenta que se crea. */
+export function inviteStaff(staffId: string): Promise<AdminStaffDirectoryItem> {
+  return request(`${DIRECTORIO}/${staffId}/invite`, parseFicha('invitacion'), { method: 'POST' });
 }

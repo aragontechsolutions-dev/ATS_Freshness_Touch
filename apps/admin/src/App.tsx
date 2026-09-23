@@ -34,7 +34,16 @@ export default function App() {
     useCallback(() => void signOut('idle'), [signOut]),
   );
 
-  const alPerderSesion = useCallback(() => void signOut('expired'), [signOut]);
+  /*
+   * El motivo lo decide quien recibe el error, no este componente. Antes
+   * estaba fijo en "caducada" y eso mentia: a una cuenta sin permiso para
+   * esta pantalla se le decia que volviera a entrar, cosa que no arregla
+   * nada y que la deja reintentando indefinidamente.
+   */
+  const alPerderSesion = useCallback(
+    (reason: 'expired' | 'noAccess' = 'expired') => void signOut(reason),
+    [signOut],
+  );
 
   const cambiarIdioma = (): void => {
     const siguiente: Locale = locale === 'en' ? 'es' : 'en';
@@ -102,7 +111,7 @@ export default function App() {
 
       <main className="mx-auto max-w-5xl px-4 py-6">
         {enAjustes && puedeConfigurar ? (
-          <SettingsPage locale={locale} onSessionLost={alPerderSesion} />
+          <SettingsPage staff={state.staff} locale={locale} onSessionLost={alPerderSesion} />
         ) : openBookingId ? (
           <BookingDetailPage
             bookingId={openBookingId}

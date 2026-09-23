@@ -807,3 +807,205 @@ sembrados a propósito:
 Y en la base de datos, tras el recorrido: **un** registro `booking.team_changed`
 con `before: []`, el `after` correcto y la IP; el intento rechazado no dejó
 rastro.
+
+---
+
+## 14. Dar de alta personal e invitarlo al panel
+
+> Etapa 2.8. Hasta aquí, la única forma de que alguien existiera en el sistema
+> era meterlo a mano en la base de datos. La etapa 2.7 dejó asignar equipos,
+> pero no había a quién.
+
+### 14.1. Existir y poder entrar son dos cosas distintas
+
+Es la distinción que sostiene toda esta etapa, igual que «identidad y
+autoridad» (§1) sostiene el acceso:
+
+|                                | Qué hace falta                              | Quién lo concede      |
+| ------------------------------ | ------------------------------------------- | --------------------- |
+| **Recibir trabajos asignados** | una ficha en `staff`                        | el alta               |
+| **Entrar al panel**            | además, una cuenta vinculada (`authUserId`) | la invitación, aparte |
+
+**`authUserId` nulo es un estado legítimo, no un dato a medias.** Una
+limpiadora necesita existir para que se le asignen trabajos, no para iniciar
+sesión. Hoy, de hecho, no tiene ninguna pantalla que mirar.
+
+Y la sesión se resuelve **por ese identificador, nunca por el correo**. Dar de
+alta a alguien con su correo **no le abre ninguna puerta por sí solo**. Merece
+la pena tenerlo claro también en sentido contrario: cambiarle el correo a
+alguien que ya entra **no le revoca nada**, porque no es su llave. Para eso
+está darle de baja.
+
+### 14.2. Alta e invitación son dos botones, y el segundo pregunta
+
+Crear una ficha es decir «esta persona trabaja aquí». Invitarla es decir
+«esta persona puede ver los datos de todos los clientes». Son decisiones de
+peso muy distinto.
+
+Si fueran el mismo formulario, la segunda se tomaría **por inercia de estar
+rellenando campos**, que es exactamente como se reparten accesos sin querer.
+Por eso el alta no pide nada relacionado con credenciales —no hay contraseña
+que escribir en ninguna pantalla— e invitar es una acción aparte que además
+**pide confirmación**, porque no tiene deshacer: la cuenta queda creada en el
+proveedor aunque luego se dé de baja la ficha.
+
+El botón de invitar solo se pinta donde tiene sentido: alguien **activo**, **sin
+cuenta todavía**, y en un despliegue que **pueda** mandar invitaciones.
+
+### 14.3. Por qué invitar y no vincular por correo
+
+Se valoraron tres caminos para conceder acceso:
+
+| Camino                               | Coste                                       | Riesgo                                                                                 |
+| ------------------------------------ | ------------------------------------------- | -------------------------------------------------------------------------------------- |
+| **Invitar desde el panel** ✅        | guardar la clave de servicio en el servidor | esa clave salta todas las reglas de la base; si se filtra, se filtra todo              |
+| Vincular por correo al primer acceso | ninguno                                     | depende de dos ajustes **fuera del código** (confirmación de correo, registro cerrado) |
+| Pegar el identificador a mano        | ninguno                                     | obliga a entrar en Supabase cada vez, y es justo la dependencia que el panel elimina   |
+
+Se eligió **invitar**. El motivo de descartar la vinculación por correo no es
+que sea insegura hoy, sino que **su seguridad vive fuera del repositorio**:
+basta con que alguien active el registro público en el proyecto para que
+cualquiera pueda reclamar la ficha de un empleado. Invitando, la cuenta la
+crea la API y no hay ningún correo en el que confiar.
+
+La clave de servicio vive **solo** en el entorno del servidor, como la de
+Stripe (`docs/08-variables-de-entorno.md`), nunca llega al navegador y **no se
+escribe jamás en un registro**, ni siquiera recortada.
+
+### 14.4. Qué pasa sin la clave configurada
+
+La aplicación **arranca igual**. La clave es opcional a propósito: el alta de
+personal, las asignaciones y todo lo demás funcionan, y lo único que no se
+puede es invitar. El directorio devuelve `canInvite: false`, el panel esconde
+el botón y explica por qué, y llamar al endpoint directamente responde `503`
+con un motivo claro en vez de un error del proveedor.
+
+**No existe un «proveedor simulado de invitaciones»**, y es deliberado: uno
+así podría quedarse encendido en producción y vincularía fichas a cuentas
+inventadas que _parecen_ tener acceso y no lo tienen. Las pruebas apuntan
+`SUPABASE_URL` a un servidor de mentira y recorren el mismo código que
+producción.
+
+### 14.5. El orden importa: primero invitar, después guardar
+
+Se manda la invitación y **solo si sale bien** se guarda el vínculo. Al revés,
+un fallo del proveedor dejaría una ficha marcada como «con acceso» sin cuenta
+detrás, y nadie se enteraría hasta que esa persona intentara entrar, que suele
+ser el peor día posible.
+
+Por el mismo motivo, este adaptador **sí propaga el fallo**, al contrario que
+el de correo (`docs/14-avisos.md`), que se los traga: un correo que no sale no
+puede tumbar una reserva ya pagada, pero una invitación que no sale tiene que
+enterarse quien creía estar dando acceso.
+
+### 14.6. No quedarse sin administración
+
+Todas las demás puertas de este panel se pueden volver a abrir desde dentro:
+si cancelas una reserva por error la vuelves a crear, si apagas un aviso lo
+enciendes. **Quedarse sin ningún administrador activo no se deshace desde el
+panel**, porque hace falta ser administrador para crear otro, y la única
+salida sería entrar a la base de datos a mano.
+
+Se protege con **tres capas**, y conviene saber cuál salta:
+
+1. **Nadie se cambia a sí mismo el puesto ni se da de baja.** Esto solo ya
+   basta para cualquier petición suelta: quien pide el cambio es
+   administración activa y sigue siéndolo después. (Sí puede corregir su
+   propio nombre, teléfono o correo: la guardia cierra lo que te deja fuera,
+   no la edición de tu ficha.)
+2. **El recuento posterior a la escritura**, con las filas de administración
+   bloqueadas, cubre la carrera: dos administradoras degradándose a la vez.
+   Se cuenta **después** de escribir y no antes, porque contar antes obliga a
+   simular mentalmente el efecto del cambio, y esa simulación es justo donde
+   se cuelan los casos no previstos.
+3. **La comprobación de rol relee la ficha en cada petición**, así que quien
+   acaba de dejar de ser administradora ni siquiera llega al servicio.
+
+La segunda es **defensa en profundidad**: con la primera y la tercera en pie
+no se ha conseguido provocar que salte, y la prueba de concurrencia no fija
+cuál de las tres responde —eso sería fijar una carrera— sino la propiedad que
+importa: **una de las dos peticiones pasa, la otra no, y queda alguien que
+pueda administrar**. Se mantiene porque las tres protegen cosas distintas y la
+primera es la candidata evidente a relajarse el día que alguien quiera «ceder
+la administración a otra persona».
+
+### 14.7. Dar de baja, no borrar
+
+`isActive: false` conserva la ficha y su historial. Borrar dejaría trabajos
+pasados sin responsable y el registro de auditoría contaría una historia
+incompleta.
+
+La baja **cierra el acceso en la petición siguiente**, sin esperar a que
+caduque ningún token, porque la sesión comprueba `isActive` cada vez (§1). Y
+esa persona desaparece del selector de asignación, aunque sus asignaciones
+antiguas se conservan (§13.5).
+
+### 14.8. Privacidad: tres pantallas, tres niveles
+
+| Pantalla                       | Quién              | Qué ve                                     |
+| ------------------------------ | ------------------ | ------------------------------------------ |
+| Selector de asignación (§13.5) | ADMIN + DISPATCHER | nombre, apellido, puesto                   |
+| Directorio de personal         | **solo ADMIN**     | además correo, teléfono y estado de acceso |
+| —                              | nadie              | el identificador de la cuenta              |
+
+Que el directorio sea **solo de administración incluso para leer** es menos
+evidente que lo demás, porque coordinación ya ve los nombres de la plantilla.
+La diferencia es **quién tiene acceso al panel**: eso es un mapa de qué
+cuentas existen, que es por donde empieza quien quiera colarse.
+
+El **identificador de la cuenta no sale nunca**. Se traduce a un estado —«sin
+acceso», «invitada», «con acceso»— antes de responder: al panel no le sirve
+para pintar nada y en cambio ayuda a suplantar. Tampoco se guarda en el
+registro de auditoría, que registra a quién se invitó y con qué puesto.
+
+### 14.9. Un mensaje que mentía
+
+Al probar esto en un navegador apareció un fallo anterior. Una cuenta de
+limpieza **entra correctamente** —es personal activo— pero cada pantalla del
+panel le responde `403` porque ninguna es para su puesto. El panel la
+expulsaba diciendo **«tu sesión ha terminado, vuelve a iniciar sesión»**.
+
+Volver a entrar no arregla nada: la deja reintentando ante una puerta que no
+se le va a abrir. El texto correcto ya existía sin usar
+(`admin.signedOut.noAccess`), y el enganche de sesión ya distinguía bien los
+dos casos; lo que estaba fijo en «caducada» era el contenedor del panel.
+
+Ahora el motivo lo decide quien recibe el error: `401` es «tu sesión ha
+caducado» y `403` es «tu cuenta no puede ver esto». Es un arreglo del mensaje,
+**no** de la causa: el personal de limpieza seguirá sin tener a dónde ir hasta
+que exista su vista propia.
+
+### 14.10. Qué está probado
+
+**Contra PostgreSQL real** (37 pruebas en dos ficheros): coordinación no ve el
+directorio ni puede dar de alta o invitar; el alta **nace sin acceso**; el
+correo se normaliza y el repetido se rechaza; un alta que traiga
+`authUserId` se rechaza; nadie se cambia su propio puesto ni se da de baja,
+pero sí corrige su nombre; dos administradoras degradándose a la vez dejan
+siempre una en pie; un rechazo no deja el cambio a medias; la baja cierra el
+acceso en la petición siguiente; la invitación manda la clave en las dos
+cabeceras y guarda el identificador; no se invita dos veces ni a quien está de
+baja; **si el proveedor rechaza, la ficha se queda sin acceso**; la auditoría
+no guarda el identificador de la cuenta; y el directorio nunca lo devuelve.
+
+**Sin la clave configurada** (fichero aparte, porque la configuración se
+congela al importar): la aplicación arranca, el directorio avisa con
+`canInvite: false`, invitar responde `503` con motivo claro, y **dar de alta
+sigue funcionando**.
+
+**Del contrato** (19 pruebas): normalización de correo y nombre, teléfono en
+formato internacional, y —lo que importa— que por el alta y la edición **no
+pueda colarse `password`, `authUserId`, `isActive` ni `invitedAt`**.
+
+**En navegador real**, con PostgreSQL y un servidor que imita la API de
+administración de Supabase: se da de alta tecleando `DARIO@Example.COM` y
+`(404) 555-0199`, y se guarda normalizado; la ficha nace diciendo «sin
+acceso»; el correo repetido se rechaza con su mensaje; al invitar pasa a
+«Invitada el …» y el botón desaparece; en la propia ficha el puesto y la
+casilla de activa están bloqueados; dar de baja a coordinación la mueve a «De
+baja» y **esa cuenta deja de entrar en el acto**, viendo ahora el mensaje
+correcto; y todo en español a 390 px sin desbordamiento horizontal.
+
+En la base, tras el recorrido: `staff.created`, `staff.invited` y
+`staff.updated` con el antes y el después, y **ningún identificador de cuenta
+en el registro**.

@@ -332,10 +332,61 @@ export const es: TranslationResources = {
         'La clave del proveedor de correo y el token del bot se configuran en el servidor, no aquí. Una credencial guardada en la base de datos acaba en cada copia de seguridad, así que viven en el entorno del servidor junto a las claves de pago.',
     },
 
+    /* --------------------------- Personal --------------------------- */
+    staff: {
+      title: 'Personal',
+      intro:
+        'Quién trabaja aquí. Dar de alta a alguien le permite recibir trabajos asignados; entrar al panel es aparte y se concede con una invitación.',
+      add: 'Dar de alta',
+      edit: 'Editar',
+      save: 'Guardar',
+      discard: 'Descartar',
+      empty: 'Todavía no hay nadie dado de alta.',
+      inactiveHeading: 'De baja',
+
+      firstName: 'Nombre',
+      lastName: 'Apellido',
+      email: 'Correo electrónico',
+      emailHelp:
+        'Es su dirección de contacto y a donde va la invitación. Cambiarla no cambia con qué cuenta entra quien ya tiene acceso.',
+      phone: 'Teléfono',
+      phoneOptional: 'Teléfono (opcional)',
+      role: 'Puesto',
+      active: 'Activa',
+      activeHelp:
+        'Al dar de baja, deja de entrar al panel en el acto y no se le puede asignar trabajo. La ficha y su historial se conservan.',
+
+      accessTitle: 'Acceso al panel',
+      accessNONE: 'Sin acceso',
+      accessINVITED: 'Invitada',
+      accessLINKED: 'Con acceso',
+      accessNoneHelp: 'Puede recibir trabajos asignados, pero no puede entrar al panel.',
+      accessInvitedHelp:
+        'Invitada el {{date}}. Podrá entrar cuando abra el enlace del correo y elija contraseña.',
+      accessLinkedHelp: 'Tiene una cuenta vinculada y puede entrar al panel.',
+      invite: 'Invitar al panel',
+      inviteConfirm:
+        'Va a recibir un correo para crear su contraseña y podrá ver los datos de todos los clientes. ¿Continuar?',
+      inviteUnavailable:
+        'Este despliegue no tiene configurado el envío de invitaciones. Falta la clave de servicio en el servidor.',
+      inviteSent: 'Invitación enviada.',
+      selfNote: 'Esta es tu ficha: no puedes cambiarte el puesto ni darte de baja tú misma.',
+    },
+
     /* --------------------------- Errores --------------------------- */
     errorSessionExpired: 'Tu sesión ha terminado. Vuelve a iniciar sesión.',
     errorNoAccess: 'Esta cuenta no tiene acceso al panel de administración.',
     errorBookingNotFound: 'No encontramos esa reserva.',
+    errorStaffNotFound: 'No encontramos esa ficha de personal.',
+    errorStaffEmailTaken: 'Ya hay alguien dado de alta con ese correo.',
+    errorStaffLastAdmin:
+      'No se puede: el sistema se quedaría sin ningún administrador activo y nadie podría volver a entrar.',
+    errorStaffSelfChange:
+      'No puedes cambiarte tu propio puesto ni darte de baja: te quedarías fuera del panel.',
+    errorAlreadyInvited: 'Esa persona ya tiene una cuenta vinculada.',
+    errorInviteInactive: 'No se puede invitar a alguien que está de baja.',
+    errorInviteUnavailable: 'El envío de invitaciones no está configurado en este despliegue.',
+    errorInviteFailed: 'El proveedor de identidad rechazó la invitación.',
     errorStaffDoubleBooked:
       'Esa persona ya tiene otro trabajo a la misma hora. Quítala del equipo o cambia una de las dos citas.',
     errorStaffNotAssignable:

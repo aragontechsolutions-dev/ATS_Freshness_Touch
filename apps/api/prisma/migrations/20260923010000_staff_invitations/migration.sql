@@ -1,0 +1,21 @@
+-- ===========================================================================
+-- INVITACION DE PERSONAL AL PANEL
+-- ===========================================================================
+-- Una sola columna. El resto de lo que hace falta para dar de alta personal
+-- ya existia en la tabla `staff` desde la migracion inicial; lo que faltaba
+-- era la pantalla, no el modelo.
+--
+-- POR QUE HACE FALTA ESTA COLUMNA. Hasta ahora "puede entrar al panel" se
+-- deducia de `authUserId`, y eso basta para decidir el acceso pero no para
+-- INFORMAR a quien administra. La invitacion de Supabase crea la cuenta en el
+-- momento de enviarla, asi que `authUserId` se rellena antes de que la
+-- persona haya hecho nada: sin esta columna, la pantalla diria "tiene acceso"
+-- de alguien que ni siquiera ha abierto el correo.
+--
+-- Con ella se pueden distinguir los tres estados reales:
+--   authUserId NULL                  -> sin acceso, y nadie le ha invitado
+--   authUserId + invitedAt           -> invitada; entrara cuando elija clave
+--   authUserId sin invitedAt         -> vinculada a mano (alta antigua)
+-- ===========================================================================
+
+ALTER TABLE "staff" ADD COLUMN IF NOT EXISTS "invitedAt" TIMESTAMPTZ(3);

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { AdminBookingDetail, AuthenticatedStaff, Locale } from '@freshness/types';
-import { ApiClientError, fetchBookingDetail, isSessionError } from '../lib/api';
+import { ApiClientError, fetchBookingDetail, isSessionError, sessionLostReason } from '../lib/api';
 import { BookingActions } from '../components/BookingActions';
 import { StatusChip } from '../components/StatusChip';
 import { TeamSection } from '../components/TeamSection';
@@ -12,7 +12,7 @@ interface BookingDetailProps {
   staff: AuthenticatedStaff;
   locale: Locale;
   onBack: () => void;
-  onSessionLost: () => void;
+  onSessionLost: (reason?: 'expired' | 'noAccess') => void;
 }
 
 export function BookingDetailPage({
@@ -36,7 +36,7 @@ export function BookingDetailPage({
       .catch((error: unknown) => {
         if (!vigente) return;
         if (isSessionError(error)) {
-          onSessionLost();
+          onSessionLost(sessionLostReason(error));
           return;
         }
         setErrorKey(error instanceof ApiClientError ? error.messageKey : 'admin.errorGeneric');

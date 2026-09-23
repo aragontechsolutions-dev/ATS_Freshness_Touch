@@ -510,7 +510,21 @@ model Staff {
   id String @id @default(uuid()) @db.Uuid
 
   /// Usuario de Supabase Auth con el que inicia sesion.
+  ///
+  /// NULO significa "no puede entrar al panel", y es un estado legitimo, no
+  /// un dato a medias: una limpiadora necesita existir para que se le
+  /// asignen trabajos, no para iniciar sesion. La sesion se resuelve por
+  /// este identificador y NUNCA por el correo, asi que dar de alta a alguien
+  /// con su correo no le abre ninguna puerta por si solo.
   authUserId String? @unique
+
+  /// Cuando se le envio la invitacion al panel, si se le envio.
+  ///
+  /// Se guarda para poder decir en pantalla "invitada el 3 de marzo, todavia
+  /// sin entrar" en vez de dejar a quien administra sin saber si la mando o
+  /// no. No sustituye a `authUserId`: la invitacion crea la cuenta al vuelo,
+  /// asi que ambos se rellenan a la vez.
+  invitedAt DateTime? @db.Timestamptz(3)
 
   firstName String
   lastName  String

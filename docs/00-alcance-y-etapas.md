@@ -99,6 +99,10 @@ Progreso:
   quién va a cada trabajo y quién es el responsable, con una guardia que
   impide poner a la misma persona en dos casas a la vez. Auditado, y el
   selector de personal no expone datos de contacto.
+- ✅ **Alta de personal e invitación al panel** (`docs/13-panel-y-permisos.md`
+  §14): dar de alta, editar y dar de baja desde el panel, con invitación por
+  correo para conceder acceso. Existir y poder entrar son cosas separadas, y
+  hay tres capas para que el sistema no se quede sin administración.
 - ⬜ Avisos por SMS.
 - Calendario de disponibilidad y reserva en línea.
 - **Stripe**: retención del depósito con `capture_method: 'manual'` al reservar y
