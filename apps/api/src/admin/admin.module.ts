@@ -1,8 +1,14 @@
 import { Module } from '@nestjs/common';
 import { PaymentsModule } from '../payments/payments.module';
 import { SettingsModule } from '../settings/settings.module';
+import { AssignmentsService } from './assignments.service';
 import { BookingActionsService } from './booking-actions.service';
-import { BookingActionsController, BookingsAdminController } from './bookings-admin.controller';
+import {
+  AssignmentsController,
+  BookingActionsController,
+  BookingsAdminController,
+  StaffListController,
+} from './bookings-admin.controller';
 import { BookingsAdminService } from './bookings-admin.service';
 import { SessionController } from './session.controller';
 import {
@@ -18,7 +24,9 @@ import {
     BookingActionsController,
     SettingsAdminController,
     NotificationSettingsController,
+    AssignmentsController,
+    StaffListController,
   ],
-  providers: [BookingsAdminService, BookingActionsService],
+  providers: [BookingsAdminService, BookingActionsService, AssignmentsService],
 })
 export class AdminModule {}

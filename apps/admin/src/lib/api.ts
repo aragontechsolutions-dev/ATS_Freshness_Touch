@@ -1,6 +1,7 @@
 import {
   AdminBookingDetailSchema,
   AdminBookingListSchema,
+  AdminStaffListSchema,
   AdminBusinessSettingsSchema,
   API_ERROR_CODES,
   NotificationSettingsSchema,
@@ -8,10 +9,12 @@ import {
   AuthenticatedStaffSchema,
   type AdminBookingDetail,
   type AdminBookingList,
+  type AdminAssignment,
   type AdminBookingQueryInput,
   type AdminCaptureDepositInput,
   type AdminReleaseDepositInput,
   type AdminBusinessSettings,
+  type AdminStaffList,
   type AdminStatusChangeInput,
   type ApiError,
   type BusinessSettings,
@@ -55,6 +58,15 @@ export class ApiClientError extends Error {
     readonly code: string,
     readonly messageKey: string,
     readonly statusCode: number,
+    /**
+     * Detalle por campo que mando la API, cuando lo hay.
+     *
+     * Se conserva por un caso concreto: al asignar equipo, el choque de
+     * horarios trae aqui el nombre de quien choca y con que reserva. Esa
+     * pantalla lo pinta; el resto de errores lo ignoran, porque en ellos es
+     * texto tecnico que no se le ensena a nadie.
+     */
+    readonly fields: ApiError['fields'] = undefined,
   ) {
     super(`${code}: ${messageKey}`);
     this.name = 'ApiClientError';
@@ -128,7 +140,12 @@ async function request<T>(
           messageKey: 'admin.errorGeneric',
         };
 
-    throw new ApiClientError(apiError.code, apiError.messageKey, apiError.statusCode);
+    throw new ApiClientError(
+      apiError.code,
+      apiError.messageKey,
+      apiError.statusCode,
+      apiError.fields,
+    );
   }
 
   return parse(payload);
@@ -275,4 +292,37 @@ export function saveNotificationSettings(
     },
     { method: 'PUT', body: settings },
   );
+}
+
+/**
+ * Personal al que se puede asignar un trabajo.
+ *
+ * La API devuelve solo nombre, apellido y puesto. NO hay correo ni telefono
+ * que mostrar aqui porque el servidor no los manda: para elegir a quien va a
+ * una casa basta el nombre, y una pantalla que se abre a diario no tiene por
+ * que ser la agenda de contacto de la plantilla.
+ */
+export function fetchAssignableStaff(): Promise<AdminStaffList> {
+  return request('/admin/staff', (payload) => {
+    const parsed = AdminStaffListSchema.safeParse(payload);
+    if (!parsed.success) throw contractError('/admin/staff', parsed.error.issues);
+    return parsed.data;
+  });
+}
+
+/**
+ * Reemplaza el equipo entero de una reserva.
+ *
+ * Va el conjunto completo y no altas y bajas sueltas: "un solo responsable"
+ * es una regla sobre el equipo entero, y solo se puede comprobar viendolo
+ * entero. Devuelve la reserva ya actualizada, como el resto de acciones.
+ */
+export function saveAssignments(
+  bookingId: string,
+  assignments: AdminAssignment[],
+): Promise<AdminBookingDetail> {
+  return request(`/admin/bookings/${bookingId}/assignments`, parseDetail('asignacion de equipo'), {
+    method: 'PUT',
+    body: { assignments },
+  });
 }

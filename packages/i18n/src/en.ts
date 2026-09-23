@@ -209,6 +209,22 @@ export const en = {
     accessNotesWarning:
       'Sensitive: do not read aloud in front of others and close this page when you step away.',
     customerNotes: 'Customer notes',
+    /* ---------------------------- Equipo ---------------------------- */
+    team: 'Team',
+    teamAssign: 'Assign team',
+    teamChange: 'Change team',
+    teamEmpty: 'Nobody is assigned to this job yet.',
+    teamLead: 'Lead',
+    teamHelp:
+      'Tick who is going and pick a lead. The lead is the one who decides if something unexpected comes up at the house.',
+    teamSave: 'Save team',
+    teamDiscard: 'Discard changes',
+    teamNoStaff: 'There is no active staff to assign. Add someone first.',
+    teamNoLeadWarning:
+      'This team has no lead. If something comes up at the house, nobody knows who decides.',
+    teamCancelledNote:
+      'This booking is cancelled: the team is kept as history and cannot be changed.',
+
     pricing: 'Price breakdown',
     total: 'Total',
     deposit: 'Travel deposit',
@@ -315,6 +331,11 @@ export const en = {
     errorSessionExpired: 'Your session has ended. Please sign in again.',
     errorNoAccess: 'This account does not have access to the admin panel.',
     errorBookingNotFound: 'We could not find that booking.',
+    errorStaffDoubleBooked:
+      'That person already has another job at the same time. Remove them from the team or move one of the two bookings.',
+    errorStaffNotAssignable:
+      'Someone on the team is no longer active. Refresh the page and pick again.',
+    errorAssignCancelled: 'You cannot assign a team to a cancelled booking.',
     errorInvalidTransition:
       'That change is not possible from the current status. Someone may have just updated it.',
     errorPaymentNotCapturable: 'There is no hold on this booking that can be charged or released.',

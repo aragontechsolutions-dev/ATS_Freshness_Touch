@@ -66,7 +66,14 @@ export const AdminBookingListItemSchema = z.strictObject({
   balanceDueCents: z.int(),
   /** Estado del deposito, o null si nunca se llego a crear. */
   paymentStatus: PaymentStatusSchema.nullable(),
-  assignedStaff: z.array(z.strictObject({ staffId: z.uuid(), name: z.string() })),
+  /**
+   * Quien va al trabajo. Lleva `isLead` tambien en el listado —no solo en el
+   * detalle— porque la agenda es donde coordinacion mira de un vistazo quien
+   * manda en cada casa del dia.
+   */
+  assignedStaff: z.array(
+    z.strictObject({ staffId: z.uuid(), name: z.string(), isLead: z.boolean() }),
+  ),
   createdAt: z.iso.datetime(),
 });
 export type AdminBookingListItem = z.infer<typeof AdminBookingListItemSchema>;

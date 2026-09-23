@@ -4,6 +4,7 @@ import type { AdminBookingDetail, AuthenticatedStaff, Locale } from '@freshness/
 import { ApiClientError, fetchBookingDetail, isSessionError } from '../lib/api';
 import { BookingActions } from '../components/BookingActions';
 import { StatusChip } from '../components/StatusChip';
+import { TeamSection } from '../components/TeamSection';
 import { formatCents, formatDateTime } from '../lib/format';
 
 interface BookingDetailProps {
@@ -147,6 +148,18 @@ export function BookingDetailPage({
           </div>
         )}
       </section>
+
+      {/*
+        El equipo va JUSTO DESPUES del cliente y antes del precio: al abrir una
+        reserva, lo operativo —a quien se limpia y quien va— se lee de una
+        vez, y lo economico queda agrupado mas abajo con el pago.
+      */}
+      <TeamSection
+        booking={booking}
+        staff={staff}
+        onUpdated={setBooking}
+        onSessionLost={onSessionLost}
+      />
 
       {/* -------------------------------- Precio ------------------------------- */}
       <section className="ft-card p-5">

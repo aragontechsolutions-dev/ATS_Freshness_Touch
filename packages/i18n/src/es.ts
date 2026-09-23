@@ -214,6 +214,22 @@ export const es: TranslationResources = {
     accessNotesWarning:
       'Dato sensible: no lo leas en alto delante de terceros y cierra esta página al levantarte.',
     customerNotes: 'Notas del cliente',
+    /* ---------------------------- Equipo ---------------------------- */
+    team: 'Equipo',
+    teamAssign: 'Asignar equipo',
+    teamChange: 'Cambiar equipo',
+    teamEmpty: 'Todavía no hay nadie asignado a este trabajo.',
+    teamLead: 'Responsable',
+    teamHelp:
+      'Marca a quien va y elige un responsable. El responsable es quien decide si surge un imprevisto en la casa.',
+    teamSave: 'Guardar equipo',
+    teamDiscard: 'Descartar cambios',
+    teamNoStaff: 'No hay personal activo al que asignar. Da de alta a alguien primero.',
+    teamNoLeadWarning:
+      'Este equipo no tiene responsable. Si surge algo en la casa, nadie sabrá quién decide.',
+    teamCancelledNote:
+      'La reserva está cancelada: el equipo se conserva como histórico y no se puede cambiar.',
+
     pricing: 'Desglose del precio',
     total: 'Total',
     deposit: 'Depósito de traslado',
@@ -320,6 +336,11 @@ export const es: TranslationResources = {
     errorSessionExpired: 'Tu sesión ha terminado. Vuelve a iniciar sesión.',
     errorNoAccess: 'Esta cuenta no tiene acceso al panel de administración.',
     errorBookingNotFound: 'No encontramos esa reserva.',
+    errorStaffDoubleBooked:
+      'Esa persona ya tiene otro trabajo a la misma hora. Quítala del equipo o cambia una de las dos citas.',
+    errorStaffNotAssignable:
+      'Alguien del equipo ya no está activo. Actualiza la página y vuelve a elegir.',
+    errorAssignCancelled: 'No se puede asignar equipo a una reserva cancelada.',
     errorInvalidTransition:
       'Ese cambio no es posible desde el estado actual. Puede que alguien acabe de cambiarlo.',
     errorPaymentNotCapturable: 'Esta reserva no tiene una retención sobre la que se pueda actuar.',

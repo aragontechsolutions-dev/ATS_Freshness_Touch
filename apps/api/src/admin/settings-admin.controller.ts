@@ -11,6 +11,7 @@ import {
 import type { Request } from 'express';
 import { ADMIN_ROUTE, CurrentStaff, Roles } from '../auth/auth.decorators';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
+import { SKIP_QUOTE_THROTTLER } from '../common/throttling';
 import { NotificationSettingsService } from '../notifications/notification-settings.service';
 import { BusinessSettingsService } from '../settings/business-settings.service';
 
@@ -31,13 +32,13 @@ import { BusinessSettingsService } from '../settings/business-settings.service';
  * pantalla dice ademas quien lo cambio y cuando, y eso si es informacion
  * interna. Quien solo necesita el telefono lo tiene en el endpoint publico.
  */
+@SkipThrottle(SKIP_QUOTE_THROTTLER)
 @Controller(`${ADMIN_ROUTE}/settings`)
 export class SettingsAdminController {
   constructor(private readonly settings: BusinessSettingsService) {}
 
   @Get()
   @Roles('ADMIN')
-  @SkipThrottle({ quotes: true })
   get(): Promise<AdminBusinessSettings> {
     return this.settings.getForAdmin();
   }
@@ -56,7 +57,6 @@ export class SettingsAdminController {
    */
   @Put()
   @Roles('ADMIN')
-  @SkipThrottle({ quotes: true })
   async update(
     @Body(new ZodValidationPipe<BusinessSettings>(BusinessSettingsSchema))
     settings: BusinessSettings,
@@ -84,20 +84,19 @@ export class SettingsAdminController {
  * y rechaza cualquier campo que no conozca, asi que un token no puede colarse
  * en la base de datos ni por descuido.
  */
+@SkipThrottle(SKIP_QUOTE_THROTTLER)
 @Controller(`${ADMIN_ROUTE}/notification-settings`)
 export class NotificationSettingsController {
   constructor(private readonly notifications: NotificationSettingsService) {}
 
   @Get()
   @Roles('ADMIN')
-  @SkipThrottle({ quotes: true })
   get(): Promise<NotificationSettings> {
     return this.notifications.get();
   }
 
   @Put()
   @Roles('ADMIN')
-  @SkipThrottle({ quotes: true })
   update(
     @Body(new ZodValidationPipe<NotificationSettings>(NotificationSettingsSchema))
     settings: NotificationSettings,

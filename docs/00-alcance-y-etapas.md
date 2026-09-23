@@ -86,8 +86,8 @@ Progreso:
   control de acceso por rol, aplicación del panel, agenda con su detalle,
   acciones sobre la reserva (cambio de estado, cobro y liberación del
   depósito) y configuración del negocio editable —teléfono, correo y
-  horario—, todo con auditoría. Quedan fuera de esta etapa la asignación de
-  equipo y la vista propia del personal de limpieza.
+  horario—, todo con auditoría. Queda fuera de esta etapa la vista propia del
+  personal de limpieza.
 - 🔄 **Dinero desde el panel**: hechos el cobro y la liberación del depósito; faltan el cobro del importe final y las devoluciones.
 - ✅ **Avisos por correo y Telegram** (`docs/14-avisos.md`): confirmación y
   cancelación al cliente en su idioma, y aviso interno por Telegram al entrar
@@ -95,6 +95,10 @@ Progreso:
 - ✅ **Recordatorio de la víspera** (`docs/14-avisos.md` §11): barrido cada 15
   minutos dentro de la propia API, sin servicio de cron aparte. Sobrevive a
   reinicios y caídas porque recalcula desde la base en cada pasada.
+- ✅ **Asignar equipo desde el panel** (`docs/13-panel-y-permisos.md` §13):
+  quién va a cada trabajo y quién es el responsable, con una guardia que
+  impide poner a la misma persona en dos casas a la vez. Auditado, y el
+  selector de personal no expone datos de contacto.
 - ⬜ Avisos por SMS.
 - Calendario de disponibilidad y reserva en línea.
 - **Stripe**: retención del depósito con `capture_method: 'manual'` al reservar y
