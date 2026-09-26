@@ -2,8 +2,8 @@ import { useTranslation } from 'react-i18next';
 import type { Locale, ServiceType } from '@freshness/types';
 import { useCatalog } from '../hooks/useCatalog';
 import { formatCentsCompact } from '../lib/format';
-import { SunflowerIcon } from '../components/Icons';
 import { Reveal } from '../components/Reveal';
+import sunflower from '../assets/sunflower.webp';
 
 const SERVICE_ORDER: ServiceType[] = [
   'STANDARD',
@@ -45,12 +45,29 @@ export function Services() {
                 delayMs={(indice % 3) * 90}
                 className="ft-card ft-card-interactive flex flex-col p-6"
               >
-                <span
-                  className="w-fit rounded-xl bg-brand-50 p-2.5 text-brand-700
-                                 dark:bg-night-700 dark:text-sun-400"
-                >
-                  <SunflowerIcon className="h-5 w-5" />
-                </span>
+                {/*
+                  EL GIRASOL VA SUELTO, SIN EL CUADRO DE COLOR QUE TENIA ANTES.
+                  Ese recuadro existia para dar fondo a un simbolo de una sola
+                  linea; con un girasol a todo color, un cuadrado azul palido
+                  detras solo ensucia.
+
+                  Es DECORATIVO: `alt` vacio. Las seis tarjetas llevan el mismo
+                  girasol, asi que anunciarlo seria repetir «girasol» seis
+                  veces sin aportar nada; lo que distingue a cada tarjeta es su
+                  titulo, que ya es texto de verdad.
+                */}
+                <img
+                  src={sunflower}
+                  alt=""
+                  className="h-11 w-11"
+                  // Medidas reales: reservan el hueco antes de descargar y
+                  // evitan que la tarjeta pegue un salto al aparecer.
+                  width={192}
+                  height={192}
+                  loading="lazy"
+                  decoding="async"
+                  draggable={false}
+                />
 
                 <h3 className="mt-4 text-lg font-semibold text-slate-900 dark:text-white">
                   {t(`services.${code}.name`)}
