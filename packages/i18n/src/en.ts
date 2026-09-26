@@ -429,6 +429,100 @@ export const en = {
       ip: 'IP {{value}}',
       details: 'Details',
 
+      /* ------------------- Lo que dice cada entrada ------------------- */
+      /**
+       * Nombres de los campos de la metadata. La clave es el nombre crudo
+       * tal y como lo escribe el servidor, asi que anadir un campo nuevo a
+       * una accion solo obliga a anadir su etiqueta aqui; mientras no este,
+       * se pinta el nombre crudo en vez de desaparecer.
+       */
+      field: {
+        role: 'Role',
+        email: 'Email',
+        reason: 'Reason',
+        amountCents: 'Amount',
+        totalCents: 'Booking total',
+        service: 'Service',
+        zone: 'Zone',
+        scheduledStart: 'Scheduled for',
+        from: 'Before',
+        to: 'After',
+        fromDate: 'From',
+        toDate: 'Until',
+        source: 'Marked from',
+        required: 'Roles allowed',
+        isActive: 'Active',
+        deleted: 'Entries removed',
+        olderThan: 'Older than',
+        changed: 'Changed',
+        teamBefore: 'Team before',
+        teamAfter: 'Team after',
+        filters: 'Filters',
+        actorId: 'Person',
+        action: 'Action',
+        surface: 'From',
+        entityType: 'About',
+        entityId: 'Record',
+      },
+
+      value: {
+        yes: 'Yes',
+        no: 'No',
+        none: '—',
+        nobody: 'Nobody',
+        lead: '{{name}} (lead)',
+        unknownPerson: 'Someone no longer on the staff list',
+        zone: 'Zone {{zone}}',
+        updated: 'Updated',
+        noChanges: 'Nothing changed',
+        noFilters: 'No filters: the whole log was requested',
+        source: { 'my-jobs': 'The "My jobs" screen' },
+      },
+
+      /** Sobre qué fue. El nombre se resuelve al leer, no se guarda. */
+      target: {
+        booking: 'Booking {{reference}}',
+        staff: 'Staff record: {{name}}',
+      },
+
+      /** Campos de configuración, por su nombre en la pantalla que los edita. */
+      settingsField: {
+        phone: 'Phone',
+        email: 'Email',
+        hours: 'Opening hours',
+        internalEmail: 'Internal mailbox',
+        telegramChatId: 'Telegram chat',
+        telegramOnNewBooking: 'Telegram on new booking',
+        emailBookingConfirmed: 'Confirmation email',
+        emailBookingCancelled: 'Cancellation email',
+        emailBookingReminder: 'Reminder email',
+        reminderHoursBefore: 'Reminder hours before',
+      },
+
+      day: {
+        today: 'Today',
+        yesterday: 'Yesterday',
+      },
+
+      /**
+       * Detalles técnicos. Aquí van la IP, los identificadores y el JSON
+       * crudo: nada se pierde, solo deja de estorbar a quien no lo necesita.
+       */
+      technical: 'Technical details',
+      technicalHelp: 'The exact data as it was recorded. Useful if you need to report a problem.',
+      rawData: 'Recorded data',
+
+      /** Categorías del desplegable de acciones, en lenguaje llano. */
+      group: {
+        access: 'Signing in',
+        bookings: 'Bookings',
+        money: 'Money',
+        staff: 'Staff',
+        settings: 'Settings',
+        sensitive: 'Customer data',
+        log: 'This log',
+      },
+
       /* Desde donde se hizo. */
       surface: {
         PANEL: 'Admin panel',

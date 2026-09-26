@@ -121,6 +121,11 @@ Progreso:
   Consultarlo deja rastro, no guarda nada sensible y se purga solo al año.
   Queda fuera el registro de intentos fallidos de contraseña, que ocurre
   dentro de Supabase.
+- ✅ **Auditoría legible para quien no programa** (`docs/16-auditoria.md`
+  §8 bis): la pantalla ya no vuelca JSON. Los identificadores salen como
+  nombres, el dinero como dinero y los estados por su nombre; la lista va
+  agrupada por día y el filtro por categorías. Lo técnico —IP, identificadores
+  y el volcado entero— se aparta a un desplegable, no se borra.
 - ⬜ Avisos por SMS.
 - Calendario de disponibilidad y reserva en línea.
 - **Stripe**: retención del depósito con `capture_method: 'manual'` al reservar y

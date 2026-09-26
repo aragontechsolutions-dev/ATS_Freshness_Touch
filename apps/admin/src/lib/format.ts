@@ -2,6 +2,20 @@ import type { Locale } from '@freshness/types';
 
 const localeTag: Record<Locale, string> = { en: 'en-US', es: 'es-US' };
 
+/**
+ * La zona horaria de la empresa.
+ *
+ * Vive aqui y no repetida en cada pantalla porque la regla es de negocio y
+ * no de maquetacion: TODO lo que sea una cita —cuando va un equipo a una
+ * casa— se ensena en hora de Georgia, aunque quien mire este en otro sitio.
+ * Lo contrario haria que el panel y el cliente hablaran de horas distintas
+ * para la misma limpieza.
+ *
+ * Lo que NO es una cita —cuando alguien pulso un boton— va en la zona de
+ * quien mira: ver `formatTimestamp`.
+ */
+export const TIMEZONE_EMPRESA = 'America/New_York';
+
 export function formatCents(cents: number, locale: Locale = 'en'): string {
   return new Intl.NumberFormat(localeTag[locale], {
     style: 'currency',

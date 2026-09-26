@@ -434,6 +434,101 @@ export const es: TranslationResources = {
       ip: 'IP {{value}}',
       details: 'Detalles',
 
+      /* ------------------- Lo que dice cada entrada ------------------- */
+      /**
+       * Nombres de los campos de la metadata. La clave es el nombre crudo
+       * tal y como lo escribe el servidor, asi que anadir un campo nuevo a
+       * una accion solo obliga a anadir su etiqueta aqui; mientras no este,
+       * se pinta el nombre crudo en vez de desaparecer.
+       */
+      field: {
+        role: 'Puesto',
+        email: 'Correo',
+        reason: 'Motivo',
+        amountCents: 'Importe',
+        totalCents: 'Total de la reserva',
+        service: 'Servicio',
+        zone: 'Zona',
+        scheduledStart: 'Agendada para',
+        from: 'Antes',
+        to: 'Después',
+        fromDate: 'Desde',
+        toDate: 'Hasta',
+        source: 'Marcado desde',
+        required: 'Puestos permitidos',
+        isActive: 'Activo',
+        deleted: 'Entradas borradas',
+        olderThan: 'Anteriores a',
+        changed: 'Se cambió',
+        teamBefore: 'Equipo antes',
+        teamAfter: 'Equipo después',
+        filters: 'Filtros',
+        actorId: 'Persona',
+        action: 'Acción',
+        surface: 'Desde',
+        entityType: 'Sobre',
+        entityId: 'Registro',
+      },
+
+      value: {
+        yes: 'Sí',
+        no: 'No',
+        none: '—',
+        nobody: 'Nadie',
+        lead: '{{name}} (responsable)',
+        unknownPerson: 'Alguien que ya no está en la lista de personal',
+        zone: 'Zona {{zone}}',
+        updated: 'Actualizado',
+        noChanges: 'No cambió nada',
+        noFilters: 'Sin filtros: se pidió el registro entero',
+        source: { 'my-jobs': 'La pantalla «Mis trabajos»' },
+      },
+
+      /** Sobre qué fue. El nombre se resuelve al leer, no se guarda. */
+      target: {
+        booking: 'Reserva {{reference}}',
+        staff: 'Ficha de personal: {{name}}',
+      },
+
+      /** Campos de configuración, por su nombre en la pantalla que los edita. */
+      settingsField: {
+        phone: 'Teléfono',
+        email: 'Correo',
+        hours: 'Horario',
+        internalEmail: 'Buzón interno',
+        telegramChatId: 'Chat de Telegram',
+        telegramOnNewBooking: 'Telegram al entrar una reserva',
+        emailBookingConfirmed: 'Correo de confirmación',
+        emailBookingCancelled: 'Correo de cancelación',
+        emailBookingReminder: 'Correo de recordatorio',
+        reminderHoursBefore: 'Horas de antelación del recordatorio',
+      },
+
+      day: {
+        today: 'Hoy',
+        yesterday: 'Ayer',
+      },
+
+      /**
+       * Detalles técnicos. Aquí van la IP, los identificadores y el JSON
+       * crudo: nada se pierde, solo deja de estorbar a quien no lo necesita.
+       */
+      technical: 'Detalles técnicos',
+      technicalHelp:
+        'Los datos exactos tal y como se registraron. Útiles si hay que reportar un problema.',
+      rawData: 'Datos registrados',
+
+      /** Categorías del desplegable de acciones, en lenguaje llano. */
+      group: {
+        access: 'Entrar al sistema',
+        bookings: 'Reservas',
+        money: 'Dinero',
+        staff: 'Personal',
+        settings: 'Configuración',
+        sensitive: 'Datos de clientes',
+        log: 'Este registro',
+      },
+
       /* Desde donde se hizo. */
       surface: {
         PANEL: 'Panel de administración',
@@ -483,7 +578,7 @@ export const es: TranslationResources = {
           released: 'Liberó la retención',
         },
         staff: {
-          created: 'Dio de alta a alguien',
+          created: 'Dio de alta a una persona',
           updated: 'Cambió una ficha de personal',
           invited: 'Invitó al panel',
         },
