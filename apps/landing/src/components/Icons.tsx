@@ -165,20 +165,6 @@ export function RefreshIcon({ className = base }: IconProps) {
   );
 }
 
-/** Girasol: elemento grafico distintivo de la identidad de Freshness Touch. */
-export function SunflowerIcon({ className = base }: IconProps) {
-  return (
-    <svg viewBox="0 0 24 24" className={className} aria-hidden="true">
-      <g transform="translate(12 12)" fill="currentColor">
-        {[0, 45, 90, 135, 180, 225, 270, 315].map((angle) => (
-          <ellipse key={angle} rx="2.5" ry="4.6" cy="-5.1" transform={`rotate(${angle})`} />
-        ))}
-      </g>
-      <circle cx="12" cy="12" r="3.6" fill="currentColor" opacity="0.4" />
-    </svg>
-  );
-}
-
 /** Globo terraqueo: selector de idioma. */
 export function GlobeIcon({ className = base }: IconProps) {
   return (
