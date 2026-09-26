@@ -146,6 +146,29 @@ export const es: TranslationResources = {
   admin: {
     title: 'Freshness Touch · Panel',
 
+    /* ------------------- Comunes de toda la interfaz ------------------- */
+    loading: 'Cargando…',
+    working: 'Un momento…',
+    retry: 'Reintentar',
+    agenda: 'Agenda',
+    toastClose: 'Descartar aviso',
+    showPassword: 'Mostrar la contraseña',
+    hidePassword: 'Ocultar la contraseña',
+
+    /*
+     * Confirmaciones de acciones que hasta ahora no decian nada al terminar:
+     * el boton se quedaba quieto y no habia forma de saber si habia pasado.
+     */
+    toast: {
+      statusChanged: 'Reserva actualizada.',
+      depositCaptured: 'Depósito cobrado.',
+      depositReleased: 'Retención liberada.',
+      teamSaved: 'Equipo guardado.',
+      staffSaved: 'Ficha guardada.',
+      jobStarted: 'Llegada registrada.',
+      jobFinished: 'Trabajo marcado como terminado.',
+    },
+
     /* --------------------------- Acceso ---------------------------- */
     signIn: 'Iniciar sesión',
     signingIn: 'Entrando…',
@@ -255,7 +278,6 @@ export const es: TranslationResources = {
     /* ----------------------- Configuracion ------------------------- */
     settings: {
       title: 'Datos del negocio',
-      backToAgenda: 'Volver a la agenda',
       intro: 'Estos datos salen en la web publica. Los cambios aparecen alli en unos minutos.',
 
       contact: 'Contacto',
@@ -359,7 +381,6 @@ export const es: TranslationResources = {
       locale: 'Idioma',
       localeHelp: 'En este idioma se le escribe, empezando por el correo de invitación.',
       localeName: { en: 'Inglés', es: 'Español' },
-      accessTitle: 'Acceso al panel',
       accessNONE: 'Sin acceso',
       accessINVITED: 'Invitada',
       accessLINKED: 'Con acceso',
@@ -400,8 +421,6 @@ export const es: TranslationResources = {
       repeatPassword: 'Repítela',
       minLength:
         'Al menos {{count}} caracteres. Mejor una frase que recuerdes que una palabra con símbolos.',
-      show: 'Ver',
-      hide: 'Ocultar',
       choose: 'Guardar contraseña',
       tooShort: 'Necesita al menos {{count}} caracteres.',
       mismatch: 'Las dos no coinciden.',
@@ -434,7 +453,6 @@ export const es: TranslationResources = {
       rooms: '{{bedrooms}} habitaciones · {{bathrooms}} baños',
       start: 'He llegado',
       finish: 'He terminado',
-      started: 'En curso',
       finished: 'Terminado',
       finishHint:
         'Marca «He llegado» al entrar en la casa. Queda la hora, y es lo que respalda tu trabajo si alguien pregunta.',
@@ -444,7 +462,6 @@ export const es: TranslationResources = {
     unreachable: {
       title: 'No pudimos comprobar tu sesión',
       body: 'Sigues dentro: esto no te ha cerrado la sesión. Puede ser la conexión o que el servidor esté arrancando. Inténtalo de nuevo en unos segundos.',
-      retry: 'Reintentar',
     },
 
     /* --------------------------- Errores --------------------------- */

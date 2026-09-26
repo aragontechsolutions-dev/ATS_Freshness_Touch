@@ -8,10 +8,14 @@ import {
   type Locale,
 } from '@freshness/types';
 import { ApiClientError, captureDeposit, changeBookingStatus, releaseDeposit } from '../lib/api';
+import { useToast } from './ToastProvider';
+import { SpinnerIcon } from './Icons';
 import { formatCents } from '../lib/format';
 
 /** Estados que exigen explicar por qué: son los que el cliente puede discutir. */
 const NEEDS_REASON: BookingStatus[] = ['CANCELLED', 'NO_SHOW'];
+
+type Accion = BookingStatus | 'capture' | 'release';
 
 interface BookingActionsProps {
   booking: AdminBookingDetail;
@@ -30,6 +34,11 @@ interface BookingActionsProps {
  *
  * El servidor vuelve a comprobarla igualmente. Esto solo evita ofrecer un
  * botón que va a fallar.
+ *
+ * EL RESULTADO SE AVISA, YA SEA BUENO O MALO. Antes, cancelar una reserva no
+ * decía nada al terminar: el botón desaparecía porque el nuevo estado ya no
+ * lo permitía, y había que deducir del cambio que había funcionado. Cobrar
+ * un depósito —que sí mueve dinero— tampoco confirmaba nada.
  */
 export function BookingActions({
   booking,
@@ -39,9 +48,9 @@ export function BookingActions({
   onSessionLost,
 }: BookingActionsProps) {
   const { t } = useTranslation();
-  const [pending, setPending] = useState<BookingStatus | 'capture' | 'release' | null>(null);
+  const toast = useToast();
+  const [pending, setPending] = useState<Accion | null>(null);
   const [reason, setReason] = useState('');
-  const [errorKey, setErrorKey] = useState<string | null>(null);
 
   const transiciones = allowedTransitions(booking.status);
   // Solo administración mueve dinero: quien puede cambiar una cita no tiene
@@ -50,27 +59,24 @@ export function BookingActions({
   const retencionViva = booking.payment?.status === 'REQUIRES_CAPTURE';
 
   const ejecutar = async (
-    accion: BookingStatus | 'capture' | 'release',
+    accion: Accion,
     llamada: () => Promise<AdminBookingDetail>,
+    claveDeExito: string,
   ): Promise<void> => {
     setPending(accion);
-    setErrorKey(null);
 
     try {
       onUpdated(await llamada());
       setReason('');
+      toast.success(claveDeExito);
     } catch (error) {
-      if (
-        error instanceof ApiClientError &&
-        (error.statusCode === 401 || error.statusCode === 403)
-      ) {
-        // Un 403 aquí puede ser "tu rol no llega", no solo sesión perdida.
-        if (error.statusCode === 401) {
-          onSessionLost();
-          return;
-        }
+      // Un 403 aquí puede ser "tu rol no llega", no solo sesión perdida: solo
+      // el 401 cierra la sesión.
+      if (error instanceof ApiClientError && error.statusCode === 401) {
+        onSessionLost();
+        return;
       }
-      setErrorKey(error instanceof ApiClientError ? error.messageKey : 'admin.errorGeneric');
+      toast.error(error instanceof ApiClientError ? error.messageKey : 'admin.errorGeneric');
     } finally {
       setPending(null);
     }
@@ -123,15 +129,19 @@ export function BookingActions({
                 // Sin esto, un botón desactivado no explica por qué lo está.
                 title={falta ? t('admin.reasonRequired') : undefined}
                 onClick={() =>
-                  void ejecutar(estado, () =>
-                    changeBookingStatus(booking.bookingId, {
-                      status: estado,
-                      ...(reason.trim() ? { reason: reason.trim() } : {}),
-                    }),
+                  void ejecutar(
+                    estado,
+                    () =>
+                      changeBookingStatus(booking.bookingId, {
+                        status: estado,
+                        ...(reason.trim() ? { reason: reason.trim() } : {}),
+                      }),
+                    'admin.toast.statusChanged',
                   )
                 }
               >
-                {pending === estado ? t('common.loading') : t(`admin.action.${estado}`)}
+                {pending === estado && <SpinnerIcon className="h-4 w-4" />}
+                {pending === estado ? t('admin.working') : t(`admin.action.${estado}`)}
               </button>
             );
           })}
@@ -152,12 +162,15 @@ export function BookingActions({
               disabled={pending !== null || reason.trim().length === 0}
               title={reason.trim().length === 0 ? t('admin.reasonRequired') : undefined}
               onClick={() =>
-                void ejecutar('capture', () =>
-                  captureDeposit(booking.bookingId, { reason: reason.trim() }),
+                void ejecutar(
+                  'capture',
+                  () => captureDeposit(booking.bookingId, { reason: reason.trim() }),
+                  'admin.toast.depositCaptured',
                 )
               }
             >
-              {pending === 'capture' ? t('common.loading') : t('admin.captureDeposit')}
+              {pending === 'capture' && <SpinnerIcon className="h-4 w-4" />}
+              {pending === 'capture' ? t('admin.working') : t('admin.captureDeposit')}
             </button>
 
             <button
@@ -166,22 +179,19 @@ export function BookingActions({
               disabled={pending !== null || reason.trim().length === 0}
               title={reason.trim().length === 0 ? t('admin.reasonRequired') : undefined}
               onClick={() =>
-                void ejecutar('release', () =>
-                  releaseDeposit(booking.bookingId, { reason: reason.trim() }),
+                void ejecutar(
+                  'release',
+                  () => releaseDeposit(booking.bookingId, { reason: reason.trim() }),
+                  'admin.toast.depositReleased',
                 )
               }
             >
-              {pending === 'release' ? t('common.loading') : t('admin.releaseDeposit')}
+              {pending === 'release' && <SpinnerIcon className="h-4 w-4" />}
+              {pending === 'release' ? t('admin.working') : t('admin.releaseDeposit')}
             </button>
           </div>
           <p className="text-xs text-slate-500 dark:text-slate-400">{t('admin.depositHelp')}</p>
         </div>
-      )}
-
-      {errorKey && (
-        <p className="text-sm font-medium text-red-700 dark:text-red-400" role="alert">
-          {t(errorKey)}
-        </p>
       )}
     </section>
   );

@@ -18,6 +18,9 @@ import {
   inviteStaff,
   updateStaff,
 } from '../lib/api';
+import { useToast } from './ToastProvider';
+import { SkeletonPersonal } from './Skeletons';
+import { PencilIcon, PlusIcon, SendIcon, SpinnerIcon, UsersIcon } from './Icons';
 import { formatTimestamp } from '../lib/format';
 
 interface StaffDirectoryProps {
@@ -68,11 +71,11 @@ const BORRADOR_VACIO: Borrador = {
 export function StaffDirectory({ staff, locale, onSessionLost }: StaffDirectoryProps) {
   const { t } = useTranslation();
 
+  const toast = useToast();
   const [personal, setPersonal] = useState<AdminStaffDirectoryItem[] | null>(null);
   const [canInvite, setCanInvite] = useState(false);
+  /** Solo el fallo de la CARGA inicial: sin lista no hay nada que gestionar. */
   const [errorKey, setErrorKey] = useState<string | null>(null);
-  const [detalleError, setDetalleError] = useState<string | null>(null);
-  const [aviso, setAviso] = useState<string | null>(null);
 
   /** `null` = nada abierto; `'nueva'` = alta; un identificador = edicion. */
   const [abierta, setAbierta] = useState<string | 'nueva' | null>(null);
@@ -84,10 +87,13 @@ export function StaffDirectory({ staff, locale, onSessionLost }: StaffDirectoryP
       onSessionLost();
       return;
     }
-    setErrorKey(error instanceof ApiClientError ? error.messageKey : 'admin.errorGeneric');
-    // El motivo del proveedor, cuando lo hay, ahorra mucho tiempo al
-    // configurar: "signups not allowed" se resuelve en un minuto.
-    setDetalleError(error instanceof ApiClientError ? (error.fields?.[0]?.message ?? null) : null);
+    toast.error(error instanceof ApiClientError ? error.messageKey : 'admin.errorGeneric', {
+      // El motivo del proveedor, cuando lo hay, ahorra mucho tiempo al
+      // configurar: "signups not allowed" se resuelve en un minuto. Va como
+      // texto plano dentro del aviso, nunca interpretado.
+      detail:
+        error instanceof ApiClientError ? (error.fields?.[0]?.message ?? undefined) : undefined,
+    });
   };
 
   useEffect(() => {
@@ -118,20 +124,12 @@ export function StaffDirectory({ staff, locale, onSessionLost }: StaffDirectoryP
     };
   }, [onSessionLost]);
 
-  const limpiar = (): void => {
-    setErrorKey(null);
-    setDetalleError(null);
-    setAviso(null);
-  };
-
   const abrirAlta = (): void => {
-    limpiar();
     setBorrador(BORRADOR_VACIO);
     setAbierta('nueva');
   };
 
   const abrirEdicion = (persona: AdminStaffDirectoryItem): void => {
-    limpiar();
     setBorrador({
       firstName: persona.firstName,
       lastName: persona.lastName,
@@ -158,7 +156,6 @@ export function StaffDirectory({ staff, locale, onSessionLost }: StaffDirectoryP
   };
 
   const guardar = async (): Promise<void> => {
-    limpiar();
     setOcupado(true);
 
     // El telefono se normaliza aqui: el contrato solo acepta formato
@@ -191,6 +188,7 @@ export function StaffDirectory({ staff, locale, onSessionLost }: StaffDirectoryP
         asentar(await updateStaff(abierta, datos));
       }
       setAbierta(null);
+      toast.success('admin.toast.staffSaved');
     } catch (error) {
       // El formulario NO se cierra: se conserva lo tecleado para corregir.
       fallo(error);
@@ -207,12 +205,11 @@ export function StaffDirectory({ staff, locale, onSessionLost }: StaffDirectoryP
      */
     if (!window.confirm(t('admin.staff.inviteConfirm'))) return;
 
-    limpiar();
     setOcupado(true);
 
     try {
       asentar(await inviteStaff(persona.staffId));
-      setAviso(t('admin.staff.inviteSent'));
+      toast.success('admin.staff.inviteSent');
     } catch (error) {
       fallo(error);
     } finally {
@@ -220,14 +217,16 @@ export function StaffDirectory({ staff, locale, onSessionLost }: StaffDirectoryP
     }
   };
 
-  if (!personal) {
+  if (errorKey) {
     return (
-      <section className="ft-card p-5">
-        <p className="text-sm text-slate-600 dark:text-slate-400">
-          {errorKey ? t(errorKey) : t('common.loading')}
-        </p>
+      <section className="ft-card p-5" role="alert">
+        <p className="text-sm font-medium text-red-700 dark:text-red-400">{t(errorKey)}</p>
       </section>
     );
+  }
+
+  if (!personal) {
+    return <SkeletonPersonal />;
   }
 
   const activas = personal.filter((p) => p.isActive);
@@ -238,7 +237,8 @@ export function StaffDirectory({ staff, locale, onSessionLost }: StaffDirectoryP
       <section className="ft-card p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="max-w-xl">
-            <h2 className="text-sm font-bold text-slate-900 dark:text-white">
+            <h2 className="flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-white">
+              <UsersIcon className="h-4 w-4 text-slate-500 dark:text-slate-400" />
               {t('admin.staff.title')}
             </h2>
             <p className="mt-1 text-xs text-slate-600 dark:text-slate-400">
@@ -247,6 +247,7 @@ export function StaffDirectory({ staff, locale, onSessionLost }: StaffDirectoryP
           </div>
           {abierta === null && (
             <button type="button" className="ft-btn-primary" onClick={abrirAlta}>
+              <PlusIcon className="h-4 w-4" />
               {t('admin.staff.add')}
             </button>
           )}
@@ -267,15 +268,13 @@ export function StaffDirectory({ staff, locale, onSessionLost }: StaffDirectoryP
           esPropia={false}
           ocupado={ocupado}
           onGuardar={() => void guardar()}
-          onDescartar={() => {
-            setAbierta(null);
-            limpiar();
-          }}
+          onDescartar={() => setAbierta(null)}
         />
       )}
 
       {activas.length === 0 && inactivas.length === 0 ? (
-        <section className="ft-card p-5">
+        <section className="ft-card flex flex-col items-center gap-2 px-6 py-12 text-center">
+          <UsersIcon className="h-9 w-9 text-slate-400 dark:text-slate-500" />
           <p className="text-sm text-slate-600 dark:text-slate-400">{t('admin.staff.empty')}</p>
         </section>
       ) : (
@@ -293,10 +292,7 @@ export function StaffDirectory({ staff, locale, onSessionLost }: StaffDirectoryP
               setBorrador={setBorrador}
               onEditar={() => abrirEdicion(persona)}
               onGuardar={() => void guardar()}
-              onDescartar={() => {
-                setAbierta(null);
-                limpiar();
-              }}
+              onDescartar={() => setAbierta(null)}
               onInvitar={() => void invitar(persona)}
             />
           ))}
@@ -319,31 +315,13 @@ export function StaffDirectory({ staff, locale, onSessionLost }: StaffDirectoryP
                   setBorrador={setBorrador}
                   onEditar={() => abrirEdicion(persona)}
                   onGuardar={() => void guardar()}
-                  onDescartar={() => {
-                    setAbierta(null);
-                    limpiar();
-                  }}
+                  onDescartar={() => setAbierta(null)}
                   onInvitar={() => void invitar(persona)}
                 />
               ))}
             </>
           )}
         </>
-      )}
-
-      {aviso && (
-        <p className="text-sm font-medium text-green-700 dark:text-green-400" role="status">
-          {aviso}
-        </p>
-      )}
-
-      {errorKey && (
-        <div role="alert">
-          <p className="text-sm font-medium text-red-700 dark:text-red-400">{t(errorKey)}</p>
-          {detalleError && (
-            <p className="mt-1 font-mono text-xs text-red-700 dark:text-red-400">{detalleError}</p>
-          )}
-        </div>
       )}
     </div>
   );
@@ -437,10 +415,12 @@ function Ficha({
           */}
           {canInvite && persona.isActive && persona.access === 'NONE' && (
             <button type="button" className="ft-btn-ghost" disabled={ocupado} onClick={onInvitar}>
+              <SendIcon className="h-4 w-4" />
               {t('admin.staff.invite')}
             </button>
           )}
           <button type="button" className="ft-btn-ghost" disabled={ocupado} onClick={onEditar}>
+            <PencilIcon className="h-4 w-4" />
             {t('admin.staff.edit')}
           </button>
         </div>
@@ -596,7 +576,8 @@ function Formulario({
           disabled={ocupado || !completo}
           onClick={onGuardar}
         >
-          {ocupado ? t('common.loading') : t('admin.staff.save')}
+          {ocupado && <SpinnerIcon className="h-4 w-4" />}
+          {ocupado ? t('admin.working') : t('admin.staff.save')}
         </button>
         <button type="button" className="ft-btn-ghost" disabled={ocupado} onClick={onDescartar}>
           {t('admin.staff.discard')}

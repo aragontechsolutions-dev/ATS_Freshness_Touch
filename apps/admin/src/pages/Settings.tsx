@@ -14,6 +14,9 @@ import {
 import { ApiClientError, fetchSettings, saveSettings } from '../lib/api';
 import { NotificationSettingsForm } from '../components/NotificationSettingsForm';
 import { StaffDirectory } from '../components/StaffDirectory';
+import { useToast } from '../components/ToastProvider';
+import { SkeletonFormulario } from '../components/Skeletons';
+import { BellIcon, GearIcon, SpinnerIcon, UsersIcon } from '../components/Icons';
 import { formatTimestamp } from '../lib/format';
 
 interface SettingsPageProps {
@@ -56,19 +59,32 @@ type Seccion = 'business' | 'notifications' | 'staff';
  * de que se guardo.
  */
 export function SettingsPage({ staff, locale, onSessionLost }: SettingsShellProps) {
+  const { t } = useTranslation();
   const [seccion, setSeccion] = useState<Seccion>('business');
 
   return (
     <div className="space-y-6">
-      <nav className="flex gap-2" aria-label="Secciones">
-        <Pestana activa={seccion === 'business'} onClick={() => setSeccion('business')}>
-          <TituloNegocio />
+      <nav className="flex flex-wrap gap-2" aria-label={t('admin.settings.title')}>
+        <Pestana
+          activa={seccion === 'business'}
+          onClick={() => setSeccion('business')}
+          icono={<GearIcon className="h-4 w-4" />}
+        >
+          {t('admin.settings.title')}
         </Pestana>
-        <Pestana activa={seccion === 'notifications'} onClick={() => setSeccion('notifications')}>
-          <TituloAvisos />
+        <Pestana
+          activa={seccion === 'notifications'}
+          onClick={() => setSeccion('notifications')}
+          icono={<BellIcon className="h-4 w-4" />}
+        >
+          {t('admin.notifications.title')}
         </Pestana>
-        <Pestana activa={seccion === 'staff'} onClick={() => setSeccion('staff')}>
-          <TituloPersonal />
+        <Pestana
+          activa={seccion === 'staff'}
+          onClick={() => setSeccion('staff')}
+          icono={<UsersIcon className="h-4 w-4" />}
+        >
+          {t('admin.staff.title')}
         </Pestana>
       </nav>
 
@@ -83,28 +99,15 @@ export function SettingsPage({ staff, locale, onSessionLost }: SettingsShellProp
   );
 }
 
-function TituloNegocio() {
-  const { t } = useTranslation();
-  return <>{t('admin.settings.title')}</>;
-}
-
-function TituloAvisos() {
-  const { t } = useTranslation();
-  return <>{t('admin.notifications.title')}</>;
-}
-
-function TituloPersonal() {
-  const { t } = useTranslation();
-  return <>{t('admin.staff.title')}</>;
-}
-
 function Pestana({
   activa,
   onClick,
+  icono,
   children,
 }: {
   activa: boolean;
   onClick: () => void;
+  icono: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
@@ -112,12 +115,9 @@ function Pestana({
       type="button"
       onClick={onClick}
       aria-current={activa ? 'page' : undefined}
-      className={
-        activa
-          ? 'rounded-lg bg-brand-700 px-3 py-2 text-sm font-semibold text-white'
-          : 'ft-btn-ghost px-3 py-2 text-sm'
-      }
+      className={`ft-tab ${activa ? 'ft-tab-on' : 'ft-tab-off'}`}
     >
+      {icono}
       {children}
     </button>
   );
@@ -126,10 +126,11 @@ function Pestana({
 function BusinessSettingsForm({ locale, onSessionLost }: SettingsPageProps) {
   const { t } = useTranslation();
 
+  const toast = useToast();
   const [cargando, setCargando] = useState(true);
   const [guardando, setGuardando] = useState(false);
+  /** Solo el fallo de la CARGA: sin datos no hay formulario que rellenar. */
   const [errorKey, setErrorKey] = useState<string | null>(null);
-  const [guardado, setGuardado] = useState(false);
   const [autoria, setAutoria] = useState<Omit<AdminBusinessSettings, 'settings'> | null>(null);
 
   // Lo que hay en los campos. El telefono se guarda como se teclea y solo se
@@ -169,14 +170,11 @@ function BusinessSettingsForm({ locale, onSessionLost }: SettingsPageProps) {
 
   const cambiarDia = (dia: Weekday, valor: { open: string; close: string } | null): void => {
     setHours((actual) => ({ ...actual, [dia]: valor }));
-    setGuardado(false);
   };
 
   const enviar = async (evento: React.FormEvent): Promise<void> => {
     evento.preventDefault();
-    setErrorKey(null);
     setFieldErrors({});
-    setGuardado(false);
 
     /*
      * Se valida aqui con EL MISMO esquema que usa el servidor. No es para
@@ -204,20 +202,31 @@ function BusinessSettingsForm({ locale, onSessionLost }: SettingsPageProps) {
       setEmail(datos.settings.email ?? '');
       setHours(datos.settings.hours);
       setAutoria({ updatedAt: datos.updatedAt, updatedBy: datos.updatedBy });
-      setGuardado(true);
+      toast.success('admin.settings.saved');
     } catch (error) {
       if (error instanceof ApiClientError && error.statusCode === 401) {
         alPerderSesion();
         return;
       }
-      setErrorKey(error instanceof ApiClientError ? error.messageKey : 'admin.errorGeneric');
+      toast.error(error instanceof ApiClientError ? error.messageKey : 'admin.errorGeneric');
     } finally {
       setGuardando(false);
     }
   };
 
   if (cargando) {
-    return <p className="text-sm text-slate-600 dark:text-slate-400">{t('common.loading')}</p>;
+    return <SkeletonFormulario bloques={2} campos={3} />;
+  }
+
+  if (errorKey) {
+    return (
+      <div className="ft-card flex flex-col items-start gap-3 p-5" role="alert">
+        <p className="text-sm font-medium text-red-700 dark:text-red-400">{t(errorKey)}</p>
+        <button type="button" className="ft-btn-ghost" onClick={() => void cargar()}>
+          {t('admin.retry')}
+        </button>
+      </div>
+    );
   }
 
   // Lo que quedara guardado, para que no haya sorpresas al pulsar el boton.
@@ -254,7 +263,6 @@ function BusinessSettingsForm({ locale, onSessionLost }: SettingsPageProps) {
             placeholder="(404) 555-0123"
             onChange={(evento) => {
               setPhone(evento.target.value);
-              setGuardado(false);
             }}
           />
           <p className="mt-1 text-xs text-slate-600 dark:text-slate-400">
@@ -280,7 +288,6 @@ function BusinessSettingsForm({ locale, onSessionLost }: SettingsPageProps) {
             placeholder="contact@freshnesstouch.com"
             onChange={(evento) => {
               setEmail(evento.target.value);
-              setGuardado(false);
             }}
           />
           <p className="mt-1 text-xs text-slate-600 dark:text-slate-400">
@@ -380,22 +387,11 @@ function BusinessSettingsForm({ locale, onSessionLost }: SettingsPageProps) {
         </ul>
       </section>
 
-      {errorKey && (
-        <p role="alert" className="text-sm font-semibold text-red-700">
-          {t(errorKey)}
-        </p>
-      )}
-
       <div className="flex flex-wrap items-center gap-3">
         <button type="submit" className="ft-btn-primary" disabled={guardando}>
+          {guardando && <SpinnerIcon className="h-4 w-4" />}
           {guardando ? t('admin.settings.saving') : t('admin.settings.save')}
         </button>
-
-        {guardado && (
-          <p role="status" className="text-sm font-semibold text-brand-700 dark:text-brand-300">
-            {t('admin.settings.saved')}
-          </p>
-        )}
       </div>
 
       {autoria?.updatedAt && (

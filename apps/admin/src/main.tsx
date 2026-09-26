@@ -7,6 +7,7 @@ import '@fontsource-variable/inter';
 import './styles.css';
 import './i18n';
 import App from './App';
+import { ToastProvider } from './components/ToastProvider';
 
 const container = document.getElementById('root');
 if (!container) {
@@ -15,6 +16,13 @@ if (!container) {
 
 createRoot(container).render(
   <StrictMode>
-    <App />
+    {/*
+      Los avisos envuelven a TODA la aplicacion, incluida la pantalla de
+      acceso. Si colgaran del panel ya abierto, el unico sitio donde no se
+      podrian dar avisos seria justo donde mas falta hacen: al entrar.
+    */}
+    <ToastProvider>
+      <App />
+    </ToastProvider>
   </StrictMode>,
 );

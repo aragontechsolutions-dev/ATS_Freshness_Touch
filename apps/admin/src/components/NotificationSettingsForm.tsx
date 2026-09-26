@@ -6,6 +6,9 @@ import {
   type NotificationSettings,
 } from '@freshness/types';
 import { ApiClientError, fetchNotificationSettings, saveNotificationSettings } from '../lib/api';
+import { useToast } from './ToastProvider';
+import { SkeletonFormulario } from './Skeletons';
+import { BellIcon, MailIcon, SpinnerIcon } from './Icons';
 
 interface Props {
   onSessionLost: () => void;
@@ -25,9 +28,10 @@ interface Props {
 export function NotificationSettingsForm({ onSessionLost }: Props) {
   const { t } = useTranslation();
 
+  const toast = useToast();
   const [cargando, setCargando] = useState(true);
   const [guardando, setGuardando] = useState(false);
-  const [guardado, setGuardado] = useState(false);
+  /** Solo el fallo de la CARGA: sin datos no hay formulario que rellenar. */
   const [errorKey, setErrorKey] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
@@ -68,14 +72,11 @@ export function NotificationSettingsForm({ onSessionLost }: Props) {
 
   const marcar = (campo: keyof NotificationSettings, valor: boolean): void => {
     setValores((actual) => ({ ...actual, [campo]: valor }));
-    setGuardado(false);
   };
 
   const enviar = async (evento: React.FormEvent): Promise<void> => {
     evento.preventDefault();
-    setErrorKey(null);
     setFieldErrors({});
-    setGuardado(false);
 
     const candidato: unknown = {
       ...valores,
@@ -107,20 +108,31 @@ export function NotificationSettingsForm({ onSessionLost }: Props) {
       setInternalEmail(datos.internalEmail ?? '');
       setTelegramChatId(datos.telegramChatId ?? '');
       setHorasAntes(String(datos.reminderHoursBefore));
-      setGuardado(true);
+      toast.success('admin.settings.saved');
     } catch (error) {
       if (error instanceof ApiClientError && error.statusCode === 401) {
         onSessionLost();
         return;
       }
-      setErrorKey(error instanceof ApiClientError ? error.messageKey : 'admin.errorGeneric');
+      toast.error(error instanceof ApiClientError ? error.messageKey : 'admin.errorGeneric');
     } finally {
       setGuardando(false);
     }
   };
 
   if (cargando) {
-    return <p className="text-sm text-slate-600 dark:text-slate-400">{t('common.loading')}</p>;
+    return <SkeletonFormulario bloques={2} campos={3} />;
+  }
+
+  if (errorKey) {
+    return (
+      <div className="ft-card flex flex-col items-start gap-3 p-5" role="alert">
+        <p className="text-sm font-medium text-red-700 dark:text-red-400">{t(errorKey)}</p>
+        <button type="button" className="ft-btn-ghost" onClick={() => void cargar()}>
+          {t('admin.retry')}
+        </button>
+      </div>
+    );
   }
 
   return (
@@ -136,7 +148,8 @@ export function NotificationSettingsForm({ onSessionLost }: Props) {
 
       {/* ------------------------ Correo al cliente ----------------------- */}
       <section className="ft-card space-y-4 p-4">
-        <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+        <h3 className="flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-white">
+          <MailIcon className="h-4 w-4 text-slate-500 dark:text-slate-400" />
           {t('admin.notifications.customerEmails')}
         </h3>
 
@@ -187,7 +200,6 @@ export function NotificationSettingsForm({ onSessionLost }: Props) {
               value={horasAntes}
               onChange={(evento) => {
                 setHorasAntes(evento.target.value);
-                setGuardado(false);
               }}
             />
             <p className="mt-1 text-xs text-slate-600 dark:text-slate-400">
@@ -202,7 +214,8 @@ export function NotificationSettingsForm({ onSessionLost }: Props) {
 
       {/* -------------------------- Avisos internos ----------------------- */}
       <section className="ft-card space-y-4 p-4">
-        <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+        <h3 className="flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-white">
+          <BellIcon className="h-4 w-4 text-slate-500 dark:text-slate-400" />
           {t('admin.notifications.internal')}
         </h3>
 
@@ -219,7 +232,6 @@ export function NotificationSettingsForm({ onSessionLost }: Props) {
             placeholder="avisos@freshnesstouch.com"
             onChange={(evento) => {
               setInternalEmail(evento.target.value);
-              setGuardado(false);
             }}
           />
           <p className="mt-1 text-xs text-slate-600 dark:text-slate-400">
@@ -253,7 +265,6 @@ export function NotificationSettingsForm({ onSessionLost }: Props) {
             placeholder="123456789"
             onChange={(evento) => {
               setTelegramChatId(evento.target.value);
-              setGuardado(false);
             }}
           />
           <p className="mt-1 text-xs text-slate-600 dark:text-slate-400">
@@ -273,22 +284,11 @@ export function NotificationSettingsForm({ onSessionLost }: Props) {
         </p>
       </section>
 
-      {errorKey && (
-        <p role="alert" className="text-sm font-semibold text-red-700">
-          {t(errorKey)}
-        </p>
-      )}
-
       <div className="flex flex-wrap items-center gap-3">
         <button type="submit" className="ft-btn-primary" disabled={guardando}>
+          {guardando && <SpinnerIcon className="h-4 w-4" />}
           {guardando ? t('admin.settings.saving') : t('admin.settings.save')}
         </button>
-
-        {guardado && (
-          <p role="status" className="text-sm font-semibold text-brand-700 dark:text-brand-300">
-            {t('admin.settings.saved')}
-          </p>
-        )}
       </div>
     </form>
   );

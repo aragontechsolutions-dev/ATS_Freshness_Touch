@@ -2,6 +2,8 @@ import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PANEL_PASSWORD_MIN_LENGTH, panelPasswordProblem } from '@freshness/types';
 import { auth } from '../lib/supabase';
+import { PasswordField } from '../components/PasswordField';
+import { AlertIcon, CheckCircleIcon, SpinnerIcon } from '../components/Icons';
 import { clearPasswordLinkFromUrl, type PasswordLink } from '../lib/password-link';
 
 interface SetPasswordProps {
@@ -132,8 +134,16 @@ export function SetPassword({ link, onDone, onCancel }: SetPasswordProps) {
 
   if (estado.fase === 'abriendo') {
     return (
-      <main className="flex min-h-dvh items-center justify-center px-4">
-        <p className="text-sm text-slate-600 dark:text-slate-400">{t('common.loading')}</p>
+      <main className="flex min-h-dvh items-center justify-center px-4 py-12">
+        <div className="ft-card w-full max-w-sm space-y-4 p-6" aria-busy="true">
+          <span className="sr-only">{t('admin.loading')}</span>
+          <div aria-hidden="true" className="space-y-4">
+            <div className="ft-skeleton h-6 w-48" />
+            <div className="ft-skeleton h-3.5 w-full" />
+            <div className="ft-skeleton h-10 w-full rounded-lg" />
+            <div className="ft-skeleton h-10 w-full rounded-lg" />
+          </div>
+        </div>
       </main>
     );
   }
@@ -142,7 +152,11 @@ export function SetPassword({ link, onDone, onCancel }: SetPasswordProps) {
     return (
       <main className="flex min-h-dvh items-center justify-center px-4 py-12">
         <div className="ft-card w-full max-w-sm p-6">
-          <p className="text-sm font-medium text-green-700 dark:text-green-400" role="status">
+          <p
+            className="flex items-start gap-2 text-sm font-medium text-green-700 dark:text-green-400"
+            role="status"
+          >
+            <CheckCircleIcon className="mt-0.5 h-5 w-5 shrink-0" />
             {t('admin.passwordReset.saved')}
           </p>
           <button type="button" className="ft-btn-primary mt-4 w-full" onClick={onDone}>
@@ -157,7 +171,11 @@ export function SetPassword({ link, onDone, onCancel }: SetPasswordProps) {
     return (
       <main className="flex min-h-dvh items-center justify-center px-4 py-12">
         <div className="ft-card w-full max-w-sm p-6">
-          <p className="text-sm font-medium text-red-700 dark:text-red-400" role="alert">
+          <p
+            className="flex items-start gap-2 text-sm font-medium text-red-700 dark:text-red-400"
+            role="alert"
+          >
+            <AlertIcon className="mt-0.5 h-5 w-5 shrink-0" />
             {t(estado.messageKey)}
           </p>
           <button type="button" className="ft-btn-primary mt-4 w-full" onClick={onCancel}>
@@ -189,57 +207,42 @@ export function SetPassword({ link, onDone, onCancel }: SetPasswordProps) {
         </p>
 
         <form className="mt-5 space-y-4" onSubmit={(event) => void submit(event)}>
+          {/*
+            UN SOLO OJO PARA LOS DOS CAMPOS. Con uno por campo se puede
+            acabar con el primero a la vista y el segundo oculto, que es
+            justo la combinacion que no ayuda a comparar si coinciden.
+          */}
           <div>
-            <label className="ft-label" htmlFor="clave-nueva">
-              {t('admin.passwordReset.newPassword')}
-            </label>
-            <input
+            <PasswordField
               id="clave-nueva"
-              type={verClave ? 'text' : 'password'}
-              // Le dice al gestor de contrasenas que esto es una clave nueva,
-              // para que ofrezca generarla y guardarla en vez de autocompletar
-              // la vieja, que es justo la que ya no vale.
-              autoComplete="new-password"
-              className="ft-input w-full"
-              maxLength={200}
+              label={t('admin.passwordReset.newPassword')}
               value={password}
-              onChange={(event) => setPassword(event.target.value)}
+              onChange={setPassword}
+              autoComplete="new-password"
+              visible={verClave}
+              onToggleVisible={() => setVerClave((valor) => !valor)}
             />
-            <div className="mt-1 flex items-start justify-between gap-2">
-              <p className="text-xs text-slate-500 dark:text-slate-400">
-                {t('admin.passwordReset.minLength', { count: PANEL_PASSWORD_MIN_LENGTH })}
-              </p>
-              {/*
-                Ver la contrasena evita la errata invisible, que es el motivo
-                numero uno de "no me deja entrar" al dia siguiente.
-              */}
-              <button
-                type="button"
-                className="shrink-0 text-xs font-semibold text-brand-700 underline dark:text-sun-300"
-                onClick={() => setVerClave((valor) => !valor)}
-              >
-                {t(verClave ? 'admin.passwordReset.hide' : 'admin.passwordReset.show')}
-              </button>
-            </div>
+            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+              {t('admin.passwordReset.minLength', { count: PANEL_PASSWORD_MIN_LENGTH })}
+            </p>
           </div>
 
-          <div>
-            <label className="ft-label" htmlFor="clave-repetida">
-              {t('admin.passwordReset.repeatPassword')}
-            </label>
-            <input
-              id="clave-repetida"
-              type={verClave ? 'text' : 'password'}
-              autoComplete="new-password"
-              className="ft-input w-full"
-              maxLength={200}
-              value={confirmation}
-              onChange={(event) => setConfirmation(event.target.value)}
-            />
-          </div>
+          <PasswordField
+            id="clave-repetida"
+            label={t('admin.passwordReset.repeatPassword')}
+            value={confirmation}
+            onChange={setConfirmation}
+            autoComplete="new-password"
+            visible={verClave}
+            onToggleVisible={() => setVerClave((valor) => !valor)}
+          />
 
           {problema && (
-            <p className="text-sm font-medium text-red-700 dark:text-red-400" role="alert">
+            <p
+              className="flex items-start gap-2 text-sm font-medium text-red-700 dark:text-red-400"
+              role="alert"
+            >
+              <AlertIcon className="mt-0.5 h-4 w-4 shrink-0" />
               {t(`admin.passwordReset.${problema}`, { count: PANEL_PASSWORD_MIN_LENGTH })}
             </p>
           )}
@@ -249,7 +252,8 @@ export function SetPassword({ link, onDone, onCancel }: SetPasswordProps) {
             className="ft-btn-primary w-full"
             disabled={estado.fase === 'guardando'}
           >
-            {estado.fase === 'guardando' ? t('common.loading') : t('admin.passwordReset.choose')}
+            {estado.fase === 'guardando' && <SpinnerIcon className="h-4 w-4" />}
+            {estado.fase === 'guardando' ? t('admin.working') : t('admin.passwordReset.choose')}
           </button>
         </form>
       </div>

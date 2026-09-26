@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import type { Locale } from '@freshness/types';
 import { useIdleSignOut } from './hooks/useIdleSignOut';
 import { useStaffSession } from './hooks/useStaffSession';
+import { useTheme } from './hooks/useTheme';
 import { Agenda } from './pages/Agenda';
 import { BookingDetailPage } from './pages/BookingDetail';
 import { ForgotPassword } from './pages/ForgotPassword';
@@ -10,23 +11,44 @@ import { Login } from './pages/Login';
 import { MyJobs } from './pages/MyJobs';
 import { SetPassword } from './pages/SetPassword';
 import { SettingsPage } from './pages/Settings';
+import {
+  AlertIcon,
+  BriefcaseIcon,
+  CalendarIcon,
+  GearIcon,
+  GlobeIcon,
+  MoonIcon,
+  RefreshIcon,
+  SignOutIcon,
+  SunIcon,
+} from './components/Icons';
+import { SkeletonListaReservas } from './components/Skeletons';
 import { persistLocale } from './i18n';
 import { readPasswordLink, type PasswordLink } from './lib/password-link';
+
+/** Las tres pantallas del panel. El detalle de una reserva se abre sobre la agenda. */
+type Vista = 'agenda' | 'myJobs' | 'settings';
 
 /**
  * PANEL DE ADMINISTRACION
  * -----------------------
- * Sin enrutador: son tres vistas y la navegacion cabe en un estado. Anadir una
- * libreria de rutas para esto seria peso y complejidad a cambio de nada;
+ * Sin enrutador: son tres vistas y la navegacion cabe en un estado. Anadir
+ * una libreria de rutas para esto seria peso y complejidad a cambio de nada;
  * cuando el panel crezca, entrara.
+ *
+ * LA VISTA ES UN VALOR, NO TRES INTERRUPTORES. Antes habia tres booleanos
+ * sueltos y cada boton tenia que acordarse de apagar los otros dos: bastaba
+ * olvidarse de uno para acabar en «ajustes» con el detalle de una reserva
+ * todavia abierto detras. Con un solo valor ese estado no se puede escribir.
  */
 export default function App() {
   const { t, i18n } = useTranslation();
   const locale = (i18n.resolvedLanguage ?? 'en') as Locale;
   const { state, signOut, refresh } = useStaffSession();
+  const { theme, toggleTheme } = useTheme();
+
+  const [vista, setVista] = useState<Vista>('agenda');
   const [openBookingId, setOpenBookingId] = useState<string | null>(null);
-  const [enAjustes, setEnAjustes] = useState(false);
-  const [enMisTrabajos, setEnMisTrabajos] = useState(false);
   const [pidiendoEnlace, setPidiendoEnlace] = useState(false);
 
   /*
@@ -54,12 +76,6 @@ export default function App() {
   );
 
   /*
-   * El motivo lo decide quien recibe el error, no este componente. Antes
-   * estaba fijo en "caducada" y eso mentia: a una cuenta sin permiso para
-   * esta pantalla se le decia que volviera a entrar, cosa que no arregla
-   * nada y que la deja reintentando indefinidamente.
-   */
-  /*
    * TAMBIEN SE ESCUCHA EL CAMBIO DE FRAGMENTO, y no es rebuscado.
    *
    * Si el panel ya esta abierto en la pestana donde se pulsa el enlace del
@@ -80,6 +96,12 @@ export default function App() {
     return () => window.removeEventListener('hashchange', alCambiarFragmento);
   }, []);
 
+  /*
+   * El motivo lo decide quien recibe el error, no este componente. Antes
+   * estaba fijo en "caducada" y eso mentia: a una cuenta sin permiso para
+   * esta pantalla se le decia que volviera a entrar, cosa que no arregla
+   * nada y que la deja reintentando indefinidamente.
+   */
   const alPerderSesion = useCallback(
     (reason: 'expired' | 'noAccess' = 'expired') => void signOut(reason),
     [signOut],
@@ -91,11 +113,31 @@ export default function App() {
     persistLocale(siguiente);
   };
 
+  const irA = (destino: Vista): void => {
+    // Cambiar de pantalla cierra el detalle abierto: volver despues a una
+    // reserva que ya no se estaba mirando desconcierta mas de lo que ahorra.
+    setOpenBookingId(null);
+    setVista(destino);
+  };
+
+  /*
+   * Mientras se comprueba quien eres se pinta EL ESQUELETO DE LA AGENDA, no
+   * un «cargando» centrado. Es lo que se va a ver en un segundo, asi que la
+   * pagina no da un salto al llegar los datos.
+   */
   if (state.status === 'loading') {
     return (
-      <main className="flex min-h-dvh items-center justify-center">
-        <p className="text-sm text-slate-600 dark:text-slate-400">{t('common.loading')}</p>
-      </main>
+      <div className="min-h-dvh">
+        <div className="border-b border-slate-200 bg-white dark:border-night-600 dark:bg-night-800">
+          <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-3">
+            <div className="ft-skeleton h-8 w-40" />
+            <div className="ft-skeleton h-11 w-32" />
+          </div>
+        </div>
+        <main className="mx-auto max-w-5xl px-4 py-6">
+          <SkeletonListaReservas />
+        </main>
+      </div>
     );
   }
 
@@ -130,24 +172,32 @@ export default function App() {
     return (
       <main className="flex min-h-dvh items-center justify-center px-4 py-12">
         <div className="ft-card w-full max-w-sm p-6">
-          <h1 className="text-lg font-bold text-slate-900 dark:text-white">
-            {t('admin.unreachable.title')}
-          </h1>
-          <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
-            {t('admin.unreachable.body')}
-          </p>
+          <div className="flex items-start gap-3">
+            <AlertIcon className="mt-0.5 h-6 w-6 shrink-0 text-sun-700 dark:text-sun-300" />
+            <div>
+              <h1 className="text-lg font-bold text-slate-900 dark:text-white">
+                {t('admin.unreachable.title')}
+              </h1>
+              <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
+                {t('admin.unreachable.body')}
+              </p>
+            </div>
+          </div>
+
           <button
             type="button"
-            className="ft-btn-primary mt-4 w-full"
+            className="ft-btn-primary mt-5 w-full"
             onClick={() => void refresh()}
           >
-            {t('admin.unreachable.retry')}
+            <RefreshIcon className="h-4 w-4" />
+            {t('admin.retry')}
           </button>
           <button
             type="button"
             className="ft-btn-ghost mt-2 w-full"
             onClick={() => void signOut('manual')}
           >
+            <SignOutIcon className="h-4 w-4" />
             {t('admin.signOut')}
           </button>
         </div>
@@ -180,72 +230,121 @@ export default function App() {
    * PARA LIMPIEZA, "MIS TRABAJOS" ES TODO EL PANEL.
    *
    * No es una pestana mas escondida entre otras: es la unica pantalla que su
-   * puesto puede abrir, asi que se pinta directamente. Coordinacion y
-   * administracion la tienen tambien —en una empresa pequena quien coordina
-   * tambien limpia, y desde la etapa anterior se le puede asignar— pero para
-   * ellas convive con la agenda.
+   * puesto puede abrir. Coordinacion y administracion la tienen tambien —en
+   * una empresa pequena quien coordina tambien limpia— pero para ellas
+   * convive con la agenda.
    */
   const soloMisTrabajos = state.staff.role === 'CLEANER';
+  const actual: Vista = soloMisTrabajos ? 'myJobs' : vista;
 
   return (
     <div className="min-h-dvh">
-      <header className="border-b border-slate-200 bg-white dark:border-night-600 dark:bg-night-800">
-        <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3 px-4 py-3">
-          <div className="min-w-0">
-            <p className="text-sm font-bold text-brand-800 dark:text-white">{t('admin.title')}</p>
-            <p className="truncate text-xs text-slate-600 dark:text-slate-400">
-              {state.staff.firstName} {state.staff.lastName} · {t(`admin.role.${state.staff.role}`)}
-            </p>
-          </div>
+      <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 backdrop-blur dark:border-night-600 dark:bg-night-800/95">
+        <div className="mx-auto max-w-5xl px-4">
+          <div className="flex flex-wrap items-center justify-between gap-3 py-3">
+            <div className="flex min-w-0 items-center gap-3">
+              {/*
+                La marca en un cuadro amarillo con la inicial: el panel no
+                lleva el logotipo completo porque a 390 px se come la mitad
+                del ancho y lo que hace falta ahi es saber quien eres tu.
+              */}
+              <span
+                aria-hidden="true"
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-sun-400 text-sm font-bold text-ink"
+              >
+                FT
+              </span>
+              <div className="min-w-0">
+                <p className="truncate text-sm font-bold text-slate-900 dark:text-white">
+                  {state.staff.firstName} {state.staff.lastName}
+                </p>
+                <p className="truncate text-xs text-slate-600 dark:text-slate-400">
+                  {t(`admin.role.${state.staff.role}`)}
+                </p>
+              </div>
+            </div>
 
-          <div className="flex shrink-0 items-center gap-2">
-            {!soloMisTrabajos && (
+            <div className="flex shrink-0 items-center gap-2">
+              {/*
+                Tema e idioma son botones de solo icono: se usan una vez y
+                luego no se vuelven a tocar, asi que ocupar ancho con su texto
+                iria en contra de lo que de verdad se pulsa a diario. Llevan
+                `aria-label` y `title`, que es lo que los hace utilizables.
+              */}
               <button
                 type="button"
-                className="ft-btn-ghost"
-                aria-pressed={enMisTrabajos}
-                onClick={() => {
-                  setOpenBookingId(null);
-                  setEnAjustes(false);
-                  setEnMisTrabajos((valor) => !valor);
-                }}
+                className="ft-btn-icon"
+                onClick={toggleTheme}
+                aria-label={t(theme === 'dark' ? 'common.theme.light' : 'common.theme.dark')}
+                title={t(theme === 'dark' ? 'common.theme.light' : 'common.theme.dark')}
               >
-                {enMisTrabajos ? t('admin.back') : t('admin.myJobs.title')}
+                {theme === 'dark' ? (
+                  <SunIcon className="h-5 w-5" />
+                ) : (
+                  <MoonIcon className="h-5 w-5" />
+                )}
               </button>
-            )}
 
-            {puedeConfigurar && (
               <button
                 type="button"
-                className="ft-btn-ghost"
-                aria-pressed={enAjustes}
-                onClick={() => {
-                  // Al ir a configuracion se cierra el detalle abierto: volver
-                  // despues a una reserva que ya no se estaba mirando
-                  // desconcierta mas de lo que ahorra.
-                  setOpenBookingId(null);
-                  setEnMisTrabajos(false);
-                  setEnAjustes((valor) => !valor);
-                }}
+                className="ft-btn-icon relative"
+                onClick={cambiarIdioma}
+                aria-label={t('common.language')}
+                title={t('common.language')}
               >
-                {enAjustes ? t('admin.settings.backToAgenda') : t('admin.settings.title')}
+                <GlobeIcon className="h-5 w-5" />
+                {/* La sigla dice a que idioma se va, no en cual se esta. */}
+                <span className="absolute right-1 bottom-0.5 text-[10px] font-bold">
+                  {locale === 'en' ? 'ES' : 'EN'}
+                </span>
               </button>
-            )}
 
-            <button type="button" className="ft-btn-ghost" onClick={cambiarIdioma}>
-              {locale === 'en' ? 'ES' : 'EN'}
-            </button>
-            <button type="button" className="ft-btn-ghost" onClick={() => void signOut('manual')}>
-              {t('admin.signOut')}
-            </button>
+              <button type="button" className="ft-btn-ghost" onClick={() => void signOut('manual')}>
+                <SignOutIcon className="h-4 w-4" />
+                <span className="hidden sm:inline">{t('admin.signOut')}</span>
+              </button>
+            </div>
           </div>
+
+          {/*
+            La navegacion solo aparece cuando hay a donde ir. Para limpieza
+            hay una sola pantalla, y una pestana solitaria que no lleva a
+            ningun sitio es ruido.
+          */}
+          {!soloMisTrabajos && (
+            <nav className="-mb-px flex gap-1 overflow-x-auto" aria-label={t('admin.title')}>
+              <Pestana
+                activa={actual === 'agenda'}
+                onClick={() => irA('agenda')}
+                icono={<CalendarIcon className="h-4 w-4" />}
+              >
+                {t('admin.agenda')}
+              </Pestana>
+              <Pestana
+                activa={actual === 'myJobs'}
+                onClick={() => irA('myJobs')}
+                icono={<BriefcaseIcon className="h-4 w-4" />}
+              >
+                {t('admin.myJobs.title')}
+              </Pestana>
+              {puedeConfigurar && (
+                <Pestana
+                  activa={actual === 'settings'}
+                  onClick={() => irA('settings')}
+                  icono={<GearIcon className="h-4 w-4" />}
+                >
+                  {t('admin.settings.title')}
+                </Pestana>
+              )}
+            </nav>
+          )}
         </div>
       </header>
 
       <main className="mx-auto max-w-5xl px-4 py-6">
-        {soloMisTrabajos || enMisTrabajos ? (
+        {actual === 'myJobs' ? (
           <MyJobs locale={locale} onSessionLost={alPerderSesion} />
-        ) : enAjustes && puedeConfigurar ? (
+        ) : actual === 'settings' && puedeConfigurar ? (
           <SettingsPage staff={state.staff} locale={locale} onSessionLost={alPerderSesion} />
         ) : openBookingId ? (
           <BookingDetailPage
@@ -260,5 +359,40 @@ export default function App() {
         )}
       </main>
     </div>
+  );
+}
+
+/**
+ * Pestana de la cabecera.
+ *
+ * La activa se marca de TRES formas a la vez y no solo con color: una linea
+ * inferior gruesa, el texto en color de marca y `aria-current="page"`. Con
+ * solo el color, quien no distingue azul de gris no sabe donde esta.
+ */
+function Pestana({
+  activa,
+  onClick,
+  icono,
+  children,
+}: {
+  activa: boolean;
+  onClick: () => void;
+  icono: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-current={activa ? 'page' : undefined}
+      className={`inline-flex shrink-0 items-center gap-2 border-b-2 px-3 py-2.5 text-sm font-semibold transition-colors ${
+        activa
+          ? 'border-brand-700 text-brand-800 dark:border-sun-400 dark:text-sun-300'
+          : 'border-transparent text-slate-600 hover:border-slate-300 hover:text-slate-900 dark:text-slate-400 dark:hover:border-night-600 dark:hover:text-slate-100'
+      }`}
+    >
+      {icono}
+      {children}
+    </button>
   );
 }
