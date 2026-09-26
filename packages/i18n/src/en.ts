@@ -141,6 +141,29 @@ export const en = {
   admin: {
     title: 'Freshness Touch · Admin',
 
+    /* ------------------- Comunes de toda la interfaz ------------------- */
+    loading: 'Loading…',
+    working: 'Working…',
+    retry: 'Try again',
+    agenda: 'Agenda',
+    toastClose: 'Dismiss',
+    showPassword: 'Show password',
+    hidePassword: 'Hide password',
+
+    /*
+     * Confirmaciones de acciones que hasta ahora no decian nada al terminar:
+     * el boton se quedaba quieto y no habia forma de saber si habia pasado.
+     */
+    toast: {
+      statusChanged: 'Booking updated.',
+      depositCaptured: 'Deposit charged.',
+      depositReleased: 'Hold released.',
+      teamSaved: 'Team saved.',
+      staffSaved: 'Staff record saved.',
+      jobStarted: 'Arrival recorded.',
+      jobFinished: 'Job marked as finished.',
+    },
+
     /* --------------------------- Acceso ---------------------------- */
     signIn: 'Sign in',
     signingIn: 'Signing in…',
@@ -250,7 +273,6 @@ export const en = {
     /* ----------------------- Configuracion ------------------------- */
     settings: {
       title: 'Business settings',
-      backToAgenda: 'Back to agenda',
       intro:
         'These details appear on the public website. Changes show up there within a few minutes.',
 
@@ -354,7 +376,6 @@ export const en = {
       locale: 'Language',
       localeHelp: 'This is the language we write to them in, starting with the invitation email.',
       localeName: { en: 'English', es: 'Spanish' },
-      accessTitle: 'Panel access',
       accessNONE: 'No access',
       accessINVITED: 'Invited',
       accessLINKED: 'Has access',
@@ -388,8 +409,6 @@ export const en = {
       newPassword: 'New password',
       repeatPassword: 'Repeat it',
       minLength: 'At least {{count}} characters. A phrase you remember beats a word with symbols.',
-      show: 'Show',
-      hide: 'Hide',
       choose: 'Save password',
       tooShort: 'It needs at least {{count}} characters.',
       mismatch: 'The two do not match.',
@@ -422,7 +441,6 @@ export const en = {
       rooms: '{{bedrooms}} bedrooms · {{bathrooms}} bathrooms',
       start: 'I have arrived',
       finish: 'I have finished',
-      started: 'In progress',
       finished: 'Finished',
       finishHint:
         'Tap "I have arrived" when you enter the house. The time is recorded, and it is what backs up your work if anyone asks.',
@@ -432,7 +450,6 @@ export const en = {
     unreachable: {
       title: 'We could not check your session',
       body: 'You are still signed in: this has not logged you out. It may be the connection, or the server starting up. Try again in a few seconds.',
-      retry: 'Try again',
     },
 
     /* --------------------------- Errores --------------------------- */

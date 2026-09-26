@@ -1427,3 +1427,195 @@ un error de nuestra API— tampoco.
    sesión y se ofrece reintentar.
 4. Una cuenta sin acceso sigue recibiendo su mensaje correcto.
 5. El mensaje «tu sesión ha terminado» ya no aparece por un fallo de red.
+
+---
+
+## 19. La interfaz del panel: avisos, esqueletos e iconos
+
+Hasta aquí el panel hacía todo lo que tenía que hacer y **no lo contaba**. Esta
+etapa no añade ninguna función nueva: arregla cómo se comunica.
+
+### 19.1. Dos cosas que estaban escritas y nunca se encendieron
+
+Antes de tocar nada apareció esto, y cambia el alcance de la etapa:
+
+1. **El modo oscuro del panel existía desde el principio y no se veía jamás.**
+   Hay cientos de clases `dark:` repartidas por cada componente, pero la
+   variante cuelga de la clase `dark` en el documento y **nadie la ponía**. El
+   sitio público sí lo hace, con `public/theme-init.js`. El panel no tenía ese
+   archivo. Todo ese estilo era código muerto por falta de un interruptor.
+
+2. **Lo mismo con el movimiento.** El CSS del panel ya tenía `html.ft-motion`
+   para el desplazamiento suave, y la clase tampoco se añadía nunca.
+
+No se borró: se conectó. El panel tiene ahora su propio
+`apps/admin/public/theme-init.js`, copia del que ya usaba el sitio.
+
+**Va en un archivo externo, no en línea, y eso es obligatorio aquí:** la
+política de seguridad del panel (`apps/admin/vercel.json`) declara
+`script-src 'self'`, así que un `<script>` en línea lo bloquearía el navegador
+y el panel arrancaría siempre en claro. Se carga síncrono y sin `defer`
+porque tiene que decidir antes del primer pintado; si se retrasara, se vería
+un fogonazo blanco antes de pasar a oscuro.
+
+Se copia en vez de compartirse con el sitio porque son **dos despliegues
+distintos**, cada uno con su carpeta `public`, y enlazarlos obligaría a montar
+un paso de compilación para veinte líneas.
+
+El interruptor manual vive en la cabecera (`hooks/useTheme.ts`). Si nadie ha
+elegido todavía, manda el sistema **y se sigue en vivo**: quien tiene el móvil
+en oscuro automático al anochecer no debería recargar para que le acompañe.
+
+### 19.2. Avisos emergentes
+
+Antes cada pantalla resolvía esto a su manera: un párrafo verde bajo el botón
+en configuración, otro distinto en personal, y en la agenda nada. Guardando con
+la página desplazada, el «guardado» aparecía fuera de la vista.
+
+La lógica vive en `lib/toast-queue.ts`, **sin React**, y el componente
+(`components/ToastProvider.tsx`) solo la pinta. Es lógica con reloj, y la
+lógica con reloj hay que poder probarla adelantando el reloj a mano.
+
+Cuatro reglas, y ninguna es de adorno:
+
+| Regla                                                     | Por qué                                                                                                                                                |
+| --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Los errores no se van solos**                           | Un «guardado» que desaparece está bien: ya está hecho. Un error que desaparece es una incidencia que nadie llega a leer. Se queda hasta que se cierra. |
+| **Un aviso repetido se renueva, no se apila**             | Pulsar «guardar» tres veces no debe llenar la esquina con tres tarjetas iguales: reinicia la cuenta atrás de la que ya estaba.                         |
+| **Nunca más de tres a la vez**                            | Por encima tapan los botones. Al llegar el cuarto se va el más viejo.                                                                                  |
+| **Se congelan al poner el ratón encima o el foco dentro** | Ver irse un aviso a media frase molesta; para quien navega con teclado es una barrera, porque el foco puede estar en el propio botón de cerrar.        |
+
+**Cómo se anuncian.** Dos regiones separadas y **siempre presentes** en el
+árbol, aunque estén vacías: los correctos en `role="status"` (educado, espera
+su turno) y los errores en `role="alert"` (interrumpe, hay algo que corregir).
+Si se montaran al llegar el primer aviso, muchos lectores de pantalla no
+anunciarían justo ese primero.
+
+**Seguridad.** Un aviso solo acepta una **clave de traducción**, nunca un texto
+ya montado: así sigue en el idioma del panel aunque se cambie con el aviso
+abierto, y ningún texto del servidor puede pintarse sin pasar por la tabla.
+Los detalles literales que sí sirven —quién choca en la agenda, el motivo que
+devuelve el proveedor de correo— van en un campo aparte, **como texto**, que
+React escapa. No hay ni puede haber `dangerouslySetInnerHTML` en esa pila.
+
+### 19.3. El fallo que encontró la comprobación en navegador
+
+Merece quedar escrito porque es una trampa que no se ve leyendo el código.
+
+La primera versión guardaba el instante de la pausa **en un estado** y, al
+reanudar, llamaba a `setToasts` **dentro del actualizador de ese estado**.
+React invoca los actualizadores dos veces en modo estricto precisamente para
+destapar eso, así que el tiempo parado **se sumaba dos veces**: con siete
+segundos leyendo un aviso, ya no se iba nunca.
+
+Lo importante: **las pruebas unitarias de la cola no podían verlo.** La cola
+estaba bien; lo que estaba mal era cómo se la llamaba. Lo cazó abrir el panel
+en un navegador de verdad y mirar el reloj.
+
+Ahora el instante de la pausa vive en una referencia —nadie depende de él para
+pintar— y hay una prueba de regresión (`components/ToastProvider.test.tsx`)
+montada **dentro de `<StrictMode>`**, porque sin él el fallo no aparece.
+Comprobado devolviendo el error a propósito: con la versión rota, la prueba
+falla; con la buena, pasa.
+
+### 19.4. Esqueletos de carga
+
+Antes, cada pantalla en espera pintaba la palabra «Calculando…» —literalmente
+esa, porque la clave venía del calculador de precios del sitio público— y al
+llegar los datos la página daba un salto.
+
+**La regla que hace que un esqueleto sirva de algo: tiene que tener la forma y
+el tamaño de lo que va a llegar.** Si no, no ahorra el salto, solo lo retrasa;
+y un esqueleto genérico de tres rayas grises es peor que un texto honesto,
+porque promete una cosa y aparece otra. Por eso `components/Skeletons.tsx`
+tiene uno por pantalla y no uno universal.
+
+Quien usa lector de pantalla no oye catorce rectángulos vacíos: el andamiaje
+es `aria-hidden` y se anuncia una sola vez que se está cargando.
+
+### 19.5. Iconos
+
+SVG **en línea**, sin librería, igual que en el sitio público
+(`apps/landing/src/components/Icons.tsx`). Una librería son cientos de
+kilobytes y una dependencia más para dibujar treinta símbolos.
+
+Dos reglas: **todos llevan `aria-hidden`**, porque en este panel un icono
+siempre acompaña a un texto y nunca lo sustituye —si se anunciaran, cada
+etiqueta se leería dos veces—; y **siempre `currentColor`**, para que hereden
+el color del texto y el contraste ya verificado siga valiendo.
+
+Donde el botón es solo icono (tema, idioma, ver la contraseña, cerrar un
+aviso) la etiqueta va en `aria-label` **y** en `title`, y el botón mide 44 px.
+
+### 19.6. Ver y ocultar la contraseña
+
+`components/PasswordField.tsx`, compartido por el acceso y por elegir
+contraseña. Escribir a ciegas una contraseña larga en el móvil, de pie y con
+prisa, es el motivo número uno de «no me deja entrar»: la errata no se ve, y
+como el mensaje de error es el mismo para correo y contraseña —a propósito—
+no hay forma de saber que fue una letra.
+
+Lo que se cuidó, que no es obvio:
+
+- **`type="button"`.** Sin eso el ojo **envía** el formulario, porque dentro de
+  un `<form>` el tipo por defecto de un botón es «submit».
+- **Empieza siempre oculta**, y el acceso la vuelve a ocultar al fallar. Dejarla
+  a la vista tras un intento fallido la deja en pantalla en un portal con gente
+  detrás.
+- **Se esconde el ojo nativo de Edge** (`::-ms-reveal`). Si no, salen dos ojos
+  pegados que no se enteran el uno del otro.
+- **`aria-pressed`** además de la etiqueta: así se puede saber si la contraseña
+  está ahora mismo a la vista antes de enseñarle la pantalla a alguien.
+- El botón dice **lo que hará** al pulsarlo, no en qué estado está.
+
+### 19.7. Navegación: un valor, no tres interruptores
+
+La cabecera tenía tres booleanos sueltos y cada botón debía acordarse de
+apagar los otros dos; bastaba olvidarse de uno para acabar en «ajustes» con el
+detalle de una reserva abierto detrás. Ahora la vista es **un solo valor**
+(`'agenda' | 'myJobs' | 'settings'`) y ese estado no se puede escribir.
+
+La pestaña activa se marca de **tres formas a la vez** —línea inferior, color
+de marca y `aria-current="page"`— porque solo con color no se distingue.
+
+### 19.8. Contraste: un fallo propio, medido
+
+Los pares de color nuevos se midieron, no se estimaron. Catorce pasaron. Uno
+**falló**: la pestaña activa rellena en modo oscuro, con texto casi negro sobre
+`brand-500`, daba **3,71:1**, por debajo del mínimo de 4,5:1 para texto.
+
+El error fue copiar el `text-ink` del botón amarillo dando por hecho que era
+«lo coherente»: ese funciona porque el amarillo es muy claro, y ese azul no lo
+es. Con texto blanco sube a **5,09:1**. Corregido.
+
+### 19.9. Qué está probado
+
+- **Cola de avisos** (20 pruebas, sin navegador): caducidad por tono, renovación
+  del repetido, el mismo texto con detalles distintos como dos avisos, el tope
+  de tres, el barrido, y que una pausa larga devuelve íntegro el tiempo parado.
+- **Arranque del tema** (8 pruebas): se ejecuta el archivo real tal y como lo
+  haría el navegador. Tema guardado frente a preferencia del sistema en los
+  cuatro cruces, movimiento permitido o no, y **los dos casos en que el
+  navegador no coopera**: `localStorage` que lanza —Brave con las protecciones
+  subidas, o ventana privada— y `matchMedia` ausente. Sin el `try/catch`, la
+  excepción abortaría el script entero y se perdería también la clase de
+  movimiento, que se pone después.
+- **Avisos en pantalla** (5 pruebas, dentro de `<StrictMode>`): aparición,
+  caducidad, congelación con el foco dentro, reanudación exacta y cierre manual.
+- **En navegador real**: acceso en claro y en oscuro, la contraseña visible, los
+  tres tonos de aviso con sus regiones `status`/`alert` separadas, la caducidad
+  con reloj de verdad, la pausa con el ratón y que en la pila de avisos no
+  aparece ningún `<script>`.
+
+### 19.10. Lo que se quitó por el camino
+
+Cuatro claves de traducción que no usaba nadie: `admin.staff.accessTitle`,
+`admin.myJobs.started` (duplicaba `admin.status.IN_PROGRESS`),
+`admin.settings.backToAgenda` (la sustituyen las pestañas) y
+`admin.passwordReset.show` / `.hide` (el botón pasó a ser un icono con su
+propia etiqueta).
+
+Se comprobaron **todas** las claves `admin.*` una a una, no a ojo: las que
+parecían muertas casi siempre se construyen sobre la marcha
+(`admin.status.${estado}`, `admin.staff.access${acceso}`) o las emite la API
+como `messageKey`. Solo esas cuatro no tenían a nadie detrás.

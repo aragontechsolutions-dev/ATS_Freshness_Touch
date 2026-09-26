@@ -5,6 +5,15 @@ import { ApiClientError, fetchBookingDetail, isSessionError, sessionLostReason }
 import { BookingActions } from '../components/BookingActions';
 import { StatusChip } from '../components/StatusChip';
 import { TeamSection } from '../components/TeamSection';
+import { SkeletonDetalleReserva } from '../components/Skeletons';
+import {
+  AlertIcon,
+  ArrowLeftIcon,
+  CardIcon,
+  ClockIcon,
+  KeyIcon,
+  UserIcon,
+} from '../components/Icons';
 import { formatCents, formatDateTime } from '../lib/format';
 
 interface BookingDetailProps {
@@ -51,22 +60,25 @@ export function BookingDetailPage({
     return (
       <div className="space-y-4">
         <button type="button" className="ft-btn-ghost" onClick={onBack}>
+          <ArrowLeftIcon className="h-4 w-4" />
           {t('admin.back')}
         </button>
-        <p className="text-sm font-medium text-red-700 dark:text-red-400" role="alert">
-          {t(errorKey)}
-        </p>
+        <div className="ft-card flex items-start gap-3 p-5" role="alert">
+          <AlertIcon className="mt-0.5 h-5 w-5 shrink-0 text-red-700 dark:text-red-400" />
+          <p className="text-sm font-medium text-red-700 dark:text-red-400">{t(errorKey)}</p>
+        </div>
       </div>
     );
   }
 
   if (!booking) {
-    return <p className="text-sm text-slate-600 dark:text-slate-400">{t('common.loading')}</p>;
+    return <SkeletonDetalleReserva />;
   }
 
   return (
     <div className="space-y-5">
       <button type="button" className="ft-btn-ghost" onClick={onBack}>
+        <ArrowLeftIcon className="h-4 w-4" />
         {t('admin.back')}
       </button>
 
@@ -76,7 +88,8 @@ export function BookingDetailPage({
             <p className="font-mono text-lg font-bold text-slate-900 dark:text-white">
               {booking.reference}
             </p>
-            <p className="mt-1 text-sm text-slate-700 dark:text-slate-300">
+            <p className="mt-1 flex items-center gap-1.5 text-sm text-slate-700 dark:text-slate-300">
+              <ClockIcon className="h-4 w-4 shrink-0 text-slate-500 dark:text-slate-400" />
               {formatDateTime(booking.scheduledStart, booking.timezone, locale)} ·{' '}
               {t('admin.durationMinutes', { minutes: booking.durationMinutes })}
             </p>
@@ -87,7 +100,10 @@ export function BookingDetailPage({
 
       {/* --------------------------- Cliente y acceso -------------------------- */}
       <section className="ft-card p-5">
-        <h2 className="text-sm font-bold text-slate-900 dark:text-white">{t('admin.customer')}</h2>
+        <h2 className="flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-white">
+          <UserIcon className="h-4 w-4 text-slate-500 dark:text-slate-400" />
+          {t('admin.customer')}
+        </h2>
         <dl className="mt-3 space-y-2 text-sm">
           <Row
             label={t('admin.name')}
@@ -129,7 +145,8 @@ export function BookingDetailPage({
            * alto delante de terceros.
            */
           <div className="mt-4 rounded-lg border border-sun-400 bg-sun-50 p-3 dark:border-sun-600 dark:bg-night-700">
-            <p className="text-xs font-bold tracking-wide text-slate-800 uppercase dark:text-sun-200">
+            <p className="flex items-center gap-1.5 text-xs font-bold tracking-wide text-slate-800 uppercase dark:text-sun-200">
+              <KeyIcon className="h-4 w-4 shrink-0" />
               {t('admin.accessNotes')}
             </p>
             <p className="mt-1 text-sm text-slate-900 dark:text-slate-100">
@@ -163,7 +180,10 @@ export function BookingDetailPage({
 
       {/* -------------------------------- Precio ------------------------------- */}
       <section className="ft-card p-5">
-        <h2 className="text-sm font-bold text-slate-900 dark:text-white">{t('admin.pricing')}</h2>
+        <h2 className="flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-white">
+          <CardIcon className="h-4 w-4 text-slate-500 dark:text-slate-400" />
+          {t('admin.pricing')}
+        </h2>
         <dl className="mt-3 space-y-2 text-sm">
           {booking.lines.map((line) => (
             <Row
@@ -195,7 +215,10 @@ export function BookingDetailPage({
 
       {/* --------------------------------- Pago -------------------------------- */}
       <section className="ft-card p-5">
-        <h2 className="text-sm font-bold text-slate-900 dark:text-white">{t('admin.payment')}</h2>
+        <h2 className="flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-white">
+          <CardIcon className="h-4 w-4 text-slate-500 dark:text-slate-400" />
+          {t('admin.payment')}
+        </h2>
 
         {booking.payment ? (
           <dl className="mt-3 space-y-2 text-sm">

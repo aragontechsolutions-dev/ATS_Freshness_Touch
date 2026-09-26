@@ -9,6 +9,9 @@ import {
   type AuthenticatedStaff,
 } from '@freshness/types';
 import { ApiClientError, fetchAssignableStaff, saveAssignments } from '../lib/api';
+import { useToast } from './ToastProvider';
+import { SkeletonSelectorEquipo } from './Skeletons';
+import { SpinnerIcon, UsersIcon } from './Icons';
 
 interface TeamSectionProps {
   booking: AdminBookingDetail;
@@ -40,9 +43,7 @@ export function TeamSection({ booking, staff, onUpdated, onSessionLost }: TeamSe
   const [personal, setPersonal] = useState<AdminStaffOption[] | null>(null);
   const [seleccion, setSeleccion] = useState<AdminAssignment[]>([]);
   const [guardando, setGuardando] = useState(false);
-  const [errorKey, setErrorKey] = useState<string | null>(null);
-  /** Nombre y referencia del trabajo con el que choca. Ver `fields` en la API. */
-  const [detalleConflicto, setDetalleConflicto] = useState<string | null>(null);
+  const toast = useToast();
 
   /*
    * Coordinacion y administracion reparten trabajos. Limpieza no: asignarse
@@ -57,8 +58,6 @@ export function TeamSection({ booking, staff, onUpdated, onSessionLost }: TeamSe
   const cancelada = booking.status === 'CANCELLED';
 
   const abrir = async (): Promise<void> => {
-    setErrorKey(null);
-    setDetalleConflicto(null);
     setSeleccion(booking.assignedStaff.map((p) => ({ staffId: p.staffId, isLead: p.isLead })));
     setEditando(true);
 
@@ -73,7 +72,7 @@ export function TeamSection({ booking, staff, onUpdated, onSessionLost }: TeamSe
         onSessionLost();
         return;
       }
-      setErrorKey(error instanceof ApiClientError ? error.messageKey : 'admin.errorGeneric');
+      toast.error(error instanceof ApiClientError ? error.messageKey : 'admin.errorGeneric');
       setEditando(false);
     }
   };
@@ -93,29 +92,30 @@ export function TeamSection({ booking, staff, onUpdated, onSessionLost }: TeamSe
 
   const guardar = async (): Promise<void> => {
     setGuardando(true);
-    setErrorKey(null);
-    setDetalleConflicto(null);
 
     try {
       onUpdated(await saveAssignments(booking.bookingId, seleccion));
       setEditando(false);
+      toast.success('admin.toast.teamSaved');
     } catch (error) {
       if (error instanceof ApiClientError && error.statusCode === 401) {
         onSessionLost();
         return;
       }
       if (error instanceof ApiClientError) {
-        setErrorKey(error.messageKey);
         /*
          * El choque de horarios es el unico error que trae datos que sirven
-         * para arreglarlo: quien choca y con que reserva. Se pinta tal cual
-         * porque son un nombre y una referencia, no una frase traducible.
+         * para arreglarlo: quien choca y con que reserva. Van como detalle
+         * del aviso, en texto plano, porque son un nombre y una referencia y
+         * no hay frase traducible que los contenga.
          */
-        if (error.code === API_ERROR_CODES.STAFF_DOUBLE_BOOKED) {
-          setDetalleConflicto(error.fields?.[0]?.message ?? null);
-        }
+        const detalle =
+          error.code === API_ERROR_CODES.STAFF_DOUBLE_BOOKED
+            ? (error.fields?.[0]?.message ?? undefined)
+            : undefined;
+        toast.error(error.messageKey, { detail: detalle });
       } else {
-        setErrorKey('admin.errorGeneric');
+        toast.error('admin.errorGeneric');
       }
       // El formulario NO se cierra: se deja lo elegido para poder corregir
       // solo a quien choca en vez de rehacer el equipo entero.
@@ -130,7 +130,10 @@ export function TeamSection({ booking, staff, onUpdated, onSessionLost }: TeamSe
   return (
     <section className="ft-card space-y-4 p-5">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-sm font-bold text-slate-900 dark:text-white">{t('admin.team')}</h2>
+        <h2 className="flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-white">
+          <UsersIcon className="h-4 w-4 text-slate-500 dark:text-slate-400" />
+          {t('admin.team')}
+        </h2>
 
         {puedeCambiar && !editando && !cancelada && (
           <button type="button" className="ft-btn-ghost" onClick={() => void abrir()}>
@@ -183,7 +186,7 @@ export function TeamSection({ booking, staff, onUpdated, onSessionLost }: TeamSe
       {editando && (
         <div className="space-y-3">
           {!personal ? (
-            <p className="text-sm text-slate-600 dark:text-slate-400">{t('common.loading')}</p>
+            <SkeletonSelectorEquipo />
           ) : personal.length === 0 ? (
             <p className="text-sm text-slate-600 dark:text-slate-400">{t('admin.teamNoStaff')}</p>
           ) : (
@@ -240,32 +243,18 @@ export function TeamSection({ booking, staff, onUpdated, onSessionLost }: TeamSe
               disabled={guardando || !personal}
               onClick={() => void guardar()}
             >
-              {guardando ? t('common.loading') : t('admin.teamSave')}
+              {guardando && <SpinnerIcon className="h-4 w-4" />}
+              {guardando ? t('admin.working') : t('admin.teamSave')}
             </button>
             <button
               type="button"
               className="ft-btn-ghost"
               disabled={guardando}
-              onClick={() => {
-                setEditando(false);
-                setErrorKey(null);
-                setDetalleConflicto(null);
-              }}
+              onClick={() => setEditando(false)}
             >
               {t('admin.teamDiscard')}
             </button>
           </div>
-        </div>
-      )}
-
-      {errorKey && (
-        <div role="alert">
-          <p className="text-sm font-medium text-red-700 dark:text-red-400">{t(errorKey)}</p>
-          {detalleConflicto && (
-            <p className="mt-1 font-mono text-xs text-red-700 dark:text-red-400">
-              {detalleConflicto}
-            </p>
-          )}
         </div>
       )}
     </section>

@@ -8,6 +8,8 @@ import type {
 } from '@freshness/types';
 import { ApiClientError, fetchBookings, isSessionError, sessionLostReason } from '../lib/api';
 import { StatusChip } from '../components/StatusChip';
+import { SkeletonListaReservas } from '../components/Skeletons';
+import { AlertIcon, CalendarIcon, RefreshIcon, SearchIcon, UsersIcon } from '../components/Icons';
 import { formatCents, formatDateTime, todayInTimezone } from '../lib/format';
 
 const TIMEZONE = 'America/New_York';
@@ -76,6 +78,8 @@ export function Agenda({ locale, onOpenBooking, onSessionLost }: AgendaProps) {
     void cargar();
   }, [cargar]);
 
+  const buscando = search.trim().length >= 2;
+
   return (
     <div className="space-y-6">
       {/* ------------------------------- Filtros ------------------------------- */}
@@ -89,7 +93,7 @@ export function Agenda({ locale, onOpenBooking, onSessionLost }: AgendaProps) {
             type="date"
             className="ft-input"
             value={date}
-            disabled={search.trim().length >= 2}
+            disabled={buscando}
             onChange={(event) => setDate(event.target.value)}
           />
         </div>
@@ -117,31 +121,51 @@ export function Agenda({ locale, onOpenBooking, onSessionLost }: AgendaProps) {
           <label className="ft-label" htmlFor="busqueda">
             {t('admin.filterSearch')}
           </label>
-          <input
-            id="busqueda"
-            type="search"
-            className="ft-input"
-            placeholder={t('admin.filterSearchPlaceholder')}
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-          />
+          {/*
+            La lupa va DENTRO del campo, a la izquierda, y el texto se aparta
+            con `pl-10`. Es la unica forma de que el icono no tape lo que se
+            escribe cuando la referencia es larga.
+          */}
+          <div className="relative">
+            <SearchIcon className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-slate-500 dark:text-slate-400" />
+            <input
+              id="busqueda"
+              type="search"
+              className="ft-input pl-10"
+              placeholder={t('admin.filterSearchPlaceholder')}
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+            />
+          </div>
         </div>
       </div>
 
       {/* ------------------------------ Resultados ----------------------------- */}
       <div aria-live="polite" aria-busy={loading}>
-        {loading && (
-          <p className="text-sm text-slate-600 dark:text-slate-400">{t('common.loading')}</p>
-        )}
+        {loading && <SkeletonListaReservas />}
 
         {!loading && errorKey && (
-          <p className="text-sm font-medium text-red-700 dark:text-red-400" role="alert">
-            {t(errorKey)}
-          </p>
+          <div className="ft-card flex flex-col items-start gap-3 p-5" role="alert">
+            <div className="flex items-start gap-3">
+              <AlertIcon className="mt-0.5 h-5 w-5 shrink-0 text-red-700 dark:text-red-400" />
+              <p className="text-sm font-medium text-red-700 dark:text-red-400">{t(errorKey)}</p>
+            </div>
+            {/*
+              Un error sin salida deja mirando la pantalla. Casi siempre es la
+              conexion, y casi siempre se arregla volviendo a pedirlo.
+            */}
+            <button type="button" className="ft-btn-ghost" onClick={() => void cargar()}>
+              <RefreshIcon className="h-4 w-4" />
+              {t('admin.retry')}
+            </button>
+          </div>
         )}
 
         {!loading && !errorKey && items.length === 0 && (
-          <p className="text-sm text-slate-600 dark:text-slate-400">{t('admin.noBookings')}</p>
+          <div className="ft-card flex flex-col items-center gap-2 px-6 py-12 text-center">
+            <CalendarIcon className="h-9 w-9 text-slate-400 dark:text-slate-500" />
+            <p className="text-sm text-slate-600 dark:text-slate-400">{t('admin.noBookings')}</p>
+          </div>
         )}
 
         {!loading && !errorKey && items.length > 0 && (
@@ -152,7 +176,7 @@ export function Agenda({ locale, onOpenBooking, onSessionLost }: AgendaProps) {
                   type="button"
                   onClick={() => onOpenBooking(item.bookingId)}
                   className="ft-card w-full p-4 text-left transition-colors hover:border-brand-300
-                             dark:hover:border-brand-700"
+                             hover:bg-brand-50/60 dark:hover:border-brand-700 dark:hover:bg-night-700/50"
                 >
                   <div className="flex flex-wrap items-start justify-between gap-2">
                     <div className="min-w-0">
@@ -177,7 +201,8 @@ export function Agenda({ locale, onOpenBooking, onSessionLost }: AgendaProps) {
                   </div>
 
                   {item.assignedStaff.length > 0 && (
-                    <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+                    <p className="mt-2 flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
+                      <UsersIcon className="h-3.5 w-3.5 shrink-0" />
                       {t('admin.assignedTo', {
                         names: item.assignedStaff.map((s) => s.name).join(', '),
                       })}

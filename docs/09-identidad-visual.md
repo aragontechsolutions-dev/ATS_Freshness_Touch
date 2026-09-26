@@ -236,8 +236,17 @@ el navegador**, no los que uno cree haber puesto. Recorre cada elemento con
 texto, compone las capas de fondo con su transparencia y compara contra WCAG AA
 (4.5:1 en texto normal, 3:1 en texto grande).
 
-Estado actual: **36 combinaciones de color auditadas, todas cumplen.** La más
-ajustada es 4.76:1 en modo claro y 6.3:1 en oscuro.
+Estado actual: **36 combinaciones auditadas en el sitio público y 68 textos
+medidos en el panel, todos cumplen.** El más ajustado del panel es 4.76:1 en
+modo claro y 5.09:1 en oscuro.
+
+Una advertencia que costó un fallo real: **no basta con calcular sobre la
+paleta**. Al montar las pestañas del panel se puso texto casi negro sobre
+`brand-500` copiando lo que hace el botón amarillo, dando por hecho que era
+«lo coherente». Da **3.71:1** y no llega. El botón amarillo funciona porque el
+amarillo es muy claro; ese azul no lo es. Con texto blanco sube a 5.09:1. Cada
+par se mide, incluso —sobre todo— cuando parece copiado de uno que ya
+funcionaba.
 
 Advertencia para quien repita la auditoría: Chromium devuelve los colores en
 formato `oklch()`/`oklab()`. Si se intenta leer esos números como si fueran RGB

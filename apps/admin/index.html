@@ -16,6 +16,13 @@
 
     <title>Freshness Touch · Panel</title>
     <link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png" />
+
+    <!--
+      Aplica el tema y decide si se permite el movimiento ANTES del primer
+      pintado. Va aqui, sincrono y sin `defer`, a proposito: si se retrasara,
+      el panel se veria un instante en claro antes de pasar a oscuro.
+    -->
+    <script src="/theme-init.js"></script>
   </head>
   <body>
     <div id="root"></div>

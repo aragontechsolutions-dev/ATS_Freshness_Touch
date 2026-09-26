@@ -118,6 +118,17 @@
     @apply border-night-600 bg-night-700 text-slate-100 placeholder:text-slate-400;
   }
 
+  /*
+   * Edge (y Chrome en algunas versiones) pintan SU PROPIO ojo dentro de los
+   * campos de contrasena. Junto al nuestro salen dos, pegados, que hacen lo
+   * mismo pero no a la vez: se toca uno, el otro no se entera, y el icono
+   * acaba diciendo lo contrario de lo que pasa.
+   */
+  .ft-input-password::-ms-reveal,
+  .ft-input-password::-ms-clear {
+    display: none;
+  }
+
   .ft-label {
     @apply mb-1.5 block text-sm font-semibold text-slate-700;
   }
@@ -129,7 +140,12 @@
   .ft-btn-primary,
   .ft-btn-ghost {
     @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm
-           font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-60;
+           font-semibold disabled:cursor-not-allowed disabled:opacity-60;
+    transition:
+      background-color 0.18s ease,
+      border-color 0.18s ease,
+      color 0.18s ease,
+      transform 0.1s ease-out;
   }
 
   .ft-btn-primary {
@@ -151,6 +167,176 @@
   /* Etiqueta de estado. El color no es la unica senal: cada estado lleva
      ademas su propio texto, porque quien no distingue colores solo lee. */
   .ft-chip {
-    @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold;
+    @apply inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold;
+  }
+}
+
+/* ===========================================================================
+ * COMPONENTES DE INTERFAZ DEL PANEL
+ * ===========================================================================
+ * Todo lo de aqui existe porque el panel lo usa VARIAS VECES. Un estilo que
+ * solo aparece en un sitio se queda en su componente; subirlo aqui solo
+ * anade un nombre que hay que ir a buscar.
+ * =========================================================================== */
+
+@layer components {
+  /* --- Boton que es solo un icono ---------------------------------------
+   * 44 pixeles de lado: el minimo para acertar con el dedo sin fallar. Un
+   * icono de 20 px suelto se falla una de cada tres veces en un movil que va
+   * en el bolsillo de un pantalon de trabajo.
+   *
+   * QUIEN USE ESTO TIENE QUE PONER `aria-label`. Sin texto visible, es la
+   * unica forma de que un lector de pantalla diga para que sirve.
+   */
+  .ft-btn-icon {
+    @apply inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border
+           border-slate-300 text-slate-600 transition-colors hover:bg-slate-100
+           disabled:cursor-not-allowed disabled:opacity-60;
+  }
+
+  .dark .ft-btn-icon {
+    @apply border-night-600 text-slate-300 hover:bg-night-700;
+  }
+
+  /* --- Pestanas de la configuracion -------------------------------------
+   * La pestana activa NO se distingue solo por el color de fondo: lleva
+   * ademas `aria-current="page"` en el marcado y su propio peso de texto.
+   */
+  .ft-tab {
+    @apply inline-flex items-center gap-2 rounded-lg border border-transparent px-3 py-2
+           text-sm font-semibold transition-colors;
+  }
+
+  .ft-tab-off {
+    @apply border-slate-300 text-slate-700 hover:bg-slate-100;
+  }
+
+  .dark .ft-tab-off {
+    @apply border-night-600 text-slate-300 hover:bg-night-700;
+  }
+
+  .ft-tab-on {
+    @apply bg-brand-700 text-white;
+  }
+
+  /*
+   * TEXTO BLANCO, NO CASI NEGRO. Con `text-ink` sobre `brand-500` el
+   * contraste se queda en 3,71:1 y no llega al minimo de 4,5:1 para texto.
+   * Copiar el `text-ink` del boton amarillo parecia coherente y no lo era:
+   * ese funciona porque el amarillo es MUY claro, y este azul no lo es.
+   * Medido, no estimado; en blanco sube a 5,09:1.
+   */
+  .dark .ft-tab-on {
+    @apply bg-brand-500 text-white;
+  }
+
+  /* --- Hueco gris mientras se carga -------------------------------------
+   * Un esqueleto tiene que tener LA FORMA DE LO QUE VA A LLEGAR. Si no, el
+   * contenido salta al aparecer y se pierde el sitio por donde se iba. Por
+   * eso cada pantalla define el suyo en vez de compartir uno generico.
+   */
+  .ft-skeleton {
+    @apply rounded-md bg-slate-200;
+  }
+
+  .dark .ft-skeleton {
+    @apply bg-night-700;
+  }
+
+  .ft-motion .ft-skeleton {
+    animation: ft-pulse 1.4s ease-in-out infinite;
+  }
+
+  /* --- Avisos emergentes ------------------------------------------------
+   * Se apilan abajo a la derecha en pantalla ancha y ARRIBA en movil: abajo
+   * taparian los botones de accion de «mis trabajos», que es justo la mano
+   * que acaba de pulsar.
+   */
+  .ft-toast-pila {
+    --ft-toast-desde: -12px;
+    @apply pointer-events-none fixed inset-x-0 top-0 z-50 flex flex-col items-center gap-2 px-4 py-4
+           sm:inset-x-auto sm:top-auto sm:right-4 sm:bottom-4 sm:items-end;
+  }
+
+  @media (min-width: 40rem) {
+    .ft-toast-pila {
+      --ft-toast-desde: 12px;
+    }
+  }
+
+  .ft-toast {
+    @apply pointer-events-auto flex w-full max-w-sm items-start gap-3 rounded-xl border
+           bg-white p-3.5 shadow-lg;
+  }
+
+  .dark .ft-toast {
+    @apply bg-night-800;
+  }
+
+  .ft-motion .ft-toast {
+    animation: ft-toast-entra 0.22s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+}
+
+@layer utilities {
+  /* La rueda de espera de los botones ocupados. */
+  .ft-motion .ft-spin {
+    animation: ft-girar 0.8s linear infinite;
+  }
+}
+
+@keyframes ft-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+
+@keyframes ft-girar {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/*
+ * Entra desde arriba en movil y desde abajo en escritorio, que es de donde
+ * viene la pila en cada caso: un aviso que se desliza desde el lado
+ * contrario al que ocupa se lee como un fallo de pintado.
+ *
+ * El sentido va en una variable en vez de en dos `@keyframes` con el mismo
+ * nombre dentro de un `@media`. Redefinir un `@keyframes` funciona, pero es
+ * de esas cosas que el siguiente que lo lea da por rotas y "arregla".
+ */
+@keyframes ft-toast-entra {
+  from {
+    opacity: 0;
+    transform: translateY(var(--ft-toast-desde, -12px));
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/*
+ * Cinturon de seguridad: aunque algo se escape de las reglas anteriores, el
+ * sistema operativo manda. Se deja 0.01ms en vez de 0 porque hay navegadores
+ * que no disparan el evento de fin de animacion con duracion exactamente
+ * cero.
+ *
+ * Esto frena tambien la rueda de espera, y esta bien asi: el boton ocupado
+ * cambia su texto y se deshabilita, que es lo que de verdad informa.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }
