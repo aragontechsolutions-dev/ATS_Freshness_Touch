@@ -46,27 +46,33 @@ público—. Un subdominio mantiene esa separación; una ruta obligaría a junta
 
 ---
 
-## 2. La decisión que hay que tomar antes de comprar: ¿vas a tener buzón?
+## 2. Buzón propio: decidido, por ahora no
 
 Esto es lo que más gente pasa por alto y lo que peor se arregla después.
 
 **Resend solo ENVÍA.** No recibe. Si un cliente responde a un correo de
-confirmación, esa respuesta tiene que llegar a algún sitio, y ese algún sitio es
-un buzón de verdad: Google Workspace, Zoho Mail, Fastmail, el que sea.
+confirmación, esa respuesta tiene que llegar a algún sitio, y ese algún sitio
+es un buzón de verdad.
 
-Tienes tres caminos:
+**Decisión tomada:** de momento **no hay buzón** en el dominio. Las respuestas
+van a `freshnesstouchcleaning@gmail.com`, el correo de la empresa, mediante
+`EMAIL_REPLY_TO`. Eso permite verificar en Resend el **dominio raíz**, y el
+remitente queda limpio: `hello@freshnesstouchcleaning.com`.
 
-| Opción                                           | Qué pasa cuando un cliente responde                 |
-| ------------------------------------------------ | --------------------------------------------------- |
-| **Buzón propio** en `freshnesstouchcleaning.com` | Lo recibes. Es lo que quieres a medio plazo         |
-| Sin buzón, `EMAIL_REPLY_TO` a tu Gmail actual    | Lo recibes en el Gmail. Funciona, se ve menos serio |
-| Sin buzón y sin `EMAIL_REPLY_TO`                 | **La respuesta rebota o se pierde.** Evítalo        |
+### Qué habrá que vigilar el día que se monte un buzón
 
-El proveedor de buzón se queda con los registros **MX** de la raíz del dominio.
-Por eso el correo saliente de Resend se configura aparte: para que no choquen.
+Un proveedor de buzón (Google Workspace, Zoho, Fastmail…) se queda con los
+registros **MX de la raíz**. Cuando llegue ese día:
 
-> No hay prisa por el buzón: puedes empezar con `EMAIL_REPLY_TO` apuntando a un
-> correo que ya leas, y montarlo más adelante sin tocar nada de esto.
+1. Mira **antes** qué registros MX tiene ya el dominio en el DNS de Vercel.
+2. Si Resend puso alguno en la raíz, hay que moverlo: se da de alta en Resend
+   un subdominio de envío (`send.freshnesstouchcleaning.com`) y el remitente
+   pasa a ser `hello@send.freshnesstouchcleaning.com`.
+3. Cambiar `EMAIL_FROM` en Render y `EMAIL_REPLY_TO` al buzón nuevo.
+
+No es difícil, pero **hay que acordarse**: si se pega el MX del proveedor de
+buzón encima del de Resend, o al revés, se deja de recibir correo y el fallo
+tarda en asociarse a su causa.
 
 ---
 
@@ -185,8 +191,8 @@ Esto es lo que el código lee de verdad. Nada más.
 | `CORS_ORIGINS`                 | `https://www.freshnesstouchcleaning.com,https://freshnesstouchcleaning.com,https://panel.freshnesstouchcleaning.com` |
 | `EMAIL_PROVIDER`               | `resend`                                                                                                             |
 | `RESEND_API_KEY`               | `re_...`                                                                                                             |
-| `EMAIL_FROM`                   | `Freshness Touch <hola@freshnesstouchcleaning.com>` — el dominio **tiene que ser el verificado en Resend**           |
-| `EMAIL_REPLY_TO`               | Un buzón que alguien lea de verdad (ver apartado 2)                                                                  |
+| `EMAIL_FROM`                   | `Freshness Touch <hello@freshnesstouchcleaning.com>` — el dominio **tiene que ser el verificado en Resend**          |
+| `EMAIL_REPLY_TO`               | `freshnesstouchcleaning@gmail.com` — el correo de la empresa, hasta que haya buzón propio                            |
 | `SUPABASE_INVITE_REDIRECT_URL` | `https://panel.freshnesstouchcleaning.com`                                                                           |
 
 Sobre `CORS_ORIGINS`: separados por coma, **sin barra final**. Los espacios
