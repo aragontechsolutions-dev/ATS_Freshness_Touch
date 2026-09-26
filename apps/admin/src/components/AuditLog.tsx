@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   AUDIT_ACTIONS,
@@ -10,6 +10,14 @@ import {
   type Locale,
 } from '@freshness/types';
 import {
+  GRUPOS,
+  describir,
+  grupoDe,
+  porDias,
+  soloLaHora,
+  type Contexto,
+} from '../lib/audit-readable';
+import {
   ApiClientError,
   fetchAuditLog,
   fetchStaffDirectory,
@@ -18,7 +26,6 @@ import {
 } from '../lib/api';
 import { SkeletonAuditoria } from './Skeletons';
 import { AlertIcon, RefreshIcon, ShieldIcon, SpinnerIcon } from './Icons';
-import { formatTimestamp } from '../lib/format';
 
 interface AuditLogProps {
   locale: Locale;
@@ -80,6 +87,19 @@ export function AuditLog({ locale, onSessionLost }: AuditLogProps) {
   const [errorKey, setErrorKey] = useState<string | null>(null);
 
   const [personas, setPersonas] = useState<{ id: string; nombre: string }[]>([]);
+
+  /*
+   * El mismo directorio sirve para dos cosas: llenar el desplegable de
+   * personas y poner nombre a los identificadores que aparecen DENTRO de la
+   * metadata (el equipo de una reserva, por ejemplo). Se memoriza porque
+   * cada entrada de la lista lo consulta al pintarse.
+   */
+  const nombres = useMemo(
+    () => new Map(personas.map((persona) => [persona.id, persona.nombre])),
+    [personas],
+  );
+
+  const contexto = useMemo<Contexto>(() => ({ t, locale, nombres }), [t, locale, nombres]);
 
   const perdioSesion = onSessionLost;
 
@@ -179,17 +199,29 @@ export function AuditLog({ locale, onSessionLost }: AuditLogProps) {
   };
 
   /*
-   * El catalogo se ordena por la etiqueta TRADUCIDA, no por el codigo: en el
-   * desplegable se lee "Cobró el depósito", y ordenar por "payment.captured"
-   * lo colocaria donde nadie lo busca. Se recalcula al cambiar de idioma.
+   * El catalogo va AGRUPADO POR CAJONES, no como una lista de veintitantas
+   * entradas alfabeticas. Quien lleva la empresa no busca
+   * «access_notes.viewed»: busca «quien ha visto datos de clientes», y con
+   * los grupos el desplegable se recorre con esa pregunta en la cabeza.
+   *
+   * Dentro de cada grupo se ordena por la etiqueta TRADUCIDA y no por el
+   * codigo: en pantalla se lee «Cobró el depósito», y ordenar por
+   * "payment.captured" lo colocaria donde nadie lo busca.
    */
-  const acciones = ordenarPorEtiqueta(
-    AUDIT_ACTIONS.map((accion) => ({
-      valor: accion,
-      etiqueta: t(`admin.audit.action.${accion}`, { defaultValue: accion }),
-    })),
-    i18n.resolvedLanguage ?? locale,
-  );
+  const cajones = useMemo(() => {
+    const idioma = i18n.resolvedLanguage ?? locale;
+    const comparador = new Intl.Collator(idioma);
+
+    return GRUPOS.map((grupo) => ({
+      grupo,
+      acciones: AUDIT_ACTIONS.filter((accion) => grupoDe(accion) === grupo)
+        .map((accion) => ({
+          valor: accion,
+          etiqueta: t(`admin.audit.action.${accion}`, { defaultValue: accion }),
+        }))
+        .sort((a, b) => comparador.compare(a.etiqueta, b.etiqueta)),
+    })).filter((cajon) => cajon.acciones.length > 0);
+  }, [t, i18n.resolvedLanguage, locale]);
 
   return (
     <div className="space-y-6">
@@ -247,10 +279,14 @@ export function AuditLog({ locale, onSessionLost }: AuditLogProps) {
               onChange={(evento) => cambiar('action', evento.target.value)}
             >
               <option value="">{t('admin.audit.anyAction')}</option>
-              {acciones.map((accion) => (
-                <option key={accion.valor} value={accion.valor}>
-                  {accion.etiqueta}
-                </option>
+              {cajones.map((cajon) => (
+                <optgroup key={cajon.grupo} label={t(`admin.audit.group.${cajon.grupo}`)}>
+                  {cajon.acciones.map((accion) => (
+                    <option key={accion.valor} value={accion.valor}>
+                      {accion.etiqueta}
+                    </option>
+                  ))}
+                </optgroup>
               ))}
             </select>
           </div>
@@ -347,11 +383,24 @@ export function AuditLog({ locale, onSessionLost }: AuditLogProps) {
 
         {!cargando && !errorKey && items.length > 0 && (
           <>
-            <ul className="space-y-2">
-              {items.map((item) => (
-                <Entrada key={item.id} item={item} locale={locale} />
-              ))}
-            </ul>
+            {/*
+              AGRUPADO POR DIA. Cincuenta marcas de tiempo seguidas obligan a
+              leer la fecha entera en cada linea para saber si algo paso el
+              mismo dia que lo anterior; con la cabecera, cada entrada solo
+              necesita la hora.
+            */}
+            {porDias(items, contexto).map((jornada) => (
+              <section key={jornada.dia} className="mb-5 last:mb-0">
+                <h3 className="mb-2 text-xs font-bold tracking-wide text-slate-500 uppercase dark:text-slate-400">
+                  {jornada.titulo}
+                </h3>
+                <ul className="space-y-2">
+                  {jornada.entradas.map((item) => (
+                    <Entrada key={item.id} item={item} locale={locale} contexto={contexto} />
+                  ))}
+                </ul>
+              </section>
+            ))}
 
             <div className="mt-4 flex flex-col items-center gap-2">
               <p className="text-xs text-slate-500 dark:text-slate-400">
@@ -385,12 +434,30 @@ export function AuditLog({ locale, onSessionLost }: AuditLogProps) {
 /**
  * Una entrada del registro.
  *
- * El nombre de quien actuo NO se da por hecho. Hay tres casos reales y los
- * tres salen en pantalla de forma distinta: una persona del equipo, un
- * cliente que reservo desde el sitio, y el sistema en un barrido automatico.
- * Un cuarto: la ficha ya no existe, y entonces queda el identificador.
+ * ANTES ESTO ERA UN VOLCADO DE JSON. Se veia asi:
+ *
+ *     { "after": [ { "isLead": false,
+ *                    "staffId": "0826c725-0414-4abb-ae61-a5e14a4178ae" } ],
+ *       "before": [], "reference": "FT-2026-0002" }
+ *
+ * Correcto, y para quien lleva la empresa, inservible. Ahora la entrada se
+ * lee de arriba abajo —quien, que, sobre que, con que detalle— y el volcado
+ * sigue estando, en «detalles tecnicos», porque de un registro de auditoria
+ * no se puede esconder nada: solo apartar lo que estorba.
+ *
+ * El nombre de quien actuo NO se da por hecho. Hay cuatro casos reales: una
+ * persona del equipo, un cliente que reservo desde el sitio, el sistema en
+ * un barrido automatico, y una ficha que ya no existe.
  */
-function Entrada({ item, locale }: { item: AuditLogItem; locale: Locale }) {
+function Entrada({
+  item,
+  locale,
+  contexto,
+}: {
+  item: AuditLogItem;
+  locale: Locale;
+  contexto: Contexto;
+}) {
   const { t } = useTranslation();
 
   const quien =
@@ -401,50 +468,119 @@ function Entrada({ item, locale }: { item: AuditLogItem; locale: Locale }) {
         ? t('admin.audit.customerActor')
         : t('admin.audit.unknownActor'));
 
-  const detalle = detalleLegible(item.metadata);
+  const { objetivo, datos } = describir(item, contexto);
+  const crudo = volcado(item.metadata);
 
   return (
     <li className="ft-card p-3.5">
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        <div className="min-w-0">
-          <p className="text-sm text-slate-900 dark:text-white">
-            <span className="font-semibold">{quien}</span>{' '}
-            <span className="text-slate-700 dark:text-slate-300">
-              {/*
-                Si un dia llega una accion que esta pantalla no conoce —una
-                version del servidor mas nueva— se ensena el codigo tal cual.
-                Es feo y es correcto: mejor "booking.refunded" que una fila en
-                blanco justo cuando alguien esta investigando algo.
-              */}
-              {t(`admin.audit.action.${item.action}`, { defaultValue: item.action })}
-            </span>
-          </p>
-          <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-            {formatTimestamp(item.occurredAt, locale)}
-            {' · '}
-            {t(`admin.audit.entity.${item.entityType}`, { defaultValue: item.entityType })}
-            {item.ipAddress !== null && ` · ${t('admin.audit.ip', { value: item.ipAddress })}`}
-          </p>
-        </div>
+      <p className="text-sm text-slate-900 dark:text-white">
+        <span className="font-semibold">{quien}</span>{' '}
+        <span className="text-slate-700 dark:text-slate-300">
+          {/*
+            Si un dia llega una accion que esta pantalla no conoce —una
+            version del servidor mas nueva— se ensena el codigo tal cual. Es
+            feo y es correcto: mejor "booking.refunded" que una fila en
+            blanco justo cuando alguien esta investigando algo.
+          */}
+          {t(`admin.audit.action.${item.action}`, { defaultValue: item.action })}
+        </span>
+      </p>
 
-        <span className="ft-chip shrink-0 bg-slate-100 text-slate-700 dark:bg-night-700 dark:text-slate-300">
+      {objetivo !== null && (
+        <p className="mt-0.5 text-sm font-medium text-brand-800 dark:text-sun-300">{objetivo}</p>
+      )}
+
+      {/*
+        La hora y el origen, juntos y en la misma linea.
+        
+        El distintivo de origen estaba antes alineado a la derecha del
+        titulo. En un movil de 390 px se descolgaba o no segun lo largo que
+        fuera el nombre de quien actuo, asi que dos entradas seguidas
+        quedaban con maquetas distintas. Aqui abajo es informacion
+        secundaria, que es lo que es, y se ve igual a cualquier ancho.
+
+        De la hora solo hace falta la hora: el dia lo dice la cabecera del
+        grupo.
+      */}
+      <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-500 dark:text-slate-400">
+        {soloLaHora(item.occurredAt, locale)}
+        <span className="ft-chip bg-slate-100 text-slate-700 dark:bg-night-700 dark:text-slate-300">
           {t(`admin.audit.surface.${item.surface}`)}
         </span>
-      </div>
+      </p>
 
-      {detalle !== null && (
+      {datos.length > 0 && (
+        <dl className="mt-2.5 grid gap-x-4 gap-y-1 border-t border-slate-100 pt-2.5 text-sm sm:grid-cols-[auto_1fr] dark:border-night-700">
+          {datos.map((dato, indice) => (
+            <Fragment key={`${dato.etiqueta}-${indice}`}>
+              <dt className="text-xs font-semibold text-slate-500 sm:text-sm dark:text-slate-400">
+                {dato.etiqueta}
+              </dt>
+              {/*
+                El valor puede venir de fuera: el motivo que alguien escribe
+                al cancelar acaba aqui. React lo escapa; `break-words` evita
+                ademas que un texto sin espacios rompa la maqueta.
+              */}
+              <dd className="mb-1 break-words text-slate-800 sm:mb-0 dark:text-slate-200">
+                {dato.valor}
+              </dd>
+            </Fragment>
+          ))}
+        </dl>
+      )}
+
+      {/*
+        LO TECNICO NO SE BORRA, SE APARTA. La direccion IP y el identificador
+        del registro no le dicen nada a quien solo quiere saber que paso, pero
+        son justo lo que hace falta el dia que haya que reportar un problema o
+        cruzar una fila con otra.
+      */}
+      {(crudo !== null || item.ipAddress !== null || item.entityId !== null) && (
         <details className="mt-2">
-          <summary className="cursor-pointer text-xs font-semibold text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100">
-            {t('admin.audit.details')}
+          <summary className="cursor-pointer text-xs font-semibold text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100">
+            {t('admin.audit.technical')}
           </summary>
-          {/*
-            Texto ya serializado dentro de un `<pre>`. React lo escapa, asi
-            que lo que alguien escribio en un motivo de cancelacion se ve tal
-            cual y no se interpreta como nada.
-          */}
-          <pre className="mt-1.5 overflow-x-auto rounded-lg bg-slate-50 p-2.5 font-mono text-xs whitespace-pre-wrap text-slate-700 dark:bg-night-900 dark:text-slate-300">
-            {detalle}
-          </pre>
+
+          <div className="mt-1.5 space-y-1.5">
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              {t('admin.audit.technicalHelp')}
+            </p>
+
+            <dl className="grid gap-x-4 text-xs sm:grid-cols-[auto_1fr]">
+              {item.ipAddress !== null && (
+                <>
+                  <dt className="font-semibold text-slate-500 dark:text-slate-400">IP</dt>
+                  <dd className="font-mono text-slate-700 dark:text-slate-300">{item.ipAddress}</dd>
+                </>
+              )}
+              {item.entityId !== null && (
+                <>
+                  <dt className="font-semibold text-slate-500 dark:text-slate-400">
+                    {t('admin.audit.field.entityId')}
+                  </dt>
+                  <dd className="font-mono break-all text-slate-700 dark:text-slate-300">
+                    {item.entityId}
+                  </dd>
+                </>
+              )}
+            </dl>
+
+            {crudo !== null && (
+              <div>
+                <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+                  {t('admin.audit.rawData')}
+                </p>
+                {/*
+                  Texto ya serializado dentro de un `<pre>`. React lo escapa,
+                  asi que lo que alguien escribio en un motivo de cancelacion
+                  se ve tal cual y no se interpreta como nada.
+                */}
+                <pre className="mt-1 overflow-x-auto rounded-lg bg-slate-50 p-2.5 font-mono text-xs whitespace-pre-wrap text-slate-700 dark:bg-night-900 dark:text-slate-300">
+                  {crudo}
+                </pre>
+              </div>
+            )}
+          </div>
         </details>
       )}
     </li>
@@ -452,12 +588,12 @@ function Entrada({ item, locale }: { item: AuditLogItem; locale: Locale }) {
 }
 
 /**
- * La metadata, lista para pintar, o `null` si no hay nada que ensenar.
+ * La metadata tal cual se guardo, o `null` si no habia nada.
  *
- * Devuelve `null` tambien con un objeto vacio: un desplegable «Detalles» que
- * se abre y ensena `{}` es peor que no ofrecerlo.
+ * Devuelve `null` tambien con un objeto vacio: un bloque que se abre y
+ * ensena `{}` es peor que no ofrecerlo.
  */
-function detalleLegible(metadata: unknown): string | null {
+function volcado(metadata: unknown): string | null {
   if (metadata === null || metadata === undefined) return null;
   if (typeof metadata === 'object' && Object.keys(metadata).length === 0) return null;
 
@@ -468,10 +604,4 @@ function detalleLegible(metadata: unknown): string | null {
     // tampoco vale la pena que rompa la pantalla entera si llegara.
     return null;
   }
-}
-
-/** Orden alfabetico segun el idioma, que no es el orden de los codigos. */
-function ordenarPorEtiqueta<T extends { etiqueta: string }>(lista: T[], idioma: string): T[] {
-  const comparador = new Intl.Collator(idioma);
-  return [...lista].sort((a, b) => comparador.compare(a.etiqueta, b.etiqueta));
 }

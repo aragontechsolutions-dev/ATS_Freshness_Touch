@@ -40,6 +40,7 @@ vi.mock('../lib/api', () => ({
 const { AuditLog } = await import('./AuditLog');
 
 const MOTIVO_CON_TRAMPA = '<img src=x onerror="alert(1)">';
+const CLEO = '0826c725-0414-4abb-ae61-a5e14a4178ae';
 
 const PAGINA: AuditPage = {
   items: [
@@ -71,7 +72,13 @@ async function montar(): Promise<void> {
 
 beforeEach(() => {
   fetchAuditLog.mockReset().mockResolvedValue(PAGINA);
-  fetchStaffDirectory.mockReset().mockResolvedValue({ staff: [], canInvite: false });
+  fetchStaffDirectory.mockReset().mockResolvedValue({
+    staff: [
+      { staffId: CLEO, firstName: 'Cleo', lastName: 'Limpia' },
+      { staffId: '22222222-2222-4222-8222-222222222222', firstName: 'Ada', lastName: 'Jefa' },
+    ],
+    canInvite: false,
+  });
 
   contenedor = document.createElement('div');
   document.body.append(contenedor);
@@ -167,14 +174,107 @@ describe('la pantalla del registro', () => {
     expect(contenedor.querySelector('img')).toBeNull();
   });
 
-  it('sin metadata no ofrece el desplegable de detalles', async () => {
+  it('sin metadata no hay volcado, pero la IP sigue disponible', async () => {
     fetchAuditLog.mockResolvedValue({
       items: [{ ...PAGINA.items[0]!, metadata: {} }],
       nextBefore: null,
     });
 
     await montar();
-    expect(contenedor.querySelector('details')).toBeNull();
+
+    // El volcado se va: un bloque que se abre y ensena `{}` es peor que nada.
+    expect(contenedor.querySelector('pre')).toBeNull();
+    // Lo tecnico se aparta, NO se borra: la IP sigue a un clic de distancia.
+    expect(contenedor.querySelector('details')).not.toBeNull();
+    expect(contenedor.textContent).toContain('203.0.113.7');
+  });
+
+  /* ---------------------- Legible para quien no programa ------------------ */
+
+  /*
+   * EL CASO QUE MOTIVO LA ETAPA. La pantalla enseñaba el JSON crudo con un
+   * `staffId` dentro; ahora se lee quien entro en el equipo.
+   */
+  it('traduce los identificadores de la metadata a nombres', async () => {
+    fetchAuditLog.mockResolvedValue({
+      items: [
+        {
+          ...PAGINA.items[0]!,
+          action: 'booking.team_changed',
+          metadata: {
+            reference: 'FT-2026-0002',
+            before: [],
+            after: [{ staffId: CLEO, isLead: false }],
+          },
+        },
+      ],
+      nextBefore: null,
+    });
+
+    await montar();
+
+    expect(contenedor.textContent).toContain('Cleo Limpia');
+    expect(contenedor.textContent).toContain('Booking FT-2026-0002');
+  });
+
+  /*
+   * El UUID no desaparece del sistema: se aparta a «detalles tecnicos». Lo
+   * que no puede es estar en la vista principal, que es donde mira quien
+   * solo quiere saber que paso.
+   */
+  it('el UUID no sale en la vista principal, solo en el bloque tecnico', async () => {
+    fetchAuditLog.mockResolvedValue({
+      items: [
+        {
+          ...PAGINA.items[0]!,
+          action: 'booking.team_changed',
+          metadata: { reference: 'FT-1', before: [], after: [{ staffId: CLEO, isLead: false }] },
+        },
+      ],
+      nextBefore: null,
+    });
+
+    await montar();
+
+    const principal = contenedor.querySelector('li')?.cloneNode(true) as HTMLElement;
+    principal.querySelector('details')?.remove();
+    expect(principal.textContent).not.toContain(CLEO);
+
+    // Y en el volcado sigue estando, entero.
+    expect(contenedor.querySelector('pre')?.textContent).toContain(CLEO);
+  });
+
+  it('agrupa por dia con una cabecera por jornada', async () => {
+    const hoy = new Date();
+    const ayer = new Date(hoy.getTime() - 86_400_000);
+
+    fetchAuditLog.mockResolvedValue({
+      items: [
+        { ...PAGINA.items[0]!, id: 'a', occurredAt: hoy.toISOString() },
+        { ...PAGINA.items[0]!, id: 'b', occurredAt: ayer.toISOString() },
+      ],
+      nextBefore: null,
+    });
+
+    await montar();
+
+    const cabeceras = [...contenedor.querySelectorAll('section h3')].map((h) => h.textContent);
+    expect(cabeceras).toEqual(['Today', 'Yesterday']);
+  });
+
+  /*
+   * Veintitantas acciones en una lista alfabetica no se recorren; agrupadas
+   * por «para que sirve», si.
+   */
+  it('el filtro de acciones va agrupado por categorias', async () => {
+    await montar();
+
+    const grupos = [
+      ...contenedor.querySelectorAll<HTMLOptGroupElement>('#auditoria-accion optgroup'),
+    ].map((grupo) => grupo.label);
+
+    expect(grupos).toContain('Customer data');
+    expect(grupos).toContain('Money');
   });
 });
 

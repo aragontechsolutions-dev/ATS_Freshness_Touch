@@ -348,6 +348,114 @@ nueva— se enseña el código tal cual. Es feo y es correcto: mejor
 
 ---
 
+## 8 bis. Legible para quien no programa (etapa 2.16)
+
+La primera versión de la pantalla enseñaba la metadata tal cual sale de la
+base de datos. Correcta, y para quien lleva la empresa, inservible:
+
+```
+Henry Marquez  Team changed
+Sep 23, 2026, 8:17 PM · Booking · IP 10.26.125.146
+▼ Details
+{ "after": [ { "isLead": false,
+               "staffId": "0826c725-0414-4abb-ae61-a5e14a4178ae" } ],
+  "before": [], "reference": "FT-2026-0002" }
+```
+
+Ahora:
+
+```
+Henry Marquez  Cambió el equipo
+Reserva FT-2026-0002
+8:17 PM · Panel de administración
+
+  Equipo antes    Nadie
+  Equipo después  Cleo Limpia
+  ▸ Detalles técnicos
+```
+
+### Las dos reglas del traductor
+
+`apps/admin/src/lib/audit-readable.ts` es código puro —recibe `t` en vez de
+usar el gancho— para poder probarlo sin montar React.
+
+1. **No se pierde nada.** Una clave que no se sepa traducir se pinta igual,
+   con su nombre crudo como etiqueta, y el JSON entero sigue accesible en
+   «detalles técnicos». Un registro de auditoría que esconde lo que no
+   entiende deja de ser una prueba de nada. Hay una prueba que mete una clave
+   inventada y exige que aparezca.
+2. **No se inventa nada.** Cada formato corresponde a una metadata que algún
+   servicio escribe de verdad (§3 de este documento las inventaría). Las
+   pruebas usan esa metadata copiada de su `audit.record(...)`, así que si un
+   servicio cambia lo que guarda, lo suyo es que la prueba falle.
+
+### Qué se traduce
+
+| Antes                                     | Ahora                        |
+| ----------------------------------------- | ---------------------------- |
+| `"staffId": "0826c725-0414-…"`            | `Cleo Limpia`                |
+| `"amountCents": 5000`                     | `$50.00`                     |
+| `"to": "COMPLETED"`                       | `Completada`                 |
+| `"role": "ADMIN"`                         | `Administración`             |
+| `"before": []`                            | `Nadie`                      |
+| `"source": "my-jobs"`                     | `La pantalla «Mis trabajos»` |
+| `"changed": ["phone"], "value": {…todo…}` | `Teléfono → (404) 555-0123`  |
+| Siete filtros a `null`                    | `Sin filtros: se pidió todo` |
+
+El nombre de las personas se resuelve **con el directorio que la pantalla ya
+pide para el filtro**, no se guarda en la fila: si alguien se cambia el
+apellido, el historial entero pasa a mostrarlo bien. Si la ficha ya no existe
+queda el correo, y si tampoco lo hay se dice «alguien que ya no está en la
+lista de personal» — nunca un identificador, que no le dice nada a nadie.
+
+### Dos detalles que parecen de formato y no lo son
+
+**`from` y `to` significan dos cosas.** En un cambio de estado son «antes» y
+«después»; en una consulta del registro son el principio y el final de un
+rango de fechas. Llamar «Antes» a «desde el 1 de septiembre» dice justo lo
+contrario de lo que pasó. Se distinguen **por la forma del valor** y no por la
+acción, para no tener que acordarse de nada al añadir una acción nueva.
+
+**Una cita va en hora de Georgia.** `scheduledStart` es la hora a la que un
+equipo se presenta en una casa, y es la misma que ve el cliente en su correo:
+en la zona del navegador, el panel y el cliente hablarían de horas distintas
+para la misma limpieza. Todo lo demás del registro —cuándo alguien pulsó un
+botón— va en la zona de quien mira. La constante vive ahora en
+`apps/admin/src/lib/format.ts` (`TIMEZONE_EMPRESA`), en vez de repetida.
+
+### Lo técnico se aparta, no se borra
+
+La dirección IP, el identificador del registro y el JSON crudo se recogen en
+un desplegable «detalles técnicos». No le dicen nada a quien solo quiere saber
+qué pasó, y son justo lo que hace falta el día que haya que reportar un
+problema o cruzar una fila con otra. Hay una prueba que comprueba las dos
+mitades: que el UUID **no** sale en la vista principal, y que **sí** sigue
+entero en el volcado.
+
+### Agrupado por día y filtrado por categorías
+
+- La lista se parte en jornadas con «Hoy», «Ayer» y la fecha larga. Cincuenta
+  marcas de tiempo seguidas obligan a leer la fecha entera en cada línea para
+  saber si algo pasó el mismo día que lo anterior.
+- El desplegable de acciones va en cajones en lenguaje llano: _entrar al
+  sistema, reservas, dinero, personal, configuración, datos de clientes, este
+  registro_. Quien lleva la empresa no busca `access_notes.viewed`: busca
+  «quién ha visto datos de clientes».
+- El cajón se decide **por el prefijo de la acción**, no con una lista, para
+  que una acción nueva del catálogo caiga sola en su sitio en vez de quedarse
+  fuera del desplegable sin que nadie lo note. Las lecturas son la excepción y
+  van explícitas: `booking.viewed` empieza por `booking` pero no es un
+  movimiento de la reserva, es alguien mirando los datos de un cliente.
+
+### Comprobado en navegador
+
+Chromium real, en claro, oscuro y a 390 px. **320 textos medidos** con el
+auditor de contraste del proyecto (que convierte los `oklch()` de Chromium
+pintándolos en un lienzo de 1×1, porque leer esos números como RGB da fallos
+que no existen): ninguno por debajo del mínimo; el más ajustado, 4,52:1.
+
+---
+
 ## 9. Qué se comprueba
 
 `apps/api/src/audit/audit.e2e.test.ts`, contra PostgreSQL real (PGlite), con
@@ -369,6 +477,14 @@ Además:
 - `apps/api/src/common/config/env.test.ts` comprueba el suelo de la retención.
 - `packages/i18n/src/i18n.test.ts` comprueba que todo el catálogo tiene
   etiqueta en inglés y en español.
+- `apps/admin/src/lib/audit-readable.test.ts` prueba el traductor con la
+  metadata real de cada acción, incluidas las dos reglas que lo sostienen:
+  que una clave sin traducir **siga apareciendo**, y que ninguna acción del
+  catálogo se quede fuera de los cajones del filtro.
+- `apps/admin/src/components/AuditLog.test.tsx` comprueba la pantalla: que no
+  consulte al teclear, que la metadata salga como texto y no como marcado,
+  que los identificadores se traduzcan a nombres, y que el UUID **no** esté
+  en la vista principal pero **sí** entero en los detalles técnicos.
 
 ---
 

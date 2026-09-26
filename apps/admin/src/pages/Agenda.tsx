@@ -10,9 +10,7 @@ import { ApiClientError, fetchBookings, isSessionError, sessionLostReason } from
 import { StatusChip } from '../components/StatusChip';
 import { SkeletonListaReservas } from '../components/Skeletons';
 import { AlertIcon, CalendarIcon, RefreshIcon, SearchIcon, UsersIcon } from '../components/Icons';
-import { formatCents, formatDateTime, todayInTimezone } from '../lib/format';
-
-const TIMEZONE = 'America/New_York';
+import { TIMEZONE_EMPRESA, formatCents, formatDateTime, todayInTimezone } from '../lib/format';
 
 const ESTADOS: BookingStatus[] = [
   'PENDING_PAYMENT',
@@ -41,7 +39,7 @@ interface AgendaProps {
 export function Agenda({ locale, onOpenBooking, onSessionLost }: AgendaProps) {
   const { t } = useTranslation();
 
-  const [date, setDate] = useState(() => todayInTimezone(TIMEZONE));
+  const [date, setDate] = useState(() => todayInTimezone(TIMEZONE_EMPRESA));
   const [status, setStatus] = useState<BookingStatus | ''>('');
   const [search, setSearch] = useState('');
 
