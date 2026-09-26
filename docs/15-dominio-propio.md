@@ -25,13 +25,19 @@ partes.
 Hay cuatro cosas distintas que necesitan nombre, y conviene decidirlas antes de
 tocar ningún DNS:
 
-| Nombre                             | Apunta a                       | Para qué                                  |
-| ---------------------------------- | ------------------------------ | ----------------------------------------- |
-| `freshnesstouchcleaning.com`       | Vercel · proyecto `landing`    | El sitio público. **Este es el canónico** |
-| `www.freshnesstouchcleaning.com`   | Vercel · redirige al de arriba | Lo que teclea la gente por costumbre      |
-| `panel.freshnesstouchcleaning.com` | Vercel · proyecto `admin`      | El panel del equipo                       |
-| _(subdominio de envío)_            | Resend · solo registros DNS    | Correo saliente. No es una página web     |
-| `api.freshnesstouchcleaning.com`   | Render · **opcional**          | La API. Ver apartado 8                    |
+| Nombre                             | Apunta a                    | Para qué                                  |
+| ---------------------------------- | --------------------------- | ----------------------------------------- |
+| `www.freshnesstouchcleaning.com`   | Vercel · proyecto `landing` | El sitio público. **Este es el canónico** |
+| `freshnesstouchcleaning.com`       | Redirige (308) al `www`     | Lo que teclea la gente sin el `www`       |
+| `panel.freshnesstouchcleaning.com` | Vercel · proyecto `admin`   | El panel del equipo                       |
+| _(subdominio de envío)_            | Resend · solo registros DNS | Correo saliente. No es una página web     |
+| `api.freshnesstouchcleaning.com`   | Render · **opcional**       | La API. Ver apartado 8                    |
+
+**Cuál es el canónico, la raíz o el `www`:** da igual, mientras uno redirija al
+otro y no queden los dos sirviendo lo mismo —eso sí penaliza en buscadores—. Al
+añadir el dominio, Vercel ofrece marcada la casilla _«Redirect apex domains to
+www»_, y con ella el canónico pasa a ser el `www`. Está bien así; lo único que
+importa es recordarlo al escribir `CORS_ORIGINS`.
 
 **Por qué el panel en un subdominio y no en `/panel`:** son dos aplicaciones
 distintas, en dos proyectos de Vercel distintos, con políticas de seguridad
@@ -103,9 +109,17 @@ usa Vercel. Aparecen con un candado porque los gestiona Vercel.
 
 ### 4.2. El panel
 
-1. Proyecto **`ats-freshness-touch-admin`** → Settings → Domains.
-2. Añade `panel.freshnesstouchcleaning.com`.
-3. Mismo procedimiento con el registro que te indique.
+1. Proyecto **`ats-freshness-touch-admin`** → Settings → Domains → Add.
+2. Escribe **`panel.freshnesstouchcleaning.com`**, el subdominio entero.
+
+> **El error fácil aquí es escribir el dominio raíz.** El cuadro de diálogo es
+> idéntico al del sitio público y el buscador autocompleta
+> `freshnesstouchcleaning.com`, que ya pertenece al otro proyecto. Un dominio
+> solo puede estar conectado a un proyecto a la vez: o Vercel lo rechaza, o te
+> lo lleva del sitio público al panel y **tiras el sitio abajo**.
+>
+> La casilla _«Redirect apex domains to www»_ no pinta nada aquí: solo actúa
+> sobre dominios raíz, y `panel.` no lo es. Da igual cómo la dejes.
 
 ### 4.3. Los dominios viejos siguen vivos
 
@@ -168,7 +182,7 @@ Esto es lo que el código lee de verdad. Nada más.
 
 | Variable                       | Valor nuevo                                                                                                          |
 | ------------------------------ | -------------------------------------------------------------------------------------------------------------------- |
-| `CORS_ORIGINS`                 | `https://freshnesstouchcleaning.com,https://www.freshnesstouchcleaning.com,https://panel.freshnesstouchcleaning.com` |
+| `CORS_ORIGINS`                 | `https://www.freshnesstouchcleaning.com,https://freshnesstouchcleaning.com,https://panel.freshnesstouchcleaning.com` |
 | `EMAIL_PROVIDER`               | `resend`                                                                                                             |
 | `RESEND_API_KEY`               | `re_...`                                                                                                             |
 | `EMAIL_FROM`                   | `Freshness Touch <hola@freshnesstouchcleaning.com>` — el dominio **tiene que ser el verificado en Resend**           |
