@@ -1333,3 +1333,97 @@ la nota del cliente, el teléfono y quién más va; la dirección enlaza al mapa
 se marca llegada y fin y los botones se turnan; no hay desbordamiento
 horizontal; y todo igual en español. Coordinación sigue viendo su agenda y
 tiene además el botón de «Mis trabajos».
+
+---
+
+## 18. El acceso que se quedaba mudo
+
+> Etapa 2.12. Un fallo reportado desde producción: con las credenciales
+> correctas, el panel se quedaba en la pantalla de acceso **sin ningún
+> mensaje**, y había que recargar con F5 para entrar.
+
+### 18.1. Dos fallos que solo juntos producían el síntoma
+
+**Uno: un acceso disparaba DOS comprobaciones de sesión.** El evento
+`SIGNED_IN` del proveedor lanzaba una y el formulario lanzaba otra al
+resolverse. Corrían a la vez, y el contador de generaciones —que existe para
+que una comprobación lenta no pise a otra más reciente— hacía que la segunda
+descartara el resultado de la primera.
+
+**Dos: nada recogía un fallo de `getSession()`.** Estaba fuera del `try`. Si
+la comprobación más reciente moría ahí, la anterior ya se había descartado, la
+promesa se perdía en silencio y **no se ponía ningún estado**. La pantalla se
+quedaba exactamente como estaba: en el acceso, sin explicación.
+
+Al recargar solo hay una comprobación, sin nada que compita, y entra. De ahí
+que F5 «arreglara» el problema y que fuera tan difícil de creer.
+
+### 18.2. Cómo se encontró
+
+No razonando: **reproduciéndolo**. Y los dos primeros intentos fallaron, lo
+cual fue informativo:
+
+1. Con **latencia realista** en el proveedor: no se reproduce. Las dos
+   comprobaciones corren, la última gana, entra bien.
+2. Cortando `/admin/session`: se queda en el acceso, pero **con** mensaje
+   («tu sesión ha terminado») y F5 **no** entra. No era el caso reportado,
+   pero destapó un tercer fallo, el de §18.4.
+3. Haciendo fallar `getSession()`: **reproducción exacta**. Sin mensaje,
+   contraseña aún escrita, y F5 entra.
+
+Lo que descartó los dos primeros intentos fue la propia captura del usuario:
+la contraseña seguía escrita —así que el formulario no había dado error, que
+la borra— y no había ningún aviso —así que el motivo era nulo—.
+
+### 18.3. Las comprobaciones se serializan
+
+Si llega una petición mientras hay otra en curso, ya no se lanza una segunda:
+se anota que hay que repetir al terminar. Y **solo se repite si la pasada no
+llegó a resolverse**.
+
+Esa condición hace dos cosas de una vez:
+
+- En un acceso normal, la segunda petición se descarta porque la primera ya
+  contestó: **una sola llamada a la API** en vez de dos.
+- Cuando la primera muere sin respuesta, la segunda se convierte en el
+  **reintento** que hace falta, y se entra igualmente.
+
+### 18.4. Un corte de red ya no echa a nadie
+
+El tercer fallo, encontrado por el camino: **cualquier** error al consultar
+`/admin/session` cerraba la sesión y decía «tu sesión ha terminado». Un corte
+de un segundo, un 502, la API todavía arrancando: todo eso obligaba a teclear
+la contraseña otra vez, y además mentía sobre el motivo.
+
+Ahora la decisión vive en `sessionOutcome`, una función pura y probada:
+
+| Respuesta                                                     | Qué significa             | Qué se hace                                 |
+| ------------------------------------------------------------- | ------------------------- | ------------------------------------------- |
+| `401`                                                         | la sesión ya no vale      | cerrar sesión, «ha caducado»                |
+| `403`                                                         | la cuenta no tiene acceso | cerrar sesión, «sin acceso»                 |
+| Sin red, `5xx`, contrato, o algo que ni es un error de la API | **no se pudo preguntar**  | **no se cierra nada**; se ofrece reintentar |
+
+Se sacó a una función propia por dos motivos: es la decisión con más
+consecuencias del panel —de ella depende que a alguien se le eche fuera— y
+estaba escrita como una condición de una línea dentro de un `catch`, metiendo
+en el mismo saco «tu sesión no vale» y «no he podido preguntar».
+
+El estado `unreachable` tiene pantalla propia, que dice lo único que importa:
+**sigues dentro, esto no te ha cerrado la sesión**, y un botón de reintentar.
+
+### 18.5. Qué está probado
+
+**De la decisión** (11 pruebas, sin navegador porque es una función pura):
+`401` y `403` cierran sesión; sin red, `500`, `502`, `503`, `504` y un
+desajuste de contrato **no**; y lo que lanza la librería de sesión —que no es
+un error de nuestra API— tampoco.
+
+**En navegador real**, los cinco casos:
+
+1. Acceso normal: **una sola** llamada a `/admin/session`, antes dos.
+2. `getSession()` revienta durante el acceso: **se entra igualmente**, porque
+   el segundo disparo actúa de reintento. Ya no hay pantalla muda.
+3. API caída: se ve «no pudimos comprobar tu sesión», **no** se cierra la
+   sesión y se ofrece reintentar.
+4. Una cuenta sin acceso sigue recibiendo su mensaje correcto.
+5. El mensaje «tu sesión ha terminado» ya no aparece por un fallo de red.

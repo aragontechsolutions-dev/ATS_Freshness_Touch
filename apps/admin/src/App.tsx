@@ -118,6 +118,43 @@ export default function App() {
     );
   }
 
+  /*
+   * No se ha podido comprobar la sesion. NO es lo mismo que estar fuera: la
+   * sesion sigue viva y lo unico que falta es poder preguntar al servidor.
+   *
+   * Antes este caso mandaba a la pantalla de acceso diciendo que la sesion
+   * habia caducado, lo cual cerraba una sesion buena y ademas mentia. Aqui se
+   * ofrece reintentar, que es lo unico que hace falta.
+   */
+  if (state.status === 'unreachable') {
+    return (
+      <main className="flex min-h-dvh items-center justify-center px-4 py-12">
+        <div className="ft-card w-full max-w-sm p-6">
+          <h1 className="text-lg font-bold text-slate-900 dark:text-white">
+            {t('admin.unreachable.title')}
+          </h1>
+          <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
+            {t('admin.unreachable.body')}
+          </p>
+          <button
+            type="button"
+            className="ft-btn-primary mt-4 w-full"
+            onClick={() => void refresh()}
+          >
+            {t('admin.unreachable.retry')}
+          </button>
+          <button
+            type="button"
+            className="ft-btn-ghost mt-2 w-full"
+            onClick={() => void signOut('manual')}
+          >
+            {t('admin.signOut')}
+          </button>
+        </div>
+      </main>
+    );
+  }
+
   if (state.status === 'signed-out') {
     if (pidiendoEnlace) {
       return <ForgotPassword onBack={() => setPidiendoEnlace(false)} />;

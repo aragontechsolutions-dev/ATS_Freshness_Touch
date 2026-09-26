@@ -429,6 +429,12 @@ export const en = {
       noActions: 'Dispatch handles the rest.',
     },
 
+    unreachable: {
+      title: 'We could not check your session',
+      body: 'You are still signed in: this has not logged you out. It may be the connection, or the server starting up. Try again in a few seconds.',
+      retry: 'Try again',
+    },
+
     /* --------------------------- Errores --------------------------- */
     errorSessionExpired: 'Your session has ended. Please sign in again.',
     errorNoAccess: 'This account does not have access to the admin panel.',

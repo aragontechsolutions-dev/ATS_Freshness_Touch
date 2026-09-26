@@ -441,6 +441,12 @@ export const es: TranslationResources = {
       noActions: 'Coordinación se encarga del resto.',
     },
 
+    unreachable: {
+      title: 'No pudimos comprobar tu sesión',
+      body: 'Sigues dentro: esto no te ha cerrado la sesión. Puede ser la conexión o que el servidor esté arrancando. Inténtalo de nuevo en unos segundos.',
+      retry: 'Reintentar',
+    },
+
     /* --------------------------- Errores --------------------------- */
     errorSessionExpired: 'Tu sesión ha terminado. Vuelve a iniciar sesión.',
     errorNoAccess: 'Esta cuenta no tiene acceso al panel de administración.',
