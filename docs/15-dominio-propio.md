@@ -154,23 +154,72 @@ quita los viejos de `CORS_ORIGINS` (apartado 6) para reducir la superficie.
 La propagación suele tardar minutos, a veces horas. Hasta que Resend no diga
 **Verified**, no cambies `EMAIL_PROVIDER` a `resend` en producción.
 
-### 5.2. DMARC: ponlo, aunque Resend no lo exija
+### 5.2. DMARC: ponlo, aunque Resend lo marque como opcional
 
 SPF y DKIM dicen «este servidor puede enviar en mi nombre». DMARC dice qué
 hacer cuando algo no cuadra, y **es lo que más peso tiene hoy** para que Gmail
-y Outlook no te manden a la carpeta de no deseado.
+y Outlook no te manden a la carpeta de no deseado. Resend lo lista como
+_(Optional)_ y **no lo crea solo**, ni siquiera con «Auto configure»: hay que
+añadirlo a mano en el DNS de Vercel.
 
-Registro TXT en `_dmarc.freshnesstouchcleaning.com`:
+| Campo | Valor               |
+| ----- | ------------------- |
+| Name  | `_dmarc`            |
+| Type  | `TXT`               |
+| Value | `v=DMARC1; p=none;` |
+
+`p=none` significa «no rechaces nada todavía». Es lo correcto al empezar: si
+más adelante confirmas que todo tu correo legítimo pasa, se sube a
+`p=quarantine` y luego a `p=reject`. Poner `p=reject` el primer día es cómo se
+tira el correo bueno de uno mismo.
+
+#### Por qué NO se pone `rua=` apuntando a un Gmail
+
+La tentación es añadir `rua=mailto:...@gmail.com` para recibir los informes.
+**No funciona de forma fiable, y conviene saber por qué.**
+
+Cuando la dirección de informes está en un dominio **distinto** del que
+publica el DMARC —`gmail.com` frente a `freshnesstouchcleaning.com`—, la
+norma (RFC 7489 §7.1) exige que el dominio receptor publique un registro de
+autorización:
 
 ```
-v=DMARC1; p=none; rua=mailto:dmarc@freshnesstouchcleaning.com
+freshnesstouchcleaning.com._report._dmarc.gmail.com   TXT   "v=DMARC1"
 ```
 
-`p=none` significa «no rechaces nada todavía, solo infórmame». Es lo correcto
-al empezar: primero miras los informes unas semanas, confirmas que todo tu
-correo legítimo pasa, y solo entonces subes a `p=quarantine` y luego a
-`p=reject`. Poner `p=reject` el primer día es cómo se tira el correo bueno de
-uno mismo.
+Gmail no publica eso para dominios ajenos, evidentemente. Los sistemas que
+siguen la norma al pie de la letra **no mandan el informe**; otros sí. El
+resultado es que llegan unos pocos, de forma irregular, y se saca la
+conclusión equivocada.
+
+Existe para evitar que cualquiera dirija el tráfico de informes de un dominio
+hacia un buzón que no controla.
+
+**Qué hacer entonces:** de momento, DMARC sin `rua`. La política sigue
+valiendo —que es para lo que de verdad sirve—, solo que sin informes. Cuando
+haya buzón propio en el dominio, o si se quiere un panel de informes, se añade
+el `rua` apuntando a una dirección **del propio dominio** o a un servicio
+especializado.
+
+### 5.2.b Cómo quedó, en la práctica
+
+Verificado el 26 de septiembre de 2026 con **Auto configure**, que crea los
+registros directamente en el DNS de Vercel. De añadir el dominio a
+_«Domain verified»_ pasaron **dos minutos**.
+
+| Registro           | Nombre              | Tipo | Estado   |
+| ------------------ | ------------------- | ---- | -------- |
+| DKIM               | `resend._domainkey` | TXT  | Verified |
+| SPF (rebotes)      | `send`              | MX   | Verified |
+| SPF (autorización) | `send`              | TXT  | Verified |
+| DMARC              | `_dmarc`            | TXT  | A mano   |
+
+**El MX está en `send.`, no en la raíz.** Es exactamente el caso bueno del
+apartado 2: la raíz queda libre, así que el día que se contrate un buzón
+propio su proveedor puede tomar los MX de la raíz sin chocar con Resend y sin
+tener que rehacer nada de esto.
+
+_«Enable Receiving»_ se deja **apagado**: solo se envía.
 
 ### 5.3. La clave de API
 
