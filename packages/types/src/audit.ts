@@ -110,6 +110,14 @@ const ACCIONES_FIJAS = [
   'access_notes.viewed',
   /** Alguien consulto el propio registro de auditoria. */
   'audit.queried',
+  /**
+   * La purga automatica borro entradas caducadas.
+   *
+   * El registro cuenta lo que se ha quitado de si mismo. Sin esta fila,
+   * un hueco en el historial es indistinguible de un borrado a mano, que
+   * es justo la duda que la auditoria existe para despejar.
+   */
+  'audit.purged',
 ] as const;
 
 /**
@@ -159,12 +167,12 @@ export type AuditEntityType = z.infer<typeof AuditEntityTypeSchema>;
 /* -------------------------------------------------------------------------- */
 
 export const AuditLogItemSchema = z.object({
-  id: z.string().uuid(),
-  occurredAt: z.string().datetime(),
+  id: z.uuid(),
+  occurredAt: z.iso.datetime(),
   surface: AuditSurfaceSchema,
   actorType: AuditActorTypeSchema,
   /** Identificador de la ficha de personal. Nulo si actuo el sistema o un cliente. */
-  actorId: z.string().uuid().nullable(),
+  actorId: z.uuid().nullable(),
   /**
    * Nombre de quien actuo, resuelto al consultar.
    *
@@ -197,7 +205,7 @@ export const AUDIT_PAGE_DEFAULT = 50;
 
 export const AuditQuerySchema = z.object({
   /** Todo lo que hizo una persona. */
-  actorId: z.string().uuid().optional(),
+  actorId: z.uuid().optional(),
   /** Una accion concreta del catalogo. */
   action: AuditActionSchema.optional(),
   surface: AuditSurfaceSchema.optional(),
@@ -205,8 +213,8 @@ export const AuditQuerySchema = z.object({
   entityType: AuditEntityTypeSchema.optional(),
   entityId: z.string().trim().min(1).max(80).optional(),
   /** Desde y hasta, en formato de fecha y hora completa. */
-  from: z.string().datetime().optional(),
-  to: z.string().datetime().optional(),
+  from: z.iso.datetime().optional(),
+  to: z.iso.datetime().optional(),
   limit: z.coerce.number().int().min(1).max(AUDIT_PAGE_MAX).default(AUDIT_PAGE_DEFAULT),
   /**
    * Paginacion POR CURSOR y no por numero de pagina.
@@ -216,13 +224,20 @@ export const AuditQuerySchema = z.object({
    * dos veces la misma fila y saltandose otra. El cursor es el instante de la
    * ultima fila leida, asi que eso no puede pasar.
    */
-  before: z.string().datetime().optional(),
+  before: z.iso.datetime().optional(),
 });
 export type AuditQuery = z.infer<typeof AuditQuerySchema>;
+/**
+ * Lo que se manda, antes de aplicar valores por defecto.
+ *
+ * `limit` es obligatorio DESPUES de validar y opcional al pedir: quien
+ * consulta desde el panel no tiene por que elegir tamano de pagina.
+ */
+export type AuditQueryInput = z.input<typeof AuditQuerySchema>;
 
 export const AuditPageSchema = z.object({
   items: z.array(AuditLogItemSchema),
   /** Cursor para la siguiente pagina. `null` cuando no queda nada mas. */
-  nextBefore: z.string().datetime().nullable(),
+  nextBefore: z.iso.datetime().nullable(),
 });
 export type AuditPage = z.infer<typeof AuditPageSchema>;
