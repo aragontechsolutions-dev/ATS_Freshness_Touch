@@ -356,6 +356,20 @@ No hace falta ningún servicio de cron en Render: el barrido va dentro de la
 API, que en el plan `starter` no se suspende. Las horas de antelación se
 configuran desde el panel, no aquí.
 
+### Registro de auditoría
+
+| Variable               | Valor                       | Obligatoria |
+| ---------------------- | --------------------------- | ----------- |
+| `AUDIT_RETENTION_DAYS` | 365 por defecto, 0 lo apaga | No          |
+| `AUDIT_PURGE_HOURS`    | 24 por defecto, 0 lo apaga  | No          |
+
+La purga corre dentro de la propia API, como el recordatorio, con una pasada
+al arrancar. **Cualquier valor distinto de cero tiene un suelo de 30 días y
+por debajo la aplicación no arranca**: un cero apaga la purga, pero un uno
+borraría casi todo el registro, y eso no se deshace.
+
+Ver `docs/16-auditoria.md` §7.
+
 **El identificador de chat NO va aquí**: se configura desde el panel, en
 Datos del negocio → Avisos. Sin el token no sirve para enviar nada, así que no
 es un secreto.

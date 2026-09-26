@@ -115,6 +115,12 @@ Progreso:
   sus trabajos, con dirección, cómo entrar y teléfono, y los botones de «he
   llegado» y «he terminado». Nunca ve importes ni trabajos ajenos: el filtro
   va en la consulta, no al pintar.
+- ✅ **Registro de auditoría completo** (`docs/16-auditoria.md`): quién hizo
+  qué, desde dónde y cuándo, con pantalla propia para administración. Cubre el
+  acceso al panel, las reservas del sitio y las lecturas de datos sensibles.
+  Consultarlo deja rastro, no guarda nada sensible y se purga solo al año.
+  Queda fuera el registro de intentos fallidos de contraseña, que ocurre
+  dentro de Supabase.
 - ⬜ Avisos por SMS.
 - Calendario de disponibilidad y reserva en línea.
 - **Stripe**: retención del depósito con `capture_method: 'manual'` al reservar y
