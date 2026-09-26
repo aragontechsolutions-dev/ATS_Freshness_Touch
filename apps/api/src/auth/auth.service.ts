@@ -34,7 +34,17 @@ export class AuthService {
     private readonly prisma: PrismaService,
   ) {}
 
-  async authenticate(token: string): Promise<AuthenticatedStaff> {
+  /**
+   * Como `authenticate`, pero devolviendo ademas el identificador de sesion.
+   *
+   * Existe aparte para que el resto del sistema siga pidiendo solo «quien
+   * eres» y nadie tenga que arrastrar un dato que no necesita. El
+   * identificador de sesion lo usa UNICAMENTE la guarda, y solo para no
+   * registrar dos veces el mismo acceso.
+   */
+  async authenticateWithSession(
+    token: string,
+  ): Promise<{ staff: AuthenticatedStaff; sessionId: string | null }> {
     // --- 1. Identidad -------------------------------------------------------
     let claims;
     try {
@@ -80,12 +90,20 @@ export class AuthService {
     }
 
     return {
-      staffId: staff.id,
-      firstName: staff.firstName,
-      lastName: staff.lastName,
-      email: staff.email,
-      role: staff.role satisfies StaffRole,
-      sessionExpiresAt: claims.expiresAt.toISOString(),
+      staff: {
+        staffId: staff.id,
+        firstName: staff.firstName,
+        lastName: staff.lastName,
+        email: staff.email,
+        role: staff.role satisfies StaffRole,
+        sessionExpiresAt: claims.expiresAt.toISOString(),
+      },
+      sessionId: claims.sessionId,
     };
+  }
+
+  /** Quien eres. Lo que necesita todo el mundo salvo la guarda. */
+  async authenticate(token: string): Promise<AuthenticatedStaff> {
+    return (await this.authenticateWithSession(token)).staff;
   }
 }

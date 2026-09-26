@@ -9,6 +9,7 @@ import { Reflector } from '@nestjs/core';
 import { API_ERROR_CODES, type AuthenticatedStaff, type StaffRole } from '@freshness/types';
 import type { Request } from 'express';
 import { AuthService } from './auth.service';
+import { SessionAuditService } from '../audit/session-audit.service';
 import { ADMIN_ROUTE, ROLES_KEY } from './auth.decorators';
 
 /** Coincide con el segmento de ruta completo, no con un trozo de palabra. */
@@ -36,6 +37,7 @@ export class AdminGuard implements CanActivate {
   constructor(
     private readonly auth: AuthService,
     private readonly reflector: Reflector,
+    private readonly sessionAudit: SessionAuditService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -52,8 +54,20 @@ export class AdminGuard implements CanActivate {
       });
     }
 
-    const staff = await this.auth.authenticate(token);
+    const { staff, sessionId } = await this.auth.authenticateWithSession(token);
     request.staff = staff;
+
+    /*
+     * QUIEN ENTRO. Se anota aqui porque es el unico sitio donde se ve: el
+     * inicio de sesion ocurre entre el navegador y Supabase, y a la API solo
+     * llega el token ya emitido.
+     *
+     * No se espera al resultado y no puede lanzar: esto corre delante de
+     * TODAS las peticiones del panel. Un acceso sin anotar es un problema;
+     * un acceso bloqueado por no poder anotarlo es peor. Solo escribe la
+     * primera vez que ve cada sesion (ver `SessionAuditService`).
+     */
+    this.sessionAudit.recordOpened(staff, sessionId, request.ip ?? null);
 
     // --- Rol, si el endpoint lo exige ---------------------------------------
     const required = this.reflector.getAllAndOverride<StaffRole[] | undefined>(ROLES_KEY, [
@@ -62,6 +76,13 @@ export class AdminGuard implements CanActivate {
     ]);
 
     if (required && required.length > 0 && !required.includes(staff.role)) {
+      /*
+       * Credenciales validas y rol insuficiente. Es la senal mas util del
+       * registro para seguridad: el personal no prueba puertas que sabe
+       * cerradas, asi que varias seguidas significan algo.
+       */
+      this.sessionAudit.recordDenied(staff, required, request.path, request.ip ?? null);
+
       throw new ForbiddenException({
         code: API_ERROR_CODES.FORBIDDEN,
         messageKey: 'admin.errorNoAccess',

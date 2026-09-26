@@ -164,6 +164,15 @@ enum ActorType {
   CUSTOMER
 }
 
+/// Desde donde se hizo algo. FIELD esta previsto para la futura aplicacion
+/// de campo y hoy no lo usa nadie: el equipo de limpieza entra al panel.
+enum AuditSurface {
+  PANEL
+  SITE
+  SYSTEM
+  FIELD
+}
+
 // ---------------------------------------------------------------------------
 // Clientes y direcciones
 // ---------------------------------------------------------------------------
@@ -616,16 +625,22 @@ model Notification {
 
 /// Rastro de quien hizo que. Imprescindible cuando se pueden cambiar precios
 /// y cancelar cobros desde un panel.
+/// SOLO SE INSERTA Y SE LEE. La aplicacion no tiene ninguna ruta que
+/// actualice ni borre una fila de aqui; el unico borrado es la purga
+/// programada por antiguedad. Un registro que se puede editar no prueba nada.
 model AuditLog {
   id String @id @default(uuid()) @db.Uuid
 
   actorType ActorType
   actorId   String?   @db.Uuid
+  /// Desde donde. Ver el enumerado AuditSurface.
+  surface   AuditSurface
   action    String    @db.VarChar(80)
 
   entityType String  @db.VarChar(40)
   entityId   String?
 
+  /// Detalle libre. NUNCA datos de tarjeta, contrasenas ni codigos de puerta.
   metadata  Json?
   /// Direccion IP de origen, util para investigar accesos indebidos.
   ipAddress String? @db.Inet
@@ -634,5 +649,9 @@ model AuditLog {
 
   @@index([entityType, entityId])
   @@index([createdAt])
+  /// «Que hizo esta persona»: la consulta mas frecuente al investigar algo.
+  @@index([actorId, createdAt])
+  /// «Ensename todas las cancelaciones» o «todos los accesos denegados».
+  @@index([action, createdAt])
   @@map("audit_logs")
 }

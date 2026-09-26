@@ -327,7 +327,7 @@ describe('marcar empezado y terminado', () => {
     await marcar(DE_CLEO, 'IN_PROGRESS');
 
     const registros = await db.query<{ metadata: Record<string, unknown> }>(
-      `SELECT metadata FROM audit_logs WHERE action = 'booking.status_changed'`,
+      `SELECT metadata FROM audit_logs WHERE action = 'booking.status.in_progress'`,
     );
 
     expect(registros.rows).toHaveLength(1);

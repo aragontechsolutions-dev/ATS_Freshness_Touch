@@ -86,6 +86,7 @@ export class BookingActionsService {
       await this.audit.record(
         {
           staff,
+          surface: 'PANEL',
           action: `booking.status.${change.status.toLowerCase()}`,
           entityType: 'booking',
           entityId: bookingId,
@@ -150,6 +151,7 @@ export class BookingActionsService {
       await this.audit.record(
         {
           staff,
+          surface: 'PANEL',
           action: 'payment.captured',
           entityType: 'booking',
           entityId: bookingId,
@@ -185,6 +187,7 @@ export class BookingActionsService {
       await this.audit.record(
         {
           staff,
+          surface: 'PANEL',
           action: 'payment.released',
           entityType: 'booking',
           entityId: bookingId,
