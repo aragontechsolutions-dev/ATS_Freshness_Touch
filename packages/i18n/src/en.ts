@@ -392,6 +392,109 @@ export const en = {
       selfNote: 'This is your own record: you cannot change your own role or deactivate yourself.',
     },
 
+    /* -------------------------- Auditoria -------------------------- */
+    audit: {
+      title: 'Activity log',
+      intro:
+        'Who did what, from where and when. Entries are never edited or deleted from here: they are kept for a year and then removed automatically.',
+
+      /*
+       * Aviso deliberado y permanente en pantalla. Quien abre esto tiene que
+       * saber que su propia consulta queda anotada, porque es justo lo que
+       * impide usar el registro para vigilar a los companeros sin que se sepa.
+       */
+      selfNote: 'Opening this screen is recorded too, with the filters you used.',
+
+      filters: 'Filters',
+      apply: 'Apply filters',
+      clear: 'Clear',
+      anyActor: 'Anyone',
+      anyAction: 'Any action',
+      anySurface: 'Anywhere',
+      actor: 'Person',
+      what: 'Action',
+      where: 'From',
+      from: 'From date',
+      to: 'To date',
+
+      empty: 'Nothing matches these filters.',
+      loadMore: 'Load older entries',
+      loadingMore: 'Loading…',
+      endOfList: 'That is everything for these filters.',
+      countShown: 'Showing {{count}} entries.',
+
+      systemActor: 'The system',
+      customerActor: 'A customer',
+      unknownActor: 'Deleted staff record',
+      ip: 'IP {{value}}',
+      details: 'Details',
+
+      /* Desde donde se hizo. */
+      surface: {
+        PANEL: 'Admin panel',
+        SITE: 'Public website',
+        SYSTEM: 'Automatic',
+        FIELD: 'Field app',
+      },
+
+      /* Sobre que. */
+      entity: {
+        booking: 'Booking',
+        staff: 'Staff record',
+        business_settings: 'Settings',
+        audit: 'Activity log',
+        session: 'Session',
+      },
+
+      /*
+       * Etiqueta de cada accion del catalogo. Va anidada igual que la accion
+       * ("booking.status.confirmed"), asi que la clave se construye pegando
+       * la accion tal cual y no hay tabla de equivalencias que mantener.
+       */
+      action: {
+        session: {
+          opened: 'Signed in',
+          closed: 'Signed out',
+          denied: 'Access denied',
+        },
+        booking: {
+          created: 'Booking placed',
+          team_changed: 'Team changed',
+          viewed: 'Booking record opened',
+          status: {
+            pending_payment: 'Marked as awaiting payment',
+            confirmed: 'Marked as confirmed',
+            in_progress: 'Marked as in progress',
+            completed: 'Marked as finished',
+            cancelled: 'Cancelled',
+            no_show: 'Marked as no-show',
+          },
+        },
+        access_notes: {
+          viewed: 'Entry instructions viewed',
+        },
+        payment: {
+          captured: 'Deposit charged',
+          released: 'Hold released',
+        },
+        staff: {
+          created: 'Staff added',
+          updated: 'Staff record changed',
+          invited: 'Invited to the panel',
+        },
+        settings: {
+          updated: 'Settings changed',
+        },
+        notifications: {
+          updated: 'Alert settings changed',
+        },
+        audit: {
+          queried: 'Activity log consulted',
+          purged: 'Expired entries removed automatically',
+        },
+      },
+    },
+
     /* ----------------------- Contraseña ----------------------- */
     passwordReset: {
       forgot: 'Forgot your password?',

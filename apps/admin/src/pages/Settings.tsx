@@ -12,16 +12,23 @@ import {
   type Weekday,
 } from '@freshness/types';
 import { ApiClientError, fetchSettings, saveSettings } from '../lib/api';
+import { AuditLog } from '../components/AuditLog';
 import { NotificationSettingsForm } from '../components/NotificationSettingsForm';
 import { StaffDirectory } from '../components/StaffDirectory';
 import { useToast } from '../components/ToastProvider';
 import { SkeletonFormulario } from '../components/Skeletons';
-import { BellIcon, GearIcon, SpinnerIcon, UsersIcon } from '../components/Icons';
+import { BellIcon, GearIcon, ShieldIcon, SpinnerIcon, UsersIcon } from '../components/Icons';
 import { formatTimestamp } from '../lib/format';
 
 interface SettingsPageProps {
   locale: Locale;
-  onSessionLost: () => void;
+  /*
+   * El motivo lo decide quien recibe el error, igual que en la agenda. Los
+   * dos formularios de esta pantalla no lo usan y llaman sin argumentos, pero
+   * el registro de actividad si: a un rol sin permiso hay que decirle que no
+   * puede entrar, no mandarle a reescribir la contrasena.
+   */
+  onSessionLost: (reason?: 'expired' | 'noAccess') => void;
 }
 
 interface SettingsShellProps extends SettingsPageProps {
@@ -48,7 +55,7 @@ interface SettingsShellProps extends SettingsPageProps {
  *      numero inventado de relleno, que es peor: un cliente lo marca y
  *      termina llamando a un desconocido.
  */
-type Seccion = 'business' | 'notifications' | 'staff';
+type Seccion = 'business' | 'notifications' | 'staff' | 'audit';
 
 /**
  * Dos bloques que se guardan por separado.
@@ -86,14 +93,29 @@ export function SettingsPage({ staff, locale, onSessionLost }: SettingsShellProp
         >
           {t('admin.staff.title')}
         </Pestana>
+        {/*
+          El registro de actividad va LA ULTIMA y dentro de configuracion, no
+          como pestana principal del panel. No es una pantalla de trabajo
+          diario: se abre cuando hay algo que aclarar, y ponerla junto a la
+          agenda invitaria a pasarse el dia mirando lo que hacen los demas.
+        */}
+        <Pestana
+          activa={seccion === 'audit'}
+          onClick={() => setSeccion('audit')}
+          icono={<ShieldIcon className="h-4 w-4" />}
+        >
+          {t('admin.audit.title')}
+        </Pestana>
       </nav>
 
       {seccion === 'business' ? (
         <BusinessSettingsForm locale={locale} onSessionLost={onSessionLost} />
       ) : seccion === 'notifications' ? (
         <NotificationSettingsForm onSessionLost={onSessionLost} />
-      ) : (
+      ) : seccion === 'staff' ? (
         <StaffDirectory staff={staff} locale={locale} onSessionLost={onSessionLost} />
+      ) : (
+        <AuditLog locale={locale} onSessionLost={onSessionLost} />
       )}
     </div>
   );

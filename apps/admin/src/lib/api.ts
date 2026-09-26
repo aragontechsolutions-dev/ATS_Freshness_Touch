@@ -7,6 +7,7 @@ import {
   MyJobsSchema,
   AdminStaffDirectoryItemSchema,
   AdminBusinessSettingsSchema,
+  AuditPageSchema,
   API_ERROR_CODES,
   NotificationSettingsSchema,
   ApiErrorSchema,
@@ -21,6 +22,8 @@ import {
   type AdminStaffDirectory,
   type AdminStaffDirectoryItem,
   type AdminStaffList,
+  type AuditPage,
+  type AuditQueryInput,
   type MyJob,
   type MyJobProgress,
   type MyJobs,
@@ -424,4 +427,31 @@ export function markMyJobProgress(bookingId: string, body: MyJobProgress): Promi
     },
     { method: 'PATCH', body },
   );
+}
+
+/* ------------------------------------------------------------------------ */
+/*  Registro de actividad. Solo administracion.                              */
+/* ------------------------------------------------------------------------ */
+
+/**
+ * Consulta el registro de auditoria.
+ *
+ * OJO AL LLAMARLA: cada llamada escribe una fila `audit.queried` con los
+ * filtros usados, y eso es intencionado (ver `AuditController`). Por eso la
+ * pantalla NO recarga al teclear, como hace la agenda: hay que pulsar
+ * "aplicar". Refrescar en cada pulsacion llenaria el registro de consultas
+ * suyas propias y enterraria lo que de verdad importa.
+ */
+export function fetchAuditLog(query: AuditQueryInput = {}): Promise<AuditPage> {
+  const params = new URLSearchParams();
+  for (const [clave, valor] of Object.entries(query)) {
+    if (valor !== undefined && valor !== '') params.set(clave, String(valor));
+  }
+  const sufijo = params.toString();
+
+  return request(`/admin/audit${sufijo ? `?${sufijo}` : ''}`, (payload) => {
+    const parsed = AuditPageSchema.safeParse(payload);
+    if (!parsed.success) throw contractError('/admin/audit', parsed.error.issues);
+    return parsed.data;
+  });
 }

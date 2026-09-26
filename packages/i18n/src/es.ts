@@ -397,6 +397,109 @@ export const es: TranslationResources = {
       selfNote: 'Esta es tu ficha: no puedes cambiarte el puesto ni darte de baja tú misma.',
     },
 
+    /* -------------------------- Auditoria -------------------------- */
+    audit: {
+      title: 'Registro de actividad',
+      intro:
+        'Quién hizo qué, desde dónde y cuándo. Las entradas no se editan ni se borran desde aquí: se guardan un año y luego se eliminan solas.',
+
+      /*
+       * Aviso deliberado y permanente en pantalla. Quien abre esto tiene que
+       * saber que su propia consulta queda anotada, porque es justo lo que
+       * impide usar el registro para vigilar a los companeros sin que se sepa.
+       */
+      selfNote: 'Abrir esta pantalla también queda registrado, junto con los filtros que uses.',
+
+      filters: 'Filtros',
+      apply: 'Aplicar filtros',
+      clear: 'Limpiar',
+      anyActor: 'Cualquiera',
+      anyAction: 'Cualquier acción',
+      anySurface: 'Desde cualquier sitio',
+      actor: 'Persona',
+      what: 'Acción',
+      where: 'Desde',
+      from: 'Desde el día',
+      to: 'Hasta el día',
+
+      empty: 'No hay nada que coincida con estos filtros.',
+      loadMore: 'Cargar entradas anteriores',
+      loadingMore: 'Cargando…',
+      endOfList: 'Esto es todo con estos filtros.',
+      countShown: 'Se muestran {{count}} entradas.',
+
+      systemActor: 'El sistema',
+      customerActor: 'Un cliente',
+      unknownActor: 'Ficha de personal eliminada',
+      ip: 'IP {{value}}',
+      details: 'Detalles',
+
+      /* Desde donde se hizo. */
+      surface: {
+        PANEL: 'Panel de administración',
+        SITE: 'Sitio público',
+        SYSTEM: 'Automático',
+        FIELD: 'Aplicación de campo',
+      },
+
+      /* Sobre que. */
+      entity: {
+        booking: 'Reserva',
+        staff: 'Ficha de personal',
+        business_settings: 'Configuración',
+        audit: 'Registro de actividad',
+        session: 'Sesión',
+      },
+
+      /*
+       * Etiqueta de cada accion del catalogo. Va anidada igual que la accion
+       * ("booking.status.confirmed"), asi que la clave se construye pegando
+       * la accion tal cual y no hay tabla de equivalencias que mantener.
+       */
+      action: {
+        session: {
+          opened: 'Inició sesión',
+          closed: 'Cerró sesión',
+          denied: 'Acceso denegado',
+        },
+        booking: {
+          created: 'Reserva realizada',
+          team_changed: 'Cambió el equipo',
+          viewed: 'Abrió la ficha de una reserva',
+          status: {
+            pending_payment: 'Marcó como pendiente de pago',
+            confirmed: 'Marcó como confirmada',
+            in_progress: 'Marcó como en curso',
+            completed: 'Marcó como terminada',
+            cancelled: 'Canceló',
+            no_show: 'Marcó como ausencia',
+          },
+        },
+        access_notes: {
+          viewed: 'Vio las instrucciones de acceso',
+        },
+        payment: {
+          captured: 'Cobró el depósito',
+          released: 'Liberó la retención',
+        },
+        staff: {
+          created: 'Dio de alta a alguien',
+          updated: 'Cambió una ficha de personal',
+          invited: 'Invitó al panel',
+        },
+        settings: {
+          updated: 'Cambió la configuración',
+        },
+        notifications: {
+          updated: 'Cambió los ajustes de avisos',
+        },
+        audit: {
+          queried: 'Consultó el registro de actividad',
+          purged: 'Se borraron solas las entradas caducadas',
+        },
+      },
+    },
+
     /* ----------------------- Contraseña ----------------------- */
     passwordReset: {
       forgot: '¿Has olvidado tu contraseña?',

@@ -199,3 +199,29 @@ export function SkeletonSelectorEquipo({ filas = 3 }: { filas?: number }) {
     </Hueco>
   );
 }
+
+/**
+ * Registro de actividad: los filtros ya estan pintados; lo que falta son las
+ * filas, que son bajas y todas iguales. Se pintan seis y no cuatro porque la
+ * pagina trae cincuenta y el hueco corto haria que la lista "creciera de
+ * golpe" justo donde se intenta evitar el salto.
+ */
+export function SkeletonAuditoria({ filas = 6 }: { filas?: number }) {
+  return (
+    <Hueco>
+      <ul className="space-y-2">
+        {Array.from({ length: filas }, (_, indice) => (
+          <li key={indice} className="ft-card p-3.5">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0 flex-1 space-y-2">
+                <Barra className="h-4 w-52 max-w-full" />
+                <Barra className="h-3 w-36 max-w-full" />
+              </div>
+              <Barra className="h-5 w-28 shrink-0 rounded-full" />
+            </div>
+          </li>
+        ))}
+      </ul>
+    </Hueco>
+  );
+}

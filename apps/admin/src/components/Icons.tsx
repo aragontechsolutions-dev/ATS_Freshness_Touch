@@ -321,6 +321,22 @@ export function KeyIcon({ className }: IconProps) {
   );
 }
 
+/**
+ * Escudo con marca: el registro de actividad.
+ *
+ * Ni un ojo ni una lupa, a proposito. Esta pantalla no esta para vigilar a
+ * nadie: esta para poder demostrar que paso si alguien lo pregunta, y el
+ * icono tiene que decir eso y no lo otro.
+ */
+export function ShieldIcon({ className }: IconProps) {
+  return (
+    <Trazo className={className}>
+      <path d="M12 3.2 5 6v5.5c0 4.2 2.9 7.6 7 9.3 4.1-1.7 7-5.1 7-9.3V6z" />
+      <path d="m9.2 11.8 2 2 3.6-3.8" />
+    </Trazo>
+  );
+}
+
 /** Candado: la pantalla de acceso y las de contrasena. */
 export function LockIcon({ className }: IconProps) {
   return (
