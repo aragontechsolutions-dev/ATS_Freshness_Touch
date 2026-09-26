@@ -1619,3 +1619,73 @@ Se comprobaron **todas** las claves `admin.*` una a una, no a ojo: las que
 parecían muertas casi siempre se construyen sobre la marcha
 (`admin.status.${estado}`, `admin.staff.access${acceso}`) o las emite la API
 como `messageKey`. Solo esas cuatro no tenían a nadie detrás.
+
+---
+
+## 20. El isotipo real en lugar del cuadro «FT»
+
+El panel llevaba un cuadrado amarillo con las letras **FT**: un marcador de
+posición puesto cuando el panel aún no tenía marca. Ahora lleva el isotipo
+oficial —girasol, hogar y onda sobre el círculo azul— en la pantalla de acceso
+y en la cabecera.
+
+### 20.1. El archivo ya estaba en el repositorio
+
+No hizo falta añadir una imagen nueva: `apps/landing/src/assets/logo-mark.webp`
+es exactamente el mismo dibujo. Se comprobó **píxel a píxel**, no a ojo:
+diferencia media de **2,84 sobre 255** frente al original de 1254×1254, que es
+el ruido normal de reescalar. Las dos versiones tienen las esquinas
+transparentes, así que no hay recuadro blanco en modo oscuro.
+
+**Se usa la versión de 256×256 (20 kB), no la de 1254×1254 (155 kB).** En el
+panel se pinta a 40 px (cabecera) y 64 px (acceso); incluso en una pantalla de
+triple densidad eso son 192 px. El original pesaría ocho veces más para que no
+se notara ninguna diferencia, y este panel se abre con datos móviles en la
+calle.
+
+### 20.2. Copiado, no enlazado
+
+`apps/admin/src/assets/logo-mark.webp` es una copia del archivo del sitio
+público. Son dos despliegues independientes con su propia compilación, así que
+no hay forma de compartir un binario sin montar un paquete aparte para un
+archivo — lo mismo que ya pasa con `favicon-32.png`.
+
+**Si algún día la marca crece** (variantes, lockups, versiones para correo),
+un `packages/brand` sí merecerá la pena. Con una imagen, no: sería un paquete
+entero para evitar copiar 20 kB.
+
+### 20.3. Se sirve desde el propio dominio
+
+La CSP del panel declara `img-src 'self' data:`, así que una imagen alojada en
+un tercero ni siquiera cargaría. Y aunque cargara, no debería: una petición a
+un dominio ajeno **desde la pantalla de acceso** delataría quién está entrando
+al panel y cuándo. Verificado en el build real: **cero peticiones a dominios
+que no sean el propio**.
+
+### 20.4. El nombre viaja en el texto alternativo
+
+El isotipo es lo **único** que identifica a la empresa en las dos pantallas: ni
+el acceso ni la cabecera escriben «Freshness Touch» en ningún sitio. Por eso
+ahí lleva el nombre en su `alt`; sin él, quien usa lector de pantalla oiría
+«Iniciar sesión» sin saber en qué aplicación está.
+
+Por defecto el componente lo deja **vacío** (decorativo), que es lo correcto
+allá donde el nombre ya esté escrito al lado: anunciarlo dos veces molesta.
+
+En la cabecera va solo el isotipo, sin el nombre en texto: a 390 px el
+logotipo completo se come la mitad del ancho, y lo que hace falta ahí es saber
+quién eres tú y a dónde puedes ir.
+
+### 20.5. Dos detalles que se ajustaron al verlo
+
+- **40 px en la cabecera, no 36.** Se compararon los cuatro tamaños en
+  pantalla: a 36 px el girasol y el tejado empiezan a empastarse. La fila no
+  crece, porque su altura la marcan los botones de 44 px.
+- **El esqueleto de carga ya no tapa el isotipo con un círculo gris.** La
+  imagen viene con la aplicación, no de la red: ya se puede pintar mientras se
+  comprueba la sesión. Fingir una espera que no existe contradice la regla de
+  §19.4.
+
+Los atributos `width` y `height` reales (256×256) van puestos aunque las clases
+manden el tamaño final: son los que dejan al navegador reservar el hueco antes
+de descargar, y sin ellos la cabecera da un salto al cargar.
