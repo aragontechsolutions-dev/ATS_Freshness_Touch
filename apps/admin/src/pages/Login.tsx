@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { auth, supabaseIsConfigured } from '../lib/supabase';
 import { PasswordField } from '../components/PasswordField';
+import { LogoMark } from '../components/Logo';
 import { AlertIcon, InfoIcon, MailIcon, SpinnerIcon } from '../components/Icons';
 import type { SignOutReason } from '../hooks/useStaffSession';
 
@@ -75,12 +76,12 @@ export function Login({ reason, onForgot, onSignedIn }: LoginProps) {
       <div className="w-full max-w-sm">
         {/* --------------------------- Marca --------------------------- */}
         <div className="mb-6 flex flex-col items-center gap-3 text-center">
-          <span
-            aria-hidden="true"
-            className="flex h-14 w-14 items-center justify-center rounded-2xl bg-sun-400 text-xl font-bold text-ink shadow-sm"
-          >
-            FT
-          </span>
+          {/*
+            El isotipo lleva el nombre de la empresa en su texto alternativo
+            porque aqui no esta escrito en ninguna otra parte: sin eso, quien
+            usa lector de pantalla oye «Iniciar sesion» sin saber donde.
+          */}
+          <LogoMark className="h-16 w-16" alt={t('common.companyName')} />
           <div>
             <h1 className="text-xl font-bold text-brand-800 dark:text-white">
               {t('admin.signIn')}

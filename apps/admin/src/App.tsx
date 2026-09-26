@@ -23,6 +23,7 @@ import {
   SunIcon,
 } from './components/Icons';
 import { SkeletonListaReservas } from './components/Skeletons';
+import { LogoMark } from './components/Logo';
 import { persistLocale } from './i18n';
 import { readPasswordLink, type PasswordLink } from './lib/password-link';
 
@@ -130,7 +131,18 @@ export default function App() {
       <div className="min-h-dvh">
         <div className="border-b border-slate-200 bg-white dark:border-night-600 dark:bg-night-800">
           <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-3">
-            <div className="ft-skeleton h-8 w-40" />
+            {/*
+              El isotipo NO es un hueco gris: viene con la aplicacion, no de
+              la red, asi que ya se puede pintar. Poner un circulo gris en su
+              sitio seria fingir una espera que no existe.
+            */}
+            <div className="flex items-center gap-3">
+              <LogoMark className="h-10 w-10 shrink-0" alt={t('common.companyName')} />
+              <div className="space-y-1.5">
+                <div className="ft-skeleton h-3.5 w-32" />
+                <div className="ft-skeleton h-3 w-20" />
+              </div>
+            </div>
             <div className="ft-skeleton h-11 w-32" />
           </div>
         </div>
@@ -244,16 +256,12 @@ export default function App() {
           <div className="flex flex-wrap items-center justify-between gap-3 py-3">
             <div className="flex min-w-0 items-center gap-3">
               {/*
-                La marca en un cuadro amarillo con la inicial: el panel no
-                lleva el logotipo completo porque a 390 px se come la mitad
-                del ancho y lo que hace falta ahi es saber quien eres tu.
+                Solo el isotipo, sin el nombre al lado: a 390 px el logotipo
+                completo se come la mitad del ancho, y lo que hace falta ahi
+                es saber quien eres tu y a donde puedes ir. El nombre viaja
+                en el texto alternativo, que es donde importa.
               */}
-              <span
-                aria-hidden="true"
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-sun-400 text-sm font-bold text-ink"
-              >
-                FT
-              </span>
+              <LogoMark className="h-10 w-10 shrink-0" alt={t('common.companyName')} />
               <div className="min-w-0">
                 <p className="truncate text-sm font-bold text-slate-900 dark:text-white">
                   {state.staff.firstName} {state.staff.lastName}
