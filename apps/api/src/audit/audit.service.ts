@@ -1,18 +1,48 @@
 import { Injectable, Logger } from '@nestjs/common';
-import type { AuthenticatedStaff } from '@freshness/types';
+import type {
+  AuditAction,
+  AuditEntityType,
+  AuditSurface,
+  AuthenticatedStaff,
+} from '@freshness/types';
 import { PrismaService } from '../database/prisma.service';
 import type { Prisma, PrismaClient } from '../generated/prisma/client';
 
 type Db = PrismaClient | Prisma.TransactionClient;
 
 export interface AuditEntry {
-  /** Quien lo hizo. Nulo cuando actua el propio sistema. */
+  /**
+   * Quien lo hizo. Nulo cuando actua el sistema O un cliente del sitio
+   * publico: un cliente no tiene ficha de personal, asi que no hay
+   * identificador que guardar. En ese caso se distingue por `actorType`.
+   */
   staff: AuthenticatedStaff | null;
-  /** Que hizo, en pasado y en minusculas: "booking.cancelled". */
-  action: string;
-  entityType: string;
+  /**
+   * Tipo de actor. Solo hay que indicarlo para un CLIENTE; en el resto se
+   * deduce de si hay ficha de personal o no, que es lo correcto el 95% de
+   * las veces y evita que se escriba mal por descuido.
+   */
+  actorType?: 'CUSTOMER';
+  /**
+   * DESDE DONDE. Obligatorio y sin valor por defecto a proposito: un
+   * defecto significaria que el dia que alguien olvide indicarlo, la fila
+   * dice «panel» aunque viniera de un barrido nocturno. Preferimos que no
+   * compile.
+   */
+  surface: AuditSurface;
+  /** Que hizo. Del catalogo de `@freshness/types`, no una cadena libre. */
+  action: AuditAction;
+  /** Sobre que. Del catalogo, por lo mismo que la accion. */
+  entityType: AuditEntityType;
   entityId: string | null;
-  /** Detalle util para investigar despues. NUNCA datos de tarjeta. */
+  /**
+   * Detalle util para investigar despues.
+   *
+   * NUNCA datos de tarjeta, contrasenas ni codigos de puerta. Que alguien
+   * miro las instrucciones de acceso de una casa se registra; cuales eran,
+   * no. Si no, este registro se convierte en el sitio mas jugoso del
+   * sistema y en el que menos se vigila.
+   */
   metadata?: Prisma.InputJsonValue;
   ipAddress?: string | null;
 }
@@ -38,8 +68,9 @@ export class AuditService {
     try {
       await db.auditLog.create({
         data: {
-          actorType: entry.staff ? 'STAFF' : 'SYSTEM',
+          actorType: entry.actorType ?? (entry.staff ? 'STAFF' : 'SYSTEM'),
           actorId: entry.staff?.staffId ?? null,
+          surface: entry.surface,
           action: entry.action.slice(0, 80),
           entityType: entry.entityType.slice(0, 40),
           entityId: entry.entityId,

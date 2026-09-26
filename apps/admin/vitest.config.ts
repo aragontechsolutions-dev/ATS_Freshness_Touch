@@ -15,5 +15,6 @@ export default defineConfig({
     // documento y temporizadores, no el entorno de Node.
     environment: 'jsdom',
     include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
+    setupFiles: ['./vitest.setup.ts'],
   },
 });

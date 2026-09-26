@@ -16,6 +16,19 @@ export interface TokenClaims {
   /** Identificador del usuario en el proveedor (reclamacion "sub"). */
   userId: string;
   email: string | null;
+  /**
+   * Identificador de la SESION, no del token.
+   *
+   * Supabase lo emite como `session_id` y se mantiene mientras dure la
+   * sesion, aunque el token se refresque cada hora. Es justo lo que hace
+   * falta para registrar «esta persona entro» una sola vez por acceso real
+   * en vez de una vez por cada peticion o por cada refresco.
+   *
+   * Nulo cuando el proveedor no lo emite —el local de desarrollo no lo
+   * hace—: en ese caso no se puede deduplicar y no se registra el acceso,
+   * que es preferible a llenar la tabla de ruido.
+   */
+  sessionId: string | null;
   /** Cuando caduca el token. */
   expiresAt: Date;
 }

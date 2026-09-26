@@ -174,7 +174,7 @@ describe('quien puede cambiar los datos publicos de la empresa', () => {
 
     const registro = await db.query<{ action: string; metadata: { changed: string[] } }>(
       `SELECT action, metadata FROM audit_logs
-       WHERE "entityType" = 'BusinessSetting' ORDER BY "createdAt" DESC LIMIT 1`,
+       WHERE "entityType" = 'business_settings' ORDER BY "createdAt" DESC LIMIT 1`,
     );
 
     expect(registro.rows[0]?.action).toBe('settings.updated');

@@ -127,8 +127,9 @@ export class StaffAdminService {
       await this.audit.record(
         {
           staff: actor,
+          surface: 'PANEL',
           action: 'staff.created',
-          entityType: 'Staff',
+          entityType: 'staff',
           entityId: persona.id,
           metadata: { email: persona.email, role: persona.role },
           ipAddress,
@@ -222,8 +223,9 @@ export class StaffAdminService {
       await this.audit.record(
         {
           staff: actor,
+          surface: 'PANEL',
           action: 'staff.updated',
-          entityType: 'Staff',
+          entityType: 'staff',
           entityId: staffId,
           metadata: {
             before: { role: anterior.role, isActive: anterior.isActive, email: anterior.email },
@@ -333,8 +335,9 @@ export class StaffAdminService {
       await this.audit.record(
         {
           staff: actor,
+          surface: 'PANEL',
           action: 'staff.invited',
-          entityType: 'Staff',
+          entityType: 'staff',
           entityId: staffId,
           /*
            * Se registra a quien y con que puesto, NUNCA el identificador de

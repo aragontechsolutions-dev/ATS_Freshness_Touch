@@ -87,6 +87,12 @@ export function toClaims(payload: JWTPayload): TokenClaims {
   return {
     userId: payload.sub,
     email: typeof payload.email === 'string' ? payload.email : null,
+    /*
+     * `session_id` es de Supabase; el proveedor local no lo emite y queda
+     * nulo. No se exige porque su ausencia no compromete nada: solo impide
+     * deduplicar el registro de acceso.
+     */
+    sessionId: typeof payload.session_id === 'string' ? payload.session_id : null,
     expiresAt: new Date(payload.exp * 1000),
   };
 }

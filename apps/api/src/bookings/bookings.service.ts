@@ -16,6 +16,7 @@ import { PrismaService } from '../database/prisma.service';
 import { Prisma } from '../generated/prisma/client';
 import { DistanceService } from '../distance/distance.service';
 import { PaymentsService } from '../payments/payments.service';
+import { AuditService } from '../audit/audit.service';
 import { AvailabilityService } from '../scheduling/availability.service';
 import type { SchedulingConfig } from '../scheduling/scheduling.config';
 import { isSlotStillAvailable } from '../scheduling/slots';
@@ -30,6 +31,7 @@ export class BookingsService {
     private readonly distance: DistanceService,
     private readonly availability: AvailabilityService,
     private readonly payments: PaymentsService,
+    private readonly audit: AuditService,
     config: ConfigService<Env, true>,
   ) {
     this.pricingConfig = buildPricingConfig(config);
@@ -56,7 +58,11 @@ export class BookingsService {
    *    webhook: el navegador no puede confirmarlo por si mismo porque podria
    *    cerrarse a mitad, o mentir.
    */
-  async create(request: BookingRequest, now: Date = new Date()): Promise<BookingResponse> {
+  async create(
+    request: BookingRequest,
+    now: Date = new Date(),
+    ip: string | null = null,
+  ): Promise<BookingResponse> {
     const durationMinutes = this.availability.durationFor(request);
     const startsAt = new Date(request.startsAt);
     const schedulingConfig = await this.availability.schedulingConfig();
@@ -90,6 +96,7 @@ export class BookingsService {
         durationMinutes,
         now,
         holdExpiresAt,
+        ip,
         schedulingConfig,
       });
     } catch (error) {
@@ -182,6 +189,8 @@ export class BookingsService {
     durationMinutes: number;
     now: Date;
     holdExpiresAt: Date;
+    /** Para el registro de auditoria. Ver la llamada al final de la transaccion. */
+    ip: string | null;
     /**
      * Las reglas de agenda YA RESUELTAS, con el horario vigente.
      *
@@ -192,7 +201,7 @@ export class BookingsService {
      */
     schedulingConfig: SchedulingConfig;
   }): Promise<Omit<BookingResponse, 'payment'>> {
-    const { request, quote, startsAt, endsAt, durationMinutes, now, holdExpiresAt } = args;
+    const { request, quote, startsAt, endsAt, durationMinutes, now, holdExpiresAt, ip } = args;
     const { schedulingConfig } = args;
 
     /*
@@ -349,6 +358,40 @@ export class BookingsService {
 
       // Se registra la referencia y la zona, nunca el nombre ni la direccion.
       this.logger.log(`Reserva ${booking.reference} creada en zona ${quote.distance.zone}`);
+
+      /*
+       * RASTRO DE LA RESERVA, dentro de la misma transaccion: o queda la
+       * reserva y su registro, o no queda ninguna de las dos.
+       *
+       * El actor es CUSTOMER y no hay identificador: quien reserva no tiene
+       * ficha de personal. Lo que identifica la fila es la reserva en si.
+       *
+       * En la metadata va lo que sirve para investigar un patron raro —diez
+       * reservas seguidas, todas canceladas— y NADA MAS. Ni nombre, ni
+       * correo, ni telefono, ni direccion: todo eso ya esta en la reserva,
+       * que es su sitio, y duplicarlo aqui solo multiplica por dos los
+       * lugares donde hay datos personales que borrar el dia que un cliente
+       * lo pida.
+       */
+      await this.audit.record(
+        {
+          staff: null,
+          actorType: 'CUSTOMER',
+          surface: 'SITE',
+          action: 'booking.created',
+          entityType: 'booking',
+          entityId: booking.id,
+          metadata: {
+            reference: booking.reference,
+            service: request.service,
+            zone: quote.distance.zone,
+            totalCents: quote.totals.totalCents,
+            scheduledStart: startsAt.toISOString(),
+          },
+          ipAddress: ip,
+        },
+        tx,
+      );
 
       return {
         bookingId: booking.id,

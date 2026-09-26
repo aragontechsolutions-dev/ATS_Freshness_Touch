@@ -125,8 +125,9 @@ export class AssignmentsService {
       await this.audit.record(
         {
           staff,
+          surface: 'PANEL',
           action: 'booking.team_changed',
-          entityType: 'Booking',
+          entityType: 'booking',
           entityId: bookingId,
           /*
            * Se guardan el antes y el despues. Ante un "nadie se presento",

@@ -178,8 +178,9 @@ export class BusinessSettingsService {
       await this.audit.record(
         {
           staff,
+          surface: 'PANEL',
           action: 'settings.updated',
-          entityType: 'BusinessSetting',
+          entityType: 'business_settings',
           entityId: SETTINGS_KEY,
           /*
            * Se guarda QUE CAMPOS cambiaron y sus valores. Aqui no hay nada

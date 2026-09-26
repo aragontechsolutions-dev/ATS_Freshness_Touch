@@ -154,23 +154,72 @@ quita los viejos de `CORS_ORIGINS` (apartado 6) para reducir la superficie.
 La propagación suele tardar minutos, a veces horas. Hasta que Resend no diga
 **Verified**, no cambies `EMAIL_PROVIDER` a `resend` en producción.
 
-### 5.2. DMARC: ponlo, aunque Resend no lo exija
+### 5.2. DMARC: ponlo, aunque Resend lo marque como opcional
 
 SPF y DKIM dicen «este servidor puede enviar en mi nombre». DMARC dice qué
 hacer cuando algo no cuadra, y **es lo que más peso tiene hoy** para que Gmail
-y Outlook no te manden a la carpeta de no deseado.
+y Outlook no te manden a la carpeta de no deseado. Resend lo lista como
+_(Optional)_ y **no lo crea solo**, ni siquiera con «Auto configure»: hay que
+añadirlo a mano en el DNS de Vercel.
 
-Registro TXT en `_dmarc.freshnesstouchcleaning.com`:
+| Campo | Valor               |
+| ----- | ------------------- |
+| Name  | `_dmarc`            |
+| Type  | `TXT`               |
+| Value | `v=DMARC1; p=none;` |
+
+`p=none` significa «no rechaces nada todavía». Es lo correcto al empezar: si
+más adelante confirmas que todo tu correo legítimo pasa, se sube a
+`p=quarantine` y luego a `p=reject`. Poner `p=reject` el primer día es cómo se
+tira el correo bueno de uno mismo.
+
+#### Por qué NO se pone `rua=` apuntando a un Gmail
+
+La tentación es añadir `rua=mailto:...@gmail.com` para recibir los informes.
+**No funciona de forma fiable, y conviene saber por qué.**
+
+Cuando la dirección de informes está en un dominio **distinto** del que
+publica el DMARC —`gmail.com` frente a `freshnesstouchcleaning.com`—, la
+norma (RFC 7489 §7.1) exige que el dominio receptor publique un registro de
+autorización:
 
 ```
-v=DMARC1; p=none; rua=mailto:dmarc@freshnesstouchcleaning.com
+freshnesstouchcleaning.com._report._dmarc.gmail.com   TXT   "v=DMARC1"
 ```
 
-`p=none` significa «no rechaces nada todavía, solo infórmame». Es lo correcto
-al empezar: primero miras los informes unas semanas, confirmas que todo tu
-correo legítimo pasa, y solo entonces subes a `p=quarantine` y luego a
-`p=reject`. Poner `p=reject` el primer día es cómo se tira el correo bueno de
-uno mismo.
+Gmail no publica eso para dominios ajenos, evidentemente. Los sistemas que
+siguen la norma al pie de la letra **no mandan el informe**; otros sí. El
+resultado es que llegan unos pocos, de forma irregular, y se saca la
+conclusión equivocada.
+
+Existe para evitar que cualquiera dirija el tráfico de informes de un dominio
+hacia un buzón que no controla.
+
+**Qué hacer entonces:** de momento, DMARC sin `rua`. La política sigue
+valiendo —que es para lo que de verdad sirve—, solo que sin informes. Cuando
+haya buzón propio en el dominio, o si se quiere un panel de informes, se añade
+el `rua` apuntando a una dirección **del propio dominio** o a un servicio
+especializado.
+
+### 5.2.b Cómo quedó, en la práctica
+
+Verificado el 26 de septiembre de 2026 con **Auto configure**, que crea los
+registros directamente en el DNS de Vercel. De añadir el dominio a
+_«Domain verified»_ pasaron **dos minutos**.
+
+| Registro           | Nombre              | Tipo | Estado   |
+| ------------------ | ------------------- | ---- | -------- |
+| DKIM               | `resend._domainkey` | TXT  | Verified |
+| SPF (rebotes)      | `send`              | MX   | Verified |
+| SPF (autorización) | `send`              | TXT  | Verified |
+| DMARC              | `_dmarc`            | TXT  | A mano   |
+
+**El MX está en `send.`, no en la raíz.** Es exactamente el caso bueno del
+apartado 2: la raíz queda libre, así que el día que se contrate un buzón
+propio su proveedor puede tomar los MX de la raíz sin chocar con Resend y sin
+tener que rehacer nada de esto.
+
+_«Enable Receiving»_ se deja **apagado**: solo se envía.
 
 ### 5.3. La clave de API
 
@@ -295,24 +344,204 @@ Los pasos 3 a 6 se pueden hacer en paralelo: ninguno depende del otro.
 
 ---
 
-## 10. Cómo comprobar que ha quedado bien
+## 10. Prueba de punta a punta
 
-Hazlo en este orden; cada punto descarta una causa distinta.
+El orden importa. Cada nivel **descarta una causa** y da por buenos los
+anteriores, así que si algo falla en el nivel 4 ya sabes que los tres primeros
+están bien. Saltar niveles es cómo se acaba buscando un fallo de CORS en el
+código del panel.
 
-| #   | Qué haces                                                       | Qué tiene que pasar                                                           |
-| --- | --------------------------------------------------------------- | ----------------------------------------------------------------------------- |
-| 1   | Abrir `https://freshnesstouchcleaning.com`                      | El sitio, con candado y sin aviso de certificado                              |
-| 2   | Abrir `https://www.freshnesstouchcleaning.com`                  | Redirige al de la raíz                                                        |
-| 3   | Abrir `https://panel.freshnesstouchcleaning.com`                | La pantalla de acceso                                                         |
-| 4   | Iniciar sesión en el panel                                      | Entra. Si falla, mira la consola: un error de CORS señala a `CORS_ORIGINS`    |
-| 5   | En el sitio, `Ctrl`+`Shift`+clic en el logotipo                 | Lleva al panel. Si abre `/#top`, falta `VITE_ADMIN_URL` **o el redespliegue** |
-| 6   | Panel → Configuración → Personal → invitar a una dirección tuya | Llega el correo, y su enlace lleva al **dominio nuevo** del panel             |
-| 7   | En ese correo (Gmail): ⋮ → **Mostrar original**                 | `SPF: PASS`, `DKIM: PASS`, `DMARC: PASS`                                      |
-| 8   | Responder a un correo de confirmación                           | Llega a donde apunta `EMAIL_REPLY_TO`                                         |
-| 9   | Hacer una reserva de prueba                                     | Llega la confirmación al cliente, sin caer en no deseado                      |
+> **Antes de empezar:** el plan gratuito de Render **duerme el servicio**. La
+> primera petición después de un rato puede tardar casi un minuto. Eso no es
+> un fallo; repite la llamada antes de sacar conclusiones.
 
-El punto 7 es el que de verdad dice si el correo va a llegar. Los tres en `PASS`
-es el objetivo; uno solo en `FAIL` basta para acabar en no deseado.
+---
+
+### Nivel 0 — La API está viva
+
+No depende de dominios, ni de correo, ni de nada de lo configurado. Si esto
+falla, lo demás no se puede ni probar.
+
+```bash
+curl -s https://ats-freshness-touch.onrender.com/api/v1/health/ready
+```
+
+Esperado: `{"status":"ready","database":"connected"}`
+
+**Lee el cuerpo, no el código de estado.** Este endpoint devuelve **siempre
+200** a propósito —si devolviera 503, Render lo interpretaría como caída y
+reiniciaría el servicio—, así que un `"status":"degraded"` viene con un 200
+que parece correcto.
+
+---
+
+### Nivel 1 — CORS, antes de tocar el navegador
+
+Esto es lo que decide si el cotizador funciona en el dominio nuevo, y es el
+único fallo de esta lista que **ven tus clientes**.
+
+```bash
+curl -s -i -X OPTIONS \
+  "https://ats-freshness-touch.onrender.com/api/v1/quotes/estimate" \
+  -H "Origin: https://www.freshnesstouchcleaning.com" \
+  -H "Access-Control-Request-Method: POST" \
+  -H "Access-Control-Request-Headers: content-type" \
+  | grep -i "access-control"
+```
+
+Esperado: una línea
+`access-control-allow-origin: https://www.freshnesstouchcleaning.com`
+
+**Si no aparece ninguna línea, ese origen no está en `CORS_ORIGINS`.**
+
+Repite cambiando el `Origin` por `https://panel.freshnesstouchcleaning.com`.
+Los dos tienen que responder.
+
+> **Ojo con curl y CORS.** Una petición normal con curl **funciona aunque el
+> origen no esté permitido**: CORS lo aplica el navegador, no el servidor —el
+> servidor solo dice quién puede. Por eso aquí se hace un `OPTIONS` con
+> cabeceras de comprobación previa y se mira la respuesta, en vez de un `GET`
+> a secas que saldría bien y no probaría nada.
+
+---
+
+### Nivel 2 — Dominios y certificados
+
+En el navegador, los tres:
+
+| Dirección                                  | Esperado              |
+| ------------------------------------------ | --------------------- |
+| `https://www.freshnesstouchcleaning.com`   | El sitio, con candado |
+| `https://freshnesstouchcleaning.com`       | Redirige al `www`     |
+| `https://panel.freshnesstouchcleaning.com` | La pantalla de acceso |
+
+Sin aviso de certificado en ninguno. Si alguno lo da, el certificado aún no se
+ha emitido: espera y vuelve a mirar en Vercel.
+
+---
+
+### Nivel 3 — El cotizador en el dominio nuevo
+
+Ya en el navegador, en `www.freshnesstouchcleaning.com`: pide una cotización
+completa. Tiene que dar un precio.
+
+Con la consola abierta (F12), **cero errores rojos**. Si sale uno de CORS,
+vuelve al nivel 1: es que el origen que falta no es el que probaste.
+
+---
+
+### Nivel 4 — La puerta de servicio
+
+En el sitio, `Ctrl`+`Shift`+clic (o `Cmd`+`Shift`+clic) sobre el logotipo.
+
+| Qué pasa                    | Qué significa                                         |
+| --------------------------- | ----------------------------------------------------- |
+| Va al panel                 | Correcto                                              |
+| Abre una pestaña en `/#top` | Falta `VITE_ADMIN_URL` **o falta volver a desplegar** |
+
+Si sospechas de lo segundo, míralo en la consola: el código escribe
+`Entrada de personal sin configurar: falta VITE_ADMIN_URL` cuando no la
+encuentra.
+
+---
+
+### Nivel 5 — Acceso al panel
+
+Inicia sesión en `panel.freshnesstouchcleaning.com`.
+
+| Qué ves                              | Qué significa                                                |
+| ------------------------------------ | ------------------------------------------------------------ |
+| Entra a la agenda                    | Correcto                                                     |
+| «No pudimos comprobar tu sesión»     | **Casi seguro CORS**: falta el dominio del panel en la lista |
+| «Esas credenciales no son correctas» | Contraseña, no configuración                                 |
+
+Esa pantalla de «no pudimos comprobar» está pensada para un corte de red, y un
+bloqueo de CORS le parece exactamente lo mismo. Confírmalo en la consola.
+
+---
+
+### Nivel 6 — El correo, que es el que más piezas encadena
+
+Panel → Configuración → Personal → **invitar a una dirección tuya**.
+
+**6.1. ¿Llega?** Mira también la carpeta de no deseado. Si no llega en unos
+minutos, en Resend → **Logs** está el envío con su motivo de fallo.
+
+**6.2. ¿Está autenticado?** En Gmail, abre el correo y usa
+**⋮ → Mostrar original**. Busca las tres líneas:
+
+```
+SPF:   PASS
+DKIM:  PASS
+DMARC: PASS
+```
+
+Los tres tienen que decir `PASS`. **Uno solo en `FAIL` basta para acabar en no
+deseado**, y es el único sitio donde se ve con certeza.
+
+**6.3. ¿El remitente es el correcto?** Tiene que decir
+`Freshness Touch <hello@freshnesstouchcleaning.com>`. Si sale otra cosa,
+`EMAIL_FROM` está mal escrita.
+
+**6.4. ¿A dónde va la respuesta?** Responde al correo. Tiene que llegar a
+`freshnesstouchcleaning@gmail.com`. Esto prueba `EMAIL_REPLY_TO`, y es lo que
+evita que un cliente que contesta se quede sin respuesta.
+
+**6.5. ¿El enlace lleva al sitio correcto?** Pulsa el botón del correo. Tiene
+que abrir **`panel.freshnesstouchcleaning.com`**, no el dominio viejo.
+
+| Qué pasa                              | Qué significa                                 |
+| ------------------------------------- | --------------------------------------------- |
+| Abre el panel nuevo y pide contraseña | Correcto                                      |
+| Abre el dominio `.vercel.app` viejo   | `SUPABASE_INVITE_REDIRECT_URL` sin actualizar |
+| «redirect URL no permitida» o similar | Falta en **Redirect URLs** de Supabase        |
+
+**6.6. Elige la contraseña y entra.** Cierra el ciclo completo de una alta de
+personal.
+
+**6.7. Recuperación.** En el acceso, «¿Olvidaste tu contraseña?» con esa misma
+dirección. El enlace tiene que volver al panel nuevo. Esta ruta **no** usa
+`SUPABASE_INVITE_REDIRECT_URL` —el panel pasa su propio origen—, así que
+comprueba la lista blanca de Supabase por el otro camino.
+
+---
+
+### Nivel 7 — El recorrido del cliente, entero
+
+En `www.freshnesstouchcleaning.com`, haz **una reserva de prueba** de punta a
+punta.
+
+1. El cotizador da precio.
+2. El formulario la acepta.
+3. Llega el correo de confirmación al cliente, con `SPF/DKIM/DMARC: PASS`.
+4. La reserva **aparece en la agenda del panel**, en su día.
+
+El punto 4 es el que prueba que sitio, API y panel están hablando entre sí con
+los dominios nuevos.
+
+---
+
+### Nivel 8 — Operación
+
+Sobre esa reserva de prueba, desde el panel:
+
+1. **Asignar equipo** a alguien de limpieza.
+2. Entrar con **esa** cuenta: tiene que ver el trabajo en «Mis trabajos».
+3. Marcar **«He llegado»** y **«He terminado»**.
+4. Volver con la cuenta de administración: el estado ha cambiado.
+
+Con esto queda probado el circuito completo con los dominios nuevos.
+
+---
+
+### Cuando termines: limpia
+
+Dos semanas después, con todo estable:
+
+- Quita los `*.vercel.app` de `CORS_ORIGINS`.
+- Repite el nivel 1 para confirmar que los nuevos siguen respondiendo.
+
+No antes: mientras tanto son la vía de vuelta si algo sale mal.
 
 ---
 

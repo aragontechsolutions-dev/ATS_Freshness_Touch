@@ -105,8 +105,9 @@ export class NotificationSettingsService {
       await this.audit.record(
         {
           staff,
+          surface: 'PANEL',
           action: 'notifications.updated',
-          entityType: 'BusinessSetting',
+          entityType: 'business_settings',
           entityId: SETTINGS_KEY,
           /*
            * Se guarda el valor completo porque aqui no hay ningun secreto: son

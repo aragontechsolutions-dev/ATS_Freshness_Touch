@@ -2,7 +2,7 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { Env } from '../common/config/env';
 import { DISTANCE_PROVIDER, type DistanceProvider, type DistanceResult } from './distance.types';
-import { TtlCache } from './ttl-cache';
+import { TtlCache } from '../common/ttl-cache';
 
 export type ResolvedDistance = DistanceResult & { cached: boolean };
 

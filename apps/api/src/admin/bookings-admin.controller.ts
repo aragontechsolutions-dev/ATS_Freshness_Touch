@@ -4,6 +4,7 @@ import {
   Get,
   HttpCode,
   HttpStatus,
+  Ip,
   Param,
   ParseUUIDPipe,
   Patch,
@@ -75,8 +76,23 @@ export class BookingsAdminController {
   @Roles('ADMIN', 'DISPATCHER')
   detail(
     @Param('bookingId', new ParseUUIDPipe({ version: '4' })) bookingId: string,
+    @CurrentStaff() staff: AuthenticatedStaff,
+    @Ip() ip: string,
   ): Promise<AdminBookingDetail> {
-    return this.bookings.detail(bookingId);
+    /*
+     * ESTA ES LA UNICA LECTURA QUE SE AUDITA, y hace falta explicar por que.
+     *
+     * Auditar cada consulta convertiria el registro en un listado de agendas
+     * donde lo importante queda enterrado. Pero esta pantalla no es una mas:
+     * es la que ensena el nombre, el telefono, el correo, la direccion
+     * completa y —sobre todo— las instrucciones de acceso a la casa de un
+     * cliente. El codigo de una puerta.
+     *
+     * Un cambio deja rastro solo. Una MIRADA no deja ninguno, y es justo lo
+     * que hace alguien que fisgonea: abrir fichas y no tocar nada. Sin esto,
+     * ese comportamiento es indistinguible de no haber pasado.
+     */
+    return this.bookings.detail(bookingId, { staff, ip });
   }
 }
 

@@ -131,6 +131,28 @@ export const EnvSchema = z
      */
     REMINDER_SWEEP_MINUTES: z.coerce.number().int().min(0).max(1440).default(15),
 
+    /**
+     * RETENCION DEL REGISTRO DE AUDITORIA, en dias.
+     *
+     * Un ano. Lo bastante para cubrir una reclamacion, una devolucion de
+     * cargo o una discusion sobre quien hizo que la temporada pasada, y lo
+     * bastante corto para no acumular indefinidamente direcciones IP y
+     * movimientos del personal. Guardar mas de lo que hace falta no es mas
+     * seguro: es mas superficie que proteger.
+     *
+     * Cero lo apaga y no borra nada. Es lo que usan las pruebas, que llaman
+     * a la purga a mano para no depender del reloj.
+     */
+    AUDIT_RETENTION_DAYS: z.coerce.number().int().min(0).max(3650).default(365),
+    /**
+     * Cada cuantas horas se buscan entradas caducadas. Cero lo apaga.
+     *
+     * Una vez al dia sobra: la retencion se mide en meses, asi que borrar
+     * unas horas mas tarde no cambia nada y barrer mas a menudo solo anade
+     * consultas.
+     */
+    AUDIT_PURGE_HOURS: z.coerce.number().int().min(0).max(168).default(24),
+
     AUTH_PROVIDER: z.enum(['local', 'supabase']).default('local'),
     /** Direccion del proyecto de Supabase: https://<ref>.supabase.co */
     SUPABASE_URL: z.string().url().optional(),
@@ -173,6 +195,19 @@ export const EnvSchema = z
       .string()
       .regex(/^\d{5}$/)
       .default('30303'),
+  })
+  /*
+   * UN CERO APAGA LA PURGA; UN UNO BORRARIA CASI TODO EL REGISTRO.
+   *
+   * Los dos son un digito, y el segundo es irreversible. Por eso cualquier
+   * retencion distinta de cero tiene suelo: el error tipografico que se paga
+   * caro no debe llegar a arrancar.
+   */
+  .refine((env) => env.AUDIT_RETENTION_DAYS === 0 || env.AUDIT_RETENTION_DAYS >= 30, {
+    message:
+      'AUDIT_RETENTION_DAYS debe ser 0 (sin purga) o al menos 30 dias: un valor menor ' +
+      'borraria el registro de auditoria casi entero y no hay forma de recuperarlo',
+    path: ['AUDIT_RETENTION_DAYS'],
   })
   .refine((env) => env.DISTANCE_PROVIDER !== 'google' || Boolean(env.GOOGLE_MAPS_API_KEY), {
     message: 'GOOGLE_MAPS_API_KEY es obligatoria cuando DISTANCE_PROVIDER=google',

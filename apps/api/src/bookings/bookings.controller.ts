@@ -1,4 +1,4 @@
-import { Body, Controller, HttpCode, HttpStatus, Post, UsePipes } from '@nestjs/common';
+import { Body, Controller, HttpCode, HttpStatus, Ip, Post, UsePipes } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { BookingRequestSchema, type BookingRequest, type BookingResponse } from '@freshness/types';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
@@ -19,7 +19,13 @@ export class BookingsController {
   @HttpCode(HttpStatus.CREATED)
   @Throttle({ global: { limit: 5, ttl: 60_000 }, quotes: { limit: 5, ttl: 60_000 } })
   @UsePipes(new ZodValidationPipe<BookingRequest>(BookingRequestSchema))
-  create(@Body() request: BookingRequest): Promise<BookingResponse> {
-    return this.bookings.create(request);
+  create(@Body() request: BookingRequest, @Ip() ip: string): Promise<BookingResponse> {
+    /*
+     * La IP se pasa para el registro de auditoria y para nada mas. Una
+     * reserva es la unica accion que un desconocido puede provocar en el
+     * sistema, asi que ante un patron raro —diez reservas en un minuto, todas
+     * canceladas despues— es el unico hilo del que tirar.
+     */
+    return this.bookings.create(request, undefined, ip);
   }
 }

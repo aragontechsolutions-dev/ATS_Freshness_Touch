@@ -165,8 +165,18 @@ export class MyJobsService {
       await this.audit.record(
         {
           staff,
-          action: 'booking.status_changed',
-          entityType: 'Booking',
+          surface: 'PANEL',
+          /*
+           * MISMA ACCION QUE CUANDO LO MARCA COORDINACION desde el panel.
+           * Antes esto ponia `booking.status_changed` y el panel ponia
+           * `booking.status.<estado>`: dos nombres para el mismo hecho, asi
+           * que filtrar «ensename todas las que se completaron» se dejaba
+           * fuera justo las que marco el equipo de limpieza, que son la
+           * mayoria. Quien lo hizo y desde donde se distingue por el actor y
+           * por `source`, no por el nombre de la accion.
+           */
+          action: `booking.status.${cambio.status.toLowerCase()}`,
+          entityType: 'booking',
           entityId: bookingId,
           /*
            * Se deja constancia de que lo marco limpieza desde su propia

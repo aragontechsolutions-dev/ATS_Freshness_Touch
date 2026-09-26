@@ -244,8 +244,16 @@ Cuando entren autenticación, datos de clientes y pagos:
 - Sesiones cortas con rotación de tokens y revocación al cerrar sesión. Hoy la
   baja es inmediata por otra vía: `isActive = false` cierra la puerta en la
   siguiente petición sin esperar a que caduque el token.
-- ~~Registro de auditoría para las acciones administrativas~~ — **la tabla y el
-  servicio están**; se llenará según lleguen las acciones que cambian datos.
+- ~~Registro de auditoría para las acciones administrativas~~ — **hecho y
+  ampliado** en la etapa 2.15 (`docs/16-auditoria.md`): además de los cambios,
+  registra quién entró al panel y cuándo, las reservas del sitio público, y
+  quién abrió la ficha de un cliente o vio sus instrucciones de acceso.
+  Consultarlo deja rastro, solo lo lee `ADMIN`, y se purga solo al año. No
+  guarda datos sensibles: que alguien vio un código de puerta se registra;
+  cuál era, no.
+- Intentos fallidos de contraseña. No los ve esta API: ocurren dentro de
+  Supabase. Requiere un _hook_ de verificación que hay que crear a mano y
+  que, mal escrito, bloquea todos los accesos (`docs/16-auditoria.md` §4).
 - Copias de seguridad y prueba de restauración.
 
 ## Cómo revisar la seguridad al añadir algo nuevo

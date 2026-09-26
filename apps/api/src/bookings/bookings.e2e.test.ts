@@ -220,6 +220,46 @@ describe('creacion de reserva', () => {
     expect(reserva.rows[0]?.pricingVersion).toBeTruthy();
   });
 
+  /*
+   * LA RESERVA DEL SITIO PUBLICO TAMBIEN DEJA RASTRO.
+   *
+   * Sin esto, el registro solo contaba lo que hacia el personal y las
+   * reservas «aparecian» sin mas. Se anota DENTRO de la misma transaccion:
+   * o quedan las dos cosas o no queda ninguna.
+   *
+   * La metadata NO lleva nombre, correo, telefono ni direccion. Todo eso ya
+   * esta en la ficha de la reserva, protegida y con sus permisos; copiarlo
+   * aqui convertiria el registro en una segunda base de datos de clientes
+   * que nadie vigila.
+   */
+  it('deja rastro de auditoria, desde el sitio y sin datos del cliente', async () => {
+    const anotadas = await db.query<{
+      action: string;
+      surface: string;
+      actorType: string;
+      actorId: string | null;
+      entityType: string;
+      metadata: unknown;
+    }>(
+      `SELECT action, surface, "actorType", "actorId", "entityType", metadata
+         FROM audit_logs WHERE action = 'booking.created'`,
+    );
+
+    expect(anotadas.rows).toHaveLength(1);
+    const fila = anotadas.rows[0];
+
+    expect(fila?.surface).toBe('SITE');
+    expect(fila?.actorType).toBe('CUSTOMER');
+    // Un cliente no tiene ficha de personal: no hay identificador que guardar.
+    expect(fila?.actorId).toBeNull();
+    expect(fila?.entityType).toBe('booking');
+
+    const serializada = JSON.stringify(fila?.metadata);
+    expect(serializada).not.toContain(CONTACTO.email);
+    expect(serializada).not.toContain(CONTACTO.firstName);
+    expect(serializada).not.toContain(DIRECCION.line1);
+  });
+
   it('rechaza el doble envio del formulario del mismo cliente', async () => {
     // Doble clic, reintento del navegador o pulsar "atras" y reenviar.
     const response = await request(app.getHttpServer())

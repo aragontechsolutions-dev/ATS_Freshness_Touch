@@ -1,13 +1,15 @@
 /**
  * Cache en memoria con caducidad y tamano maximo.
  *
- * Motivo: cada consulta al proveedor real de distancia cuesta dinero, y la
- * distancia entre dos codigos postales no cambia. Cachear elimina la mayor
- * parte del gasto y acelera la respuesta del cotizador.
+ * Vive en `common/` porque la usan dos cosas que no tienen nada que ver:
  *
- * El limite de entradas es tambien una medida de seguridad: sin el, un
- * atacante podria inflar la memoria del servidor pidiendo cotizaciones con
- * codigos postales distintos hasta agotarla.
+ *   - LA DISTANCIA. Cada consulta al proveedor real cuesta dinero, y la
+ *     distancia entre dos codigos postales no cambia.
+ *   - LA AUDITORIA DEL ACCESO. Recuerda que sesiones ya se registraron, para
+ *     no escribir una fila por cada vez que alguien cambia de pestana.
+ *
+ * El limite de entradas es tambien una medida de seguridad: sin el, se podria
+ * inflar la memoria del servidor hasta agotarla generando claves distintas.
  */
 export class TtlCache<TValue> {
   private readonly entries = new Map<string, { value: TValue; expiresAt: number }>();

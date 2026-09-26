@@ -7,8 +7,10 @@ import {
   type AdminBookingList,
   type AdminBookingListItem,
   type AdminBookingQuery,
+  type AuthenticatedStaff,
 } from '@freshness/types';
 import { PrismaService } from '../database/prisma.service';
+import { AuditService } from '../audit/audit.service';
 import type { Prisma } from '../generated/prisma/client';
 import { defaultSchedulingConfig } from '../scheduling/scheduling.config';
 
@@ -44,7 +46,10 @@ const LIST_SELECT = {
 
 @Injectable()
 export class BookingsAdminService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly audit: AuditService,
+  ) {}
 
   /**
    * Listado de reservas para la agenda del panel.
@@ -77,8 +82,18 @@ export class BookingsAdminService {
     return { items, nextCursor: hayMas ? (items.at(-1)?.bookingId ?? null) : null };
   }
 
-  /** Detalle completo, con la direccion y las instrucciones de acceso. */
-  async detail(bookingId: string): Promise<AdminBookingDetail> {
+  /**
+   * Detalle completo, con la direccion y las instrucciones de acceso.
+   *
+   * `quien` es opcional para no romper las llamadas internas: las acciones
+   * que cambian algo vuelven a leer el detalle para devolverlo actualizado, y
+   * esas YA dejan su propio rastro. Anotar ademas una «lectura» por cada
+   * cambio duplicaria las filas sin anadir nada.
+   */
+  async detail(
+    bookingId: string,
+    quien?: { staff: AuthenticatedStaff; ip: string | null },
+  ): Promise<AdminBookingDetail> {
     const booking = await this.prisma.db.booking.findUnique({
       where: { id: bookingId },
       select: {
@@ -153,6 +168,37 @@ export class BookingsAdminService {
     const duracion = Math.round(
       (booking.scheduledEnd.getTime() - booking.scheduledStart.getTime()) / 60_000,
     );
+
+    /*
+     * EL RASTRO SE DEJA AQUI, no al entrar: si la reserva no existe se ha
+     * lanzado antes, y registrar una lectura que no ocurrio ensuciaria el
+     * registro con ruido de enlaces caducados.
+     *
+     * Va FUERA de transaccion y sin esperar: esto es una lectura, y una
+     * lectura no puede fallar porque no se pueda anotar. Se prefiere perder
+     * una fila a devolver un error a alguien que solo queria mirar.
+     */
+    if (quien) {
+      const veAccesos = booking.address.accessNotes !== null;
+      void this.audit
+        .record({
+          staff: quien.staff,
+          surface: 'PANEL',
+          /*
+           * Si la ficha lleva instrucciones de acceso, la accion lo dice.
+           * Asi «quien ha visto codigos de puerta este mes» es un filtro y
+           * no una lectura de todas las filas mirando la metadata.
+           */
+          action: veAccesos ? 'access_notes.viewed' : 'booking.viewed',
+          entityType: 'booking',
+          entityId: booking.id,
+          // La referencia, para poder leer el registro sin cruzar tablas.
+          // NUNCA el contenido de las instrucciones de acceso.
+          metadata: { reference: booking.reference },
+          ipAddress: quien.ip,
+        })
+        .catch(() => undefined);
+    }
 
     return {
       ...toListItem(booking),
