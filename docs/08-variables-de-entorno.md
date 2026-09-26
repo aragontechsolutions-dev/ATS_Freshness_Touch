@@ -240,17 +240,26 @@ Directory. Sus variables:
 
 ### Tres cosas que hay que hacer a mano
 
-1. **Sustituir el marcador de la política de contenido.** En
-   `apps/admin/vercel.json` hay `https://SUPABASE-REF-PENDIENTE.supabase.co`.
-   Si no lo cambias por tu dominio real, **el navegador bloqueará el inicio de
-   sesión** aunque todo lo demás esté bien. Es intencionado: la lista de
-   destinos permitidos tiene que ser explícita.
+1. **La política de contenido lleva el proyecto de Supabase escrito.** En
+   `apps/admin/vercel.json`, `connect-src` nombra el dominio del proyecto. Ya
+   está puesto el real; si algún día cambias de proyecto de Supabase, hay que
+   cambiarlo ahí también o **el navegador bloqueará el inicio de sesión**
+   aunque todo lo demás esté bien. Es intencionado: la lista de destinos
+   permitidos tiene que ser explícita.
 
 2. **Añadir el dominio del panel a `CORS_ORIGINS` en Render**, separado por
    coma del dominio del sitio público. Sin eso la API rechazará sus peticiones.
 
 3. **Poner `VITE_ADMIN_URL` en el proyecto del sitio público**, que es a donde
-   lleva la puerta de servicio. Sin ella, el gesto no hace nada.
+   lleva la puerta de servicio. Sin ella, el gesto **no lleva al panel**: el
+   logotipo se comporta como el enlace normal que es y abre `#top`.
+
+   Es una variable de **construcción**: ponerla en Vercel no basta, hay que
+   volver a desplegar para que entre en el paquete.
+
+> Al pasar a un dominio propio, todo esto cambia de sitio. La guía completa
+> —Vercel, Resend, DMARC, Supabase y el orden en que hacerlo— está en
+> **`docs/15-dominio-propio.md`**.
 
 ---
 
