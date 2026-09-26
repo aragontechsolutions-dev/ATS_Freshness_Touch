@@ -10,6 +10,14 @@ partes.
 > apartado 8 —mover la API—, que es **opcional y no recomendado de momento**.
 > Todo lo demás son ajustes en los paneles de Vercel, Render, Resend y Supabase.
 
+> **Sobre el plan de Vercel.** La cuenta está en **Hobby**, que Vercel destina a
+> proyectos personales y **no comerciales**. Esto es el sitio de una empresa que
+> cobra a clientes, así que conviene revisar la política de uso de Vercel y
+> valorar el paso a Pro antes de poner el dominio de la empresa a producir. No
+> es un detalle de estilo: un proyecto comercial en Hobby se puede suspender, y
+> se llevaría por delante el sitio y el panel a la vez. Compruébalo tú en las
+> condiciones vigentes; aquí solo se deja anotado.
+
 ---
 
 ## 1. Qué nombre va a cada cosa
@@ -56,23 +64,28 @@ Por eso el correo saliente de Resend se configura aparte: para que no choquen.
 
 ---
 
-## 3. Dónde vive el DNS: elige UN sitio
+## 3. Dónde vive el DNS: ya está decidido
 
-Cuando compres el dominio, el registrador (Namecheap, Cloudflare, GoDaddy…) te
-da un panel de DNS. Puedes:
+El dominio se compró **en la propia Vercel**, así que Vercel es a la vez
+registrador y servidor de nombres (`ns1.vercel-dns.com`, `ns2.vercel-dns.com`).
+Eso quita trabajo:
 
-- **Dejar el DNS en el registrador** y añadir a mano los registros que te pidan
-  Vercel y Resend, o
-- **Delegar el DNS a Vercel** cambiando los servidores de nombres, y crear allí
-  también los registros de Resend y del buzón.
+- **Para la parte web no hay que copiar ningún registro a mano.** Al conectar
+  el dominio a un proyecto, Vercel crea y mantiene los registros solo.
+- **Todo lo demás también va ahí**: los registros de Resend, el DMARC y, el día
+  que lo haya, el buzón. Vercel → Domains → el dominio → **DNS Records**.
 
-Las dos funcionan. Lo que **no** funciona es tenerlos a medias: los registros
-solo valen en el sitio al que apuntan los servidores de nombres. Elige uno y
-pon todo ahí.
+> **No añadas a mano un registro `A` apuntando a Vercel.** El formulario de la
+> página viene precargado con un ejemplo (`subdomain` / `A` / una IP), y es
+> solo eso: un ejemplo. Conectar el proyecto es lo que hay que hacer; un
+> registro puesto a mano puede estorbar al que crea Vercel.
 
-> Para una empresa pequeña con un buzón, Resend y dos proyectos web, dejar el
-> DNS en el registrador suele dar menos sorpresas: es el sitio al que volverás
-> a mirar dentro de un año.
+### Los registros CAA que ya vienen puestos
+
+El dominio trae tres registros `CAA` (`pki.goog`, `sectigo.com`,
+`letsencrypt.org`). Son correctos y **no hay que tocarlos**: dicen qué
+autoridades pueden emitir certificados para este dominio, y son justo las que
+usa Vercel. Aparecen con un candado porque los gestiona Vercel.
 
 ---
 
