@@ -343,8 +343,24 @@
  * =========================================================================== */
 
 @layer components {
+  /*
+   * EL MAPA SE QUEDA EN SU SITIO.
+   *
+   * Leaflet pinta sus capas hasta z-index 700 y sus controles —el zoom, la
+   * atribucion— en 1000. La cabecera pegajosa esta muy por debajo, asi que
+   * el mapa se le subia encima al desplazar la pagina.
+   *
+   * No se arregla subiendo la cabecera: seria una carrera que se pierde con
+   * el siguiente componente. Se arregla ENCERRANDO a Leaflet: `isolation`
+   * mas un `z-index` propio crean un contexto de apilamiento, y entonces sus
+   * 1000 solo compiten entre ellos dentro de esta caja. La caja entera vale
+   * 0 y pasa por debajo de todo lo demas.
+   */
   .ft-map,
   .ft-map-hueco {
+    position: relative;
+    isolation: isolate;
+    z-index: 0;
     @apply h-72 w-full overflow-hidden rounded-xl border border-slate-200 sm:h-96;
   }
 
