@@ -349,6 +349,51 @@ export const en = {
         'The email API key and the Telegram bot token are set on the server, not here. Credentials stored in the database end up in every backup, so they stay in the server environment alongside the payment keys.',
     },
 
+    rates: {
+      title: 'Rates',
+      intro:
+        'The prices the site quotes with. Every new quote is calculated with whatever is here.',
+      onlyFuture:
+        'Anything already booked does not change: each booking stores the prices it was calculated with. This only affects quotes from now on.',
+
+      services: 'Price per service',
+      servicesHelp:
+        'The total is the base charge plus bedrooms, bathrooms and square feet. If it lands below the minimum, the minimum is charged.',
+      base: 'Base',
+      perBedroom: 'Per bedroom',
+      perBathroom: 'Per bathroom',
+      perSquareFoot: 'Per sq ft',
+      minimum: 'Minimum',
+
+      addOns: 'Add-ons',
+      amount: 'Amount',
+      maxQuantity: 'Max',
+
+      discounts: 'Recurring discount',
+      discountsHelp:
+        'On the service plus add-ons. More often means more discount: the system will not save it the other way round.',
+
+      deposit: 'Deposit',
+      depositHelp:
+        'What is held on the card at booking, not what is charged. It comes off the total on the day of service.',
+      depositBase: 'Base',
+      freeRadius: 'Free radius',
+      depositMin: 'Minimum',
+      depositMax: 'Maximum',
+      roundTrip: 'Charge round-trip miles',
+
+      save: 'Save rates',
+      saved: 'Rates saved. New quotes already use these prices.',
+      invalidNumbers: 'Check the amounts: one of the fields is not a number.',
+      outOfRange:
+        'That amount is beyond anything reasonable. Check "{{field}}": is there an extra zero?',
+      errMinimumZero:
+        'The minimum has to be greater than zero: otherwise a small home would come out free.',
+      errDiscountOrder:
+        'The discount cannot drop as the frequency goes up: someone coming weekly would pay proportionally more than someone coming once a month.',
+      errDepositRange: 'The deposit minimum cannot be higher than the maximum.',
+      currentVersion: 'Version {{version}} · {{count}} saved in total',
+    },
     /* ----------------------- Area de servicio ----------------------- */
     serviceArea: {
       title: 'Service area',
@@ -625,6 +670,9 @@ export const en = {
         },
         service_area: {
           updated: 'Service area changed',
+        },
+        pricing: {
+          updated: 'Rates changed',
         },
         notifications: {
           updated: 'Alert settings changed',

@@ -3,8 +3,21 @@ import type { AddOnCode, AddOnUnit, Frequency, ServiceType, ServiceZone } from '
 /**
  * CONFIGURACION COMERCIAL DE FRESHNESS TOUCH
  * ------------------------------------------
- * Este archivo es el unico lugar donde viven los precios. Cambiar una tarifa
- * aqui la cambia en la API, en el sitio web y en los tests.
+ * ESTE ARCHIVO YA NO ES EL UNICO LUGAR DONDE VIVEN LOS PRECIOS, y conviene
+ * saberlo antes de cambiar una cifra aqui. Desde la etapa 2.22 los precios
+ * por servicio, los extras, los descuentos por recurrencia y el deposito SE
+ * EDITAN DESDE EL PANEL y viven en la tabla `pricing_tables`, versionados
+ * (ver `docs/20-tarifas-editables.md`).
+ *
+ * Lo que hay aqui sigue siendo la fuente de:
+ *
+ *   - Lo que NO es editable: duraciones, limites de validacion, impuesto y
+ *     el servicio comercial.
+ *   - LAS TARIFAS DE PARTIDA. La primera fila de la tabla se siembra desde
+ *     aqui, y son tambien a las que se cae si la base no responde.
+ *
+ * Cambiar una tarifa en este archivo por tanto NO cambia los precios de un
+ * despliegue que ya tiene su tabla guardada: solo los de uno nuevo.
  *
  * Las cifras iniciales se derivan de los rangos de mercado de Georgia
  * (limpieza estandar 120-250 USD, profunda 180-700, mudanza 160-750,

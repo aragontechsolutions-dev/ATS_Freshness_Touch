@@ -13,6 +13,7 @@ import {
 } from '@freshness/types';
 import { ApiClientError, fetchSettings, saveSettings } from '../lib/api';
 import { AuditLog } from '../components/AuditLog';
+import { PricingRatesForm } from '../components/PricingRatesForm';
 import { ServiceAreaForm } from '../components/ServiceAreaForm';
 import { NotificationSettingsForm } from '../components/NotificationSettingsForm';
 import { StaffDirectory } from '../components/StaffDirectory';
@@ -20,6 +21,7 @@ import { useToast } from '../components/ToastProvider';
 import { SkeletonFormulario } from '../components/Skeletons';
 import {
   BellIcon,
+  CardIcon,
   GearIcon,
   MapPinIcon,
   ShieldIcon,
@@ -63,7 +65,7 @@ interface SettingsShellProps extends SettingsPageProps {
  *      numero inventado de relleno, que es peor: un cliente lo marca y
  *      termina llamando a un desconocido.
  */
-type Seccion = 'business' | 'serviceArea' | 'notifications' | 'staff' | 'audit';
+type Seccion = 'business' | 'serviceArea' | 'pricing' | 'notifications' | 'staff' | 'audit';
 
 /**
  * Dos bloques que se guardan por separado.
@@ -99,6 +101,19 @@ export function SettingsPage({ staff, locale, onSessionLost }: SettingsShellProp
         >
           {t('admin.serviceArea.title')}
         </Pestana>
+        {/*
+          LAS TARIFAS VAN JUSTO DESPUES DEL AREA, y las dos antes que los
+          avisos y el personal: area y precios son las dos mitades de la
+          misma pregunta —a donde vamos y por cuanto—, y quien abre una casi
+          siempre acaba mirando la otra.
+        */}
+        <Pestana
+          activa={seccion === 'pricing'}
+          onClick={() => setSeccion('pricing')}
+          icono={<CardIcon className="h-4 w-4" />}
+        >
+          {t('admin.rates.title')}
+        </Pestana>
         <Pestana
           activa={seccion === 'notifications'}
           onClick={() => setSeccion('notifications')}
@@ -132,6 +147,8 @@ export function SettingsPage({ staff, locale, onSessionLost }: SettingsShellProp
         <BusinessSettingsForm locale={locale} onSessionLost={onSessionLost} />
       ) : seccion === 'serviceArea' ? (
         <ServiceAreaForm locale={locale} onSessionLost={onSessionLost} />
+      ) : seccion === 'pricing' ? (
+        <PricingRatesForm locale={locale} onSessionLost={onSessionLost} />
       ) : seccion === 'notifications' ? (
         <NotificationSettingsForm onSessionLost={onSessionLost} />
       ) : seccion === 'staff' ? (

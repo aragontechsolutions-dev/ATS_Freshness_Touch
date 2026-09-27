@@ -3,12 +3,15 @@ import { SkipThrottle } from '@nestjs/throttler';
 import {
   BusinessSettingsSchema,
   NotificationSettingsSchema,
+  PricingRatesSchema,
   ServiceAreaSettingsSchema,
   type AdminBusinessSettings,
+  type AdminPricingRates,
   type AdminServiceArea,
   type AuthenticatedStaff,
   type BusinessSettings,
   type NotificationSettings,
+  type PricingRates,
   type ServiceAreaSettings,
 } from '@freshness/types';
 import type { Request } from 'express';
@@ -17,6 +20,7 @@ import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
 import { SKIP_QUOTE_THROTTLER } from '../common/throttling';
 import { NotificationSettingsService } from '../notifications/notification-settings.service';
 import { BusinessSettingsService } from '../settings/business-settings.service';
+import { PricingRatesService } from '../settings/pricing-rates.service';
 import { ServiceAreaService } from '../settings/service-area.service';
 
 /**
@@ -159,5 +163,59 @@ export class ServiceAreaAdminController {
     @Req() request: Request,
   ): Promise<AdminServiceArea> {
     return this.serviceArea.save(settings, staff, request.ip ?? null);
+  }
+}
+
+/**
+ * LAS TARIFAS
+ * -----------
+ * SOLO ADMINISTRACION, y aqui el motivo es el mas directo de todo el panel:
+ * quien pueda tocar esta pantalla decide cuanto factura la empresa. Un cero
+ * de mas en un precio, o un descuento del cincuenta por ciento, no rompen
+ * nada: el sistema cotiza, cobra y factura con la cifra equivocada, sin un
+ * solo error por ningun sitio. Coordinacion organiza la agenda; no fija
+ * precios.
+ *
+ * QUE NO SE PUEDE HACER DESDE AQUI:
+ *
+ *   - Poner precio al servicio comercial. No da precio automatico, asi que
+ *     cualquier cifra seria decorativa.
+ *   - Cambiar si un extra es plano o por unidad, las duraciones, los limites
+ *     de validacion o el impuesto. Ver `packages/types/src/pricing-rates.ts`.
+ *   - Reescribir una tabla anterior. Cada guardado crea una VERSION NUEVA y
+ *     ninguna se borra: es lo que permite reproducir un presupuesto antiguo.
+ */
+@SkipThrottle(SKIP_QUOTE_THROTTLER)
+@Controller(`${ADMIN_ROUTE}/pricing-rates`)
+export class PricingRatesAdminController {
+  constructor(private readonly rates: PricingRatesService) {}
+
+  @Get()
+  @Roles('ADMIN')
+  get(): Promise<AdminPricingRates> {
+    return this.rates.getForAdmin();
+  }
+
+  /**
+   * Guarda una tabla nueva.
+   *
+   * PUT y no PATCH, y con mas razon que en el resto: las invariantes son
+   * sobre el CONJUNTO —que el descuento no baje al subir la frecuencia, que
+   * el minimo del deposito no supere al maximo— y no se pueden comprobar
+   * sobre un campo suelto.
+   *
+   * LA VERSION NO VIAJA EN LA PETICION: la pone el servidor. Si la mandara
+   * quien llama, dos pestanas abiertas podrian enviar la misma y la segunda
+   * machacaria a la primera, que es justo lo que una tabla de solo anadir
+   * existe para impedir.
+   */
+  @Put()
+  @Roles('ADMIN')
+  update(
+    @Body(new ZodValidationPipe<PricingRates>(PricingRatesSchema)) rates: PricingRates,
+    @CurrentStaff() staff: AuthenticatedStaff,
+    @Req() request: Request,
+  ): Promise<AdminPricingRates> {
+    return this.rates.save(rates, staff, request.ip ?? null);
   }
 }

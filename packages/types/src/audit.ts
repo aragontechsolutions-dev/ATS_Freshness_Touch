@@ -126,6 +126,16 @@ const ACCIONES_FIJAS = [
    * dinero en cada reserva que entre despues.
    */
   'service_area.updated',
+  /**
+   * Cambiaron las tarifas.
+   *
+   * Tiene accion propia y no `settings.updated` por lo mismo que el area de
+   * servicio, y con mas motivo: cambiar un precio mueve dinero en CADA
+   * reserva posterior. Ante una reclamacion, la pregunta es «quien subio
+   * este precio y cuando», y tiene que responderse con un filtro, no
+   * leyendo cincuenta cambios de telefono.
+   */
+  'pricing.updated',
 
   /* --- Lecturas de datos sensibles ------------------------------------- */
   /** Alguien abrio la ficha completa de una reserva, con datos del cliente. */

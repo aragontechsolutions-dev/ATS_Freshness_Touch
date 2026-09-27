@@ -608,6 +608,40 @@ model BusinessSetting {
   @@map("business_settings")
 }
 
+/// Una tabla de tarifas, tal y como estuvo vigente.
+///
+/// ES DE SOLO ANADIR: cada guardado desde el panel escribe una fila nueva y
+/// NUNCA se actualiza ni se borra una anterior. El motivo esta en `Quote` y
+/// en `Booking`: las dos guardan `pricingVersion` porque, sin ella, un
+/// presupuesto antiguo no se puede reproducir despues de cambiar los precios.
+/// Mientras las tarifas vivian en un archivo del codigo esa promesa no se
+/// cumplia —del archivo solo existe su version actual—; con esta tabla, cada
+/// version es una fila que se puede volver a leer.
+///
+/// Por eso tampoco tiene purga automatica, a diferencia de la auditoria: la
+/// fila de 2026 sigue haciendo falta el dia que se revise una factura de
+/// 2026.
+model PricingTable {
+  /// Formato `AAAA.MM.DD.n`. Se ordena sola y dice cuando se cambio el
+  /// precio sin abrir la fila.
+  version String @id @db.VarChar(40)
+
+  /// Solo lo editable desde el panel: precios por servicio, extras,
+  /// descuentos por recurrencia y deposito. Lo demas —duraciones, limites,
+  /// impuesto, el servicio comercial— sigue en el codigo.
+  rates Json
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  createdBy String?  @db.Uuid
+
+  /// El nombre de quien la puso, COMO TEXTO y no como referencia a su ficha.
+  /// Quien subio un precio el ano pasado puede haber causado baja, y "lo
+  /// cambio alguien que ya no esta" no sirve al revisar una factura.
+  createdByName String? @db.VarChar(160)
+
+  @@map("pricing_tables")
+}
+
 /// Cada intento de aviso con su resultado. Responde a "¿le llego el correo?"
 /// y, gracias al indice unico parcial, impide que un reenvio del webhook del
 /// proveedor de pago acabe en un segundo correo al cliente.
