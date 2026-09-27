@@ -88,19 +88,45 @@ export type QuoteDistance = z.infer<typeof QuoteDistanceSchema>;
  * Deposito reembolsable por desplazamiento.
  * Se retiene (no se cobra) al reservar y se descuenta del total al finalizar.
  */
+/**
+ * EL DEPOSITO, QUE AHORA ES UNA CIFRA FIJA.
+ *
+ * Antes llevaba dentro el coste del traslado —millas, tarifa por milla,
+ * tope— y por eso dos clientes del mismo barrio podian ver retenciones
+ * distintas. Ese coste se ha mudado a `QuoteTravel`, que es una linea del
+ * precio y se ve sumada.
+ *
+ * NO ES UN CARGO EXTRA: se retiene al reservar y se descuenta del total.
+ */
 export const QuoteDepositSchema = z.strictObject({
   amountCents: z.int().nonnegative(),
-  baseCents: z.int().nonnegative(),
-  freeRadiusMiles: z.number().nonnegative(),
-  /** Millas facturables: ida y vuelta mas alla del radio libre. */
-  billableMiles: z.number().nonnegative(),
-  mileageRateCentsPerMile: z.number().nonnegative(),
-  /** true si se aplico el tope maximo configurado. */
+  /**
+   * `true` si hubo que recortarlo porque el trabajo cuesta menos que el
+   * deposito. Nunca se retiene mas dinero del que vale el servicio.
+   */
   capped: z.boolean(),
   /** El deposito se acredita contra el total final del servicio. */
   appliedToTotal: z.literal(true),
 });
 export type QuoteDeposit = z.infer<typeof QuoteDepositSchema>;
+
+/**
+ * EL TRASLADO, DESGLOSADO.
+ *
+ * Existe para poder ensenar de donde sale el recargo. Antes eran escalones
+ * —25, 50, 75 dolares por franja— y dos casas separadas por una milla
+ * podian pagar veinticinco dolares de diferencia sin explicacion posible.
+ * Ahora son millas contadas por una tarifa publicada.
+ */
+export const QuoteTravelSchema = z.strictObject({
+  /** Millas alrededor de la base que no se cobran. */
+  freeRadiusMiles: z.number().nonnegative(),
+  /** Las que sobran, ida y vuelta. Cero dentro del radio. */
+  billableMiles: z.number().nonnegative(),
+  centsPerMile: z.number().nonnegative(),
+  amountCents: z.int().nonnegative(),
+});
+export type QuoteTravel = z.infer<typeof QuoteTravelSchema>;
 
 /** Totales agregados. discountCents se expresa en positivo (magnitud). */
 export const QuoteTotalsSchema = z.strictObject({
@@ -152,6 +178,7 @@ export const QuoteResponseSchema = z.strictObject({
   totals: QuoteTotalsSchema,
   tax: QuoteTaxSchema,
   deposit: QuoteDepositSchema,
+  travel: QuoteTravelSchema,
   /** Total menos deposito: lo que queda por pagar el dia del servicio. */
   balanceDueAtServiceCents: z.int(),
   manualReview: ManualReviewSchema,

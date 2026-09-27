@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import {
   EDITABLE_SERVICE_TYPES,
+  OFFERED_ADD_ON_CODES,
   PricingRatesSchema,
   nextPricingVersion,
   type AdminPricingRates,
@@ -33,6 +34,9 @@ const VERSION_SEMILLA = defaultPricingConfig.version;
  * consulta por pulsacion.
  */
 const CACHE_TTL_MS = 30_000;
+
+/** Las cadencias, en el orden en que se leen. */
+const CADENCIAS = ['ONE_TIME', 'MONTHLY', 'BIWEEKLY', 'WEEKLY'] as const;
 
 /**
  * LAS TARIFAS VIGENTES, Y TODAS LAS QUE LO FUERON
@@ -287,52 +291,60 @@ export class PricingRatesService {
 function diferencias(antes: PricingRates, despues: PricingRates): Record<string, string> {
   const cambios: Record<string, string> = {};
 
-  const anotar = (clave: string, a: number | boolean, b: number | boolean): void => {
-    if (a !== b) cambios[clave] = `${String(a)} → ${String(b)}`;
+  const anotar = (clave: string, a: unknown, b: unknown): void => {
+    if (a !== b) cambios[clave] = `${etiqueta(a)} → ${etiqueta(b)}`;
   };
 
   for (const tipo of EDITABLE_SERVICE_TYPES) {
     const a = antes.services[tipo];
     const b = despues.services[tipo];
     if (!a || !b) continue;
-    anotar(`${tipo}.base`, a.baseCents, b.baseCents);
-    anotar(`${tipo}.dormitorio`, a.perBedroomCents, b.perBedroomCents);
-    anotar(`${tipo}.bano`, a.perBathroomCents, b.perBathroomCents);
-    anotar(`${tipo}.pieCuadrado`, a.centsPerSquareFoot, b.centsPerSquareFoot);
-    anotar(`${tipo}.minimo`, a.minimumCents, b.minimumCents);
+
+    for (const cadencia of CADENCIAS) {
+      const antesTarifa = a[cadencia];
+      const despuesTarifa = b[cadencia];
+
+      /*
+       * Dejar de ofrecer una cadencia —o empezar a ofrecerla— es el cambio
+       * mas grande que se puede hacer aqui y no es un numero, asi que se
+       * dice con palabras en vez de con una flecha entre cifras.
+       */
+      if (antesTarifa === null || despuesTarifa === null) {
+        if (antesTarifa !== despuesTarifa) {
+          cambios[`${tipo}.${cadencia}`] =
+            antesTarifa === null ? 'no se ofrecía → se ofrece' : 'se ofrecía → ya no';
+        }
+        continue;
+      }
+
+      anotar(`${tipo}.${cadencia}.importe`, antesTarifa.flatCents, despuesTarifa.flatCents);
+      anotar(
+        `${tipo}.${cadencia}.pieCuadrado`,
+        antesTarifa.centsPerSquareFoot,
+        despuesTarifa.centsPerSquareFoot,
+      );
+    }
   }
 
-  for (const codigo of Object.keys(despues.addOns) as (keyof PricingRates['addOns'])[]) {
+  for (const codigo of OFFERED_ADD_ON_CODES) {
     const a = antes.addOns[codigo];
     const b = despues.addOns[codigo];
     if (!a || !b) continue;
-    anotar(`extra.${String(codigo)}.importe`, a.unitAmountCents, b.unitAmountCents);
-    anotar(`extra.${String(codigo)}.maximo`, a.maxQuantity, b.maxQuantity);
+    anotar(`extra.${codigo}.importe`, a.unitAmountCents, b.unitAmountCents);
+    anotar(`extra.${codigo}.maximo`, a.maxQuantity, b.maxQuantity);
   }
 
-  anotar(
-    'descuento.semanal',
-    antes.frequencyDiscounts.weeklyPercent,
-    despues.frequencyDiscounts.weeklyPercent,
-  );
-  anotar(
-    'descuento.quincenal',
-    antes.frequencyDiscounts.biweeklyPercent,
-    despues.frequencyDiscounts.biweeklyPercent,
-  );
-  anotar(
-    'descuento.mensual',
-    antes.frequencyDiscounts.monthlyPercent,
-    despues.frequencyDiscounts.monthlyPercent,
-  );
-
-  anotar('deposito.base', antes.deposit.baseCents, despues.deposit.baseCents);
-  anotar('deposito.radioLibre', antes.deposit.freeRadiusMiles, despues.deposit.freeRadiusMiles);
-  anotar('deposito.idaYVuelta', antes.deposit.roundTrip, despues.deposit.roundTrip);
-  anotar('deposito.minimo', antes.deposit.minCents, despues.deposit.minCents);
-  anotar('deposito.maximo', antes.deposit.maxCents, despues.deposit.maxCents);
+  anotar('deposito', antes.depositCents, despues.depositCents);
+  anotar('traslado.radioLibre', antes.travel.freeRadiusMiles, despues.travel.freeRadiusMiles);
+  anotar('traslado.porMilla', antes.travel.centsPerMile, despues.travel.centsPerMile);
+  anotar('traslado.idaYVuelta', antes.travel.roundTrip, despues.travel.roundTrip);
 
   return cambios;
+}
+
+/** `null` se lee mejor como «la del IRS» que como la palabra null. */
+function etiqueta(valor: unknown): string {
+  return valor === null ? 'por defecto' : String(valor);
 }
 
 function describir(error: unknown): string {

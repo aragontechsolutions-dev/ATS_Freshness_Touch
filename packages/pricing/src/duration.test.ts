@@ -92,8 +92,14 @@ describe('estimacion de duracion', () => {
   });
 
   it('nunca baja del minimo ni supera el maximo', () => {
+    /*
+     * Los dos extremos se prueban con servicios que SIGUEN dando precio
+     * automatico. Desde que la post-obra y la rotacion de Airbnb se cotizan
+     * a mano, no se agendan solas y su duracion estimada es cero, asi que ya
+     * no sirven para comprobar los topes.
+     */
     const minimo = estimateDurationMinutes({
-      service: 'AIRBNB_TURNOVER',
+      service: 'STANDARD',
       bedrooms: 0,
       bathrooms: 0,
       squareFeet: 200,
@@ -102,13 +108,31 @@ describe('estimacion de duracion', () => {
     expect(minimo).toBe(defaultPricingConfig.durationMinMinutes);
 
     const maximo = estimateDurationMinutes({
-      service: 'POST_CONSTRUCTION',
+      service: 'DEEP',
       bedrooms: 12,
       bathrooms: 12,
       squareFeet: 20000,
       addOns: [],
     });
     expect(maximo).toBe(defaultPricingConfig.durationMaxMinutes);
+  });
+
+  it('la post-obra y la rotacion de Airbnb ya no tienen duracion estimable', () => {
+    /*
+     * Ambas pasaron a presupuesto a medida: sin tarifa automatica no hay
+     * hueco que reservar hasta que alguien las mire.
+     */
+    for (const service of ['POST_CONSTRUCTION', 'AIRBNB_TURNOVER'] as const) {
+      expect(
+        estimateDurationMinutes({
+          service,
+          bedrooms: 3,
+          bathrooms: 2,
+          squareFeet: 1800,
+          addOns: [],
+        }),
+      ).toBe(0);
+    }
   });
 
   it('el servicio comercial no tiene duracion estimable: se agenda a mano', () => {

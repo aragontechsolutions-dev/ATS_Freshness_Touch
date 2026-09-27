@@ -24,6 +24,7 @@ export const en = {
 
   nav: {
     services: 'Services',
+    scope: "What's included",
     quote: 'Instant quote',
     areas: 'Service areas',
     whyUs: 'Why us',
@@ -95,13 +96,54 @@ export const en = {
     BED_LINENS: 'Change bed linens',
   },
 
+  /**
+   * QUE ENTRA Y QUE NO ENTRA EN UNA LIMPIEZA
+   * ----------------------------------------
+   * Sale de las plantillas de trabajo que usa el equipo, no de un texto
+   * comercial. Esa es la gracia: lo que el cliente lee aqui es EXACTAMENTE
+   * la lista que la persona que va a su casa tiene delante.
+   *
+   * La lista de lo que NO se limpia esta en el sitio a proposito, y no
+   * escondida en las condiciones. Casi todas las quejas de una limpieza
+   * salen de algo que el cliente daba por incluido; decirlo antes cuesta
+   * una seccion y evita la discusion entera.
+   */
+  scope: {
+    title: 'What does a cleaning include?',
+    subtitle:
+      'This is the same task list our team carries when they arrive at your home. No fine print.',
+
+    /** Los extras: se piden aparte y se cobran aparte. */
+    extrasTitle: 'Additional services',
+    extrasNote:
+      'You add these in the quote tool and they are billed on top. They are not part of a regular cleaning.',
+
+    /** Lo que se cobra por cada unidad, como las ventanas. */
+    perUnit: 'each',
+
+    notIncludedTitle: 'What we do not clean',
+    notIncludedNote:
+      'We say it up front, not afterwards: if you need something on this list, tell us and we will point you to someone who does it.',
+    notIncluded: {
+      patios: 'Patios',
+      porches: 'Porches',
+      exteriorWindows: 'Exterior windows',
+      windowTracks: 'Window tracks',
+      dishes: 'Dishes and dishwasher',
+      walls: 'Walls',
+      fullFridgeAndCabinets: 'Refrigerator and cabinets with items inside',
+      smallAppliances: 'Mini ovens and air fryers',
+    },
+  },
+
   frequency: {
+    /** Para la cadencia que un servicio concreto no ofrece. */
+    notOffered: 'We do not offer this service on this schedule',
     title: 'How often?',
     ONE_TIME: 'One time',
     WEEKLY: 'Weekly',
     BIWEEKLY: 'Every 2 weeks',
     MONTHLY: 'Monthly',
-    savePercent: 'Save {{percent}}%',
   },
 
   calculator: {
@@ -356,30 +398,25 @@ export const en = {
       onlyFuture:
         'Anything already booked does not change: each booking stores the prices it was calculated with. This only affects quotes from now on.',
 
-      services: 'Price per service',
+      services: 'Price per service and frequency',
       servicesHelp:
-        'The total is the base charge plus bedrooms, bathrooms and square feet. If it lands below the minimum, the minimum is charged.',
-      base: 'Base',
-      perBedroom: 'Per bedroom',
-      perBathroom: 'Per bathroom',
+        'In each frequency the higher of the two wins: the flat amount or what the square footage gives. Unchecking a frequency means the service is not offered that way.',
+      flat: 'Amount',
       perSquareFoot: 'Per sq ft',
-      minimum: 'Minimum',
+      noSize: 'not used',
+      notOffered: 'Not offered at this frequency',
 
       addOns: 'Add-ons',
       amount: 'Amount',
       maxQuantity: 'Max',
 
-      discounts: 'Recurring discount',
-      discountsHelp:
-        'On the service plus add-ons. More often means more discount: the system will not save it the other way round.',
-
-      deposit: 'Deposit',
+      depositAndTravel: 'Deposit and travel',
       depositHelp:
-        'What is held on the card at booking, not what is charged. It comes off the total on the day of service.',
-      depositBase: 'Base',
+        'The deposit is held at booking and comes off the total: it is not an extra charge. Travel is free inside the radius; beyond it, the extra miles are charged.',
+      deposit: 'Deposit',
       freeRadius: 'Free radius',
-      depositMin: 'Minimum',
-      depositMax: 'Maximum',
+      perMile: 'Per mile',
+      irsRate: 'IRS rate',
       roundTrip: 'Charge round-trip miles',
 
       save: 'Save rates',
@@ -387,13 +424,13 @@ export const en = {
       invalidNumbers: 'Check the amounts: one of the fields is not a number.',
       outOfRange:
         'That amount is beyond anything reasonable. Check "{{field}}": is there an extra zero?',
-      errMinimumZero:
-        'The minimum has to be greater than zero: otherwise a small home would come out free.',
-      errDiscountOrder:
-        'The discount cannot drop as the frequency goes up: someone coming weekly would pay proportionally more than someone coming once a month.',
-      errDepositRange: 'The deposit minimum cannot be higher than the maximum.',
+      errOneTimeRequired:
+        'A service has to be bookable as a one-off: leave the "One time" frequency checked.',
+      errFrequencyOrder:
+        'The price cannot go up as the frequency goes up: someone coming weekly would pay more than someone coming once.',
       currentVersion: 'Version {{version}} · {{count}} saved in total',
     },
+
     /* ----------------------- Area de servicio ----------------------- */
     serviceArea: {
       title: 'Service area',
@@ -917,6 +954,19 @@ export const en = {
         PATIO: 'Balcony / patio',
         BED_LINENS: 'Bed linens (x{{quantity}})',
       },
+      /**
+       * El traslado que SE COBRA HOY: las millas que pasan del radio libre,
+       * contadas ida y vuelta.
+       */
+      travel:
+        'Travel · {{miles}} mi ({{freeRadius}} included, {{billableMiles}} billed round trip)',
+
+      /*
+       * LAS TRES DE ABAJO YA NO SE EMITEN. Se quedan porque el panel lee
+       * presupuestos y reservas guardados, y sus lineas siguen apuntando a
+       * estas claves: borrarlas dejaria el historial mostrando el nombre de
+       * la clave en vez del concepto.
+       */
       discount: {
         ONE_TIME: 'Discount',
         WEEKLY: 'Weekly service discount ({{percent}}%)',
@@ -925,6 +975,7 @@ export const en = {
       },
       minimumAdjustment: 'Service minimum (${{minimum}})',
       zoneSurcharge: 'Travel surcharge · zone {{zone}} ({{miles}} mi)',
+
       salesTax: 'Sales tax ({{percent}}%)',
     },
     disclaimer: {
@@ -951,6 +1002,14 @@ export const en = {
         'We do reach that far, but at that distance we price the job in person: travel changes the numbers a lot and we would rather give you a real figure. Leave us your details and we will call you.',
       outOfState: 'We currently operate in the State of Georgia only.',
       largeProperty: 'Large properties are quoted individually to keep the estimate accurate.',
+
+      /**
+       * El servicio existe, pero no en esa cadencia. Distinto de «no damos
+       * precio automático»: aquí la salida está en la misma pantalla —
+       * cambiar de frecuencia—, no en esperar una llamada.
+       */
+      frequencyUnavailable:
+        'We do not offer this service on that schedule. Pick another frequency, or write to us and we will work it out with you.',
     },
     tax: {
       gaExempt: 'Exempt — cleaning services are not taxed in Georgia',
@@ -985,7 +1044,13 @@ export const en = {
     upToMiles: 'Up to {{miles}} miles from our base',
     beyondMiles: 'Beyond {{miles}} miles',
     noSurcharge: 'No travel surcharge',
-    surcharge: '{{amount}} travel surcharge',
+
+    /**
+     * EL TRASLADO YA NO ES UN IMPORTE POR ZONA. Se cobra por milla a partir
+     * del radio libre, así que la tarjeta no puede prometer una cifra: lo
+     * honesto es decir cómo se cuenta y que el cotizador dé el número.
+     */
+    travelByMile: 'Travel billed per mile beyond the included radius',
     outOfRange: 'Outside the area we cover — contact us for a custom proposal',
 
     /* --------------------------- El mapa --------------------------- */

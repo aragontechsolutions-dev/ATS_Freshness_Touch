@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { AddOnCodeSchema, ServiceTypeSchema } from './enums';
+import { ServiceTypeSchema } from './enums';
 
 /**
  * LAS TARIFAS, EDITABLES DESDE EL PANEL
@@ -44,12 +44,17 @@ import { AddOnCodeSchema, ServiceTypeSchema } from './enums';
  * Los servicios con precio automatico, que son los unicos que tiene sentido
  * tarifar. `COMMERCIAL` se queda fuera a proposito: ver la cabecera.
  */
-export const EDITABLE_SERVICE_TYPES = [
-  'STANDARD',
-  'DEEP',
-  'MOVE_IN_OUT',
+export const EDITABLE_SERVICE_TYPES = ['STANDARD', 'DEEP', 'MOVE_IN_OUT'] as const;
+
+/**
+ * Los que NO se tarifan porque no dan precio automatico: se visita la casa y
+ * se propone. Estan aqui y no sueltos para que la guardia de compilacion de
+ * abajo pueda comprobar que no falta ninguno.
+ */
+export const QUOTE_ONLY_SERVICE_TYPES = [
   'POST_CONSTRUCTION',
   'AIRBNB_TURNOVER',
+  'COMMERCIAL',
 ] as const;
 
 export const EditableServiceTypeSchema = z.enum(EDITABLE_SERVICE_TYPES);
@@ -65,10 +70,32 @@ export type EditableServiceType = z.infer<typeof EditableServiceTypeSchema>;
  */
 type ServicioSinClasificar = Exclude<
   z.infer<typeof ServiceTypeSchema>,
-  EditableServiceType | 'COMMERCIAL'
+  EditableServiceType | (typeof QUOTE_ONLY_SERVICE_TYPES)[number]
 >;
 const _todosClasificados: ServicioSinClasificar extends never ? true : never = true;
 void _todosClasificados;
+
+/* -------------------------------------------------------------------------- */
+/*  Extras                                                                    */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Los extras que se ofrecen hoy, y son los de las plantillas de trabajo.
+ *
+ * LOS RETIRADOS NO DESAPARECEN DEL ENUMERADO: su codigo esta escrito dentro
+ * del JSON de cotizaciones y reservas que ya existen, y borrarlo haria
+ * ilegible un presupuesto del mes pasado. Simplemente no se tarifan ni se
+ * ofrecen.
+ */
+export const OFFERED_ADD_ON_CODES = [
+  'INSIDE_OVEN',
+  'INSIDE_FRIDGE',
+  'INSIDE_CABINETS',
+  'INTERIOR_WINDOWS',
+] as const;
+
+export const OfferedAddOnCodeSchema = z.enum(OFFERED_ADD_ON_CODES);
+export type OfferedAddOnCode = z.infer<typeof OfferedAddOnCodeSchema>;
 
 /* -------------------------------------------------------------------------- */
 /*  Topes                                                                     */
@@ -82,63 +109,110 @@ void _todosClasificados;
  * obliga a tocar el codigo para subir un precio, que es exactamente lo que
  * esta etapa viene a evitar.
  */
-const MAX_CARGO_CENTS = 1_000_000; // 10 000 $: ninguna limpieza domestica se acerca
-const MAX_POR_HABITACION_CENTS = 100_000; // 1 000 $ por dormitorio o bano
+const MAX_TARIFA_CENTS = 1_000_000; // 10 000 $: ninguna limpieza domestica se acerca
 const MAX_CENTS_POR_PIE = 100; // 1 $ el pie cuadrado
 const MAX_EXTRA_CENTS = 100_000; // 1 000 $ un extra
 const MAX_CANTIDAD_EXTRA = 100;
-/** Mas de la mitad de descuento es pagar por limpiar. */
-const MAX_DESCUENTO_PORCENTAJE = 50;
 /** El mismo tope que el area de servicio: Georgia de punta a punta. */
 const MAX_RADIO_MILLAS = 500;
-
-const CargoSchema = z.number().int().min(0).max(MAX_CARGO_CENTS);
+/** Cinco dolares la milla ya es mudanza, no limpieza. */
+const MAX_CENTS_POR_MILLA = 500;
 
 /* -------------------------------------------------------------------------- */
 /*  Las piezas                                                                */
 /* -------------------------------------------------------------------------- */
 
 /**
- * El precio de un servicio.
+ * LA TARIFA DE UN SERVICIO EN UNA CADENCIA. Manda el mayor de los dos:
  *
- * `centsPerSquareFoot` ADMITE DECIMALES y el resto no. No es un descuido:
- * los demas son importes que se cobran tal cual, y medio centavo no existe.
- * Este se multiplica por los pies cuadrados antes de redondear, asi que 3,5
- * es una tarifa perfectamente normal —y la diferencia entre 3 y 4 en una
- * casa de 2 000 pies son veinte dolares—.
+ *   precio = max(flatCents, centsPerSquareFoot * pies cuadrados)
+ *
+ * POR QUE EL MAYOR Y NO UN UMBRAL POR TAMANO. Con un umbral —«hasta 809
+ * pies lo plano, por encima por pie»— aparece un escalon hacia abajo: a 810
+ * pies saldrian 243 $ y a 809, 250 $. La casa mas grande, siete dolares mas
+ * barata. Con el maximo no hay escalon y la regla dice lo mismo.
+ *
+ * `centsPerSquareFoot` ADMITE DECIMALES y el importe plano no. No es un
+ * descuido: el plano se cobra tal cual y medio centavo no existe; este se
+ * multiplica por los pies antes de redondear, y la diferencia entre 30 y 31
+ * centavos en una casa de 2 000 pies son veinte dolares.
  */
-export const EditableServiceRateSchema = z
-  .strictObject({
-    baseCents: CargoSchema,
-    perBedroomCents: z.number().int().min(0).max(MAX_POR_HABITACION_CENTS),
-    perBathroomCents: z.number().int().min(0).max(MAX_POR_HABITACION_CENTS),
-    centsPerSquareFoot: z.number().min(0).max(MAX_CENTS_POR_PIE),
-    minimumCents: CargoSchema,
-  })
-  .refine((tarifa) => tarifa.minimumCents > 0, {
-    /*
-     * UN MINIMO DE CERO CONVIERTE EL SERVICIO EN GRATIS para una casa
-     * pequena sin extras. El motor aplica el minimo como suelo; sin suelo,
-     * el suelo es cero.
-     */
-    /*
-     * EL MENSAJE ES UNA CLAVE DE TRADUCCION, no una frase. Es la misma
-     * leccion que dejaron los ajustes del negocio: un mensaje escrito en el
-     * contrato acaba apareciendo en espanol en un panel en ingles, porque
-     * el contrato no sabe quien lo esta leyendo.
-     */
-    message: 'admin.rates.errMinimumZero',
-    path: ['minimumCents'],
-  });
-export type EditableServiceRate = z.infer<typeof EditableServiceRateSchema>;
+export const FrequencyRateSchema = z.strictObject({
+  flatCents: z.number().int().min(1).max(MAX_TARIFA_CENTS),
+  /** `null` cuando ese servicio no mira el tamano de la casa. */
+  centsPerSquareFoot: z.number().min(0).max(MAX_CENTS_POR_PIE).nullable(),
+});
+export type FrequencyRate = z.infer<typeof FrequencyRateSchema>;
 
 /**
- * El precio de un extra.
+ * Lo que cuesta un servicio en cada cadencia.
  *
- * No lleva `unit`: ver la cabecera. La cantidad maxima si es editable porque
- * es un limite operativo —cuantas ventanas se pueden hacer en una visita— y
- * eso cambia con el tamano del equipo.
+ * `null` significa QUE NO SE OFRECE ASI, y no es lo mismo que un precio
+ * alto: una limpieza profunda no se contrata cada semana porque la casa ya
+ * esta profunda. El cotizador responde distinto a cada cosa —«elige otra
+ * frecuencia» frente a «te llamamos»—, asi que la diferencia tiene que
+ * existir en el contrato.
  */
+export const ServiceRatesSchema = z
+  .strictObject({
+    ONE_TIME: FrequencyRateSchema.nullable(),
+    WEEKLY: FrequencyRateSchema.nullable(),
+    BIWEEKLY: FrequencyRateSchema.nullable(),
+    MONTHLY: FrequencyRateSchema.nullable(),
+  })
+  .refine((tarifas) => tarifas.ONE_TIME !== null, {
+    /*
+     * SIEMPRE TIENE QUE PODERSE CONTRATAR UNA VEZ. Sin la puntual, un
+     * servicio marcado con precio automatico solo se podria contratar
+     * comprometiendose de antemano, y el cotizador daria «elige otra
+     * frecuencia» a quien solo quiere una limpieza.
+     */
+    message: 'admin.rates.errOneTimeRequired',
+    path: ['ONE_TIME'],
+  })
+  .refine((tarifas) => enOrden(tarifas, (t) => t.flatCents), {
+    /*
+     * A MAS COMPROMISO, NUNCA MAS CARO. Cada numero por separado es valido y
+     * el conjunto no significa nada: quien se compromete a una limpieza
+     * semanal pagaria mas que quien viene una vez. Se pierde dinero en cada
+     * reserva recurrente y no lo delata ninguna pantalla.
+     */
+    message: 'admin.rates.errFrequencyOrder',
+    path: ['WEEKLY'],
+  })
+  .refine((tarifas) => enOrden(tarifas, (t) => t.centsPerSquareFoot ?? 0), {
+    message: 'admin.rates.errFrequencyOrder',
+    path: ['WEEKLY'],
+  });
+export type ServiceRates = z.infer<typeof ServiceRatesSchema>;
+
+/**
+ * Que las cadencias ofrecidas no suban de precio al hacerse mas frecuentes.
+ *
+ * Se comparan SOLO LAS OFRECIDAS: un hueco en medio —profunda puntual y
+ * semanal, sin mensual— es raro pero no es incoherente, y rechazarlo seria
+ * inventarse una regla que el negocio no pidio.
+ */
+function enOrden(
+  tarifas: Record<string, FrequencyRate | null>,
+  valor: (tarifa: FrequencyRate) => number,
+): boolean {
+  // De menos compromiso a mas: cada una tiene que ser <= que la anterior.
+  const orden = ['ONE_TIME', 'MONTHLY', 'BIWEEKLY', 'WEEKLY'] as const;
+  let tope = Number.POSITIVE_INFINITY;
+
+  for (const cadencia of orden) {
+    const tarifa = tarifas[cadencia];
+    if (!tarifa) continue;
+    const actual = valor(tarifa);
+    if (actual > tope) return false;
+    tope = actual;
+  }
+
+  return true;
+}
+
+/** El precio de un extra. El tipo de unidad no es editable: es producto. */
 export const EditableAddOnRateSchema = z.strictObject({
   unitAmountCents: z.number().int().min(0).max(MAX_EXTRA_CENTS),
   maxQuantity: z.number().int().min(1).max(MAX_CANTIDAD_EXTRA),
@@ -146,56 +220,24 @@ export const EditableAddOnRateSchema = z.strictObject({
 export type EditableAddOnRate = z.infer<typeof EditableAddOnRateSchema>;
 
 /**
- * Descuentos por recurrencia.
+ * El coste del traslado.
  *
- * `ONE_TIME` es literalmente cero y no un campo: un servicio que no se
- * repite no tiene descuento por repetirse. Dejarlo editable solo permitiria
- * ponerle uno por error.
+ * Dentro del radio no se cobra nada, y es una promesa comercial que se dice
+ * en una frase. Por encima se cobran las millas que sobran, no un escalon:
+ * con franjas, dos casas separadas por una milla podian pagar veinticinco
+ * dolares de diferencia por caer a un lado u otro de una raya invisible.
  */
-export const FrequencyDiscountsSchema = z
-  .strictObject({
-    weeklyPercent: z.number().int().min(0).max(MAX_DESCUENTO_PORCENTAJE),
-    biweeklyPercent: z.number().int().min(0).max(MAX_DESCUENTO_PORCENTAJE),
-    monthlyPercent: z.number().int().min(0).max(MAX_DESCUENTO_PORCENTAJE),
-  })
-  .refine((d) => d.weeklyPercent >= d.biweeklyPercent && d.biweeklyPercent >= d.monthlyPercent, {
-    /*
-     * A MAS FRECUENCIA, MAS DESCUENTO. Al reves cada numero es valido por
-     * separado y el conjunto no significa nada: quien se compromete a una
-     * limpieza semanal pagaria proporcionalmente mas que quien viene una vez
-     * al mes. Se pierde dinero en cada reserva recurrente y no lo delata
-     * ninguna pantalla.
-     */
-    message: 'admin.rates.errDiscountOrder',
-    path: ['weeklyPercent'],
-  });
-export type FrequencyDiscounts = z.infer<typeof FrequencyDiscountsSchema>;
-
-/**
- * La regla del deposito: lo que se RETIENE en la tarjeta al reservar, que no
- * es lo que se cobra.
- */
-export const EditableDepositRuleSchema = z
-  .strictObject({
-    baseCents: CargoSchema,
-    /** Millas sin recargo alrededor de la base de operaciones. */
-    freeRadiusMiles: z.number().int().min(0).max(MAX_RADIO_MILLAS),
-    /** Si se cobran las millas de ida y vuelta. */
-    roundTrip: z.boolean(),
-    minCents: CargoSchema,
-    maxCents: CargoSchema,
-  })
-  .refine((d) => d.minCents <= d.maxCents, {
-    /*
-     * El deposito calculado se recorta a este intervalo. Con el minimo por
-     * encima del maximo el recorte no tiene solucion, y lo que salga
-     * dependera del orden en que se apliquen: un fallo que da cifras
-     * distintas sin fallar por ningun sitio.
-     */
-    message: 'admin.rates.errDepositRange',
-    path: ['minCents'],
-  });
-export type EditableDepositRule = z.infer<typeof EditableDepositRuleSchema>;
+export const EditableTravelRuleSchema = z.strictObject({
+  freeRadiusMiles: z.number().int().min(0).max(MAX_RADIO_MILLAS),
+  roundTrip: z.boolean(),
+  /**
+   * `null` usa la tarifa vigente del IRS, que es una cifra oficial y
+   * publicada: ante un cliente que discute el recargo hay algo que ensenar
+   * que no se ha inventado la empresa.
+   */
+  centsPerMile: z.number().min(0).max(MAX_CENTS_POR_MILLA).nullable(),
+});
+export type EditableTravelRule = z.infer<typeof EditableTravelRuleSchema>;
 
 /* -------------------------------------------------------------------------- */
 /*  La tabla entera                                                           */
@@ -204,15 +246,19 @@ export type EditableDepositRule = z.infer<typeof EditableDepositRuleSchema>;
 /**
  * Todo lo editable, junto.
  *
- * VA ENTERA Y NO POR PIEZAS. Igual que el area de servicio: las invariantes
- * son sobre el CONJUNTO —que el descuento semanal no baje del mensual— y no
- * se pueden comprobar sobre un cambio suelto.
+ * VA ENTERA Y NO POR PIEZAS: las invariantes son sobre el CONJUNTO —que el
+ * precio no suba al aumentar la frecuencia— y no se pueden comprobar sobre
+ * un cambio suelto.
  */
 export const PricingRatesSchema = z.strictObject({
-  services: z.record(EditableServiceTypeSchema, EditableServiceRateSchema),
-  addOns: z.record(AddOnCodeSchema, EditableAddOnRateSchema),
-  frequencyDiscounts: FrequencyDiscountsSchema,
-  deposit: EditableDepositRuleSchema,
+  services: z.record(EditableServiceTypeSchema, ServiceRatesSchema),
+  addOns: z.record(OfferedAddOnCodeSchema, EditableAddOnRateSchema),
+  /**
+   * Lo que se retiene al reservar, en centavos. Se descuenta del total: NO
+   * es un cargo extra.
+   */
+  depositCents: z.number().int().min(1).max(MAX_TARIFA_CENTS),
+  travel: EditableTravelRuleSchema,
 });
 export type PricingRates = z.infer<typeof PricingRatesSchema>;
 

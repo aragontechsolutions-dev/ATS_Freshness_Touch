@@ -77,10 +77,11 @@ export function Services() {
                 </p>
 
                 <p className="mt-5 text-sm font-semibold text-brand-700 dark:text-brand-300">
+                  {/* El «desde X» sale de la tarifa mas barata que se ofrezca: el minimo facturable ya no existe. */}
                   {entry === undefined
                     ? ' '
-                    : entry.instantQuote
-                      ? `${t('services.startingAt')} ${formatCentsCompact(entry.minimumCents, locale)}`
+                    : entry.instantQuote && entry.fromCents !== null
+                      ? `${t('services.startingAt')} ${formatCentsCompact(entry.fromCents, locale)}`
                       : t('services.requiresVisit')}
                 </p>
               </Reveal>

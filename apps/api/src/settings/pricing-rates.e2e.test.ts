@@ -83,11 +83,12 @@ async function guardar(rates: unknown, token?: string) {
 }
 
 /** Una cotizacion normal, para ver el precio que sale de verdad. */
-async function cotizar(servicio = 'STANDARD') {
+async function cotizar(servicio = 'STANDARD', frecuencia = 'ONE_TIME') {
   return request(app.getHttpServer())
     .post('/api/v1/quotes/estimate')
     .send({
       service: servicio,
+      frequency: frecuencia,
       bedrooms: 2,
       bathrooms: 1,
       squareFeet: 1200,
@@ -147,9 +148,11 @@ describe('quien puede tocar los precios', () => {
 
     expect(respuesta.status).toBe(200);
     expect(AdminPricingRatesSchema.safeParse(respuesta.body).success).toBe(true);
-    expect(respuesta.body.rates.services.STANDARD.baseCents).toBe(
-      defaultPricingConfig.services.STANDARD.baseCents,
+    expect(respuesta.body.rates.services.STANDARD.ONE_TIME.flatCents).toBe(
+      defaultPricingConfig.services.STANDARD.byFrequency.ONE_TIME?.flatCents,
     );
+    // La profunda solo se contrata puntual: ver `config.ts`.
+    expect(respuesta.body.rates.services.DEEP.WEEKLY).toBeNull();
   });
 
   /*
@@ -206,7 +209,11 @@ describe('el cambio llega al cotizador', () => {
 
     await guardar(
       conCambio((r) => {
-        r.services.STANDARD.baseCents += 5000; // 50 $ mas
+        // 50 $ mas en TODAS las cadencias: el contrato exige que el precio
+        // no suba al aumentar la frecuencia, asi que se mueven a la vez.
+        for (const tarifa of Object.values(r.services.STANDARD)) {
+          if (tarifa) tarifa.flatCents += 5000;
+        }
         return r;
       }),
     );
@@ -216,20 +223,45 @@ describe('el cambio llega al cotizador', () => {
     expect(despues.body.totals.totalCents).toBe(antes.body.totals.totalCents + 5000);
   });
 
-  it('subir el descuento semanal se ve en el catalogo publico', async () => {
+  /*
+   * LA RECURRENCIA YA NO ES UN PORCENTAJE, ES SU PROPIA TARIFA. Se anuncia
+   * «120 a la semana», no «185 menos un 35 %», asi que lo que tiene que
+   * viajar al catalogo es el precio de cada cadencia.
+   */
+  it('bajar la tarifa semanal se ve en el catalogo publico', async () => {
     await guardar(
       conCambio((r) => {
-        r.frequencyDiscounts.weeklyPercent = 20;
+        const semanal = r.services.STANDARD.WEEKLY;
+        if (semanal) semanal.flatCents = 9900;
         return r;
       }),
     );
 
     const catalogo = await request(app.getHttpServer()).get('/api/v1/pricing/catalog');
-    const semanal = catalogo.body.frequencies.find(
-      (f: { code: string }) => f.code === 'WEEKLY',
-    ) as { discountPercent: number };
+    const estandar = catalogo.body.services.find(
+      (servicio: { code: string }) => servicio.code === 'STANDARD',
+    ) as { rates: Record<string, { flatCents: number } | null>; fromCents: number };
 
-    expect(semanal.discountPercent).toBe(20);
+    expect(estandar.rates.WEEKLY?.flatCents).toBe(9900);
+    // Y el «desde» de la pagina de servicios lo sigue: se calcula, no se fija.
+    expect(estandar.fromCents).toBe(9900);
+  });
+
+  it('el traslado se cobra con la tarifa por milla que se guarde', async () => {
+    await guardar(
+      conCambio((r) => {
+        r.travel = { freeRadiusMiles: 0, roundTrip: false, centsPerMile: 100 };
+        return r;
+      }),
+    );
+
+    const catalogo = await request(app.getHttpServer()).get('/api/v1/pricing/catalog');
+
+    expect(catalogo.body.travel).toMatchObject({
+      freeRadiusMiles: 0,
+      roundTrip: false,
+      centsPerMile: 100,
+    });
   });
 
   it('la version que se congela en cada reserva es la de la tabla vigente', async () => {
@@ -246,7 +278,7 @@ describe('el cambio llega al cotizador', () => {
      */
     const respuesta = await guardar(
       conCambio((r) => {
-        r.services.STANDARD.baseCents += 100;
+        r.depositCents += 100;
         return r;
       }),
     );
@@ -278,13 +310,15 @@ describe('el historial', () => {
 
     const primera = await guardar(
       conCambio((r) => {
-        r.services.DEEP.baseCents = 10_000;
+        const puntual = r.services.DEEP.ONE_TIME;
+        if (puntual) puntual.flatCents = 10_000;
         return r;
       }),
     );
     const segunda = await guardar(
       conCambio((r) => {
-        r.services.DEEP.baseCents = 11_000;
+        const puntual = r.services.DEEP.ONE_TIME;
+        if (puntual) puntual.flatCents = 11_000;
         return r;
       }),
     );
@@ -304,20 +338,22 @@ describe('el historial', () => {
      */
     const vieja = await guardar(
       conCambio((r) => {
-        r.services.DEEP.baseCents = 10_000;
+        const puntual = r.services.DEEP.ONE_TIME;
+        if (puntual) puntual.flatCents = 10_000;
         return r;
       }),
     );
     await guardar(
       conCambio((r) => {
-        r.services.DEEP.baseCents = 11_000;
+        const puntual = r.services.DEEP.ONE_TIME;
+        if (puntual) puntual.flatCents = 11_000;
         return r;
       }),
     );
 
     const config = await app.get(PricingConfigService).atVersion(vieja.body.version as string);
 
-    expect(config?.services.DEEP.baseCents).toBe(10_000);
+    expect(config?.services.DEEP.byFrequency.ONE_TIME?.flatCents).toBe(10_000);
     expect(config?.version).toBe(vieja.body.version);
   });
 
@@ -340,10 +376,11 @@ describe('el historial', () => {
 });
 
 describe('lo que el contrato no deja pasar', () => {
-  it('rechaza un cargo base con un cero de mas', async () => {
+  it('rechaza un importe con un cero de mas', async () => {
     const respuesta = await guardar(
       conCambio((r) => {
-        r.services.STANDARD.baseCents = 99_999_999;
+        const puntual = r.services.STANDARD.ONE_TIME;
+        if (puntual) puntual.flatCents = 99_999_999;
         return r;
       }),
     );
@@ -351,10 +388,31 @@ describe('lo que el contrato no deja pasar', () => {
     expect(respuesta.status).toBe(400);
   });
 
-  it('rechaza que el descuento baje al aumentar la frecuencia', async () => {
+  /*
+   * Quien se compromete a una limpieza semanal no puede pagar mas que quien
+   * viene una vez: se pierde la venta recurrente entera y no lo delata nada.
+   */
+  it('rechaza que el precio suba al aumentar la frecuencia', async () => {
     const respuesta = await guardar(
       conCambio((r) => {
-        r.frequencyDiscounts = { weeklyPercent: 5, biweeklyPercent: 10, monthlyPercent: 15 };
+        const semanal = r.services.STANDARD.WEEKLY;
+        if (semanal) semanal.flatCents = 99_000;
+        return r;
+      }),
+    );
+
+    expect(respuesta.status).toBe(400);
+  });
+
+  it('rechaza dejar un servicio sin tarifa puntual', async () => {
+    /*
+     * Sin la puntual, un servicio con precio automatico solo se podria
+     * contratar comprometiendose de antemano, y el cotizador responderia
+     * «elige otra frecuencia» a quien solo quiere una limpieza.
+     */
+    const respuesta = await guardar(
+      conCambio((r) => {
+        r.services.STANDARD.ONE_TIME = null;
         return r;
       }),
     );
@@ -368,13 +426,25 @@ describe('lo que el contrato no deja pasar', () => {
       services: {
         ...PARTIDA.services,
         COMMERCIAL: {
-          baseCents: 5000,
-          perBedroomCents: 0,
-          perBathroomCents: 0,
-          centsPerSquareFoot: 0,
-          minimumCents: 1000,
+          ONE_TIME: { flatCents: 5000, centsPerSquareFoot: null },
+          MONTHLY: null,
+          BIWEEKLY: null,
+          WEEKLY: null,
         },
       },
+    });
+
+    expect(respuesta.status).toBe(400);
+  });
+
+  it('rechaza tarifar un extra que ya no se ofrece', async () => {
+    /*
+     * Su codigo sigue existiendo para releer presupuestos antiguos, pero
+     * ponerle precio lo devolveria al catalogo por la puerta de atras.
+     */
+    const respuesta = await guardar({
+      ...PARTIDA,
+      addOns: { ...PARTIDA.addOns, LAUNDRY: { unitAmountCents: 2000, maxQuantity: 6 } },
     });
 
     expect(respuesta.status).toBe(400);
@@ -385,7 +455,8 @@ describe('lo que el contrato no deja pasar', () => {
 
     await guardar(
       conCambio((r) => {
-        r.services.STANDARD.baseCents = 99_999_999;
+        const puntual = r.services.STANDARD.ONE_TIME;
+        if (puntual) puntual.flatCents = 99_999_999;
         return r;
       }),
     );
@@ -399,7 +470,8 @@ describe('la auditoria', () => {
   it('registra QUE cambio, no un volcado de la tabla entera', async () => {
     await guardar(
       conCambio((r) => {
-        r.services.DEEP.baseCents = 12_345;
+        const puntual = r.services.DEEP.ONE_TIME;
+        if (puntual) puntual.flatCents = 12_345;
         return r;
       }),
     );
@@ -411,13 +483,13 @@ describe('la auditoria', () => {
     expect(filas.rows).toHaveLength(1);
 
     const metadata = String(filas.rows[0]?.metadata);
-    expect(metadata).toContain('DEEP.base');
+    expect(metadata).toContain('DEEP.ONE_TIME.importe');
     expect(metadata).toContain('12345');
     /*
      * Y NO los cuarenta numeros que no se movieron. Un volcado en cada fila
      * no se lee, y la pregunta real es siempre «que subio y cuanto».
      */
-    expect(metadata).not.toContain('STANDARD.base');
+    expect(metadata).not.toContain('STANDARD');
   });
 
   it('tiene accion propia, distinta de la de los ajustes', async () => {

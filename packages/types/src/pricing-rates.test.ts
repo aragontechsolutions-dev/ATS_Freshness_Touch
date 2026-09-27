@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
   EDITABLE_SERVICE_TYPES,
-  EditableDepositRuleSchema,
-  EditableServiceRateSchema,
-  FrequencyDiscountsSchema,
+  EditableAddOnRateSchema,
+  EditableTravelRuleSchema,
+  FrequencyRateSchema,
+  OFFERED_ADD_ON_CODES,
   PricingRatesSchema,
+  QUOTE_ONLY_SERVICE_TYPES,
+  ServiceRatesSchema,
   nextPricingVersion,
   type PricingRates,
 } from './pricing-rates';
@@ -18,38 +21,36 @@ import {
  * se interpone entre un dedo y una factura absurda son estas reglas.
  */
 
-const TARIFA_VALIDA = {
-  baseCents: 6500,
-  perBedroomCents: 1200,
-  perBathroomCents: 1500,
-  centsPerSquareFoot: 3,
-  minimumCents: 12000,
+/** La estandar real: plana, y mas barata cuanto mas se repite. */
+const ESTANDAR = {
+  ONE_TIME: { flatCents: 18_500, centsPerSquareFoot: null },
+  MONTHLY: { flatCents: 15_000, centsPerSquareFoot: null },
+  BIWEEKLY: { flatCents: 13_500, centsPerSquareFoot: null },
+  WEEKLY: { flatCents: 12_000, centsPerSquareFoot: null },
+};
+
+/** La profunda real: solo puntual, y mirando los pies cuadrados. */
+const POR_TAMANO = {
+  ONE_TIME: { flatCents: 25_000, centsPerSquareFoot: 30 },
+  MONTHLY: null,
+  BIWEEKLY: null,
+  WEEKLY: null,
 };
 
 const RATES: PricingRates = {
-  services: Object.fromEntries(
-    EDITABLE_SERVICE_TYPES.map((tipo) => [tipo, TARIFA_VALIDA]),
-  ) as PricingRates['services'],
+  services: {
+    STANDARD: ESTANDAR,
+    DEEP: POR_TAMANO,
+    MOVE_IN_OUT: POR_TAMANO,
+  },
   addOns: {
-    INSIDE_FRIDGE: { unitAmountCents: 3500, maxQuantity: 1 },
-    INSIDE_OVEN: { unitAmountCents: 3500, maxQuantity: 1 },
-    INSIDE_CABINETS: { unitAmountCents: 4500, maxQuantity: 1 },
+    INSIDE_OVEN: { unitAmountCents: 5000, maxQuantity: 1 },
+    INSIDE_FRIDGE: { unitAmountCents: 5000, maxQuantity: 1 },
+    INSIDE_CABINETS: { unitAmountCents: 2500, maxQuantity: 1 },
     INTERIOR_WINDOWS: { unitAmountCents: 600, maxQuantity: 40 },
-    LAUNDRY: { unitAmountCents: 2000, maxQuantity: 6 },
-    BASEMENT: { unitAmountCents: 4000, maxQuantity: 1 },
-    GARAGE: { unitAmountCents: 4500, maxQuantity: 1 },
-    PET_HAIR: { unitAmountCents: 3000, maxQuantity: 1 },
-    PATIO: { unitAmountCents: 2500, maxQuantity: 1 },
-    BED_LINENS: { unitAmountCents: 1000, maxQuantity: 10 },
   },
-  frequencyDiscounts: { weeklyPercent: 15, biweeklyPercent: 10, monthlyPercent: 5 },
-  deposit: {
-    baseCents: 3000,
-    freeRadiusMiles: 20,
-    roundTrip: true,
-    minCents: 3000,
-    maxCents: 12000,
-  },
+  depositCents: 3500,
+  travel: { freeRadiusMiles: 35, roundTrip: true, centsPerMile: null },
 };
 
 describe('la tabla de partida vale', () => {
@@ -57,20 +58,19 @@ describe('la tabla de partida vale', () => {
     expect(PricingRatesSchema.safeParse(RATES).success).toBe(true);
   });
 
-  it('el comercial NO esta entre los editables', () => {
+  it('los servicios que se cotizan a mano NO estan entre los editables', () => {
     /*
-     * No tiene precio automatico: se visita y se propone a mano. Cualquier
-     * cifra que se pusiera no se usaria jamas, y un campo que no hace nada
-     * es peor que ninguno.
+     * Post-obra, rotacion de Airbnb y comercial se visitan y se proponen a
+     * mano. Cualquier cifra que se pusiera no se usaria jamas, y un campo
+     * que no hace nada es peor que ninguno.
      */
-    expect(EDITABLE_SERVICE_TYPES).not.toContain('COMMERCIAL');
+    for (const tipo of QUOTE_ONLY_SERVICE_TYPES) {
+      expect(EDITABLE_SERVICE_TYPES).not.toContain(tipo);
+    }
   });
 
   it('hacen falta TODOS los servicios editables', () => {
-    const incompleta = {
-      ...RATES,
-      services: { STANDARD: TARIFA_VALIDA },
-    };
+    const incompleta = { ...RATES, services: { STANDARD: ESTANDAR } };
 
     /*
      * Si faltara uno, el motor se quedaria con la tarifa del codigo para ese
@@ -80,13 +80,28 @@ describe('la tabla de partida vale', () => {
     expect(PricingRatesSchema.safeParse(incompleta).success).toBe(false);
   });
 
-  it('hacen falta TODOS los extras', () => {
+  it('hacen falta TODOS los extras que se ofrecen', () => {
     const incompleta = {
       ...RATES,
-      addOns: { INSIDE_FRIDGE: { unitAmountCents: 3500, maxQuantity: 1 } },
+      addOns: { INSIDE_OVEN: { unitAmountCents: 5000, maxQuantity: 1 } },
     };
 
     expect(PricingRatesSchema.safeParse(incompleta).success).toBe(false);
+  });
+
+  it('un extra retirado no se cuela en la tabla', () => {
+    /*
+     * Su codigo sigue existiendo para poder releer presupuestos antiguos,
+     * pero tarifarlo lo devolveria al catalogo por la puerta de atras.
+     */
+    expect(OFFERED_ADD_ON_CODES).not.toContain('LAUNDRY');
+
+    const conRetirado = {
+      ...RATES,
+      addOns: { ...RATES.addOns, LAUNDRY: { unitAmountCents: 2000, maxQuantity: 6 } },
+    };
+
+    expect(PricingRatesSchema.safeParse(conRetirado).success).toBe(false);
   });
 
   it('un campo de mas se rechaza, no se ignora', () => {
@@ -102,102 +117,183 @@ describe('la tabla de partida vale', () => {
 });
 
 describe('el cero de mas', () => {
-  it('rechaza un cargo base absurdo', () => {
+  it('rechaza un importe absurdo', () => {
     /*
      * ESTE ES EL FALLO REALISTA. No un precio negativo: un dedo que teclea
-     * 120000 donde iban 12000. Sin tope, la siguiente cotizacion sale a
-     * 1 200 $ y se descubre con la factura delante.
+     * 1850000 donde iban 18500. Sin tope, la siguiente cotizacion sale a
+     * 18 500 $ y se descubre con la factura delante.
      */
-    const resultado = EditableServiceRateSchema.safeParse({
-      ...TARIFA_VALIDA,
-      baseCents: 99_999_999,
-    });
-
-    expect(resultado.success).toBe(false);
+    expect(
+      FrequencyRateSchema.safeParse({ flatCents: 99_999_999, centsPerSquareFoot: null }).success,
+    ).toBe(false);
   });
 
   it('rechaza un precio negativo', () => {
     expect(
-      EditableServiceRateSchema.safeParse({ ...TARIFA_VALIDA, perBedroomCents: -100 }).success,
+      FrequencyRateSchema.safeParse({ flatCents: -100, centsPerSquareFoot: null }).success,
     ).toBe(false);
+  });
+
+  it('el importe plano no puede ser cero', () => {
+    /*
+     * Es el suelo del precio: con cero, una casa pequena de un servicio sin
+     * precio por pie saldria gratis.
+     */
+    expect(FrequencyRateSchema.safeParse({ flatCents: 0, centsPerSquareFoot: null }).success).toBe(
+      false,
+    );
   });
 
   it('acepta decimales solo en el precio por pie cuadrado', () => {
     /*
-     * Los demas son importes que se cobran tal cual y medio centavo no
-     * existe. Este se multiplica por los pies antes de redondear, y la
-     * diferencia entre 3 y 4 en una casa de 2 000 pies son veinte dolares.
+     * El plano se cobra tal cual y medio centavo no existe. Este se
+     * multiplica por los pies antes de redondear, y la diferencia entre 30 y
+     * 31 centavos en una casa de 2 000 pies son veinte dolares.
      */
     expect(
-      EditableServiceRateSchema.safeParse({ ...TARIFA_VALIDA, centsPerSquareFoot: 3.5 }).success,
+      FrequencyRateSchema.safeParse({ flatCents: 25_000, centsPerSquareFoot: 30.5 }).success,
     ).toBe(true);
     expect(
-      EditableServiceRateSchema.safeParse({ ...TARIFA_VALIDA, baseCents: 6500.5 }).success,
+      FrequencyRateSchema.safeParse({ flatCents: 18_500.5, centsPerSquareFoot: null }).success,
     ).toBe(false);
   });
 
-  it('el importe minimo no puede ser cero', () => {
-    /*
-     * El motor aplica el minimo como suelo. Sin suelo, el suelo es cero: una
-     * casa pequena sin extras saldria gratis.
-     */
-    expect(EditableServiceRateSchema.safeParse({ ...TARIFA_VALIDA, minimumCents: 0 }).success).toBe(
-      false,
-    );
+  it('el deposito no puede ser cero', () => {
+    // Sin garantia no hay nada que retener: la regla dejaria de existir.
+    expect(PricingRatesSchema.safeParse({ ...RATES, depositCents: 0 }).success).toBe(false);
   });
 });
 
 describe('lo que no significa nada aunque cada numero valga', () => {
-  it('el descuento no puede bajar al aumentar la frecuencia', () => {
+  it('siempre tiene que poderse contratar una vez', () => {
     /*
-     * Quince por ciento al mes y cinco a la semana: los dos numeros son
-     * validos. Juntos significan que quien se compromete a una limpieza
-     * semanal paga proporcionalmente mas que quien viene una vez al mes. Se
-     * pierde dinero en cada reserva recurrente y no lo delata nada.
+     * Sin la puntual, un servicio con precio automatico solo se podria
+     * contratar comprometiendose de antemano, y el cotizador respondería
+     * «elige otra frecuencia» a quien solo quiere una limpieza.
      */
-    const alReves = { weeklyPercent: 5, biweeklyPercent: 10, monthlyPercent: 15 };
+    const sinPuntual = { ...ESTANDAR, ONE_TIME: null };
 
-    expect(FrequencyDiscountsSchema.safeParse(alReves).success).toBe(false);
+    expect(ServiceRatesSchema.safeParse(sinPuntual).success).toBe(false);
   });
 
-  it('descuentos iguales sí valen', () => {
-    // No es raro: la misma promoción para todas las recurrencias.
-    const iguales = { weeklyPercent: 10, biweeklyPercent: 10, monthlyPercent: 10 };
+  it('el precio no puede SUBIR al aumentar la frecuencia', () => {
+    /*
+     * 120 $ la puntual y 185 $ la semanal: los dos numeros son validos.
+     * Juntos significan que quien se compromete a una limpieza semanal paga
+     * mas que quien viene una vez. Se pierde la venta recurrente entera y no
+     * lo delata nada.
+     */
+    const alReves = {
+      ONE_TIME: { flatCents: 12_000, centsPerSquareFoot: null },
+      MONTHLY: { flatCents: 13_500, centsPerSquareFoot: null },
+      BIWEEKLY: { flatCents: 15_000, centsPerSquareFoot: null },
+      WEEKLY: { flatCents: 18_500, centsPerSquareFoot: null },
+    };
 
-    expect(FrequencyDiscountsSchema.safeParse(iguales).success).toBe(true);
+    expect(ServiceRatesSchema.safeParse(alReves).success).toBe(false);
   });
 
-  it('rechaza un descuento por encima de la mitad', () => {
+  it('el precio por pie cuadrado se vigila igual que el plano', () => {
+    const alReves = {
+      ONE_TIME: { flatCents: 25_000, centsPerSquareFoot: 14 },
+      MONTHLY: { flatCents: 15_000, centsPerSquareFoot: 18 },
+      BIWEEKLY: null,
+      WEEKLY: null,
+    };
+
+    expect(ServiceRatesSchema.safeParse(alReves).success).toBe(false);
+  });
+
+  it('precios iguales en todas las cadencias SI valen', () => {
+    // No es raro: un servicio que no premia el compromiso.
+    const iguales = {
+      ONE_TIME: { flatCents: 15_000, centsPerSquareFoot: null },
+      MONTHLY: { flatCents: 15_000, centsPerSquareFoot: null },
+      BIWEEKLY: { flatCents: 15_000, centsPerSquareFoot: null },
+      WEEKLY: { flatCents: 15_000, centsPerSquareFoot: null },
+    };
+
+    expect(ServiceRatesSchema.safeParse(iguales).success).toBe(true);
+  });
+
+  it('un hueco en medio vale: se comparan solo las cadencias ofrecidas', () => {
+    /*
+     * Puntual y semanal sin mensual es raro, pero no es incoherente.
+     * Rechazarlo seria inventarse una regla que el negocio no pidio.
+     */
+    const conHueco = {
+      ONE_TIME: { flatCents: 18_500, centsPerSquareFoot: null },
+      MONTHLY: null,
+      BIWEEKLY: null,
+      WEEKLY: { flatCents: 12_000, centsPerSquareFoot: null },
+    };
+
+    expect(ServiceRatesSchema.safeParse(conHueco).success).toBe(true);
+  });
+
+  it('solo puntual vale: es el caso de la profunda', () => {
+    expect(ServiceRatesSchema.safeParse(POR_TAMANO).success).toBe(true);
+  });
+});
+
+describe('el traslado', () => {
+  it('la tarifa por milla puede quedar en null: entonces manda el IRS', () => {
+    /*
+     * Es una cifra oficial y publicada: ante un cliente que discute el
+     * recargo hay algo que ensenar que no se ha inventado la empresa.
+     */
     expect(
-      FrequencyDiscountsSchema.safeParse({
-        weeklyPercent: 80,
-        biweeklyPercent: 10,
-        monthlyPercent: 5,
+      EditableTravelRuleSchema.safeParse({
+        freeRadiusMiles: 35,
+        roundTrip: true,
+        centsPerMile: null,
+      }).success,
+    ).toBe(true);
+  });
+
+  it('rechaza una tarifa por milla de mudanza', () => {
+    expect(
+      EditableTravelRuleSchema.safeParse({
+        freeRadiusMiles: 35,
+        roundTrip: true,
+        centsPerMile: 900,
       }).success,
     ).toBe(false);
   });
 
-  it('el minimo del deposito no puede superar al maximo', () => {
-    /*
-     * El deposito calculado se recorta a ese intervalo. Invertido, el
-     * recorte no tiene solucion y el resultado depende del orden en que se
-     * apliquen los dos limites: cifras distintas sin fallar por ningun
-     * sitio.
-     */
-    const invertido = { ...RATES.deposit, minCents: 20000, maxCents: 5000 };
-
-    expect(EditableDepositRuleSchema.safeParse(invertido).success).toBe(false);
+  it('el radio libre puede ser cero: cobrar desde la puerta es legitimo', () => {
+    expect(
+      EditableTravelRuleSchema.safeParse({
+        freeRadiusMiles: 0,
+        roundTrip: false,
+        centsPerMile: 70,
+      }).success,
+    ).toBe(true);
   });
 
-  it('el deposito base SI puede quedar por debajo del minimo', () => {
-    /*
-     * Es legitimo y hay que dejarlo pasar: la base es un componente del
-     * calculo, no el resultado. Lo que se recorta al intervalo es el total,
-     * ya con el recargo por distancia.
-     */
-    const bajo = { ...RATES.deposit, baseCents: 1000, minCents: 3000, maxCents: 12000 };
+  it('el radio libre no puede ser mas grande que el estado', () => {
+    expect(
+      EditableTravelRuleSchema.safeParse({
+        freeRadiusMiles: 5000,
+        roundTrip: true,
+        centsPerMile: null,
+      }).success,
+    ).toBe(false);
+  });
+});
 
-    expect(EditableDepositRuleSchema.safeParse(bajo).success).toBe(true);
+describe('los extras', () => {
+  it('un extra puede costar cero: se regala, no se retira', () => {
+    expect(EditableAddOnRateSchema.safeParse({ unitAmountCents: 0, maxQuantity: 1 }).success).toBe(
+      true,
+    );
+  });
+
+  it('la cantidad maxima nunca es cero', () => {
+    // Con cero, el extra se ofrece y luego no se cobra: peor que retirarlo.
+    expect(
+      EditableAddOnRateSchema.safeParse({ unitAmountCents: 600, maxQuantity: 0 }).success,
+    ).toBe(false);
   });
 });
 

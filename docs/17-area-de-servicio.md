@@ -64,18 +64,23 @@ pierde un cliente que sí se podía atender.
 
 ## 3. Las zonas de partida
 
-| Zona           | Hasta      | Recargo | Precio automático |
-| -------------- | ---------- | ------- | ----------------- |
-| A              | 20 mi      | —       | Sí                |
-| B              | 35 mi      | $25     | Sí                |
-| C              | 50 mi      | $50     | Sí                |
-| D              | 60 mi      | $75     | Sí                |
-| **E**          | **325 mi** | —       | **No**            |
-| `OUT_OF_RANGE` | más allá   | —       | No se atiende     |
+Tres bandas desde la Etapa 2.23. Antes eran cinco anillos con recargo propio;
+el porqué del cambio está en `docs/21-modelo-de-operaciones.md` §2.
 
-Las cuatro primeras son **exactamente las que ya estaban** en el código: esta
-etapa amplía la cobertura, **no cambia ningún precio vigente**. `E` es lo
-nuevo.
+| Zona           | Hasta      | Traslado               | Precio automático |
+| -------------- | ---------- | ---------------------- | ----------------- |
+| A              | 35 mi      | **No se cobra**        | Sí                |
+| B              | 60 mi      | Por milla desde las 35 | Sí                |
+| C              | **325 mi** | Se calcula en persona  | **No**            |
+| `OUT_OF_RANGE` | más allá   | —                      | No se atiende     |
+
+**Las 35 millas de la zona A son el radio sin recargo**, y no es casualidad:
+la frontera que el cliente nota es «me cobras el viaje o no», así que la zona
+y el radio tienen que coincidir. El día que se muevan por separado, el mapa
+dirá una cosa y la factura otra.
+
+`D` y `E` siguen en el enumerado aunque el área de partida ya no las use:
+**están escritas en reservas que ya existen**.
 
 `OUT_OF_RANGE` **no se configura desde el panel**, y es deliberado: no es una
 zona, es lo que hay más allá de la última. Ofrecerla para editar invitaría a
@@ -85,7 +90,15 @@ marcarla como atendida, que es una contradicción con nombre propio.
 
 ## 4. Qué se puede editar y qué no
 
-Se editan **los límites, los recargos y si cada zona da precio automático**.
+Se editan **los límites en millas y si cada zona da precio automático**.
+
+> **El recargo por zona ya no existe.** Lo tuvo —25, 50 y 75 dólares por
+> franja— y se quitó en la Etapa 2.23: dos casas separadas por una milla
+> podían pagar veinticinco dólares de diferencia por caer a un lado u otro de
+> una raya que el cliente no ve. El traslado se cobra ahora **por milla** a
+> partir del radio incluido (`docs/21-modelo-de-operaciones.md` §1.3), y lo
+> único que deciden las zonas es hasta dónde se va y hasta dónde el precio
+> sale solo.
 
 **No se puede inventar zonas.** El conjunto de códigos (`A`…`E`) es fijo
 porque **se guarda en cada reserva**: si se pudieran crear zonas, el histórico
@@ -96,12 +109,12 @@ el pasado sería fiable.
 
 El contrato las comprueba, y cada una evita un problema concreto:
 
-| Regla                                       | Qué evita                                                                                                                                                       |
-| ------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Los códigos van en orden y sin saltos       | El motor recorre la lista y se queda con la primera zona que alcanza la distancia: desordenada, asignaría **el recargo equivocado sin fallar por ningún sitio** |
-| Cada anillo llega más lejos que el anterior | Un tramo que nunca se alcanza: un recargo configurado que no se aplica jamás                                                                                    |
-| El precio automático no vuelve              | Si a 50 millas hay que dar precio en persona, a 200 también. Lo contrario deja al cotizador dando cifras más lejos de donde ya dijo que no puede                |
-| Sin precio automático no hay recargo        | Un número que no se cobra nunca y que hace creer que sí                                                                                                         |
+| Regla                                                | Qué evita                                                                                                                                                                                          |
+| ---------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Los códigos van en orden y sin saltos                | El motor recorre la lista y se queda con la primera zona que alcanza la distancia: desordenada, diría **que el precio se da en persona cuando sale solo, o al revés**, sin fallar por ningún sitio |
+| Cada anillo llega más lejos que el anterior          | Un tramo que nunca se alcanza: una zona configurada que no se asigna jamás                                                                                                                         |
+| El precio automático no vuelve                       | Si a 50 millas hay que dar precio en persona, a 200 también. Lo contrario deja al cotizador dando cifras más lejos de donde ya dijo que no puede                                                   |
+| La zona más cercana **siempre** da precio automático | Sin ella no habría cotizador: el sitio pediría los datos para no darle ninguna cifra a nadie, ni siquiera a quien vive al lado                                                                     |
 
 Hay además un **tope duro de 500 millas** por zona. No es manía: sin él, un
 cero de más convierte el área de servicio en medio país.
@@ -306,8 +319,14 @@ El mapa mentiría, y nadie lo notaría hasta que un cliente reclamara.
 
 - Solo administración lee y escribe. Coordinación recibe `403` en las dos.
 - **Las cuatro reglas del conjunto**, cada una con su caso: anillos que no
-  crecen, precio automático que vuelve, recargo en zona sin precio, y códigos
-  con saltos. Más el tope de distancia y los códigos inventados.
+  crecen, precio automático que vuelve, un área en la que ni la zona más
+  cercana da precio, y códigos con saltos. Más el tope de distancia y los
+  códigos inventados.
+- **Que una fila guardada con el recargo antiguo se siga leyendo.** El
+  contrato es estricto, así que sin limpiar el campo retirado esas filas
+  caerían enteras y la empresa volvería a las zonas de partida sin enterarse:
+  sus 60 millas configuradas se convertirían en 35, y con ellas el precio de
+  cada reserva posterior (`docs/21-modelo-de-operaciones.md` §2.1).
 - **Que el cambio llegue de verdad al cotizador**: se reduce el área y el
   catálogo público lo refleja. Es el punto de toda la etapa — si el área se
   guarda pero el cotizador sigue con la del código, no se ha sacado nada del
