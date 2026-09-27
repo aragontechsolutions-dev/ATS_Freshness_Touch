@@ -142,7 +142,11 @@ guardar, rotar y vigilar — y que, al ir en el navegador, **es pública por
 definición**. Para dibujar unos círculos sobre un estado, eso es pagar y
 arriesgar por nada.
 
-### Tres cosas que hubo que resolver
+Esa elección tiene una letra pequeña que conviene leer antes de darla por
+cerrada: **«Una advertencia que hay que tener escrita»**, más abajo en esta
+misma sección.
+
+### Tres cosas que hubo que resolver antes de publicar
 
 **1. La CSP bloqueaba las teselas.** `img-src` estaba en `'self' data:`, así
 que el mapa habría salido **gris en producción y perfecto en local** — ahí no
@@ -162,6 +166,83 @@ millas y la cobertura entera a 325. Encuadrado al estado completo, las cuatro
 zonas cercanas se apelotonan en un punto y no se distingue ninguna. Por eso el
 sitio ofrece **dos encuadres**: «todo el estado» (el que sale por defecto,
 porque es lo que la gente viene a comprobar) y «área con precio al instante».
+
+### Dos fallos que solo aparecieron en producción
+
+Los dos se reportaron desde el sitio publicado, y ninguno de los dos podía
+verse en local: uno depende de desplazar una página completa, el otro de una
+cabecera que solo pone Vercel.
+
+**4. El mapa se subía encima de la cabecera.** Leaflet pinta sus capas hasta
+`z-index` 700 y sus controles —el zoom, la atribución— en **1000**. La
+cabecera pegajosa está en 40 en el sitio y en 30 en el panel, así que al
+desplazar, el mapa le pasaba por encima.
+
+Subir la cabecera **no es el arreglo**: es una carrera que se pierde con el
+siguiente componente que traiga números altos. El arreglo es **encerrar** a
+Leaflet. En `.ft-map` y `.ft-map-hueco`:
+
+```css
+position: relative;
+isolation: isolate;
+z-index: 0;
+```
+
+Eso crea un **contexto de apilamiento**: los 1000 de Leaflet pasan a competir
+solo entre ellos, dentro de la caja, y la caja entera vale 0 frente al resto
+de la página. Se aplicó en las **dos** aplicaciones — el sitio tenía el mismo
+fallo latente aunque nadie lo hubiera reportado todavía.
+
+**5. El panel recibía 403 al pedir las teselas; el sitio no.** El mensaje era
+`App is not following the tile usage policy`. La diferencia entre las dos
+aplicaciones estaba en una cabecera de `vercel.json`:
+
+| Aplicación | `Referrer-Policy`                 | Teselas |
+| ---------- | --------------------------------- | ------- |
+| Sitio      | `strict-origin-when-cross-origin` | Cargan  |
+| Panel      | `no-referrer`                     | **403** |
+
+OpenStreetMap exige que una aplicación **se identifique**; sin referente, sus
+servidores la bloquean. Y `no-referrer` en el panel es lo correcto: es una
+herramienta interna, y sus rutas (`/admin/reservas/<id>`, por ejemplo) no
+tienen por qué salir a ningún sitio.
+
+Por eso se arregla **en la capa de teselas y no aflojando la cabecera**:
+
+```ts
+L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  referrerPolicy: 'strict-origin-when-cross-origin',
+  ...
+});
+```
+
+El atributo del elemento manda sobre la política del documento, así que
+**solo estas imágenes** envían referente, y `strict-origin` envía **solo el
+origen**, nunca la ruta. El panel conserva `no-referrer` para todo lo demás.
+
+### Una advertencia que hay que tener escrita
+
+El 403 se arregló, pero destapó algo más grande que conviene dejar por
+escrito antes de que muerda: **el servidor público de teselas de
+OpenStreetMap no está pensado para producción.** Lo mantiene la fundación con
+donaciones, y su política de uso lo reserva a desarrollo y a usos ligeros; se
+reserva el derecho a bloquear a cualquier aplicación, y eso es exactamente lo
+que le acaba de pasar al panel.
+
+Hoy funciona y la carga de este proyecto es mínima, así que no hay nada roto.
+Pero **es una dependencia prestada**: si un día deja de servir teselas, el
+mapa sale gris y no hay a quién reclamar. Las salidas, por orden de coste:
+
+| Salida                         | Clave de API | Coste         | Qué implica                                                                |
+| ------------------------------ | ------------ | ------------- | -------------------------------------------------------------------------- |
+| Seguir con OSM                 | No           | $0            | Lo de hoy. Puede bloquearse sin aviso                                      |
+| Esri (teselas ráster)          | No           | $0            | Sigue siendo Leaflet, solo cambia una URL. Sus condiciones hay que leerlas |
+| OpenFreeMap                    | No           | $0            | **Vectorial**: obliga a cambiar Leaflet por MapLibre GL                    |
+| MapTiler / Stadia / LocationIQ | **Sí**       | Capa gratuita | Clave pública en el navegador, hay que restringirla por dominio            |
+
+**La decisión es del negocio, no técnica**, y no se ha tomado en esta etapa.
+Cambiar de proveedor ráster es cambiar una URL y la atribución; pasar a
+vectorial es reescribir el componente.
 
 ### Detalles que parecen menores
 

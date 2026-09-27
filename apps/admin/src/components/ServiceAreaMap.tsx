@@ -104,6 +104,21 @@ export function ServiceAreaMap({
       maxZoom: 18,
       // Obligatoria por la licencia de OpenStreetMap, y ademas es de justicia.
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+      /*
+       * HAY QUE MANDAR DE DONDE VIENE LA PETICION, O NOS BLOQUEAN.
+       *
+       * OpenStreetMap exige que una aplicacion se identifique; si no, sus
+       * servidores responden 403 «App is not following the tile usage
+       * policy». Le paso al panel y al sitio no, y la diferencia estaba en
+       * una cabecera: el panel manda `Referrer-Policy: no-referrer` —que es
+       * lo correcto para una herramienta interna— y el sitio no.
+       *
+       * Se arregla AQUI y no aflojando esa cabecera: el atributo del
+       * elemento manda sobre la politica del documento, asi que solo estas
+       * imagenes envian referente, y solo el ORIGEN. La ruta que se estaba
+       * mirando en el panel no sale a ningun sitio.
+       */
+      referrerPolicy: 'strict-origin-when-cross-origin',
     }).addTo(instancia);
 
     /*
