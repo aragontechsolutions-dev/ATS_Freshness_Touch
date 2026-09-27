@@ -384,6 +384,13 @@ export const en = {
         'Invited on {{date}}. They can sign in once they open the emailed link and choose a password.',
       accessLinkedHelp: 'Has a linked account and can sign in to the panel.',
       invite: 'Invite to the panel',
+      resend: 'Resend invitation',
+      resendConfirm:
+        'They will get a new link to choose a password. The previous link stops working. Continue?',
+      resendSent: 'Invitation sent again.',
+      signsInWith: 'Signs in with {{email}}',
+      signsInWithHelp:
+        'Their contact address was changed after the account was created. Changing it here does not change the account, so this is the address they have to use to sign in.',
       inviteConfirm:
         'They will get an email to create a password and will be able to see every customer\u2019s details. Continue?',
       inviteUnavailable:
@@ -575,6 +582,7 @@ export const en = {
           created: 'Staff added',
           updated: 'Staff record changed',
           invited: 'Invited to the panel',
+          reinvited: 'Invitation sent again',
         },
         settings: {
           updated: 'Settings changed',
@@ -659,7 +667,10 @@ export const en = {
       'Not possible: the system would be left with no active administrator and nobody could get back in.',
     errorStaffSelfChange:
       'You cannot change your own role or deactivate yourself: you would lock yourself out.',
-    errorAlreadyInvited: 'That person already has a linked account.',
+    errorAlreadyInvited:
+      'That person already signs in normally, so there is nothing to send. If they forgot their password, they can request a link themselves from the sign-in screen.',
+    errorStaffAccountTaken:
+      'That email already has an account, and it belongs to another staff record. Check whether the same person was added twice.',
     errorInviteInactive: 'You cannot invite someone who is inactive.',
     errorInviteUnavailable: 'Invitation sending is not configured on this deployment.',
     errorInviteNotDelivered:

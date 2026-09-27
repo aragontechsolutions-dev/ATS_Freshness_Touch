@@ -20,7 +20,7 @@ import {
 } from '../lib/api';
 import { useToast } from './ToastProvider';
 import { SkeletonPersonal } from './Skeletons';
-import { PencilIcon, PlusIcon, SendIcon, SpinnerIcon, UsersIcon } from './Icons';
+import { KeyIcon, PencilIcon, PlusIcon, SendIcon, SpinnerIcon, UsersIcon } from './Icons';
 import { formatTimestamp } from '../lib/format';
 
 interface StaffDirectoryProps {
@@ -199,17 +199,25 @@ export function StaffDirectory({ staff, locale, onSessionLost }: StaffDirectoryP
 
   const invitar = async (persona: AdminStaffDirectoryItem): Promise<void> => {
     /*
-     * Se pregunta antes. Es la unica accion de este panel que reparte acceso
-     * a los datos de todos los clientes, y no tiene deshacer: la cuenta queda
-     * creada en el proveedor aunque luego se de de baja la ficha.
+     * Reenviar y invitar por primera vez usan la misma llamada, pero NO son
+     * la misma pregunta.
+     *
+     * La primera reparte acceso a los datos de todos los clientes y no tiene
+     * deshacer: la cuenta queda creada en el proveedor aunque luego se de de
+     * baja la ficha. La segunda no reparte nada nuevo —esa persona ya tenia
+     * acceso— pero invalida el enlace anterior, que es justo lo que hay que
+     * avisar si alguien lo tiene a medio abrir.
      */
-    if (!window.confirm(t('admin.staff.inviteConfirm'))) return;
+    const reenvio = persona.access !== 'NONE';
+    if (!window.confirm(t(reenvio ? 'admin.staff.resendConfirm' : 'admin.staff.inviteConfirm'))) {
+      return;
+    }
 
     setOcupado(true);
 
     try {
       asentar(await inviteStaff(persona.staffId));
-      toast.success('admin.staff.inviteSent');
+      toast.success(reenvio ? 'admin.staff.resendSent' : 'admin.staff.inviteSent');
     } catch (error) {
       fallo(error);
     } finally {
@@ -395,6 +403,30 @@ function Ficha({
             {persona.email}
             {persona.phone && ` · ${formatPhone(persona.phone)}`}
           </p>
+
+          {/*
+            EL AVISO QUE FALTABA, Y QUE COSTO UN INCIDENTE.
+
+            El correo de arriba es el de CONTACTO. Editarlo no cambia la
+            cuenta del proveedor, asi que puede no ser el correo con el que
+            esa persona inicia sesion. Cuando difieren, la pantalla lo dice:
+            sin esto se ve una direccion que parece la buena y con la que esa
+            persona no puede entrar, y no hay forma de darse cuenta mirando.
+
+            Solo aparece cuando de verdad difieren; el servidor manda nulo en
+            el caso normal.
+          */}
+          {persona.signInEmail !== null && (
+            <p className="mt-1 flex items-start gap-1.5 text-xs text-sun-800 dark:text-sun-300">
+              <KeyIcon className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+              <span>
+                <span className="font-semibold">
+                  {t('admin.staff.signsInWith', { email: persona.signInEmail })}
+                </span>{' '}
+                {t('admin.staff.signsInWithHelp')}
+              </span>
+            </p>
+          )}
           <p className="mt-1.5 text-xs text-slate-600 dark:text-slate-400">
             <span className="font-semibold">{t(`admin.staff.access${persona.access}`)}</span>
             {' · '}
@@ -407,16 +439,35 @@ function Ficha({
           )}
         </div>
 
-        <div className="flex shrink-0 flex-wrap gap-2">
+        {/*
+          SIN `shrink-0`, y hace falta explicarlo porque parece un descuido.
+
+          Con el, este bloque no podia encogerse, asi que su `flex-wrap`
+          interno nunca llegaba a activarse: en un movil de 390 px los dos
+          botones se salian de la tarjeta y «Editar» quedaba cortado. Lo
+          destapo «Reenviar la invitacion», que es mas largo que «Invitar al
+          panel» y fue el primero en no caber.
+        */}
+        <div className="flex flex-wrap gap-2">
           {/*
-            Invitar solo aparece donde tiene sentido: alguien activo, sin
-            cuenta todavia, y en un despliegue que pueda mandar invitaciones.
-            Un boton que se sabe que va a fallar no deberia pintarse.
+            Invitar aparece donde tiene sentido: alguien activo y en un
+            despliegue que pueda mandar invitaciones. Un boton que se sabe que
+            va a fallar no deberia pintarse.
+
+            REENVIAR TAMBIEN APARECE PARA QUIEN YA FUE INVITADA, y es lo que
+            faltaba: el enlace caduca, y sin este boton a quien no lo abria a
+            tiempo se le quedaba una ficha que decia «invitada» y una puerta
+            cerrada, sin ninguna salida desde el panel.
+
+            Si esa persona ya entra con normalidad, el servidor responde que
+            no hay nada que enviar. Se deja que lo diga el servidor en vez de
+            esconder el boton: aqui no se sabe si alguien ha entrado alguna
+            vez, y esconderlo por si acaso devolveria el problema original.
           */}
-          {canInvite && persona.isActive && persona.access === 'NONE' && (
+          {canInvite && persona.isActive && (
             <button type="button" className="ft-btn-ghost" disabled={ocupado} onClick={onInvitar}>
               <SendIcon className="h-4 w-4" />
-              {t('admin.staff.invite')}
+              {t(persona.access === 'NONE' ? 'admin.staff.invite' : 'admin.staff.resend')}
             </button>
           )}
           <button type="button" className="ft-btn-ghost" disabled={ocupado} onClick={onEditar}>

@@ -58,6 +58,15 @@ export const API_ERROR_CODES = {
   STAFF_SELF_CHANGE: 'STAFF_SELF_CHANGE',
   /** Esa persona ya tiene cuenta vinculada: invitarla otra vez crearia una segunda. */
   STAFF_ALREADY_INVITED: 'STAFF_ALREADY_INVITED',
+  /**
+   * El correo ya tiene cuenta, y esa cuenta es de OTRA ficha de personal.
+   *
+   * Antes esto reventaba con un 500 sin explicacion: se intentaba guardar en
+   * una ficha un identificador de cuenta que ya estaba en otra, y saltaba la
+   * restriccion de la base. Es un caso previsible —dos fichas para la misma
+   * persona, o un correo reutilizado— y merece decirse con palabras.
+   */
+  STAFF_ACCOUNT_TAKEN: 'STAFF_ACCOUNT_TAKEN',
   /** Este despliegue no tiene configurado el envio de invitaciones. */
   STAFF_INVITE_UNAVAILABLE: 'STAFF_INVITE_UNAVAILABLE',
   /** El proveedor de identidad rechazo la invitacion. */

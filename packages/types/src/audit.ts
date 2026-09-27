@@ -95,6 +95,14 @@ const ACCIONES_FIJAS = [
   'staff.created',
   'staff.updated',
   'staff.invited',
+  /**
+   * Se le volvio a mandar la invitacion.
+   *
+   * Se distingue de la primera a proposito: tres reenvios seguidos a la
+   * misma persona cuentan una historia —el correo no llega, o va a una
+   * direccion equivocada— que «invitada» a secas esconderia.
+   */
+  'staff.reinvited',
 
   /* --- Configuracion --------------------------------------------------- */
   'settings.updated',

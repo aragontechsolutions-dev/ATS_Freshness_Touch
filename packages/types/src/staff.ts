@@ -112,6 +112,18 @@ export const AdminStaffDirectoryItemSchema = z.strictObject({
   locale: LocaleSchema,
   isActive: z.boolean(),
   access: PanelAccessSchema,
+  /**
+   * El correo CON EL QUE ENTRA, cuando no es el mismo que el de contacto.
+   *
+   * Nulo en el caso normal —coinciden, o no hay cuenta, o es una ficha
+   * anterior a que esto se guardara— para que la pantalla solo avise cuando
+   * de verdad hay algo que avisar.
+   *
+   * Existe por un incidente real: editar el correo de contacto no cambia la
+   * cuenta del proveedor, asi que el panel mostraba una direccion con la que
+   * esa persona no podia iniciar sesion, y no habia forma de saberlo.
+   */
+  signInEmail: z.string().nullable(),
   invitedAt: z.iso.datetime().nullable(),
   createdAt: z.iso.datetime(),
 });

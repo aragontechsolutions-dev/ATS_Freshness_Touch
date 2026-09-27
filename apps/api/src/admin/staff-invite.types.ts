@@ -35,6 +35,31 @@ export type InviteResult =
     }
   | { ok: false; reason: string };
 
+/**
+ * Una cuenta de acceso, tal y como la ve el proveedor.
+ *
+ * Hace falta para poder distinguir DOS situaciones que en nuestra tabla se
+ * ven exactamente igual —ficha con cuenta vinculada— y que piden respuestas
+ * opuestas cuando alguien pulsa «invitar»:
+ *
+ *   - Se le invito y NUNCA ha entrado: el enlace caduco y hay que reenviarlo.
+ *   - Ya entra con normalidad: reenviar no procede; si perdio la contrasena,
+ *     la pide ella desde «he olvidado mi contrasena».
+ *
+ * Sin esto, la unica salida era negarse siempre, que es lo que dejaba sin
+ * acceso a quien se le caducaba el enlace.
+ */
+export interface StaffAccount {
+  authUserId: string;
+  /**
+   * El correo CON EL QUE INICIA SESION, que manda sobre el de la ficha.
+   * Editar el correo de contacto en el panel no cambia este.
+   */
+  email: string;
+  /** Si alguna vez ha iniciado sesion. */
+  hasSignedIn: boolean;
+}
+
 export interface StaffInviteProvider {
   readonly name: string;
   /**
@@ -47,6 +72,17 @@ export interface StaffInviteProvider {
   readonly available: boolean;
 
   invite(email: string): Promise<InviteResult>;
+
+  /**
+   * La cuenta, o `null` si el proveedor ya no la tiene o no se pudo
+   * preguntar.
+   *
+   * DEVUELVE `null` EN VEZ DE LANZAR, y quien llama decide. Es una consulta
+   * de apoyo: sirve para afinar el mensaje y para avisar de un desajuste de
+   * correo, no para autorizar nada. Que el proveedor tarde un segundo de mas
+   * no puede impedir invitar a alguien.
+   */
+  account(authUserId: string): Promise<StaffAccount | null>;
 }
 
 export const STAFF_INVITE_PROVIDER = Symbol('STAFF_INVITE_PROVIDER');

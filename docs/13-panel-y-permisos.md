@@ -1430,6 +1430,133 @@ un error de nuestra API— tampoco.
 
 ---
 
+## 18 bis. El incidente de la invitación caducada (etapa 2.17)
+
+Un incidente real en producción, con su arreglo. Merece quedar escrito entero
+porque ninguna de las cuatro piezas se veía leyendo el código.
+
+### Qué pasó
+
+1. Se invitó a alguien al panel. Abrió el correo pero **no usó el enlace en
+   casi 48 horas**, así que caducó.
+2. Al volver a intentarlo le dijo que había caducado. **No había ninguna
+   salida desde el panel**: volver a pulsar «Invitar» respondía «ya está
+   invitada», para siempre.
+3. Se le **corrigió el correo** en su ficha. Eso cambia nuestra tabla, **no**
+   la cuenta del proveedor, que sigue pidiendo el correo original al iniciar
+   sesión. A partir de ahí la pantalla mostraba una dirección con la que esa
+   persona no podía entrar, y no había forma de darse cuenta mirando.
+4. Se creó una **segunda ficha** con el correo original y se pulsó «Invitar».
+   El proveedor, para un correo que ya existe, **devuelve la cuenta que hay**
+   en vez de crear otra. Intentamos guardarla en la ficha nueva y saltó la
+   restricción de unicidad:
+
+```
+PrismaClientKnownRequestError:
+Invalid `prisma.staff.update()` invocation:
+Unique constraint failed on the constraint: `staff_authUserId_key`
+```
+
+Un **500 sin explicación** en la cara de quien administra.
+
+### Los cuatro fallos, y su arreglo
+
+| Fallo                                                 | Arreglo                                                        |
+| ----------------------------------------------------- | -------------------------------------------------------------- |
+| No se podía reenviar una invitación                   | `invite()` reenvía cuando esa persona **nunca llegó a entrar** |
+| Un 500 ilegible cuando la cuenta ya era de otra ficha | Un `409 STAFF_ACCOUNT_TAKEN` que **dice de quién es**          |
+| Cambiar el correo desincronizaba en silencio          | Se guarda `authEmail` y la pantalla avisa: «Entra con …»       |
+| Tratábamos una cuenta existente como recién creada    | Se comprueba antes de escribir                                 |
+
+### Reenviar: por qué hace falta preguntar al proveedor
+
+En nuestra tabla, «se le invitó y nunca entró» y «ya entra con normalidad» se
+ven **exactamente igual**: una ficha con cuenta vinculada. Y piden respuestas
+opuestas:
+
+- **Nunca ha entrado** → el enlace caducó: se regenera y se reenvía.
+- **Ya entra** → reenviar no procede. Si perdió la contraseña la pide ella
+  desde «he olvidado mi contraseña», sin depender de nadie.
+
+Por eso el puerto de invitaciones gana `account(authUserId)`, que consulta la
+cuenta y devuelve si tiene `last_sign_in_at`. **No lanza nunca**: cualquier
+fallo devuelve `null` y se sigue adelante. Es una consulta de apoyo para
+afinar un mensaje, no una comprobación de permisos; que el proveedor tarde no
+puede impedir invitar a nadie.
+
+### El reenvío va al correo de la cuenta, no al de la ficha
+
+Cuando difieren, el enlace se manda a la dirección de la **cuenta**.
+Reenviar es «otro enlace para la cuenta que ya tienes»: mandarlo al correo de
+contacto crearía una **segunda cuenta** y cambiaría en silencio con qué correo
+entra esa persona. Si no se pudo preguntar al proveedor, se usa el de la
+ficha, que es lo único que se sabe con certeza.
+
+### `authEmail`: por qué una columna y no una comparación
+
+`staff.email` es el correo de **contacto** y se edita desde el panel.
+`staff.authEmail` es el correo **con el que se creó la cuenta**. Parecen lo
+mismo y la diferencia entre ambos es justo lo que causó el incidente.
+
+La migración `20260927120000_staff_auth_email` **no rellena la columna con el
+correo actual**, y es lo importante de ella: copiarlo afirmaría que ambos
+coinciden, que es exactamente lo que puede ser falso en las fichas que ya
+existen —en una de ellas se sabe que no—. Nulo significa «no lo sabemos» y el
+panel no avisa de nada; las invitaciones nuevas sí lo rellenan, y una ficha
+antigua queda al día la próxima vez que se le reenvíe la invitación.
+
+El panel solo recibe `signInEmail` **cuando difiere** del de contacto. En el
+caso normal viene nulo, para que la pantalla avise únicamente cuando de verdad
+hay algo que avisar.
+
+### El reenvío se distingue en la auditoría
+
+`staff.reinvited`, no `staff.invited`. Tres reenvíos seguidos a la misma
+persona cuentan una historia —el correo no llega, o va a una dirección
+equivocada— que «invitada» a secas escondería. La metadata guarda **a dónde
+fue el enlace**, que en un reenvío puede no ser el correo de la ficha.
+
+### Qué se comprueba
+
+En `apps/api/src/admin/staff-admin.e2e.test.ts`, contra PostgreSQL real:
+
+- Se reenvía a quien nunca entró, y sale un correo nuevo.
+- **No** se reenvía a quien ya entra: `409` con la salida correcta en el
+  mensaje.
+- El reenvío se registra como `staff.reinvited`.
+- **El 500 de producción, reproducido paso a paso**: invitar → cambiar el
+  correo → dar de alta de nuevo con el original → invitar. Ahora responde
+  `409 STAFF_ACCOUNT_TAKEN` y **dice cuál es la otra ficha**, que es la única
+  información con la que se puede deshacer el lío.
+- La ficha avisa con qué correo se entra cuando ya no es el de contacto, y no
+  avisa cuando coinciden.
+- El reenvío va al correo de la cuenta.
+
+El servidor de mentira de las pruebas se cambió para que **derive el
+identificador del correo**, como el proveedor real: pedir invitación para un
+correo que ya tiene cuenta devuelve la que hay. Con un identificador fijo el
+choque quedaba escondido, y con uno aleatorio se habría fingido que cada
+invitación crea una cuenta nueva. Ninguno de los dos habría destapado esto.
+
+### Comprobado en navegador
+
+Chromium real, en claro, oscuro y a 390 px. La revisión a 390 px destapó un
+fallo de maqueta: el bloque de botones llevaba `shrink-0`, así que su
+`flex-wrap` interno nunca llegaba a activarse y «Editar» se salía de la
+tarjeta. Lo sacó a la luz «Reenviar la invitación», más largo que «Invitar al
+panel». 52 textos medidos con el auditor de contraste, ninguno por debajo del
+mínimo.
+
+### Lo que sigue fuera
+
+Cambiar el correo de acceso de alguien que ya tiene cuenta. Hoy se puede
+cambiar el de contacto y la pantalla avisa de la diferencia, pero **no** hay
+forma de mover la cuenta a otra dirección desde el panel. Requiere llamar al
+proveedor para cambiar el correo de la cuenta y dejar los dos sistemas
+consistentes si esa llamada falla, que es una etapa en sí misma.
+
+---
+
 ## 19. La interfaz del panel: avisos, esqueletos e iconos
 
 Hasta aquí el panel hacía todo lo que tenía que hacer y **no lo contaba**. Esta
