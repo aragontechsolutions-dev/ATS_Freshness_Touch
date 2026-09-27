@@ -7,6 +7,7 @@ import {
   MyJobsSchema,
   AdminStaffDirectoryItemSchema,
   AdminBusinessSettingsSchema,
+  AdminPricingRatesSchema,
   AdminServiceAreaSchema,
   AuditPageSchema,
   API_ERROR_CODES,
@@ -23,6 +24,7 @@ import {
   type AdminStaffDirectory,
   type AdminStaffDirectoryItem,
   type AdminStaffList,
+  type AdminPricingRates,
   type AdminServiceArea,
   type AuditPage,
   type AuditQueryInput,
@@ -35,6 +37,7 @@ import {
   type ApiError,
   type BusinessSettings,
   type NotificationSettings,
+  type PricingRates,
   type ServiceAreaSettings,
   type AuthenticatedStaff,
 } from '@freshness/types';
@@ -497,6 +500,47 @@ export function saveServiceArea(settings: ServiceAreaSettings): Promise<AdminSer
       return parsed.data;
     },
     { method: 'PUT', body: settings },
+  );
+}
+
+/* ------------------------------------------------------------------------ */
+
+const TARIFAS = '/admin/pricing-rates';
+
+/**
+ * Las tarifas vigentes, con su version y quien las puso.
+ *
+ * Solo administracion, tambien para leer. Aqui el motivo es el mas directo
+ * del panel: esto es la estructura de costes entera de la empresa.
+ */
+export function fetchPricingRates(): Promise<AdminPricingRates> {
+  return request(TARIFAS, (payload) => {
+    const parsed = AdminPricingRatesSchema.safeParse(payload);
+    if (!parsed.success) throw contractError(TARIFAS, parsed.error.issues);
+    return parsed.data;
+  });
+}
+
+/**
+ * Guarda una tabla de tarifas NUEVA. No sobrescribe la anterior.
+ *
+ * Va completa y no por precios sueltos: sus reglas —que el descuento no baje
+ * al subir la frecuencia, que el minimo del deposito no supere al maximo—
+ * son sobre el CONJUNTO.
+ *
+ * LA VERSION NO SE MANDA: la pone el servidor. Si la eligiera esta pantalla,
+ * dos pestañas abiertas podrian enviar la misma y la segunda machacaria a la
+ * primera, que es justo lo que una tabla de solo añadir evita.
+ */
+export function savePricingRates(rates: PricingRates): Promise<AdminPricingRates> {
+  return request(
+    TARIFAS,
+    (payload) => {
+      const parsed = AdminPricingRatesSchema.safeParse(payload);
+      if (!parsed.success) throw contractError('guardado de las tarifas', parsed.error.issues);
+      return parsed.data;
+    },
+    { method: 'PUT', body: rates },
   );
 }
 

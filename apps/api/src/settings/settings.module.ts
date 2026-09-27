@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { BusinessSettingsController } from './business-settings.controller';
 import { BusinessSettingsService } from './business-settings.service';
 import { PricingConfigService } from './pricing-config.service';
+import { PricingRatesService } from './pricing-rates.service';
 import { ServiceAreaService } from './service-area.service';
 
 /**
@@ -11,7 +12,12 @@ import { ServiceAreaService } from './service-area.service';
  */
 @Module({
   controllers: [BusinessSettingsController],
-  providers: [BusinessSettingsService, ServiceAreaService, PricingConfigService],
-  exports: [BusinessSettingsService, ServiceAreaService, PricingConfigService],
+  providers: [
+    BusinessSettingsService,
+    ServiceAreaService,
+    PricingRatesService,
+    PricingConfigService,
+  ],
+  exports: [BusinessSettingsService, ServiceAreaService, PricingRatesService, PricingConfigService],
 })
 export class SettingsModule {}

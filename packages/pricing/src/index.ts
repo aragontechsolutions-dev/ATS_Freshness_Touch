@@ -5,4 +5,5 @@ export * from './duration';
 export * from './engine';
 export * from './mileage';
 export * from './money';
+export * from './rates';
 export * from './zones';

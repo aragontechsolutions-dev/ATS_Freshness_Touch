@@ -147,6 +147,12 @@ Progreso:
   cinco comparten una sola maqueta con el logotipo y los colores oficiales,
   pensada para que se entienda también con las imágenes bloqueadas, que es
   como la recibe media plantilla de clientes de correo.
+- ✅ **Las tarifas salen del código** (`docs/20-tarifas-editables.md`): los
+  precios se editan desde el panel y cada cambio queda como una versión que
+  se puede volver a leer. Lo segundo no es un extra: `pricingVersion` se
+  guarda en cada reserva desde el primer día prometiendo que un presupuesto
+  antiguo se puede reproducir, y apuntando a un archivo del código esa
+  promesa no se cumplía.
 - ⬜ Avisos por SMS.
 - Calendario de disponibilidad y reserva en línea.
 - **Stripe**: retención del depósito con `capture_method: 'manual'` al reservar y
@@ -159,16 +165,19 @@ Progreso:
     (`docs/13-panel-y-permisos.md` §12). El horario que se guarda es además el
     que usa el motor de agenda, así que no puede desajustarse de lo que se
     anuncia.
-  - Textos y afirmaciones del sitio que deben mantenerse veraces
-    (seguros, verificación de antecedentes, garantía).
+  - ⬜ Textos y afirmaciones del sitio que deben mantenerse veraces
+    (seguros, verificación de antecedentes, garantía). Hoy viven en
+    `packages/i18n`, así que cambiarlos exige un despliegue. **Es lo único
+    que queda para cerrar la configuración por completo.**
   - ✅ Zona de servicio: hecha en la Etapa 2.18
     (`docs/17-area-de-servicio.md`). Los límites, los recargos y si cada zona
     da precio automático se editan desde el panel, con vista previa en el
     mapa; el cambio queda en la auditoría con las cifras de antes y después.
-  - Las tarifas: pasarlas de archivo a base de datos permite ajustar precios
-    sin desplegar, pero exige registrar quién cambió qué y cuándo, porque
-    afecta directamente a la facturación. **Es lo que queda para cerrar la
-    configuración por completo.**
+  - ✅ Las tarifas: hechas en la Etapa 2.22
+    (`docs/20-tarifas-editables.md`). Los precios por servicio, los extras,
+    los descuentos por recurrencia y el depósito se editan desde el panel;
+    cada guardado crea una versión nueva y ninguna se borra, que es lo que
+    permite reproducir un presupuesto antiguo.
 
 **Requisitos previos:** cuentas de Supabase y Stripe, y la dirección completa
 del cliente (que en la Etapa 1 no se pide a propósito).

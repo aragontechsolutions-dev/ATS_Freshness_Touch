@@ -354,6 +354,51 @@ export const es: TranslationResources = {
         'La clave del proveedor de correo y el token del bot se configuran en el servidor, no aquí. Una credencial guardada en la base de datos acaba en cada copia de seguridad, así que viven en el entorno del servidor junto a las claves de pago.',
     },
 
+    rates: {
+      title: 'Tarifas',
+      intro:
+        'Los precios con los que cotiza el sitio. Cada cotización nueva se calcula con lo que haya aquí.',
+      onlyFuture:
+        'Lo que ya está reservado no cambia: cada reserva guarda los precios con los que se calculó. Esto afecta solo a las cotizaciones a partir de ahora.',
+
+      services: 'Precio por servicio',
+      servicesHelp:
+        'El total es el cargo base más las habitaciones, los baños y los pies cuadrados. Si sale por debajo del mínimo, se cobra el mínimo.',
+      base: 'Base',
+      perBedroom: 'Por dormitorio',
+      perBathroom: 'Por baño',
+      /* En centavos y no en dólares: el sector piensa así en este campo. */
+      perSquareFoot: 'Por pie²',
+      minimum: 'Mínimo',
+
+      addOns: 'Extras',
+      amount: 'Importe',
+      maxQuantity: 'Máx.',
+
+      discounts: 'Descuento por recurrencia',
+      discountsHelp:
+        'Sobre el servicio más los extras. A más frecuencia, más descuento: el sistema no deja guardarlo al revés.',
+
+      deposit: 'Depósito',
+      depositHelp:
+        'Lo que se retiene en la tarjeta al reservar, no lo que se cobra. Se descuenta del total el día del servicio.',
+      depositBase: 'Base',
+      freeRadius: 'Radio sin recargo',
+      depositMin: 'Mínimo',
+      depositMax: 'Máximo',
+      roundTrip: 'Cobrar las millas de ida y vuelta',
+
+      save: 'Guardar tarifas',
+      saved: 'Tarifas guardadas. Las cotizaciones nuevas ya usan estos precios.',
+      invalidNumbers: 'Revisa los importes: hay algún campo que no es un número.',
+      outOfRange: 'Ese importe está fuera de lo razonable. Revisa «{{field}}»: ¿sobra un cero?',
+      errMinimumZero:
+        'El importe mínimo tiene que ser mayor que cero: si no, una casa pequeña saldría gratis.',
+      errDiscountOrder:
+        'El descuento no puede bajar al aumentar la frecuencia: quien viene cada semana pagaría proporcionalmente más que quien viene una vez al mes.',
+      errDepositRange: 'El mínimo del depósito no puede superar al máximo.',
+      currentVersion: 'Versión {{version}} · {{count}} guardadas en total',
+    },
     /* ----------------------- Area de servicio ----------------------- */
     serviceArea: {
       title: 'Área de servicio',
@@ -631,6 +676,9 @@ export const es: TranslationResources = {
         },
         service_area: {
           updated: 'Cambió el área de servicio',
+        },
+        pricing: {
+          updated: 'Cambió las tarifas',
         },
         notifications: {
           updated: 'Cambió los ajustes de avisos',

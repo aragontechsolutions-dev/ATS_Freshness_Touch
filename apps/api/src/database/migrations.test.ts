@@ -65,6 +65,7 @@ describe('migraciones', () => {
       'customers',
       'notifications',
       'payments',
+      'pricing_tables',
       'quotes',
       'recurring_series',
       'staff',
