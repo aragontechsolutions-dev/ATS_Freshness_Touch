@@ -354,6 +354,36 @@ export const es: TranslationResources = {
         'La clave del proveedor de correo y el token del bot se configuran en el servidor, no aquí. Una credencial guardada en la base de datos acaba en cada copia de seguridad, así que viven en el entorno del servidor junto a las claves de pago.',
     },
 
+    /* ----------------------- Area de servicio ----------------------- */
+    serviceArea: {
+      title: 'Área de servicio',
+      intro:
+        'Hasta dónde nos desplazamos y dónde sale el precio solo. Cada reserva que entre a partir de ahora se cobra con esto.',
+      preview: 'Vista previa',
+      mapDescription:
+        'Mapa del área de servicio: anillos concéntricos alrededor de la base que llegan hasta {{miles}} millas.',
+      mapZone: 'Zona {{zone}} — hasta {{miles}} millas',
+      legendInstant: 'Precio al instante',
+      legendOnRequest: 'Precio en persona',
+      summary: 'Llegamos hasta {{total}} millas. El precio sale solo hasta {{instant}}.',
+
+      zones: 'Zonas',
+      zonesHelp:
+        'Cada anillo tiene que llegar más lejos que el anterior. Cuando una zona deja de dar precio automático, las siguientes tampoco pueden darlo.',
+      zoneName: 'Zona {{zone}}',
+      maxMiles: 'Hasta (millas)',
+      surcharge: 'Recargo por traslado ($)',
+      /*
+       * Se dice lo que PASA si se desmarca, no el nombre del ajuste. «Precio
+       * automatico» no le dice a nadie que el cotizador dejara de dar una
+       * cifra en esa zona.
+       */
+      instantQuote: 'El cotizador da precio aquí al momento',
+      invalidNumbers:
+        'Revisa los números: las millas y los recargos tienen que ser cifras válidas.',
+      saved: 'Área de servicio guardada.',
+    },
+
     /* --------------------------- Personal --------------------------- */
     staff: {
       title: 'Personal',
@@ -502,6 +532,11 @@ export const es: TranslationResources = {
         phone: 'Teléfono',
         email: 'Correo',
         hours: 'Horario',
+        radiusMilesBefore: 'Cobertura antes',
+        radiusMilesAfter: 'Cobertura después',
+        instantRadiusMilesBefore: 'Precio automático antes',
+        instantRadiusMilesAfter: 'Precio automático después',
+        zones: 'Zonas',
         internalEmail: 'Buzón interno',
         telegramChatId: 'Chat de Telegram',
         telegramOnNewBooking: 'Telegram al entrar una reserva',
@@ -592,6 +627,9 @@ export const es: TranslationResources = {
         },
         settings: {
           updated: 'Cambió la configuración',
+        },
+        service_area: {
+          updated: 'Cambió el área de servicio',
         },
         notifications: {
           updated: 'Cambió los ajustes de avisos',
@@ -866,7 +904,14 @@ export const es: TranslationResources = {
       commercialWalkthrough:
         'Los trabajos comerciales se cotizan tras una visita gratuita para ajustar el alcance a tus instalaciones.',
       outOfServiceArea:
-        'Este código postal está fuera de nuestra zona habitual. Aun así podríamos ayudarte: consúltanos.',
+        'Este código postal queda fuera del área que cubrimos. Aun así podríamos ayudarte: consúltanos.',
+      /*
+       * Distinto de `outOfServiceArea`, y la diferencia importa: «no
+       * vamos» y «vamos, te llamamos con el precio» son dos respuestas
+       * opuestas para quien esta pidiendo un presupuesto.
+       */
+      farZone:
+        'Llegamos hasta ahí, pero a esa distancia el precio lo damos en persona: el traslado cambia mucho las cuentas y preferimos darte una cifra real. Déjanos tus datos y te llamamos.',
       outOfState: 'Por ahora operamos únicamente en el estado de Georgia.',
       largeProperty:
         'Las propiedades grandes se cotizan de forma individual para que el estimado sea preciso.',
@@ -905,7 +950,28 @@ export const es: TranslationResources = {
     beyondMiles: 'Más allá de {{miles}} millas',
     noSurcharge: 'Sin recargo por traslado',
     surcharge: 'Recargo por traslado de {{amount}}',
-    outOfRange: 'Fuera de nuestra zona habitual — contáctanos para una propuesta personalizada',
+    outOfRange: 'Fuera del área que cubrimos — contáctanos para una propuesta personalizada',
+
+    /* --------------------------- El mapa --------------------------- */
+    /** Lo que oye quien usa lector de pantalla: un mapa sin describir no dice nada. */
+    mapDescription:
+      'Mapa de nuestra área de servicio: anillos concéntricos alrededor de Atlanta que llegan hasta {{miles}} millas y cubren todo el estado de Georgia.',
+    mapZoneInstant: 'Zona {{zone}} — hasta {{miles}} millas · {{amount}}',
+    mapZoneOnRequest:
+      'Hasta {{miles}} millas — llegamos hasta aquí, y el precio lo damos en persona',
+    mapViewLabel: 'Vista del mapa',
+    viewWholeState: 'Todo el estado',
+    viewInstantArea: 'Área con precio al instante ({{miles}} mi)',
+    legendInstant: 'Precio al instante en la web',
+    legendOnRequest: 'Precio en persona',
+
+    /**
+     * Para las zonas sin precio automatico. NO se les puede decir «sin
+     * recargo por traslado»: no es que sea gratis, es que el precio todavia
+     * no esta hecho, y prometer lo primero deja a la empresa con una
+     * expectativa que no puede cumplir.
+     */
+    onRequest: 'El precio lo damos en persona',
   },
 
   faq: {

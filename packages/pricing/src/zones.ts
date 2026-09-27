@@ -12,9 +12,20 @@ export function resolveZone(miles: number, config: PricingConfig): ZoneRule {
       return zone;
     }
   }
+  /*
+   * La red de seguridad: una configuracion sin zona final dejaria esta
+   * funcion sin nada que devolver. Cae en «fuera de area», que es la unica
+   * respuesta segura: ante la duda no se promete un servicio ni un precio.
+   */
   const fallback = config.zones.find((zone) => zone.maxMiles === null);
   return (
-    fallback ?? { code: 'OUT_OF_RANGE', maxMiles: null, surchargeCents: 0, serviceable: false }
+    fallback ?? {
+      code: 'OUT_OF_RANGE',
+      maxMiles: null,
+      surchargeCents: 0,
+      serviceable: false,
+      instantQuote: false,
+    }
   );
 }
 

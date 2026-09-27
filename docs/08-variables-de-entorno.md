@@ -356,6 +356,20 @@ No hace falta ningún servicio de cron en Render: el barrido va dentro de la
 API, que en el plan `starter` no se suspende. Las horas de antelación se
 configuran desde el panel, no aquí.
 
+### Base de operaciones
+
+| Variable                 | Valor               | Obligatoria |
+| ------------------------ | ------------------- | ----------- |
+| `COMPANY_BASE_LATITUDE`  | 33.749 por defecto  | No          |
+| `COMPANY_BASE_LONGITUDE` | -84.388 por defecto | No          |
+
+Centran el mapa de zonas del sitio y del panel. Van junto al resto de la base
+porque es el mismo punto desde el que se mide la distancia: guardadas por
+separado, el día que la empresa se mude el mapa dibujaría los círculos
+alrededor del sitio antiguo mientras los precios se calculan desde el nuevo.
+
+Ver `docs/17-area-de-servicio.md` §7.
+
 ### Registro de auditoría
 
 | Variable               | Valor                       | Obligatoria |

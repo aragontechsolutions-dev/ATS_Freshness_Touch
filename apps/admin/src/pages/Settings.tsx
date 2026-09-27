@@ -13,11 +13,19 @@ import {
 } from '@freshness/types';
 import { ApiClientError, fetchSettings, saveSettings } from '../lib/api';
 import { AuditLog } from '../components/AuditLog';
+import { ServiceAreaForm } from '../components/ServiceAreaForm';
 import { NotificationSettingsForm } from '../components/NotificationSettingsForm';
 import { StaffDirectory } from '../components/StaffDirectory';
 import { useToast } from '../components/ToastProvider';
 import { SkeletonFormulario } from '../components/Skeletons';
-import { BellIcon, GearIcon, ShieldIcon, SpinnerIcon, UsersIcon } from '../components/Icons';
+import {
+  BellIcon,
+  GearIcon,
+  MapPinIcon,
+  ShieldIcon,
+  SpinnerIcon,
+  UsersIcon,
+} from '../components/Icons';
 import { formatTimestamp } from '../lib/format';
 
 interface SettingsPageProps {
@@ -55,7 +63,7 @@ interface SettingsShellProps extends SettingsPageProps {
  *      numero inventado de relleno, que es peor: un cliente lo marca y
  *      termina llamando a un desconocido.
  */
-type Seccion = 'business' | 'notifications' | 'staff' | 'audit';
+type Seccion = 'business' | 'serviceArea' | 'notifications' | 'staff' | 'audit';
 
 /**
  * Dos bloques que se guardan por separado.
@@ -78,6 +86,18 @@ export function SettingsPage({ staff, locale, onSessionLost }: SettingsShellProp
           icono={<GearIcon className="h-4 w-4" />}
         >
           {t('admin.settings.title')}
+        </Pestana>
+        {/*
+          El area de servicio va justo despues de los datos del negocio: son
+          las dos cosas que definen QUE ofrece la empresa, antes de como se
+          avisa y de quien trabaja aqui.
+        */}
+        <Pestana
+          activa={seccion === 'serviceArea'}
+          onClick={() => setSeccion('serviceArea')}
+          icono={<MapPinIcon className="h-4 w-4" />}
+        >
+          {t('admin.serviceArea.title')}
         </Pestana>
         <Pestana
           activa={seccion === 'notifications'}
@@ -110,6 +130,8 @@ export function SettingsPage({ staff, locale, onSessionLost }: SettingsShellProp
 
       {seccion === 'business' ? (
         <BusinessSettingsForm locale={locale} onSessionLost={onSessionLost} />
+      ) : seccion === 'serviceArea' ? (
+        <ServiceAreaForm locale={locale} onSessionLost={onSessionLost} />
       ) : seccion === 'notifications' ? (
         <NotificationSettingsForm onSessionLost={onSessionLost} />
       ) : seccion === 'staff' ? (

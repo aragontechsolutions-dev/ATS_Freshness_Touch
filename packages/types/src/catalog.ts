@@ -42,6 +42,14 @@ export const CatalogZoneSchema = z.strictObject({
   maxMiles: z.number().nullable(),
   surchargeCents: z.int().nonnegative(),
   serviceable: z.boolean(),
+  /**
+   * Si en esta zona el precio sale solo.
+   *
+   * Atendida y con precio automatico NO son lo mismo, y la diferencia es lo
+   * que permite cubrir todo Georgia sin prometer un precio imposible: cerca
+   * el cotizador da la cifra al instante, lejos dice que se da en persona.
+   */
+  instantQuote: z.boolean(),
 });
 export type CatalogZone = z.infer<typeof CatalogZoneSchema>;
 
@@ -69,6 +77,17 @@ export const CatalogResponseSchema = z.strictObject({
     city: z.string(),
     state: z.string(),
     postalCode: z.string(),
+    /*
+     * Coordenadas del mismo punto desde el que se mide la distancia.
+     *
+     * Van aqui y no escritas en el sitio web porque el mapa de zonas se
+     * centra en ellas: si se guardaran por separado, el dia que la empresa
+     * se mude el mapa seguiria dibujando circulos alrededor del sitio
+     * antiguo mientras los precios se calculan desde el nuevo. El mapa
+     * mentiria, y nadie lo notaria hasta que un cliente reclamara.
+     */
+    latitude: z.number().min(-90).max(90),
+    longitude: z.number().min(-180).max(180),
   }),
   services: z.array(CatalogServiceSchema),
   addOns: z.array(CatalogAddOnSchema),

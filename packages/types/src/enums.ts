@@ -42,7 +42,19 @@ export type AddOnUnit = z.infer<typeof AddOnUnitSchema>;
  * Zonas de servicio por distancia desde la base de operaciones.
  * OUT_OF_RANGE = fuera del radio maximo: no se cotiza automaticamente.
  */
-export const ServiceZoneSchema = z.enum(['A', 'B', 'C', 'D', 'OUT_OF_RANGE']);
+/**
+ * Las zonas de servicio, de la mas cercana a la mas lejana.
+ *
+ * `E` cubre el resto de Georgia y se atiende SIN PRECIO AUTOMATICO: a esa
+ * distancia el traslado pesa mas que el propio trabajo, asi que el precio se
+ * da en persona. Ver `service-area.ts`.
+ *
+ * El conjunto es FIJO aunque los limites y los recargos se editen desde el
+ * panel. El motivo es que este codigo se guarda en cada reserva: si alguien
+ * pudiera inventarse zonas, el historico acabaria lleno de codigos que ya no
+ * significan nada. Se editan los numeros, no el catalogo.
+ */
+export const ServiceZoneSchema = z.enum(['A', 'B', 'C', 'D', 'E', 'OUT_OF_RANGE']);
 export type ServiceZone = z.infer<typeof ServiceZoneSchema>;
 
 /** Naturaleza de cada linea del presupuesto. DISCOUNT lleva importe negativo. */

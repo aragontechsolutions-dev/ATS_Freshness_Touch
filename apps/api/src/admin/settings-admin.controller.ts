@@ -3,10 +3,13 @@ import { SkipThrottle } from '@nestjs/throttler';
 import {
   BusinessSettingsSchema,
   NotificationSettingsSchema,
+  ServiceAreaSettingsSchema,
   type AdminBusinessSettings,
+  type AdminServiceArea,
   type AuthenticatedStaff,
   type BusinessSettings,
   type NotificationSettings,
+  type ServiceAreaSettings,
 } from '@freshness/types';
 import type { Request } from 'express';
 import { ADMIN_ROUTE, CurrentStaff, Roles } from '../auth/auth.decorators';
@@ -14,6 +17,7 @@ import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
 import { SKIP_QUOTE_THROTTLER } from '../common/throttling';
 import { NotificationSettingsService } from '../notifications/notification-settings.service';
 import { BusinessSettingsService } from '../settings/business-settings.service';
+import { ServiceAreaService } from '../settings/service-area.service';
 
 /**
  * CONFIGURACION DEL NEGOCIO DESDE EL PANEL
@@ -104,5 +108,56 @@ export class NotificationSettingsController {
     @Req() request: Request,
   ): Promise<NotificationSettings> {
     return this.notifications.update(settings, staff, request.ip);
+  }
+}
+
+/**
+ * AREA DE SERVICIO
+ * ----------------
+ * Hasta donde va la empresa y donde el precio sale solo.
+ *
+ * SOLO ADMINISTRACION, y aqui el motivo es el mas directo de los tres
+ * bloques de esta pantalla: CADA RESERVA QUE ENTRE DESPUES SE COBRA CON
+ * ESTO. Mover un limite unas millas cambia el recargo de todas las casas de
+ * esa franja, y ampliar el precio automatico a trescientas millas haria que
+ * el cotizador prometiera cifras para traslados de ocho horas.
+ *
+ * Coordinacion mueve la agenda; no decide el area de cobertura ni los
+ * recargos. Eso es una decision comercial.
+ *
+ * QUE NO SE PUEDE HACER DESDE AQUI: inventarse zonas. El conjunto de codigos
+ * es fijo porque se guarda en cada reserva. Lo que se edita son los limites,
+ * los recargos y si cada zona da precio automatico; el contrato ademas
+ * rechaza combinaciones que no significan nada —anillos desordenados, o
+ * precio automatico mas lejos que donde ya se dijo que no hay—.
+ */
+@SkipThrottle(SKIP_QUOTE_THROTTLER)
+@Controller(`${ADMIN_ROUTE}/service-area`)
+export class ServiceAreaAdminController {
+  constructor(private readonly serviceArea: ServiceAreaService) {}
+
+  @Get()
+  @Roles('ADMIN')
+  get(): Promise<AdminServiceArea> {
+    return this.serviceArea.getForAdmin();
+  }
+
+  /**
+   * Guarda el area entera.
+   *
+   * PUT y no PATCH por lo mismo que el horario: las zonas son un bloque que
+   * solo tiene sentido completo. Sus reglas —que cada anillo llegue mas
+   * lejos que el anterior, que el precio automatico no vuelva— son sobre el
+   * CONJUNTO, y no se pueden comprobar sobre un cambio suelto.
+   */
+  @Put()
+  @Roles('ADMIN')
+  update(
+    @Body(new ZodValidationPipe<ServiceAreaSettings>(ServiceAreaSettingsSchema))
+    settings: ServiceAreaSettings,
+    @CurrentStaff() staff: AuthenticatedStaff,
+    @Req() request: Request,
+  ): Promise<AdminServiceArea> {
+    return this.serviceArea.save(settings, staff, request.ip ?? null);
   }
 }

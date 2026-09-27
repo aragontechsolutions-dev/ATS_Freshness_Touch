@@ -349,6 +349,36 @@ export const en = {
         'The email API key and the Telegram bot token are set on the server, not here. Credentials stored in the database end up in every backup, so they stay in the server environment alongside the payment keys.',
     },
 
+    /* ----------------------- Area de servicio ----------------------- */
+    serviceArea: {
+      title: 'Service area',
+      intro:
+        'How far we travel, and where the price comes out automatically. Every booking placed from now on is priced with this.',
+      preview: 'Preview',
+      mapDescription:
+        'Map of the service area: concentric rings around the base reaching up to {{miles}} miles.',
+      mapZone: 'Zone {{zone}} — up to {{miles}} miles',
+      legendInstant: 'Instant price',
+      legendOnRequest: 'Priced in person',
+      summary:
+        'We travel up to {{total}} miles. The price comes out automatically up to {{instant}}.',
+
+      zones: 'Zones',
+      zonesHelp:
+        'Each ring has to reach further than the one before it. Once a zone stops giving an instant price, the ones beyond it cannot give one either.',
+      zoneName: 'Zone {{zone}}',
+      maxMiles: 'Up to (miles)',
+      surcharge: 'Travel surcharge ($)',
+      /*
+       * Se dice lo que PASA si se desmarca, no el nombre del ajuste. «Precio
+       * automatico» no le dice a nadie que el cotizador dejara de dar una
+       * cifra en esa zona.
+       */
+      instantQuote: 'The quote tool gives a price here right away',
+      invalidNumbers: 'Check the numbers: miles and surcharges must be valid figures.',
+      saved: 'Service area saved.',
+    },
+
     /* --------------------------- Personal --------------------------- */
     staff: {
       title: 'Staff',
@@ -497,6 +527,11 @@ export const en = {
         phone: 'Phone',
         email: 'Email',
         hours: 'Opening hours',
+        radiusMilesBefore: 'Coverage before',
+        radiusMilesAfter: 'Coverage after',
+        instantRadiusMilesBefore: 'Instant price before',
+        instantRadiusMilesAfter: 'Instant price after',
+        zones: 'Zones',
         internalEmail: 'Internal mailbox',
         telegramChatId: 'Telegram chat',
         telegramOnNewBooking: 'Telegram on new booking',
@@ -586,6 +621,9 @@ export const en = {
         },
         settings: {
           updated: 'Settings changed',
+        },
+        service_area: {
+          updated: 'Service area changed',
         },
         notifications: {
           updated: 'Alert settings changed',
@@ -854,7 +892,14 @@ export const en = {
       commercialWalkthrough:
         'Commercial jobs are priced after a free on-site walkthrough so the scope matches your facility.',
       outOfServiceArea:
-        'This ZIP code is outside our standard service area. We may still be able to help — ask us.',
+        'This ZIP code is outside the area we cover. We may still be able to help — ask us.',
+      /*
+       * Distinto de `outOfServiceArea`, y la diferencia importa: «no
+       * vamos» y «vamos, te llamamos con el precio» son dos respuestas
+       * opuestas para quien esta pidiendo un presupuesto.
+       */
+      farZone:
+        'We do reach that far, but at that distance we price the job in person: travel changes the numbers a lot and we would rather give you a real figure. Leave us your details and we will call you.',
       outOfState: 'We currently operate in the State of Georgia only.',
       largeProperty: 'Large properties are quoted individually to keep the estimate accurate.',
     },
@@ -892,7 +937,27 @@ export const en = {
     beyondMiles: 'Beyond {{miles}} miles',
     noSurcharge: 'No travel surcharge',
     surcharge: '{{amount}} travel surcharge',
-    outOfRange: 'Outside our standard area — contact us for a custom proposal',
+    outOfRange: 'Outside the area we cover — contact us for a custom proposal',
+
+    /* --------------------------- El mapa --------------------------- */
+    /** Lo que oye quien usa lector de pantalla: un mapa sin describir no dice nada. */
+    mapDescription:
+      'Map of our service area: concentric rings around Atlanta reaching up to {{miles}} miles, covering the whole State of Georgia.',
+    mapZoneInstant: 'Zone {{zone}} — up to {{miles}} miles · {{amount}}',
+    mapZoneOnRequest: 'Up to {{miles}} miles — we come out here, and we price the job in person',
+    mapViewLabel: 'Map view',
+    viewWholeState: 'Whole state',
+    viewInstantArea: 'Instant-price area ({{miles}} mi)',
+    legendInstant: 'Instant price online',
+    legendOnRequest: 'We price it in person',
+
+    /**
+     * Para las zonas sin precio automatico. NO se les puede decir «sin
+     * recargo por traslado»: no es que sea gratis, es que el precio todavia
+     * no esta hecho, y prometer lo primero deja a la empresa con una
+     * expectativa que no puede cumplir.
+     */
+    onRequest: 'We price this one in person',
   },
 
   faq: {

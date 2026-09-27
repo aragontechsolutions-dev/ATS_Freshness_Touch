@@ -39,6 +39,15 @@ export interface ZoneRule {
   maxMiles: number | null;
   surchargeCents: number;
   serviceable: boolean;
+  /**
+   * Si el precio sale solo en esta zona.
+   *
+   * ATENDIDA Y CON PRECIO AUTOMATICO NO SON LO MISMO. Se va a esa casa, pero
+   * a trescientas millas el traslado pesa mas que la limpieza y ninguna
+   * tabla de recargos acierta a ciegas: el cotizador recoge la solicitud y
+   * el precio se da en persona.
+   */
+  instantQuote: boolean;
 }
 
 export interface DepositRule {
@@ -77,7 +86,14 @@ export interface PricingConfig {
    */
   version: string;
   currency: 'USD';
-  baseOfOperations: { city: string; state: string; postalCode: string };
+  baseOfOperations: {
+    city: string;
+    state: string;
+    postalCode: string;
+    /** Donde se centra el mapa de zonas. El mismo punto desde el que se mide. */
+    latitude: number;
+    longitude: number;
+  };
   services: Record<ServiceType, ServiceRate>;
   addOns: Record<AddOnCode, AddOnRate>;
   /** Descuento por recurrencia, en porcentaje sobre servicio + extras. */
@@ -112,7 +128,13 @@ export interface PricingConfig {
 export const defaultPricingConfig: PricingConfig = {
   version: '2026.09.1',
   currency: 'USD',
-  baseOfOperations: { city: 'Atlanta', state: 'GA', postalCode: '30303' },
+  baseOfOperations: {
+    city: 'Atlanta',
+    state: 'GA',
+    postalCode: '30303',
+    latitude: 33.749,
+    longitude: -84.388,
+  },
 
   services: {
     STANDARD: {
@@ -191,11 +213,22 @@ export const defaultPricingConfig: PricingConfig = {
    * 15% de las horas pagadas.
    */
   zones: [
-    { code: 'A', maxMiles: 20, surchargeCents: 0, serviceable: true },
-    { code: 'B', maxMiles: 35, surchargeCents: 2500, serviceable: true },
-    { code: 'C', maxMiles: 50, surchargeCents: 5000, serviceable: true },
-    { code: 'D', maxMiles: 60, surchargeCents: 7500, serviceable: true },
-    { code: 'OUT_OF_RANGE', maxMiles: null, surchargeCents: 0, serviceable: false },
+    { code: 'A', maxMiles: 20, surchargeCents: 0, serviceable: true, instantQuote: true },
+    { code: 'B', maxMiles: 35, surchargeCents: 2500, serviceable: true, instantQuote: true },
+    { code: 'C', maxMiles: 50, surchargeCents: 5000, serviceable: true, instantQuote: true },
+    { code: 'D', maxMiles: 60, surchargeCents: 7500, serviceable: true, instantQuote: true },
+    /*
+     * El resto de Georgia. Se atiende, sin precio automatico: ver
+     * `instantQuote` en `ZoneRule` y `packages/types/src/service-area.ts`.
+     */
+    { code: 'E', maxMiles: 325, surchargeCents: 0, serviceable: true, instantQuote: false },
+    {
+      code: 'OUT_OF_RANGE',
+      maxMiles: null,
+      surchargeCents: 0,
+      serviceable: false,
+      instantQuote: false,
+    },
   ],
 
   deposit: {

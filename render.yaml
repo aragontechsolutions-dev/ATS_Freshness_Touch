@@ -167,3 +167,10 @@ services:
         sync: false
       - key: COMPANY_BASE_POSTAL_CODE
         sync: false
+      # Coordenadas de la base, para centrar el mapa de zonas del sitio.
+      # Tienen valor por defecto (Atlanta), asi que solo hacen falta aqui si
+      # la empresa se muda. Ver `docs/17-area-de-servicio.md`.
+      - key: COMPANY_BASE_LATITUDE
+        sync: false
+      - key: COMPANY_BASE_LONGITUDE
+        sync: false

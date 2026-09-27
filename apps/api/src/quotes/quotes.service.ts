@@ -1,11 +1,9 @@
 import { Injectable } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { randomUUID } from 'node:crypto';
 import type { CatalogResponse, QuoteRequest, QuoteResponse } from '@freshness/types';
-import { buildCatalog, calculateQuote, type PricingConfig } from '@freshness/pricing';
-import type { Env } from '../common/config/env';
-import { buildPricingConfig } from '../common/pricing-config';
+import { buildCatalog, calculateQuote } from '@freshness/pricing';
 import { DistanceService } from '../distance/distance.service';
+import { PricingConfigService } from '../settings/pricing-config.service';
 
 /**
  * Orquesta una cotizacion: resuelve la distancia y aplica el motor de precios.
@@ -16,14 +14,16 @@ import { DistanceService } from '../distance/distance.service';
  */
 @Injectable()
 export class QuotesService {
-  private readonly pricingConfig: PricingConfig;
-
   constructor(
     private readonly distance: DistanceService,
-    config: ConfigService<Env, true>,
-  ) {
-    this.pricingConfig = buildPricingConfig(config);
-  }
+    /*
+     * La configuracion se pide EN CADA LLAMADA, no una vez al arrancar. El
+     * area de servicio se edita desde el panel, y guardarla en el
+     * constructor significaria que un cambio no se ve hasta reiniciar el
+     * servidor. La cache del area evita que esto cueste una consulta.
+     */
+    private readonly pricing: PricingConfigService,
+  ) {}
 
   async estimate(request: QuoteRequest, now: Date = new Date()): Promise<QuoteResponse> {
     const distance = await this.distance.resolve(
@@ -35,11 +35,11 @@ export class QuotesService {
       quoteId: randomUUID(),
       now,
       distance,
-      config: this.pricingConfig,
+      config: await this.pricing.current(),
     });
   }
 
-  getCatalog(now: Date = new Date()): CatalogResponse {
-    return buildCatalog(now, this.pricingConfig);
+  async getCatalog(now: Date = new Date()): Promise<CatalogResponse> {
+    return buildCatalog(now, await this.pricing.current());
   }
 }

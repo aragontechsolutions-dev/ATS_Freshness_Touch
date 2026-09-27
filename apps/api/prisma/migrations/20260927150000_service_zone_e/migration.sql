@@ -1,0 +1,22 @@
+-- ZONA E: EL RESTO DE GEORGIA
+-- ===========================
+-- Hasta ahora se atendia hasta 60 millas de Atlanta y lo demas se rechazaba.
+-- La empresa pasa a operar en todo el estado, que desde Atlanta son unas 300
+-- millas hasta la esquina mas lejana.
+--
+-- La zona E se atiende PERO NO DA PRECIO AUTOMATICO. A esa distancia el
+-- traslado pesa mas que la limpieza y ninguna tabla de recargos acierta a
+-- ciegas: el cotizador recoge la solicitud y el precio se da en persona.
+-- Los limites y recargos concretos se editan desde el panel; aqui solo se
+-- anade el codigo, que es lo que se guarda en cada reserva.
+
+-- SOBRE `IF NOT EXISTS`: esta migracion es reejecutable a proposito. Anadir
+-- un valor a un enumerado no se puede deshacer en PostgreSQL, asi que un
+-- reintento tras un fallo a medias encontraria el valor ya puesto y abortaria
+-- la migracion entera por algo que en realidad ya estaba hecho.
+--
+-- SOBRE EL ORDEN: `BEFORE 'OUT_OF_RANGE'` mantiene el enumerado ordenado de
+-- cerca a lejos. Sin eso, E quedaria DETRAS de OUT_OF_RANGE y cualquier
+-- consulta que ordene por zona pondria «fuera de area» en medio de las zonas
+-- atendidas.
+ALTER TYPE "ServiceZone" ADD VALUE IF NOT EXISTS 'E' BEFORE 'OUT_OF_RANGE';

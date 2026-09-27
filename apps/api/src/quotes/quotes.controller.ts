@@ -19,7 +19,7 @@ export class QuotesController {
    */
   @Get('pricing/catalog')
   @SkipThrottle({ quotes: true })
-  getCatalog(): CatalogResponse {
+  getCatalog(): Promise<CatalogResponse> {
     return this.quotes.getCatalog();
   }
 

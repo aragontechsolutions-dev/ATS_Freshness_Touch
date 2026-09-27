@@ -164,15 +164,50 @@ describe('calculateQuote - zonas y deposito', () => {
 });
 
 describe('calculateQuote - revision manual', () => {
-  it('marca fuera de area y no cotiza mas alla del radio maximo', () => {
+  /*
+   * ATENDIDA PERO SIN PRECIO AUTOMATICO. Es la diferencia que permite cubrir
+   * todo Georgia: a 80 millas se va, pero el precio se da en persona porque
+   * a esa distancia el traslado pesa mas que la limpieza.
+   *
+   * Lo que NO puede pasar es que se le diga a esa persona que esta fuera del
+   * area: «no vamos» y «vamos, te llamamos con el precio» son dos respuestas
+   * opuestas, y confundirlas pierde un cliente que si se podia atender.
+   */
+  it('a media distancia se atiende, pero sin precio automatico', () => {
     const quote = calculateQuote(buildRequest(), buildContext(80));
 
-    expect(quote.distance.zone).toBe('OUT_OF_RANGE');
+    expect(quote.distance.zone).toBe('E');
     expect(quote.manualReview.required).toBe(true);
-    expect(quote.manualReview.reasonKeys).toContain('quote.review.outOfServiceArea');
+    expect(quote.manualReview.reasonKeys).toContain('quote.review.farZone');
+    expect(quote.manualReview.reasonKeys).not.toContain('quote.review.outOfServiceArea');
+    // Sin precio no hay nada que cobrar ni que retener.
     expect(quote.totals.totalCents).toBe(0);
     expect(quote.deposit.amountCents).toBe(0);
     expect(quote.lines).toHaveLength(0);
+  });
+
+  it('mas alla del estado entero si queda fuera de area', () => {
+    const quote = calculateQuote(buildRequest(), buildContext(400));
+
+    expect(quote.distance.zone).toBe('OUT_OF_RANGE');
+    expect(quote.manualReview.reasonKeys).toContain('quote.review.outOfServiceArea');
+    expect(quote.manualReview.reasonKeys).not.toContain('quote.review.farZone');
+    expect(quote.totals.totalCents).toBe(0);
+    expect(quote.lines).toHaveLength(0);
+  });
+
+  /*
+   * Las zonas cercanas NO cambian con esta etapa. Se amplia la cobertura; no
+   * se toca ningun precio vigente.
+   */
+  it('las zonas con precio automatico siguen cotizando igual que antes', () => {
+    expect(calculateQuote(buildRequest(), buildContext(10)).distance.zone).toBe('A');
+    expect(calculateQuote(buildRequest(), buildContext(45)).distance.zone).toBe('C');
+
+    const cerca = calculateQuote(buildRequest(), buildContext(55));
+    expect(cerca.distance.zone).toBe('D');
+    expect(cerca.totals.surchargesCents).toBe(7500);
+    expect(cerca.manualReview.reasonKeys).not.toContain('quote.review.farZone');
   });
 
   it('el servicio comercial no recibe precio instantaneo', () => {

@@ -333,3 +333,95 @@
     scroll-behavior: auto !important;
   }
 }
+
+/* ===========================================================================
+ * EL MAPA DE ZONAS
+ * ===========================================================================
+ * Leaflet trae su propia hoja de estilos y pinta con elementos absolutos
+ * dentro del contenedor. Lo unico que hace falta aqui es darle tamano —sin
+ * altura explicita no se ve nada— y encajarlo con el resto del sitio.
+ * =========================================================================== */
+
+@layer components {
+  .ft-map,
+  .ft-map-hueco {
+    @apply h-72 w-full overflow-hidden rounded-xl border border-slate-200 sm:h-96;
+  }
+
+  .dark .ft-map,
+  .dark .ft-map-hueco {
+    @apply border-night-600;
+  }
+
+  /* El hueco mientras Leaflet se descarga. Del color de una tarjeta, para que
+     al llegar el mapa no haya un salto de contraste. */
+  .ft-map-hueco {
+    @apply animate-pulse bg-slate-200;
+  }
+
+  .dark .ft-map-hueco {
+    @apply bg-night-700;
+  }
+
+  /* Los cuadraditos de la leyenda. Mismo color que los circulos del mapa. */
+  .ft-map-clave {
+    @apply inline-block h-3 w-3 rounded-sm border-2;
+  }
+
+  .ft-map-clave-instantanea {
+    border-color: #145788;
+    background-color: rgb(20 87 136 / 0.15);
+  }
+
+  .ft-map-clave-peticion {
+    border-color: #f0b429;
+    background-color: rgb(240 180 41 / 0.15);
+  }
+}
+
+/*
+ * MODO OSCURO: SE INVIERTEN LAS TESELAS, no se cambia de proveedor.
+ *
+ * OpenStreetMap solo sirve teselas claras. Un mapa blanco brillante dentro
+ * de una pagina oscura deslumbra y rompe la lectura. Los proveedores de
+ * teselas oscuras exigen cuenta o clave, que es justo lo que se evito al
+ * elegir OpenStreetMap.
+ *
+ * El filtro solo se aplica a las TESELAS, no al contenedor: si se aplicara a
+ * todo, los circulos de las zonas y la atribucion se invertirian tambien y
+ * el azul de marca saldria naranja.
+ */
+.dark .ft-map .leaflet-tile-pane {
+  filter: invert(1) hue-rotate(180deg) brightness(0.95) contrast(0.9);
+}
+
+/* La atribucion de OpenStreetMap, legible sobre los dos fondos. */
+.dark .ft-map .leaflet-control-attribution {
+  background: rgb(27 31 36 / 0.85);
+  color: #cbd5e1;
+}
+
+.dark .ft-map .leaflet-control-attribution a {
+  color: #93c5fd;
+}
+
+@layer components {
+  /* Los dos encuadres del mapa. Pastillas, no botones grandes: son una
+     preferencia de vista, no la accion principal de la seccion. */
+  .ft-map-vista {
+    @apply rounded-full border border-slate-300 px-3 py-1.5 text-xs font-semibold
+           text-slate-700 transition-colors hover:bg-slate-100;
+  }
+
+  .dark .ft-map-vista {
+    @apply border-night-600 text-slate-300 hover:bg-night-700;
+  }
+
+  .ft-map-vista-on {
+    @apply border-brand-700 bg-brand-700 text-white hover:bg-brand-800;
+  }
+
+  .dark .ft-map-vista-on {
+    @apply border-brand-500 bg-brand-500 text-white hover:bg-brand-400 hover:text-white;
+  }
+}

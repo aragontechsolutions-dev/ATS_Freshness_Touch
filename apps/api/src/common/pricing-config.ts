@@ -17,6 +17,8 @@ export function buildPricingConfig(config: ConfigService<Env, true>): PricingCon
       city: config.get('COMPANY_BASE_CITY', { infer: true }),
       state: config.get('COMPANY_BASE_STATE', { infer: true }),
       postalCode: config.get('COMPANY_BASE_POSTAL_CODE', { infer: true }),
+      latitude: config.get('COMPANY_BASE_LATITUDE', { infer: true }),
+      longitude: config.get('COMPANY_BASE_LONGITUDE', { infer: true }),
     },
   };
 }
