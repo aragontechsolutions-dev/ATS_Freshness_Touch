@@ -17,6 +17,7 @@ import {
 } from '@freshness/types';
 import { AuditService } from '../audit/audit.service';
 import { PrismaService } from '../database/prisma.service';
+import { EmailBrandingService } from '../notifications/email-branding.service';
 import { EMAIL_PROVIDER, type EmailProvider } from '../notifications/notifications.types';
 import { staffInviteEmail } from '../notifications/templates/staff-emails';
 import { BusinessSettingsService } from '../settings/business-settings.service';
@@ -81,6 +82,7 @@ export class StaffAdminService {
     @Inject(STAFF_INVITE_PROVIDER) private readonly invitaciones: StaffInviteProvider,
     @Inject(EMAIL_PROVIDER) private readonly email: EmailProvider,
     private readonly business: BusinessSettingsService,
+    private readonly marca: EmailBrandingService,
   ) {}
 
   /** Si este despliegue puede invitar. Lo consulta el directorio. */
@@ -433,6 +435,7 @@ export class StaffAdminService {
         actionLink: resultado.actionLink,
         companyPhone: negocio.phone,
         companyEmail: negocio.email,
+        logoUrl: this.marca.logoUrl,
       }),
     );
 

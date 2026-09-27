@@ -1,5 +1,6 @@
 import type { Locale, StaffRole } from '@freshness/types';
 import type { EmailMessage } from '../notifications.types';
+import { COMPANY_NAME, emailHtml } from './layout';
 
 /**
  * CORREO DE INVITACION AL PANEL
@@ -42,9 +43,19 @@ export interface StaffInviteEmailData {
   /** Contacto de la empresa, si esta configurado. */
   companyPhone: string | null;
   companyEmail: string | null;
+  /** De donde se descarga el logotipo, o `null` para no ponerlo. */
+  logoUrl: string | null;
 }
 
-const COMPANY_NAME = 'Freshness Touch';
+/**
+ * Lo que necesita el correo de recuperacion.
+ *
+ * ES EL DE LA INVITACION MENOS EL PUESTO: a quien ya trabaja aqui no hay que
+ * recordarle a que se le contrato, y repetirlo en un correo de "has perdido
+ * la contrasena" solo anade informacion interna a un mensaje que puede
+ * acabar en un buzon ajeno.
+ */
+export type StaffRecoveryEmailData = Omit<StaffInviteEmailData, 'role'>;
 
 /** Como se llama el puesto en cada idioma, para explicar a que se le invita. */
 const PUESTO: Record<Locale, Record<StaffRole, string>> = {
@@ -109,9 +120,90 @@ export function staffInviteEmail(to: string, data: StaffInviteEmailData): EmailM
   };
 }
 
+/**
+ * CORREO DE RECUPERACION DE ACCESO
+ * --------------------------------
+ * Hermano del de invitacion, y por las mismas razones vive aqui y no en la
+ * plantilla del proveedor de identidad: se revisa como el codigo, se prueba,
+ * y va en el idioma de la persona.
+ *
+ * ANTES LO MANDABA SUPABASE. Llegaba en ingles, con su remitente y su
+ * aspecto, a traves de un servicio de correo que el propio proveedor
+ * describe como no apto para produccion y que limita los envios por hora.
+ * Para alguien que no puede entrar a trabajar, quedarse sin correo porque se
+ * agoto una cuota no es un detalle estetico.
+ *
+ * LA DIFERENCIA DE FONDO CON EL DE INVITACION es solo el tono: aqui la
+ * persona ya tiene cuenta y ya ha entrado antes. No se le da la bienvenida,
+ * se le devuelve la llave.
+ *
+ * QUE NO LLEVA, igual que el de invitacion: ninguna contrasena, y ni una
+ * palabra sobre nadie mas.
+ */
+export function staffRecoveryEmail(to: string, data: StaffRecoveryEmailData): EmailMessage {
+  const es = data.locale === 'es';
+
+  const titulo = es ? 'Vuelve a entrar en el panel' : 'Get back into the panel';
+
+  const parrafos = es
+    ? [
+        `Hola ${data.firstName}:`,
+        `Se ha pedido volver a elegir la contraseña de tu acceso al panel de ${COMPANY_NAME}.`,
+        'Elige una nueva con el botón de abajo.',
+      ]
+    : [
+        `Hi ${data.firstName},`,
+        `Someone asked to choose a new password for your ${COMPANY_NAME} panel access.`,
+        'Pick a new one with the button below.',
+      ];
+
+  const boton = es ? 'Elegir contraseña nueva' : 'Choose a new password';
+
+  const nota = es
+    ? 'Este enlace sirve una sola vez y caduca. Si al abrirlo te dice que ya no vale, vuelve a pedirlo desde «¿Has olvidado tu contraseña?» en la pantalla de acceso.'
+    : 'This link works once and then expires. If it tells you it is no longer valid, request it again from "Forgot your password?" on the sign-in screen.';
+
+  /*
+   * EL AVISO ES DISTINTO AL DE LA INVITACION, y la diferencia importa.
+   *
+   * Aqui la cuenta YA existe: si quien recibe esto no lo pidio, puede que
+   * alguien este probando con su correo. Se le dice que ignorarlo basta
+   * —nada cambia hasta que se abre el enlace— y que lo cuente. Un correo
+   * inesperado de este tipo es la primera senal de un intento de entrada.
+   */
+  const aviso = es
+    ? 'Si no lo has pedido tú, ignora este correo: tu contraseña actual sigue funcionando y no cambia nada. Si te llegan varios, avisa a administración.'
+    : 'If you did not request this, ignore the email: your current password still works and nothing changes. If several arrive, tell administration.';
+
+  const contacto = pieDeContacto(data, es);
+
+  return {
+    to,
+    subject: titulo,
+    text: [
+      titulo,
+      '',
+      ...parrafos,
+      '',
+      data.actionLink,
+      '',
+      nota,
+      '',
+      aviso,
+      ...(contacto.length > 0 ? ['', ...contacto] : []),
+      '',
+      COMPANY_NAME,
+    ].join('\n'),
+    html: comoHtml({ titulo, parrafos, boton, nota, aviso, contacto, data }),
+  };
+}
+
 /* -------------------------------------------------------------------------- */
 
-function pieDeContacto(data: StaffInviteEmailData, es: boolean): string[] {
+function pieDeContacto(
+  data: Pick<StaffInviteEmailData, 'companyPhone' | 'companyEmail'>,
+  es: boolean,
+): string[] {
   const lineas: string[] = [];
   if (data.companyPhone) lineas.push(`${es ? 'Teléfono' : 'Phone'}: ${data.companyPhone}`);
   if (data.companyEmail) lineas.push(`${es ? 'Correo' : 'Email'}: ${data.companyEmail}`);
@@ -119,15 +211,12 @@ function pieDeContacto(data: StaffInviteEmailData, es: boolean): string[] {
 }
 
 /**
- * HTML con estilos en linea, como el resto de los correos: los clientes de
- * correo descartan las hojas de estilo y muchos ignoran el `<style>` del
- * encabezado.
+ * El HTML sale del diseno comun (`layout.ts`).
  *
- * EL ENLACE SE ESCAPA COMO ATRIBUTO, que no es lo mismo que escapar texto. Va
- * dentro de `href="..."`, asi que unas comillas sin escapar permitirian cerrar
- * el atributo y anadir otros. El enlace lo construye el proveedor y no el
- * usuario, pero escapar solo donde uno cree que hace falta es como se acaban
- * colando estas cosas.
+ * Aqui habia otra copia casi exacta de la maqueta de los correos de
+ * reservas, incluida su propia funcion de escapado. Ahora esta funcion solo
+ * traduce al vocabulario del diseno; el boton y el enlace en texto los pone
+ * el diseno, para todos los correos igual.
  */
 function comoHtml(partes: {
   titulo: string;
@@ -136,49 +225,18 @@ function comoHtml(partes: {
   nota: string;
   aviso: string;
   contacto: string[];
-  data: StaffInviteEmailData;
+  data: Pick<StaffInviteEmailData, 'locale' | 'actionLink' | 'logoUrl'>;
 }): string {
   const { titulo, parrafos, boton, nota, aviso, contacto, data } = partes;
-  const enlace = escapar(data.actionLink);
 
-  return `<!doctype html>
-<html lang="${data.locale}">
-  <body style="margin:0;padding:24px;background:#f7f9fc;font-family:-apple-system,'Segoe UI',sans-serif;">
-    <table role="presentation" style="max-width:560px;margin:0 auto;background:#ffffff;border-radius:12px;border:1px solid #e2e8f0;">
-      <tr>
-        <td style="padding:24px;">
-          <p style="margin:0 0 16px;font-size:20px;font-weight:700;color:#10456c;">${escapar(titulo)}</p>
-          ${parrafos.map((p) => `<p style="margin:0 0 12px;font-size:15px;color:#334155;line-height:1.5;">${escapar(p)}</p>`).join('')}
-          <p style="margin:24px 0;">
-            <a href="${enlace}" style="display:inline-block;padding:12px 20px;background:#10456c;color:#ffffff;text-decoration:none;border-radius:8px;font-size:15px;font-weight:600;">${escapar(boton)}</a>
-          </p>
-          <!--
-            El enlace tambien en texto: hay clientes de correo que no pintan
-            botones, y quien lea esto en un movil viejo tiene que poder
-            copiarlo a mano.
-          -->
-          <p style="margin:0 0 16px;font-size:12px;color:#94a3b8;word-break:break-all;">${enlace}</p>
-          <p style="margin:0 0 12px;font-size:14px;color:#475569;line-height:1.5;">${escapar(nota)}</p>
-          <p style="margin:0 0 16px;font-size:13px;color:#64748b;line-height:1.5;">${escapar(aviso)}</p>
-          ${
-            contacto.length > 0
-              ? `<hr style="border:0;border-top:1px solid #e2e8f0;margin:16px 0;" />
-                 ${contacto.map((linea) => `<p style="margin:0 0 4px;font-size:13px;color:#64748b;">${escapar(linea)}</p>`).join('')}`
-              : ''
-          }
-          <p style="margin:16px 0 0;font-size:13px;color:#94a3b8;">${COMPANY_NAME}</p>
-        </td>
-      </tr>
-    </table>
-  </body>
-</html>`;
-}
-
-function escapar(valor: string): string {
-  return valor
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
+  return emailHtml({
+    locale: data.locale,
+    titulo,
+    parrafos,
+    boton: { texto: boton, enlace: data.actionLink },
+    nota,
+    aviso,
+    contacto,
+    branding: { logoUrl: data.logoUrl },
+  });
 }

@@ -13,6 +13,8 @@ import {
 } from './bookings-admin.controller';
 import { BookingsAdminService } from './bookings-admin.service';
 import { MyJobsController } from './my-jobs.controller';
+import { PasswordRecoveryController } from './password-recovery.controller';
+import { PasswordRecoveryService } from './password-recovery.service';
 import { MyJobsService } from './my-jobs.service';
 import { SessionController } from './session.controller';
 import { SupabaseInviteProvider } from './providers/supabase-invite.provider';
@@ -39,6 +41,13 @@ import type { Env } from '../common/config/env';
     StaffListController,
     StaffAdminController,
     MyJobsController,
+    /*
+     * PUBLICO, sin sesion y fuera de `/admin`: quien no puede entrar no
+     * tiene con que identificarse. Vive en este modulo igualmente porque
+     * necesita el proveedor de invitaciones que se configura aqui abajo,
+     * y duplicar esa fabrica era la otra opcion.
+     */
+    PasswordRecoveryController,
   ],
   providers: [
     BookingsAdminService,
@@ -46,6 +55,7 @@ import type { Env } from '../common/config/env';
     AssignmentsService,
     StaffAdminService,
     MyJobsService,
+    PasswordRecoveryService,
     {
       /*
        * La capacidad de invitar se DERIVA de la configuracion en vez de

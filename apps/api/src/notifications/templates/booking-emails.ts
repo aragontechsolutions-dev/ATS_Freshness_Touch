@@ -1,6 +1,7 @@
 import { DateTime } from 'luxon';
 import type { Locale } from '@freshness/types';
 import type { EmailMessage } from '../notifications.types';
+import { COMPANY_NAME, emailHtml } from './layout';
 
 /**
  * TEXTOS DE LOS CORREOS AL CLIENTE
@@ -40,11 +41,17 @@ export interface BookingEmailData {
   /** Contacto de la empresa, si esta configurado. */
   companyPhone: string | null;
   companyEmail: string | null;
+  /**
+   * De donde se descarga el logotipo, o `null` para no ponerlo.
+   *
+   * Viaja en los datos y no lo lee la plantilla de una variable global para
+   * que estas funciones sigan siendo puras: se prueban pasandoles un objeto,
+   * sin entorno que preparar.
+   */
+  logoUrl: string | null;
 }
 
 const ETIQUETA_LOCALE: Record<Locale, string> = { en: 'en-US', es: 'es-US' };
-
-const COMPANY_NAME = 'Freshness Touch';
 
 /** Correo de confirmacion: la reserva quedo en firme. */
 export function bookingConfirmedEmail(to: string, data: BookingEmailData): EmailMessage {
@@ -274,14 +281,12 @@ function comoTexto(
 }
 
 /**
- * HTML de correo, con estilos en linea.
+ * El HTML sale del diseno comun (`layout.ts`).
  *
- * No es descuido: los clientes de correo descartan las hojas de estilo y
- * muchos ignoran incluso el `<style>` del encabezado. Lo unico que sobrevive
- * de forma fiable es el atributo `style` en cada elemento.
- *
- * Todo lo que viene de fuera pasa por `escapar()`. Un apellido con `<` no
- * deberia poder romper la maqueta, y menos aun colar etiquetas.
+ * Esta funcion era antes una copia casi exacta de la de los correos del
+ * personal. Casi exacta es el problema: un arreglo se aplicaba a una y no a
+ * la otra. Ahora solo traduce los datos de una reserva al vocabulario del
+ * diseno.
  */
 function comoHtml(
   titulo: string,
@@ -290,40 +295,15 @@ function comoHtml(
   nota: string,
   data: BookingEmailData,
 ): string {
-  const contacto = pieDeContacto(data);
-
-  const filas = datos
-    .map(
-      ([etiqueta, valor]) => `
-        <tr>
-          <td style="padding:6px 12px 6px 0;color:#475569;font-size:14px;">${escapar(etiqueta)}</td>
-          <td style="padding:6px 0;color:#0f172a;font-size:14px;font-weight:600;">${escapar(valor)}</td>
-        </tr>`,
-    )
-    .join('');
-
-  return `<!doctype html>
-<html lang="${data.locale}">
-  <body style="margin:0;padding:24px;background:#f7f9fc;font-family:-apple-system,'Segoe UI',sans-serif;">
-    <table role="presentation" style="max-width:560px;margin:0 auto;background:#ffffff;border-radius:12px;border:1px solid #e2e8f0;">
-      <tr>
-        <td style="padding:24px;">
-          <p style="margin:0 0 16px;font-size:20px;font-weight:700;color:#10456c;">${escapar(titulo)}</p>
-          ${parrafos.map((p) => `<p style="margin:0 0 12px;font-size:15px;color:#334155;line-height:1.5;">${escapar(p)}</p>`).join('')}
-          <table role="presentation" style="margin:16px 0;border-collapse:collapse;">${filas}</table>
-          <p style="margin:0 0 16px;font-size:14px;color:#475569;line-height:1.5;">${escapar(nota)}</p>
-          ${
-            contacto.length > 0
-              ? `<hr style="border:0;border-top:1px solid #e2e8f0;margin:16px 0;" />
-                 ${contacto.map((linea) => `<p style="margin:0 0 4px;font-size:13px;color:#64748b;">${escapar(linea)}</p>`).join('')}`
-              : ''
-          }
-          <p style="margin:16px 0 0;font-size:13px;color:#94a3b8;">${COMPANY_NAME}</p>
-        </td>
-      </tr>
-    </table>
-  </body>
-</html>`;
+  return emailHtml({
+    locale: data.locale,
+    titulo,
+    parrafos,
+    datos,
+    nota,
+    contacto: pieDeContacto(data),
+    branding: { logoUrl: data.logoUrl },
+  });
 }
 
 /** Fecha y hora en la zona de la empresa, que es cuando llega el equipo. */
@@ -339,14 +319,4 @@ function formatearDinero(cents: number, currency: string, locale: Locale): strin
     style: 'currency',
     currency,
   }).format(cents / 100);
-}
-
-/** Evita que un dato del cliente rompa la maqueta o cuele etiquetas. */
-function escapar(valor: string): string {
-  return valor
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
 }

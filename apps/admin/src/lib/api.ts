@@ -499,3 +499,30 @@ export function saveServiceArea(settings: ServiceAreaSettings): Promise<AdminSer
     { method: 'PUT', body: settings },
   );
 }
+
+/**
+ * PEDIR UN ENLACE PARA VOLVER A ENTRAR.
+ *
+ * ES LA UNICA LLAMADA DE ESTE ARCHIVO SIN SESION, y tiene que serlo: quien
+ * la hace es precisamente quien no puede entrar. Por eso no pasa por
+ * `request`, que exige token y falla antes de salir.
+ *
+ * NO LANZA NUNCA Y NO DEVUELVE NADA. La pantalla enseña «mira tu correo»
+ * pase lo que pase —exista o no la cuenta, responda o no la API— y el
+ * servidor hace lo mismo por su lado. Si esta función pudiera fallar de
+ * formas distintas, la pantalla acabaría contando cuál fue, y con eso se
+ * averigua qué direcciones están dadas de alta probándolas una a una.
+ */
+export async function requestPasswordRecovery(email: string): Promise<void> {
+  try {
+    await fetch(`${BASE_URL}/password-recovery`, {
+      method: 'POST',
+      headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+      credentials: 'omit',
+      referrerPolicy: 'no-referrer',
+    });
+  } catch {
+    // A propósito: ni se relanza ni se registra. Ver el comentario de arriba.
+  }
+}

@@ -38,3 +38,24 @@ export const SKIP_ALL_THROTTLERS: Record<ThrottlerName, boolean> = Object.fromEn
 export const SKIP_QUOTE_THROTTLER: Partial<Record<ThrottlerName, boolean>> = {
   [THROTTLER_NAMES[1]]: true,
 };
+
+/**
+ * EL LIMITE DE LA RECUPERACION DE CONTRASENA.
+ *
+ * Va como override por ruta con `@Throttle({ global: RECOVERY_RATE_LIMIT })`
+ * y NO como limitador con nombre propio, que fue lo primero que probe.
+ *
+ * El motivo es la trampa que explica todo este archivo: un limitador con
+ * nombre se aplica a TODA la API, asi que anadir uno de cinco peticiones por
+ * cuarto de hora habria obligado a eximirlo en cada controlador que existe
+ * —y en cada uno que se escriba manana—. El dia que a alguien se le olvide,
+ * la pantalla afectada se cae a la sexta peticion. Un override por ruta solo
+ * puede afectar a esa ruta.
+ *
+ * Los numeros: cinco peticiones por cuarto de hora y por IP. Cada una manda
+ * un correo a una persona real, asi que sin tope esto es una forma gratuita
+ * de inundar un buzon ajeno y de gastar la cuota de envio de la empresa de
+ * paso. Cinco deja margen de sobra para quien se equivoca al teclear su
+ * correo y lo reintenta.
+ */
+export const RECOVERY_RATE_LIMIT = { limit: 5, ttl: 15 * 60 * 1000 } as const;

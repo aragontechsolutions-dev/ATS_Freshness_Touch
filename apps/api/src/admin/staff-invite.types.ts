@@ -60,6 +60,17 @@ export interface StaffAccount {
   hasSignedIn: boolean;
 }
 
+/**
+ * Un enlace para volver a entrar, cuando la cuenta YA EXISTE y su duena
+ * perdio la contrasena.
+ *
+ * No devuelve identificador de cuenta, y es deliberado: aqui no se vincula
+ * nada. La ficha ya tiene su `authUserId` desde que se la invito, y volver a
+ * escribirlo desde un camino publico seria darle a un endpoint sin sesion la
+ * capacidad de cambiar con que cuenta entra una persona.
+ */
+export type RecoveryResult = { ok: true; actionLink: string } | { ok: false; reason: string };
+
 export interface StaffInviteProvider {
   readonly name: string;
   /**
@@ -83,6 +94,25 @@ export interface StaffInviteProvider {
    * no puede impedir invitar a alguien.
    */
   account(authUserId: string): Promise<StaffAccount | null>;
+
+  /**
+   * Un enlace para elegir contrasena de nuevo.
+   *
+   * POR QUE LO GENERA EL SERVIDOR Y NO EL NAVEGADOR. La libreria del cliente
+   * tiene su propio `resetPasswordForEmail`, y era lo que usabamos. Ese
+   * camino guarda un verificador en el navegador QUE PIDIO el enlace y lo
+   * exige al canjearlo; como el enlace llega por correo y el correo se abre
+   * SIEMPRE en otra pestana, el verificador nunca esta donde hace falta y el
+   * canje falla. Dejo a una persona sin poder entrar durante dias.
+   *
+   * Generado aqui no hay verificador que perder: el enlace vuelve con la
+   * sesion en el fragmento de la direccion, igual que el de invitacion, y
+   * funciona se abra donde se abra.
+   *
+   * COMO EL DE INVITACION: es una credencial de un solo uso y no se registra
+   * en ningun sitio.
+   */
+  recovery(email: string): Promise<RecoveryResult>;
 }
 
 export const STAFF_INVITE_PROVIDER = Symbol('STAFF_INVITE_PROVIDER');

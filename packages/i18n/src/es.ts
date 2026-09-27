@@ -624,6 +624,7 @@ export const es: TranslationResources = {
           updated: 'Cambió una ficha de personal',
           invited: 'Invitó al panel',
           reinvited: 'Volvió a enviar la invitación',
+          recovery_sent: 'Pidió volver a entrar y se le mandó el enlace',
         },
         settings: {
           updated: 'Cambió la configuración',

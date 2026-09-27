@@ -101,6 +101,20 @@ export const EnvSchema = z
     EMAIL_FROM: z.string().min(1).optional(),
     /** A donde responde el cliente si contesta. Si falta, se usa EMAIL_FROM. */
     EMAIL_REPLY_TO: z.string().email().optional(),
+    /**
+     * Logotipo de la cabecera de los correos. Direccion publica y absoluta.
+     *
+     * OPCIONAL A PROPOSITO. Sin ella los correos salen con el nombre de la
+     * empresa en texto y el color de marca, que es exactamente lo que ve de
+     * todos modos quien tenga las imagenes bloqueadas —Outlook por defecto,
+     * y Gmail con quien no este en su libreta—. Un correo con una imagen
+     * rota apuntando a un dominio que ya no es de la empresa es peor que un
+     * correo sin imagen.
+     *
+     * Tiene que ser HTTPS y absoluta: un correo no tiene pagina desde la
+     * que resolver una ruta relativa.
+     */
+    EMAIL_LOGO_URL: z.string().url().startsWith('https://').optional(),
     EMAIL_TIMEOUT_MS: z.coerce.number().int().min(1000).default(10000),
 
     /**

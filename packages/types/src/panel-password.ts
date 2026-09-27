@@ -62,3 +62,28 @@ export function panelPasswordProblem(
   if (password !== confirmation) return 'mismatch';
   return null;
 }
+
+/**
+ * PEDIR UN ENLACE PARA VOLVER A ENTRAR
+ * ------------------------------------
+ * Lo unico que viaja es un correo. Lo que NO lleva es igual de importante:
+ * ni a donde volver ni que tipo de enlace se quiere. Las dos cosas las
+ * decide el servidor.
+ *
+ * El destino del enlace viene de la configuracion del servidor y no de la
+ * peticion. Si lo eligiera quien llama, cualquiera podria pedir un enlace
+ * para el correo de otra persona y hacer que apuntara a un sitio suyo: el
+ * enlace seguiria llegando al buzon legitimo, pero al abrirlo entregaria la
+ * sesion al atacante. Es el fallo clasico de redireccion abierta, y aqui
+ * costaria el panel entero.
+ */
+export const PasswordRecoveryRequestSchema = z.strictObject({
+  /*
+   * NO se usa `z.email()`: el servidor responde lo mismo escriba lo que
+   * escriba, asi que rechazar por formato solo anadiria una respuesta
+   * distinta —un 400— con la que averiguar cosas. Un tope de largo si, para
+   * que nadie mande un megabyte.
+   */
+  email: z.string().min(1).max(160),
+});
+export type PasswordRecoveryRequest = z.infer<typeof PasswordRecoveryRequestSchema>;
