@@ -28,7 +28,6 @@ export function buildCatalog(
   now: Date,
   config: PricingConfig = defaultPricingConfig,
 ): CatalogResponse {
-
   const services: CatalogService[] = (Object.keys(config.services) as ServiceType[]).map((code) => {
     const rates = Object.fromEntries(
       FRECUENCIAS.map((frecuencia) => {

@@ -422,7 +422,8 @@ export const en = {
       save: 'Save rates',
       saved: 'Rates saved. New quotes already use these prices.',
       invalidNumbers: 'Check the amounts: one of the fields is not a number.',
-      outOfRange: 'That amount is beyond anything reasonable. Check "{{field}}": is there an extra zero?',
+      outOfRange:
+        'That amount is beyond anything reasonable. Check "{{field}}": is there an extra zero?',
       errOneTimeRequired:
         'A service has to be bookable as a one-off: leave the "One time" frequency checked.',
       errFrequencyOrder:
@@ -957,7 +958,8 @@ export const en = {
        * El traslado que SE COBRA HOY: las millas que pasan del radio libre,
        * contadas ida y vuelta.
        */
-      travel: 'Travel · {{miles}} mi ({{freeRadius}} included, {{billableMiles}} billed round trip)',
+      travel:
+        'Travel · {{miles}} mi ({{freeRadius}} included, {{billableMiles}} billed round trip)',
 
       /*
        * LAS TRES DE ABAJO YA NO SE EMITEN. Se quedan porque el panel lee

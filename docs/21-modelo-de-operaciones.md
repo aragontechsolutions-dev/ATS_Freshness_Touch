@@ -11,15 +11,15 @@ viejos seguían cuadrando entre ellos; lo que dejó de encajar fue el modelo.
 
 ## 1. Lo que había, y por qué se cambió
 
-| | Antes | Ahora |
-| --- | --- | --- |
-| **Estándar** | `65 $ base + 12 $/dorm + 15 $/baño + 3¢/pie²`, mínimo 120 $ | **185 $** planos, y su propia tarifa por cadencia |
-| **Recurrencia** | Descuento en porcentaje (15 / 10 / 5 %) | **Tarifa propia**: 150 mensual, 135 quincenal, 120 semanal |
-| **Profunda y mudanza** | Fórmula por habitaciones | **`max(250 $, 0,30 $/pie²)`**, solo puntual |
-| **Depósito** | Variable: 30 $ + millas × tarifa IRS, acotado entre 30 y 120 | **35 $ fijos**, descontados del total |
-| **Distancia** | Cuatro anillos con recargo fijo (0 / 25 / 50 / 75 $) | **35 millas incluidas**, y por encima las millas reales |
-| **Extras** | Diez | **Cuatro**: horno, nevera, gabinetes, ventanas por dentro |
-| **Servicios con precio automático** | Cinco | **Tres**: estándar, profunda y mudanza |
+|                                     | Antes                                                        | Ahora                                                      |
+| ----------------------------------- | ------------------------------------------------------------ | ---------------------------------------------------------- |
+| **Estándar**                        | `65 $ base + 12 $/dorm + 15 $/baño + 3¢/pie²`, mínimo 120 $  | **185 $** planos, y su propia tarifa por cadencia          |
+| **Recurrencia**                     | Descuento en porcentaje (15 / 10 / 5 %)                      | **Tarifa propia**: 150 mensual, 135 quincenal, 120 semanal |
+| **Profunda y mudanza**              | Fórmula por habitaciones                                     | **`max(250 $, 0,30 $/pie²)`**, solo puntual                |
+| **Depósito**                        | Variable: 30 $ + millas × tarifa IRS, acotado entre 30 y 120 | **35 $ fijos**, descontados del total                      |
+| **Distancia**                       | Cuatro anillos con recargo fijo (0 / 25 / 50 / 75 $)         | **35 millas incluidas**, y por encima las millas reales    |
+| **Extras**                          | Diez                                                         | **Cuatro**: horno, nevera, gabinetes, ventanas por dentro  |
+| **Servicios con precio automático** | Cinco                                                        | **Tres**: estándar, profunda y mudanza                     |
 
 Cuatro de esos cambios son de modelo, no de cifra, y conviene tener escrito
 por qué.
@@ -81,12 +81,12 @@ cuesta menos que el depósito.
 
 Las cinco zonas con recargo pasaron a tres bandas sin recargo propio:
 
-| Zona | Hasta | Qué significa |
-| --- | --- | --- |
-| **A** | 35 millas | Dentro del radio incluido: **el traslado no se cobra** |
-| **B** | 60 millas | Se cobra el traslado por milla, **el precio sigue saliendo solo** |
-| **C** | 325 millas | El resto de Georgia: **se atiende, sin precio automático** |
-| `OUT_OF_RANGE` | — | Más allá de la última. No se configura: no es una zona |
+| Zona           | Hasta      | Qué significa                                                     |
+| -------------- | ---------- | ----------------------------------------------------------------- |
+| **A**          | 35 millas  | Dentro del radio incluido: **el traslado no se cobra**            |
+| **B**          | 60 millas  | Se cobra el traslado por milla, **el precio sigue saliendo solo** |
+| **C**          | 325 millas | El resto de Georgia: **se atiende, sin precio automático**        |
+| `OUT_OF_RANGE` | —          | Más allá de la última. No se configura: no es una zona            |
 
 **Las 35 millas de la zona A son el radio sin recargo, y no es casualidad.**
 La frontera que el cliente nota es «me cobras el viaje o no», así que la zona
@@ -115,14 +115,14 @@ a ciegas. Al guardar de nuevo desde el panel, la fila queda ya sin el campo.
 
 ### 3.1 Servicios
 
-| Servicio | Precio automático | Cadencias |
-| --- | --- | --- |
-| Estándar | Sí | Las cuatro |
-| Profunda | Sí | Solo puntual |
-| Mudanza | Sí | Solo puntual |
-| Post-construcción | **No** | — |
-| Rotación Airbnb | **No** | — |
-| Comercial | **No** | — |
+| Servicio          | Precio automático | Cadencias    |
+| ----------------- | ----------------- | ------------ |
+| Estándar          | Sí                | Las cuatro   |
+| Profunda          | Sí                | Solo puntual |
+| Mudanza           | Sí                | Solo puntual |
+| Post-construcción | **No**            | —            |
+| Rotación Airbnb   | **No**            | —            |
+| Comercial         | **No**            | —            |
 
 Los tres últimos se visitan y se proponen a mano. **No desaparecen del
 enumerado**: su código está escrito en reservas que ya existen.
@@ -221,12 +221,12 @@ da precio automático.
 
 **Lo que NO se edita, y por qué:**
 
-| | Por qué |
-| --- | --- |
-| Que un servicio dé precio automático | Es una regla de negocio, no una tarifa |
-| Si un extra es plano o por unidad | Cambia el significado de cada línea de los presupuestos anteriores |
-| Las duraciones | Afectan a la agenda, no al importe |
-| El impuesto | En Georgia la limpieza está exenta por ley |
+|                                      | Por qué                                                            |
+| ------------------------------------ | ------------------------------------------------------------------ |
+| Que un servicio dé precio automático | Es una regla de negocio, no una tarifa                             |
+| Si un extra es plano o por unidad    | Cambia el significado de cada línea de los presupuestos anteriores |
+| Las duraciones                       | Afectan a la agenda, no al importe                                 |
+| El impuesto                          | En Georgia la limpieza está exenta por ley                         |
 
 ---
 
@@ -256,17 +256,17 @@ Lo que se revisó al cerrar la etapa:
 
 ## 8. Dónde está cada cosa
 
-| Qué | Dónde |
-| --- | --- |
-| La forma del modelo | `packages/pricing/src/config.ts` |
-| El cálculo | `packages/pricing/src/engine.ts` |
-| El traslado | `packages/pricing/src/travel.ts` |
-| El depósito | `packages/pricing/src/deposit.ts` |
-| El catálogo público | `packages/pricing/src/catalog.ts` |
-| El contrato de lo editable | `packages/types/src/pricing-rates.ts` |
-| El contrato de las zonas | `packages/types/src/service-area.ts` |
-| La pantalla de Tarifas | `apps/admin/src/components/PricingRatesForm.tsx` |
-| Qué se hace y qué no | `apps/landing/src/sections/ScopeOfWork.tsx` |
+| Qué                        | Dónde                                            |
+| -------------------------- | ------------------------------------------------ |
+| La forma del modelo        | `packages/pricing/src/config.ts`                 |
+| El cálculo                 | `packages/pricing/src/engine.ts`                 |
+| El traslado                | `packages/pricing/src/travel.ts`                 |
+| El depósito                | `packages/pricing/src/deposit.ts`                |
+| El catálogo público        | `packages/pricing/src/catalog.ts`                |
+| El contrato de lo editable | `packages/types/src/pricing-rates.ts`            |
+| El contrato de las zonas   | `packages/types/src/service-area.ts`             |
+| La pantalla de Tarifas     | `apps/admin/src/components/PricingRatesForm.tsx` |
+| Qué se hace y qué no       | `apps/landing/src/sections/ScopeOfWork.tsx`      |
 
 ---
 

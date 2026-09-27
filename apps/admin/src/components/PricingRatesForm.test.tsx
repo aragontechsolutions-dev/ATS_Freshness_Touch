@@ -116,10 +116,7 @@ function campoImporte(indice: number): HTMLInputElement {
 }
 
 function escribir(input: HTMLInputElement, valor: string): void {
-  const setter = Object.getOwnPropertyDescriptor(
-    window.HTMLInputElement.prototype,
-    'value',
-  )?.set;
+  const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
   setter?.call(input, valor);
   input.dispatchEvent(new Event('input', { bubbles: true }));
 }

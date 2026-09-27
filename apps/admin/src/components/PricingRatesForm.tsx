@@ -221,8 +221,7 @@ export function PricingRatesForm({ locale, onSessionLost }: PricingRatesFormProp
                * importe plano y daria igual, pero el dia que alguien mire la
                * tabla vería un precio por pie que no existe.
                */
-              centsPerSquareFoot:
-                campos.sqft.trim() === '' ? null : Number.parseFloat(campos.sqft),
+              centsPerSquareFoot: campos.sqft.trim() === '' ? null : Number.parseFloat(campos.sqft),
             };
       }
       services[tipo] = porCadencia;

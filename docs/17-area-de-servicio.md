@@ -67,12 +67,12 @@ pierde un cliente que sí se podía atender.
 Tres bandas desde la Etapa 2.23. Antes eran cinco anillos con recargo propio;
 el porqué del cambio está en `docs/21-modelo-de-operaciones.md` §2.
 
-| Zona | Hasta | Traslado | Precio automático |
-| --- | --- | --- | --- |
-| A | 35 mi | **No se cobra** | Sí |
-| B | 60 mi | Por milla desde las 35 | Sí |
-| C | **325 mi** | Se calcula en persona | **No** |
-| `OUT_OF_RANGE` | más allá | — | No se atiende |
+| Zona           | Hasta      | Traslado               | Precio automático |
+| -------------- | ---------- | ---------------------- | ----------------- |
+| A              | 35 mi      | **No se cobra**        | Sí                |
+| B              | 60 mi      | Por milla desde las 35 | Sí                |
+| C              | **325 mi** | Se calcula en persona  | **No**            |
+| `OUT_OF_RANGE` | más allá   | —                      | No se atiende     |
 
 **Las 35 millas de la zona A son el radio sin recargo**, y no es casualidad:
 la frontera que el cliente nota es «me cobras el viaje o no», así que la zona
@@ -109,12 +109,12 @@ el pasado sería fiable.
 
 El contrato las comprueba, y cada una evita un problema concreto:
 
-| Regla | Qué evita |
-| --- | --- |
-| Los códigos van en orden y sin saltos | El motor recorre la lista y se queda con la primera zona que alcanza la distancia: desordenada, diría **que el precio se da en persona cuando sale solo, o al revés**, sin fallar por ningún sitio |
-| Cada anillo llega más lejos que el anterior | Un tramo que nunca se alcanza: una zona configurada que no se asigna jamás |
-| El precio automático no vuelve | Si a 50 millas hay que dar precio en persona, a 200 también. Lo contrario deja al cotizador dando cifras más lejos de donde ya dijo que no puede |
-| La zona más cercana **siempre** da precio automático | Sin ella no habría cotizador: el sitio pediría los datos para no darle ninguna cifra a nadie, ni siquiera a quien vive al lado |
+| Regla                                                | Qué evita                                                                                                                                                                                          |
+| ---------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Los códigos van en orden y sin saltos                | El motor recorre la lista y se queda con la primera zona que alcanza la distancia: desordenada, diría **que el precio se da en persona cuando sale solo, o al revés**, sin fallar por ningún sitio |
+| Cada anillo llega más lejos que el anterior          | Un tramo que nunca se alcanza: una zona configurada que no se asigna jamás                                                                                                                         |
+| El precio automático no vuelve                       | Si a 50 millas hay que dar precio en persona, a 200 también. Lo contrario deja al cotizador dando cifras más lejos de donde ya dijo que no puede                                                   |
+| La zona más cercana **siempre** da precio automático | Sin ella no habría cotizador: el sitio pediría los datos para no darle ninguna cifra a nadie, ni siquiera a quien vive al lado                                                                     |
 
 Hay además un **tope duro de 500 millas** por zona. No es manía: sin él, un
 cero de más convierte el área de servicio en medio país.

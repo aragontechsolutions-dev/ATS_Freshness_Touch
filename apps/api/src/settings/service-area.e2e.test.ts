@@ -207,17 +207,13 @@ describe('las reglas del conjunto', () => {
    * es una mania: es lo que impide que una errata se guarde.
    */
   it('rechaza una distancia absurda', async () => {
-    const respuesta = await guardar([
-      { code: 'A', maxMiles: 9999, instantQuote: true },
-    ]);
+    const respuesta = await guardar([{ code: 'A', maxMiles: 9999, instantQuote: true }]);
 
     expect(respuesta.status).toBe(400);
   });
 
   it('no se pueden inventar zonas fuera del catalogo', async () => {
-    const respuesta = await guardar([
-      { code: 'Z', maxMiles: 20, instantQuote: true },
-    ]);
+    const respuesta = await guardar([{ code: 'Z', maxMiles: 20, instantQuote: true }]);
 
     expect(respuesta.status).toBe(400);
   });

@@ -32,14 +32,14 @@ porque la casa ya está profunda.
 
 ### Tarifas de partida (importe plano, en dólares)
 
-| Servicio | Una vez | Mensual | Cada 2 semanas | Semanal | Por pie² |
-| --- | ---: | ---: | ---: | ---: | ---: |
-| Estándar | 185.00 | 150.00 | 135.00 | 120.00 | — |
-| Profunda | 250.00 | — | — | — | 0.30 |
-| Mudanza | 250.00 | — | — | — | 0.30 |
-| Post-construcción | requiere visita | | | | |
-| Rotación Airbnb | requiere visita | | | | |
-| Comercial | requiere visita | | | | |
+| Servicio          |         Una vez | Mensual | Cada 2 semanas | Semanal | Por pie² |
+| ----------------- | --------------: | ------: | -------------: | ------: | -------: |
+| Estándar          |          185.00 |  150.00 |         135.00 |  120.00 |        — |
+| Profunda          |          250.00 |       — |              — |       — |     0.30 |
+| Mudanza           |          250.00 |       — |              — |       — |     0.30 |
+| Post-construcción | requiere visita |         |                |         |          |
+| Rotación Airbnb   | requiere visita |         |                |         |          |
+| Comercial         | requiere visita |         |                |         |          |
 
 **La estándar es plana: el tamaño no la cambia.** Un piso de 400 pies² y una
 casa de 3 000 pagan lo mismo. Es deliberado —es el precio que se dice por
@@ -53,12 +53,12 @@ cuatro juntos no significar nada.
 
 ## 2. Extras
 
-| Extra | Tipo | Precio |
-| --- | --- | ---: |
-| Interior del horno | fijo | 50.00 |
-| Interior del refrigerador | fijo | 50.00 |
-| Interior de gabinetes | fijo | 25.00 |
-| Ventanas por dentro | por unidad (máx. 40) | 6.00 |
+| Extra                     | Tipo                 | Precio |
+| ------------------------- | -------------------- | -----: |
+| Interior del horno        | fijo                 |  50.00 |
+| Interior del refrigerador | fijo                 |  50.00 |
+| Interior de gabinetes     | fijo                 |  25.00 |
+| Ventanas por dentro       | por unidad (máx. 40) |   6.00 |
 
 Los "por unidad" se recortan a su máximo: pedir 999 ventanas cobra 40, no 999.
 
@@ -76,10 +76,10 @@ millas_facturables = max(0, millas − radio_libre) × 2      (ida y vuelta)
 recargo            = millas_facturables × centavos_por_milla
 ```
 
-| Parámetro | Valor de partida |
-| --- | ---: |
-| Radio libre | 35 millas |
-| Ida y vuelta | sí |
+| Parámetro          |  Valor de partida |
+| ------------------ | ----------------: |
+| Radio libre        |         35 millas |
+| Ida y vuelta       |                sí |
 | Centavos por milla | la tarifa del IRS |
 
 **Por milla y no por escalones.** Antes había franjas con recargos fijos —25,
@@ -91,11 +91,11 @@ La **tarifa por milla por defecto es la del IRS vigente en la fecha del
 presupuesto** (`packages/pricing/src/mileage.ts`), lo que da una justificación
 objetiva y defendible ante el cliente:
 
-| Vigencia | Centavos por milla |
-| --- | ---: |
-| Desde 2025-01-01 | 70.0 |
-| Desde 2026-01-01 | 72.5 |
-| Desde 2026-07-01 | 76.0 |
+| Vigencia         | Centavos por milla |
+| ---------------- | -----------------: |
+| Desde 2025-01-01 |               70.0 |
+| Desde 2026-01-01 |               72.5 |
+| Desde 2026-07-01 |               76.0 |
 
 > Cuando el IRS publique una tarifa nueva, **añadir una entrada** a esa tabla.
 > Nunca editar las anteriores: un presupuesto antiguo debe poder reproducirse
@@ -113,12 +113,12 @@ Se puede fijar una tarifa propia desde el panel, y entonces esa manda.
 Tres bandas, que salen de la base de datos y se editan desde el panel
 (`docs/17-area-de-servicio.md`).
 
-| Zona | Distancia | ¿Se atiende? | ¿Precio automático? |
-| --- | --- | --- | --- |
-| A | hasta 35 millas | Sí | Sí |
-| B | hasta 60 millas | Sí | Sí |
-| C | hasta 325 millas | Sí | **No**: se da en persona |
-| Fuera de rango | más allá | No | — |
+| Zona           | Distancia        | ¿Se atiende? | ¿Precio automático?      |
+| -------------- | ---------------- | ------------ | ------------------------ |
+| A              | hasta 35 millas  | Sí           | Sí                       |
+| B              | hasta 60 millas  | Sí           | Sí                       |
+| C              | hasta 325 millas | Sí           | **No**: se da en persona |
+| Fuera de rango | más allá         | No           | —                        |
 
 **Las 35 millas de la zona A son el radio sin recargo**, y tienen que
 coincidir: la frontera que el cliente nota es «me cobras el viaje o no».
@@ -173,13 +173,13 @@ pueden comparar sin casos especiales.
 
 ## 8. Casos que van a revisión manual
 
-| Motivo | Comportamiento |
-| --- | --- |
-| Servicio sin precio automático | No se da precio; se ofrece visita y propuesta |
-| Zona atendida sin precio automático | **Se atiende**, pero el precio se da en persona |
-| Fuera del radio máximo | No se atiende; se invita a consultar |
-| Fuera de Georgia | Se avisa; se marca para revisión |
-| Más de 6.000 pies² | **Sí** se da precio, pero se marca para revisar |
+| Motivo                                   | Comportamiento                                       |
+| ---------------------------------------- | ---------------------------------------------------- |
+| Servicio sin precio automático           | No se da precio; se ofrece visita y propuesta        |
+| Zona atendida sin precio automático      | **Se atiende**, pero el precio se da en persona      |
+| Fuera del radio máximo                   | No se atiende; se invita a consultar                 |
+| Fuera de Georgia                         | Se avisa; se marca para revisión                     |
+| Más de 6.000 pies²                       | **Sí** se da precio, pero se marca para revisar      |
 | El servicio no se ofrece en esa cadencia | No se da precio; la salida es elegir otra frecuencia |
 
 Las dos últimas filas son nuevas y la distinción importa: «no vamos», «vamos y
@@ -190,7 +190,7 @@ distintas para quien está pidiendo un presupuesto.
 
 ## 9. Cómo cambiar un precio
 
-**Desde el panel** (lo normal): *Configuración → Tarifas*. Solo ADMIN. Cada
+**Desde el panel** (lo normal): _Configuración → Tarifas_. Solo ADMIN. Cada
 guardado crea una versión nueva y ninguna se borra. Ver
 `docs/20-tarifas-editables.md`.
 

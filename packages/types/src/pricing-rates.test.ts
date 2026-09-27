@@ -291,9 +291,9 @@ describe('los extras', () => {
 
   it('la cantidad maxima nunca es cero', () => {
     // Con cero, el extra se ofrece y luego no se cobra: peor que retirarlo.
-    expect(EditableAddOnRateSchema.safeParse({ unitAmountCents: 600, maxQuantity: 0 }).success).toBe(
-      false,
-    );
+    expect(
+      EditableAddOnRateSchema.safeParse({ unitAmountCents: 600, maxQuantity: 0 }).success,
+    ).toBe(false);
   });
 });
 
