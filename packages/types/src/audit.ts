@@ -103,6 +103,16 @@ const ACCIONES_FIJAS = [
    * direccion equivocada— que «invitada» a secas esconderia.
    */
   'staff.reinvited',
+  /**
+   * Se le mando un enlace para volver a elegir contrasena, a peticion suya
+   * desde la pantalla de acceso.
+   *
+   * SOLO SE REGISTRA CUANDO EL ENLACE SALE DE VERDAD. Una peticion para un
+   * correo que no existe no deja fila: si la dejara, este registro seria
+   * una lista de las direcciones que alguien ha ido probando, ordenadas por
+   * hora, dentro de la propia herramienta que existe para detectar eso.
+   */
+  'staff.recovery_sent',
 
   /* --- Configuracion --------------------------------------------------- */
   'settings.updated',

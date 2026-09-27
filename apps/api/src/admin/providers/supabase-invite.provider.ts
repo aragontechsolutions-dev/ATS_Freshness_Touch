@@ -1,6 +1,11 @@
 import { Logger } from '@nestjs/common';
 import { describeFailure } from '../../notifications/notifications.types';
-import type { InviteResult, StaffAccount, StaffInviteProvider } from '../staff-invite.types';
+import type {
+  InviteResult,
+  RecoveryResult,
+  StaffAccount,
+  StaffInviteProvider,
+} from '../staff-invite.types';
 
 export interface SupabaseInviteOptions {
   /** Direccion del proyecto: https://<ref>.supabase.co */
@@ -60,6 +65,47 @@ export class SupabaseInviteProvider implements StaffInviteProvider {
   }
 
   async invite(email: string): Promise<InviteResult> {
+    const enlace = await this.generarEnlace('invite', email);
+    if (!enlace.ok) return enlace;
+
+    if (!enlace.authUserId) {
+      /*
+       * Respondio que si pero sin identificador. Se trata como fallo: sin
+       * el no hay nada que vincular, y decir que la invitacion salio bien
+       * dejaria una ficha que parece tener acceso y no lo tiene.
+       */
+      this.logger.error('Supabase genero el enlace pero la respuesta no trae lo esperado');
+      return { ok: false, reason: 'La respuesta del proveedor esta incompleta' };
+    }
+
+    return { ok: true, authUserId: enlace.authUserId, actionLink: enlace.actionLink };
+  }
+
+  /**
+   * Enlace de recuperacion para una cuenta que ya existe.
+   *
+   * A DIFERENCIA DE `invite`, aqui NO se exige identificador de cuenta. La
+   * recuperacion no vincula nada: la ficha ya sabe cual es su cuenta desde
+   * que se la invito. Exigirlo solo anadiria una forma de fallar.
+   */
+  async recovery(email: string): Promise<RecoveryResult> {
+    const enlace = await this.generarEnlace('recovery', email);
+    return enlace.ok ? { ok: true, actionLink: enlace.actionLink } : enlace;
+  }
+
+  /**
+   * La llamada a `generate_link`, compartida por los dos tipos de enlace.
+   *
+   * Los dos hacen exactamente lo mismo —pedir un enlace y leer la respuesta—
+   * y solo cambia una palabra en el cuerpo. Duplicarla habria significado
+   * que un arreglo en el manejo de errores se aplicara a uno y no al otro.
+   */
+  private async generarEnlace(
+    tipo: 'invite' | 'recovery',
+    email: string,
+  ): Promise<
+    { ok: true; actionLink: string; authUserId: string | null } | { ok: false; reason: string }
+  > {
     if (!this.options.url || !this.options.serviceRoleKey) {
       return { ok: false, reason: 'El envio de invitaciones no esta configurado' };
     }
@@ -80,7 +126,7 @@ export class SupabaseInviteProvider implements StaffInviteProvider {
           Authorization: `Bearer ${this.options.serviceRoleKey}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ type: 'invite', email }),
+        body: JSON.stringify({ type: tipo, email }),
         signal: controller.signal,
       });
 
@@ -94,31 +140,25 @@ export class SupabaseInviteProvider implements StaffInviteProvider {
          * proyecto es un habito que en el adaptador de Telegram si habria
          * filtrado el token. Mas vale que la regla sea siempre la misma.
          */
-        this.logger.error(`Supabase rechazo la invitacion: ${detalle}`);
+        this.logger.error(`Supabase rechazo el enlace de tipo ${tipo}: ${detalle}`);
         return { ok: false, reason: detalle.slice(0, 200) };
       }
 
-      const authUserId = extraerId(cuerpo);
       const actionLink = extraerEnlace(cuerpo);
 
-      if (!authUserId || !actionLink) {
-        /*
-         * Respondio que si pero sin identificador. Se trata como fallo: sin
-         * el no hay nada que vincular, y decir que la invitacion salio bien
-         * dejaria una ficha que parece tener acceso y no lo tiene.
-         */
-        this.logger.error('Supabase genero el enlace pero la respuesta no trae lo esperado');
+      if (!actionLink) {
+        this.logger.error('Supabase respondio sin enlace');
         return { ok: false, reason: 'La respuesta del proveedor esta incompleta' };
       }
 
-      return { ok: true, authUserId, actionLink };
+      return { ok: true, actionLink, authUserId: extraerId(cuerpo) };
     } catch (error) {
       const motivo =
         error instanceof Error && error.name === 'AbortError'
           ? `El proveedor de identidad no respondio en ${this.options.timeoutMs} ms`
           : describeFailure(error);
 
-      this.logger.error(`No se pudo enviar la invitacion: ${motivo}`);
+      this.logger.error(`No se pudo generar el enlace de tipo ${tipo}: ${motivo}`);
       return { ok: false, reason: motivo };
     } finally {
       clearTimeout(temporizador);

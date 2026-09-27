@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-import { auth, supabaseIsConfigured } from '../lib/supabase';
+import { requestPasswordRecovery } from '../lib/api';
+import { supabaseIsConfigured } from '../lib/supabase';
 import {
   AlertIcon,
   ArrowLeftIcon,
@@ -37,18 +38,27 @@ export function ForgotPassword({ onBack }: ForgotPasswordProps) {
 
   const submit = async (event: FormEvent): Promise<void> => {
     event.preventDefault();
-    if (!auth || working) return;
+    if (working) return;
 
     setWorking(true);
 
     /*
-     * El enlace vuelve a la raiz del panel. Desde ahi, `readPasswordLink`
-     * decide si hay algo que atender; el resto del panel no acepta sesiones
-     * metidas en la direccion.
+     * EL ENLACE LO PIDE NUESTRA API, NO LA LIBRERIA DEL NAVEGADOR.
+     *
+     * Antes esto llamaba a `resetPasswordForEmail` de Supabase, y NO PODIA
+     * FUNCIONAR. Ese camino guarda un verificador en el navegador que pide
+     * el enlace y lo exige al canjearlo; el enlace llega por correo, un
+     * correo se abre siempre en otra pestana, y la sesion de este panel vive
+     * en `sessionStorage`, que muere con la pestana. El verificador nunca
+     * estaba donde hacia falta.
+     *
+     * Generado en el servidor no hay verificador que perder, y ademas el
+     * correo sale con nuestra plantilla y en el idioma de la persona en vez
+     * del que manda el proveedor. A donde vuelve el enlace tambien lo decide
+     * el servidor: si lo mandara esta pantalla, bastaria con manipular la
+     * peticion para que el enlace de otra persona apuntara a un sitio ajeno.
      */
-    await auth
-      .resetPasswordForEmail(email.trim(), { redirectTo: window.location.origin })
-      .catch(() => undefined);
+    await requestPasswordRecovery(email.trim());
 
     /*
      * Se anuncia enviado PASE LO QUE PASE, y sin mirar la respuesta. Es lo

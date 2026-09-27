@@ -3,6 +3,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import type { Env } from '../common/config/env';
 import { SettingsModule } from '../settings/settings.module';
 import { NotificationSettingsService } from './notification-settings.service';
+import { EmailBrandingService } from './email-branding.service';
 import { NotificationsService } from './notifications.service';
 import { ReminderSweepService } from './reminder-sweep.service';
 import {
@@ -29,6 +30,7 @@ import { NoopTelegramProvider } from './providers/noop-telegram.provider';
 @Module({
   imports: [ConfigModule, SettingsModule],
   providers: [
+    EmailBrandingService,
     {
       provide: EMAIL_PROVIDER,
       inject: [ConfigService],
@@ -99,6 +101,12 @@ import { NoopTelegramProvider } from './providers/noop-telegram.provider';
     NotificationSettingsService,
     ReminderSweepService,
     EMAIL_PROVIDER,
+    /*
+     * La marca se exporta porque los correos al personal —invitacion y
+     * recuperacion— los compone el modulo de administracion, que ya usa de
+     * aqui el proveedor de correo.
+     */
+    EmailBrandingService,
   ],
 })
 export class NotificationsModule {}

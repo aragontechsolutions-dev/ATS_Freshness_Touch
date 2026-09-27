@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { PGlite } from '@electric-sql/pglite';
 import { PGLiteSocketServer } from '@electric-sql/pglite-socket';
 import { Test } from '@nestjs/testing';
+import { getStorageToken, type ThrottlerStorageService } from '@nestjs/throttler';
 import type { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -83,6 +84,7 @@ let supabase: Server;
 let recibido: { email: string | null; apikey: string | null; authorization: string | null };
 /** Permite forzar que el proveedor rechace. */
 let rechazarInvitaciones = false;
+let limitador: ThrottlerStorageService;
 
 const comoAdmin = (): Promise<string> => provider.issue(ADMIN_AUTH, 'ada@example.com', 3600);
 const comoAdmin2 = (): Promise<string> => provider.issue(ADMIN2_AUTH, 'alba@example.com', 3600);
@@ -118,6 +120,14 @@ async function invitar(staffId: string, token?: string) {
     .set('authorization', `Bearer ${token ?? (await comoAdmin())}`);
 }
 
+/**
+ * Pedir un enlace para volver a entrar. SIN CABECERA DE SESION a proposito:
+ * es publico porque quien lo usa es justamente quien no puede entrar.
+ */
+async function recuperar(email: string) {
+  return request(app.getHttpServer()).post('/api/v1/password-recovery').send({ email });
+}
+
 async function directorio(token?: string) {
   return request(app.getHttpServer())
     .get(RUTA)
@@ -142,6 +152,10 @@ const cuentaDe = (email: string): string => {
 const correoDeCuenta = new Map<string, string>();
 /** Cuentas cuyo titular ya inicio sesion alguna vez. */
 const yaEntraron = new Set<string>();
+/** Si ese correo tiene ya cuenta en el proveedor de mentira. */
+const cuentaExiste = (email: string): boolean => [...correoDeCuenta.values()].includes(email);
+/** Los tipos de enlace que se le han pedido al proveedor, en orden. */
+const tiposPedidos: string[] = [];
 
 beforeAll(async () => {
   // --- Servidor de mentira que imita la API de administracion de Supabase ---
@@ -180,11 +194,27 @@ beforeAll(async () => {
         return;
       }
 
+      const pedido = JSON.parse(cuerpo || '{}') as { email?: string; type?: string };
       recibido = {
-        email: (JSON.parse(cuerpo || '{}') as { email?: string }).email ?? null,
+        email: pedido.email ?? null,
         apikey: (peticion.headers.apikey as string) ?? null,
         authorization: peticion.headers.authorization ?? null,
       };
+      tiposPedidos.push(pedido.type ?? '');
+
+      /*
+       * `recovery` SOLO FUNCIONA SOBRE UNA CUENTA QUE YA EXISTE, igual que
+       * en el proveedor real. Es la diferencia que obliga a la recuperacion
+       * a tener red de seguridad: quien nunca abrio su invitacion no tiene
+       * cuenta confirmada, y para esa persona el unico enlace posible es
+       * uno de invitacion. Si el doble aceptara los dos tipos siempre, esa
+       * rama no se probaria nunca.
+       */
+      if (pedido.type === 'recovery' && !cuentaExiste(pedido.email ?? '')) {
+        respuesta.writeHead(404, { 'content-type': 'application/json' });
+        respuesta.end(JSON.stringify({ msg: 'User not found' }));
+        return;
+      }
 
       if (rechazarInvitaciones) {
         respuesta.writeHead(422, { 'content-type': 'application/json' });
@@ -209,8 +239,13 @@ beforeAll(async () => {
         JSON.stringify({
           id,
           email,
-          // `generate_link` devuelve el enlace en vez de mandar el correo.
-          action_link: 'https://panel.example.com/#access_token=t&refresh_token=r&type=invite',
+          /*
+           * `generate_link` devuelve el enlace en vez de mandar el correo, y
+           * lo devuelve CON LOS TOKENS EN EL FRAGMENTO. Es justamente lo que
+           * hace que funcione abrirlo en otro navegador: no hay verificador
+           * que tenga que estar guardado en ningun sitio.
+           */
+          action_link: `https://panel.example.com/#access_token=t&refresh_token=r&type=${pedido.type ?? 'invite'}`,
         }),
       );
     });
@@ -236,6 +271,7 @@ beforeAll(async () => {
 
   provider = app.get<LocalAuthProvider>(AUTH_PROVIDER);
   correo = app.get<LogEmailProvider>(EMAIL_PROVIDER);
+  limitador = app.get<ThrottlerStorageService>(getStorageToken());
 }, 120_000);
 
 afterAll(async () => {
@@ -250,6 +286,15 @@ beforeEach(async () => {
   correo.sent.length = 0;
   correoDeCuenta.clear();
   yaEntraron.clear();
+  tiposPedidos.length = 0;
+  /*
+   * EL LIMITADOR SE VACIA ENTRE PRUEBAS. El de recuperacion es de cinco
+   * peticiones cada cuarto de hora —a proposito, cada una manda un correo a
+   * una persona real— y su contador sobrevive de una prueba a la siguiente.
+   * Sin esto, la sexta prueba del bloque falla con un 429 que no tiene nada
+   * que ver con lo que esa prueba comprueba.
+   */
+  limitador.storage.clear();
 
   // Estado de partida: una administradora y coordinacion, nada mas.
   await db.exec(`
@@ -891,5 +936,242 @@ describe('privacidad del directorio', () => {
 
   it('dice que este despliegue puede invitar', async () => {
     expect((await directorio()).body.canInvite).toBe(true);
+  });
+});
+
+/* ======================================================================== */
+
+describe('volver a entrar cuando se perdio la contrasena', () => {
+  /*
+   * ESTE ES EL CAMINO QUE ESTABA ROTO Y QUE DEJO A UNA PERSONA FUERA.
+   *
+   * El correo lo mandaba Supabase y el enlace se generaba en el NAVEGADOR,
+   * que guardaba un verificador en su propia pestana y lo exigia al
+   * canjearlo. Como el enlace llega por correo y un correo se abre siempre
+   * en otra pestana, el verificador nunca estaba y el canje fallaba
+   * SIEMPRE. La pantalla decia «enlace caducado» sobre un enlace recien
+   * generado.
+   *
+   * Ahora lo genera el servidor. Lo que estas pruebas vigilan, por orden de
+   * importancia, es que el enlace salga de verdad y que la respuesta no
+   * cuente nunca nada.
+   */
+
+  /** Espera a que el trabajo de fondo termine: se responde sin esperarlo. */
+  const asentarse = async (): Promise<void> => {
+    await new Promise((listo) => setTimeout(listo, 150));
+  };
+
+  async function personaConAcceso(): Promise<string> {
+    const creada = await crear();
+    await invitar(creada.body.staffId);
+    correo.sent.length = 0;
+    tiposPedidos.length = 0;
+    /*
+     * EL LIMITADOR SE VACIA ENTRE PRUEBAS. El de recuperacion es de cinco
+     * peticiones cada cuarto de hora —a proposito, cada una manda un correo a
+     * una persona real— y su contador sobrevive de una prueba a la siguiente.
+     * Sin esto, la sexta prueba del bloque falla con un 429 que no tiene nada
+     * que ver con lo que esa prueba comprueba.
+     */
+    limitador.storage.clear();
+    return creada.body.staffId as string;
+  }
+
+  it('manda el enlace a quien tiene acceso', async () => {
+    await personaConAcceso();
+
+    const respuesta = await recuperar('cleo@example.com');
+    await asentarse();
+
+    expect(respuesta.status).toBe(202);
+    expect(correo.sent).toHaveLength(1);
+    expect(correo.sent[0]?.to).toBe('cleo@example.com');
+  });
+
+  it('el enlace vuelve con la sesion en el fragmento, no con un codigo que canjear', async () => {
+    await personaConAcceso();
+
+    await recuperar('cleo@example.com');
+    await asentarse();
+
+    /*
+     * LA COMPROBACION QUE HABRIA EVITADO EL INCIDENTE. Un enlace con `?code=`
+     * exige un verificador guardado en el navegador que lo pidio; uno con
+     * `#access_token=` no exige nada y funciona se abra donde se abra.
+     */
+    expect(correo.sent[0]?.text).toContain('#access_token=');
+    expect(correo.sent[0]?.text).not.toContain('?code=');
+  });
+
+  it('pide un enlace de recuperacion, no de invitacion', async () => {
+    await personaConAcceso();
+
+    await recuperar('cleo@example.com');
+    await asentarse();
+
+    expect(tiposPedidos).toEqual(['recovery']);
+  });
+
+  it('cae a un enlace de invitacion si la cuenta nunca se confirmo', async () => {
+    /*
+     * El caso real: se la invito, no abrio el enlace a tiempo y se le
+     * caduco. Para el proveedor esa cuenta no admite recuperacion. Sin esta
+     * red de seguridad, la unica salida que le queda a esa persona tampoco
+     * funcionaria.
+     */
+    const creada = await crear();
+    await invitar(creada.body.staffId);
+    correo.sent.length = 0;
+    tiposPedidos.length = 0;
+    /*
+     * EL LIMITADOR SE VACIA ENTRE PRUEBAS. El de recuperacion es de cinco
+     * peticiones cada cuarto de hora —a proposito, cada una manda un correo a
+     * una persona real— y su contador sobrevive de una prueba a la siguiente.
+     * Sin esto, la sexta prueba del bloque falla con un 429 que no tiene nada
+     * que ver con lo que esa prueba comprueba.
+     */
+    limitador.storage.clear();
+
+    // Se olvida la cuenta en el proveedor: recovery respondera 404.
+    correoDeCuenta.clear();
+
+    await recuperar('cleo@example.com');
+    await asentarse();
+
+    expect(tiposPedidos).toEqual(['recovery', 'invite']);
+    expect(correo.sent).toHaveLength(1);
+  });
+
+  it('responde igual para un correo que no existe, y no manda nada', async () => {
+    const respuesta = await recuperar('nadie@example.com');
+    await asentarse();
+
+    expect(respuesta.status).toBe(202);
+    expect(respuesta.body).toEqual({});
+    expect(correo.sent).toHaveLength(0);
+  });
+
+  it('responde igual para quien causo baja, y no manda nada', async () => {
+    const staffId = await personaConAcceso();
+    await editar(staffId, { ...FICHA, isActive: false });
+
+    const respuesta = await recuperar('cleo@example.com');
+    await asentarse();
+
+    expect(respuesta.status).toBe(202);
+    expect(correo.sent).toHaveLength(0);
+  });
+
+  it('responde igual para una ficha que nunca fue invitada, y no manda nada', async () => {
+    await crear();
+
+    const respuesta = await recuperar('cleo@example.com');
+    await asentarse();
+
+    expect(respuesta.status).toBe(202);
+    expect(correo.sent).toHaveLength(0);
+  });
+
+  it('encuentra a quien cambio su correo de contacto despues de invitar', async () => {
+    /*
+     * Tras editar el correo de contacto, la cuenta sigue respondiendo al
+     * antiguo. Buscar solo por el de contacto dejaria fuera exactamente a
+     * quien mas probablemente esta perdida.
+     */
+    const staffId = await personaConAcceso();
+    await editar(staffId, { ...FICHA, email: 'cleo.nueva@example.com', isActive: true });
+
+    await recuperar('cleo@example.com');
+    await asentarse();
+
+    expect(correo.sent).toHaveLength(1);
+    // Y va al correo DE LA CUENTA, no al de contacto recien cambiado.
+    expect(correo.sent[0]?.to).toBe('cleo@example.com');
+  });
+
+  it('da igual como se escriban las mayusculas', async () => {
+    await personaConAcceso();
+
+    await recuperar('  CLEO@Example.com  ');
+    await asentarse();
+
+    expect(correo.sent).toHaveLength(1);
+  });
+
+  it('el correo no lleva ninguna contrasena', async () => {
+    await personaConAcceso();
+
+    await recuperar('cleo@example.com');
+    await asentarse();
+
+    const cuerpo = `${correo.sent[0]?.text ?? ''}${correo.sent[0]?.html ?? ''}`.toLowerCase();
+    expect(cuerpo).not.toContain('contraseña temporal');
+    expect(cuerpo).not.toContain('temporary password');
+  });
+
+  it('deja rastro en la auditoria solo cuando el correo sale', async () => {
+    await personaConAcceso();
+
+    await recuperar('nadie@example.com');
+    await asentarse();
+
+    const sinFila = await db.query<{ count: string }>(
+      `SELECT count(*)::text FROM audit_logs WHERE action = 'staff.recovery_sent'`,
+    );
+    /*
+     * Registrar tambien los intentos fallidos convertiria la auditoria en la
+     * lista ordenada por hora de las direcciones que alguien fue probando.
+     */
+    expect(sinFila.rows[0]?.count).toBe('0');
+
+    await recuperar('cleo@example.com');
+    await asentarse();
+
+    const conFila = await db.query<{ count: string; metadata: unknown }>(
+      `SELECT count(*)::text, max(metadata::text) AS metadata
+         FROM audit_logs WHERE action = 'staff.recovery_sent'`,
+    );
+    expect(conFila.rows[0]?.count).toBe('1');
+    // Y nunca el enlace: es una credencial de un solo uso.
+    expect(String(conFila.rows[0]?.metadata)).not.toContain('access_token');
+  });
+
+  it('corta a la sexta peticion desde la misma conexion', async () => {
+    /*
+     * Cada peticion manda un correo a una persona real. Sin tope, esta API
+     * es una forma gratuita de inundar el buzon de alguien y de gastar la
+     * cuota de envio de la empresa por el camino.
+     *
+     * El limite se cuenta por IP y NO por correo: contarlo por correo
+     * dejaria que una sola conexion recorriera la plantilla entera a razon
+     * de cinco correos por persona.
+     */
+    await personaConAcceso();
+
+    const estados: number[] = [];
+    for (let intento = 0; intento < 6; intento += 1) {
+      estados.push((await recuperar('cleo@example.com')).status);
+    }
+    await asentarse();
+
+    expect(estados).toEqual([202, 202, 202, 202, 202, 429]);
+  });
+
+  it('el contrato es estricto: no se puede elegir a donde vuelve el enlace', async () => {
+    /*
+     * Si el destino viajara en la peticion, cualquiera podria pedir un
+     * enlace para el correo de otra persona apuntando a un sitio propio: le
+     * llegaria a su buzon legitimo y, al abrirlo, entregaria la sesion.
+     */
+    await personaConAcceso();
+
+    const respuesta = await request(app.getHttpServer())
+      .post('/api/v1/password-recovery')
+      .send({ email: 'cleo@example.com', redirectTo: 'https://sitio-del-atacante.example' });
+    await asentarse();
+
+    expect(respuesta.status).toBe(400);
+    expect(correo.sent).toHaveLength(0);
   });
 });

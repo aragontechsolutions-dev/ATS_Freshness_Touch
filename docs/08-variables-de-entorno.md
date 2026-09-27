@@ -323,6 +323,15 @@ Ver `docs/14-avisos.md` para el porqué de cada decisión.
 | `EMAIL_FROM`       | `Freshness Touch <hola@tu-dominio.com>` | Sí, si `resend` |
 | `EMAIL_REPLY_TO`   | A dónde responde el cliente             | No              |
 | `EMAIL_TIMEOUT_MS` | 10000 por defecto                       | No              |
+| `EMAIL_LOGO_URL`   | `https://<sitio>/brand/logo-email.jpg`  | No              |
+
+**`EMAIL_LOGO_URL` es opcional a propósito.** Sin ella, los correos salen con
+el nombre de la empresa en texto sobre el color de marca, que es exactamente
+lo que ve de todos modos quien tenga las imágenes bloqueadas —Outlook por
+defecto, y Gmail con quien no esté en su libreta—. Tiene que ser **absoluta y
+HTTPS**: un correo no tiene página desde la que resolver una ruta relativa.
+La imagen ya está en el repositorio, en
+`apps/landing/public/brand/logo-email.jpg`; ver `docs/19-diseno-de-los-correos.md`.
 
 **El dominio de `EMAIL_FROM` hay que verificarlo en Resend** (registros SPF y
 DKIM en tu DNS). Sin verificar, los correos acaban en la carpeta de no

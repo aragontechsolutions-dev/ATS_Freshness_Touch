@@ -618,6 +618,7 @@ export const en = {
           updated: 'Staff record changed',
           invited: 'Invited to the panel',
           reinvited: 'Invitation sent again',
+          recovery_sent: 'Asked to get back in; the link was sent',
         },
         settings: {
           updated: 'Settings changed',

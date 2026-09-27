@@ -137,6 +137,16 @@ Progreso:
   persona, porque a trescientas millas el traslado pesa más que la limpieza.
   Las zonas se editan desde el panel y se ven en un mapa (Leaflet y
   OpenStreetMap, sin clave de API) tanto en el sitio como en el panel.
+- ✅ **Recuperar el acceso de verdad** (`docs/18-acceso-y-recuperacion.md`): a
+  raíz del mismo incidente, que no se cerró con lo anterior. «¿Has olvidado
+  tu contraseña?» **no podía funcionar**: el enlace lo generaba el navegador
+  con un verificador guardado en su pestaña, y un correo se abre siempre en
+  otra. Ahora lo genera el servidor, llega con nuestra plantilla y en el
+  idioma de la persona, y ninguna plantilla de Supabase dispara ya.
+- ✅ **Los correos con la marca** (`docs/19-diseno-de-los-correos.md`): los
+  cinco comparten una sola maqueta con el logotipo y los colores oficiales,
+  pensada para que se entienda también con las imágenes bloqueadas, que es
+  como la recibe media plantilla de clientes de correo.
 - ⬜ Avisos por SMS.
 - Calendario de disponibilidad y reserva en línea.
 - **Stripe**: retención del depósito con `capture_method: 'manual'` al reservar y

@@ -9,6 +9,7 @@ import {
   type NotificationSettings,
 } from '@freshness/types';
 import { PrismaService } from '../database/prisma.service';
+import { EmailBrandingService } from './email-branding.service';
 import { BusinessSettingsService } from '../settings/business-settings.service';
 import {
   EMAIL_PROVIDER,
@@ -83,6 +84,7 @@ export class NotificationsService {
     private readonly business: BusinessSettingsService,
     @Inject(EMAIL_PROVIDER) private readonly email: EmailProvider,
     @Inject(TELEGRAM_PROVIDER) private readonly telegram: TelegramProvider,
+    private readonly marca: EmailBrandingService,
   ) {}
 
   /**
@@ -130,6 +132,7 @@ export class NotificationsService {
         currency: reserva.currency,
         companyPhone: negocio.phone,
         companyEmail: negocio.email,
+        logoUrl: this.marca.logoUrl,
       };
 
       await this.correoAlCliente(bookingId, event, ajustes, reserva.customer.email, datos);
