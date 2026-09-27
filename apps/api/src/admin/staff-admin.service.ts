@@ -34,6 +34,7 @@ const DIRECTORY_SELECT = {
   locale: true,
   isActive: true,
   authUserId: true,
+  authEmail: true,
   invitedAt: true,
   createdAt: true,
 } as const;
@@ -285,18 +286,46 @@ export class StaffAdminService {
     }
 
     /*
-     * Invitar dos veces crearia una segunda cuenta con el mismo correo, o el
-     * proveedor lo rechazaria con un error suyo que no dice nada util. Mejor
-     * decirlo aqui con claridad.
+     * REENVIO: EL CASO QUE FALTABA, Y QUE COSTO UN INCIDENTE.
+     *
+     * Antes, cualquier ficha con cuenta vinculada recibia "ya esta invitada"
+     * y punto. Pero el enlace de invitacion CADUCA: a quien no lo abre a
+     * tiempo se le queda una ficha que dice "invitada" y una puerta cerrada,
+     * sin ninguna salida desde el panel. Paso de verdad.
+     *
+     * Ahora se distinguen las dos situaciones, que en nuestra tabla se ven
+     * igual y piden respuestas opuestas:
+     *
+     *   - Nunca ha entrado  -> se regenera el enlace y se reenvia.
+     *   - Ya entra           -> reenviar no procede. Si perdio la contrasena
+     *                           la pide ella desde «he olvidado mi
+     *                           contrasena», que no necesita a nadie.
      */
-    if (persona.authUserId !== null) {
+    const cuenta =
+      persona.authUserId === null ? null : await this.invitaciones.account(persona.authUserId);
+
+    if (cuenta?.hasSignedIn === true) {
       throw new ConflictException({
         code: API_ERROR_CODES.STAFF_ALREADY_INVITED,
         messageKey: 'admin.errorAlreadyInvited',
       });
     }
 
-    const resultado = await this.invitaciones.invite(persona.email);
+    const reenvio = persona.authUserId !== null;
+
+    /*
+     * EL REENVIO VA AL CORREO DE LA CUENTA, no al de la ficha, cuando se
+     * sabe y son distintos.
+     *
+     * Reenviar es "otro enlace para la cuenta que ya tienes", y esa cuenta
+     * responde a su propio correo: mandarlo al de contacto crearia una
+     * SEGUNDA cuenta y cambiaria en silencio con que correo entra esa
+     * persona. Si no se pudo preguntar al proveedor, se usa el de la ficha,
+     * que es lo unico que se sabe con certeza.
+     */
+    const destino = reenvio ? (cuenta?.email ?? persona.email) : persona.email;
+
+    const resultado = await this.invitaciones.invite(destino);
 
     if (!resultado.ok) {
       /*
@@ -326,17 +355,60 @@ export class StaffAdminService {
      * no que la cuenta existe. Son dos cosas distintas y conviene poder
      * distinguirlas al mirar la pantalla.
      */
+    /*
+     * ¿ESA CUENTA YA ES DE OTRA FICHA?
+     *
+     * Puede serlo, y hasta ahora reventaba con un 500 ilegible. El proveedor
+     * NO crea una cuenta nueva cuando el correo ya existe: devuelve la que
+     * hay. Si esa cuenta esta vinculada a otra ficha —dos fichas para la
+     * misma persona, un correo reutilizado, o un correo de contacto que se
+     * edito despues de invitar— guardarla aqui rompe la restriccion de
+     * unicidad de la base.
+     *
+     * Se comprueba ANTES de escribir para poder decir cual es la otra ficha,
+     * que es la unica informacion con la que quien administra puede arreglar
+     * el lio. La restriccion de la base sigue siendo la garantia real —entre
+     * esta consulta y la escritura cabe otra invitacion—, pero el caso
+     * frecuente ya se responde con palabras.
+     */
+    const otraFicha = await this.prisma.db.staff.findFirst({
+      where: { authUserId: resultado.authUserId, id: { not: staffId } },
+      select: { firstName: true, lastName: true, email: true },
+    });
+
+    if (otraFicha) {
+      throw new ConflictException({
+        code: API_ERROR_CODES.STAFF_ACCOUNT_TAKEN,
+        messageKey: 'admin.errorStaffAccountTaken',
+        /*
+         * El nombre y el correo de la otra ficha van como detalle para que
+         * la pantalla pueda decir «esa cuenta ya es de Fulanita». Es
+         * personal interno que quien administra ya ve en el directorio, asi
+         * que no se expone nada nuevo.
+         */
+        fields: [
+          {
+            path: 'email',
+            message: `${otraFicha.firstName} ${otraFicha.lastName} (${otraFicha.email})`,
+          },
+        ],
+      });
+    }
+
     await this.prisma.db.$transaction(async (tx) => {
       await tx.staff.update({
         where: { id: staffId },
-        data: { authUserId: resultado.authUserId },
+        // `authEmail` se guarda SIEMPRE junto al identificador: son el mismo
+        // hecho —"esta ficha entra con esta cuenta y este correo"— y
+        // separarlos es justo lo que dejo el desajuste invisible.
+        data: { authUserId: resultado.authUserId, authEmail: destino },
       });
 
       await this.audit.record(
         {
           staff: actor,
           surface: 'PANEL',
-          action: 'staff.invited',
+          action: reenvio ? 'staff.reinvited' : 'staff.invited',
           entityType: 'staff',
           entityId: staffId,
           /*
@@ -345,7 +417,7 @@ export class StaffAdminService {
            * quien investigue un incidente, y el enlace es una credencial de
            * un solo uso que serviria para entrar en su lugar.
            */
-          metadata: { email: persona.email, role: persona.role },
+          metadata: { email: destino, role: persona.role },
           ipAddress,
         },
         tx,
@@ -354,7 +426,7 @@ export class StaffAdminService {
 
     const negocio = await this.business.get();
     const envio = await this.email.send(
-      staffInviteEmail(persona.email, {
+      staffInviteEmail(destino, {
         locale: persona.locale,
         firstName: persona.firstName,
         role: persona.role,
@@ -451,6 +523,15 @@ export function toDirectoryItem(persona: FilaPersonal): AdminStaffDirectoryItem 
     locale: persona.locale,
     isActive: persona.isActive,
     access,
+    /*
+     * SOLO CUANDO NO COINCIDEN. Si el correo de la cuenta es el mismo que el
+     * de contacto, no hay nada que avisar y mandarlo solo invitaria a
+     * pintarlo dos veces. Nulo tambien cuando no se sabe —fichas anteriores
+     * a la columna—, porque decir "coinciden" sin saberlo seria mentir justo
+     * en el caso que esto viene a resolver.
+     */
+    signInEmail:
+      persona.authEmail !== null && persona.authEmail !== persona.email ? persona.authEmail : null,
     invitedAt: persona.invitedAt?.toISOString() ?? null,
     createdAt: persona.createdAt.toISOString(),
   };

@@ -126,6 +126,11 @@ Progreso:
   nombres, el dinero como dinero y los estados por su nombre; la lista va
   agrupada por día y el filtro por categorías. Lo técnico —IP, identificadores
   y el volcado entero— se aparta a un desplegable, no se borra.
+- ✅ **Invitaciones reenviables** (`docs/13-panel-y-permisos.md` §18 bis): a
+  raíz de un incidente real. El enlace de invitación caduca y no había forma
+  de reenviarlo; ahora sí, y el panel avisa cuando el correo de contacto de
+  alguien ya no es el correo con el que entra. Un 500 ilegible pasa a ser un
+  mensaje que dice de quién es la cuenta.
 - ⬜ Avisos por SMS.
 - Calendario de disponibilidad y reserva en línea.
 - **Stripe**: retención del depósito con `capture_method: 'manual'` al reservar y

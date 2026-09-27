@@ -389,6 +389,13 @@ export const es: TranslationResources = {
         'Invitada el {{date}}. Podrá entrar cuando abra el enlace del correo y elija contraseña.',
       accessLinkedHelp: 'Tiene una cuenta vinculada y puede entrar al panel.',
       invite: 'Invitar al panel',
+      resend: 'Reenviar la invitación',
+      resendConfirm:
+        'Recibirá un enlace nuevo para elegir contraseña. El anterior dejará de funcionar. ¿Continuar?',
+      resendSent: 'Invitación reenviada.',
+      signsInWith: 'Entra con {{email}}',
+      signsInWithHelp:
+        'Su correo de contacto se cambió después de crear la cuenta. Cambiarlo aquí no cambia la cuenta, así que esta es la dirección con la que tiene que iniciar sesión.',
       inviteConfirm:
         'Va a recibir un correo para crear su contraseña y podrá ver los datos de todos los clientes. ¿Continuar?',
       inviteUnavailable:
@@ -581,6 +588,7 @@ export const es: TranslationResources = {
           created: 'Dio de alta a una persona',
           updated: 'Cambió una ficha de personal',
           invited: 'Invitó al panel',
+          reinvited: 'Volvió a enviar la invitación',
         },
         settings: {
           updated: 'Cambió la configuración',
@@ -672,7 +680,10 @@ export const es: TranslationResources = {
       'No se puede: el sistema se quedaría sin ningún administrador activo y nadie podría volver a entrar.',
     errorStaffSelfChange:
       'No puedes cambiarte tu propio puesto ni darte de baja: te quedarías fuera del panel.',
-    errorAlreadyInvited: 'Esa persona ya tiene una cuenta vinculada.',
+    errorAlreadyInvited:
+      'Esa persona ya entra con normalidad, así que no hay nada que enviar. Si ha olvidado su contraseña, puede pedir el enlace ella misma desde la pantalla de acceso.',
+    errorStaffAccountTaken:
+      'Ese correo ya tiene cuenta, y es de otra ficha de personal. Comprueba si se dio de alta a la misma persona dos veces.',
     errorInviteInactive: 'No se puede invitar a alguien que está de baja.',
     errorInviteUnavailable: 'El envío de invitaciones no está configurado en este despliegue.',
     errorInviteNotDelivered:

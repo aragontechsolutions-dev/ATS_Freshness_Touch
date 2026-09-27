@@ -527,6 +527,21 @@ model Staff {
   /// con su correo no le abre ninguna puerta por si solo.
   authUserId String? @unique
 
+  /// El correo CON EL QUE SE CREO la cuenta de acceso.
+  ///
+  /// Parece una copia de `email` y no lo es. `email` es el correo de
+  /// contacto y se puede editar desde el panel; eso NO cambia la cuenta del
+  /// proveedor, que sigue pidiendo el correo original al iniciar sesion.
+  ///
+  /// Se guarda porque esa diferencia ya causo un incidente real: se invito a
+  /// alguien, luego se le corrigio el correo en su ficha, y a partir de ahi
+  /// la pantalla mostraba una direccion con la que esa persona no podia
+  /// entrar. Nadie podia saberlo mirando. Teniendo las dos, el panel lo dice.
+  ///
+  /// Nulo en las fichas anteriores a esta columna y en las que no tienen
+  /// cuenta. Nulo significa "no lo sabemos", nunca "coinciden".
+  authEmail String?
+
   /// Idioma en el que se le escribe.
   ///
   /// Lo tienen los clientes desde el principio y al personal le faltaba. El

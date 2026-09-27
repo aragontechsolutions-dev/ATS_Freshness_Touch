@@ -1,6 +1,6 @@
 import { Logger } from '@nestjs/common';
 import { describeFailure } from '../../notifications/notifications.types';
-import type { InviteResult, StaffInviteProvider } from '../staff-invite.types';
+import type { InviteResult, StaffAccount, StaffInviteProvider } from '../staff-invite.types';
 
 export interface SupabaseInviteOptions {
   /** Direccion del proyecto: https://<ref>.supabase.co */
@@ -124,6 +124,78 @@ export class SupabaseInviteProvider implements StaffInviteProvider {
       clearTimeout(temporizador);
     }
   }
+
+  /**
+   * Consulta una cuenta por su identificador.
+   *
+   * `GET /auth/v1/admin/users/{id}`. Solo se usan dos datos: el correo real
+   * de la cuenta —que manda sobre el de la ficha— y si alguna vez ha
+   * iniciado sesion.
+   *
+   * NO LANZA NUNCA. Cualquier fallo devuelve `null` y quien llama sigue
+   * adelante con lo que sabe. Es una consulta de apoyo para afinar un
+   * mensaje, no una comprobacion de permisos: si el proveedor tarda, que no
+   * se pueda invitar a nadie seria un precio absurdo.
+   */
+  async account(authUserId: string): Promise<StaffAccount | null> {
+    if (!this.options.url || !this.options.serviceRoleKey) return null;
+
+    const controller = new AbortController();
+    const temporizador = setTimeout(() => controller.abort(), this.options.timeoutMs);
+
+    try {
+      const respuesta = await fetch(
+        new URL(`/auth/v1/admin/users/${encodeURIComponent(authUserId)}`, this.options.url),
+        {
+          headers: {
+            apikey: this.options.serviceRoleKey,
+            Authorization: `Bearer ${this.options.serviceRoleKey}`,
+          },
+          signal: controller.signal,
+        },
+      );
+
+      if (!respuesta.ok) {
+        // Un 404 es informacion legitima: la cuenta se borro en el proveedor.
+        // No se registra como error para no llenar el log de ruido.
+        if (respuesta.status !== 404) {
+          this.logger.warn(`No se pudo consultar la cuenta: codigo ${respuesta.status}`);
+        }
+        return null;
+      }
+
+      const cuerpo: unknown = await respuesta.json().catch(() => null);
+      const usuario = desenvolver(cuerpo);
+      const email = usuario?.email;
+
+      if (typeof email !== 'string' || email.length === 0) return null;
+
+      return {
+        authUserId,
+        email,
+        /*
+         * `last_sign_in_at` con valor significa que esa persona entro alguna
+         * vez. Estar ausente o nulo es lo normal en una cuenta recien
+         * invitada que todavia no ha abierto el enlace.
+         */
+        hasSignedIn: typeof usuario?.last_sign_in_at === 'string',
+      };
+    } catch (error) {
+      this.logger.warn(`No se pudo consultar la cuenta: ${describeFailure(error)}`);
+      return null;
+    } finally {
+      clearTimeout(temporizador);
+    }
+  }
+}
+
+/** La respuesta, venga suelta o envuelta en `{ user: ... }`. */
+function desenvolver(cuerpo: unknown): Record<string, unknown> | null {
+  if (typeof cuerpo !== 'object' || cuerpo === null) return null;
+
+  return 'user' in cuerpo && typeof (cuerpo as { user: unknown }).user === 'object'
+    ? ((cuerpo as { user: Record<string, unknown> | null }).user ?? null)
+    : (cuerpo as Record<string, unknown>);
 }
 
 /**

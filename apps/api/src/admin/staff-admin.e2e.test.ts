@@ -124,12 +124,62 @@ async function directorio(token?: string) {
     .set('authorization', `Bearer ${token ?? (await comoAdmin())}`);
 }
 
+/**
+ * Las cuentas que «existen» en el proveedor de mentira.
+ *
+ * Un correo siempre devuelve el mismo identificador, igual que el proveedor
+ * real: invitar dos veces al mismo correo NO crea dos cuentas.
+ */
+const cuentaDe = (email: string): string => {
+  const existente = [...correoDeCuenta].find(([, valor]) => valor === email)?.[0];
+  if (existente) return existente;
+
+  const id = `abcd0000-0000-4000-8000-${String(correoDeCuenta.size + 1).padStart(12, '0')}`;
+  correoDeCuenta.set(id, email);
+  return id;
+};
+
+const correoDeCuenta = new Map<string, string>();
+/** Cuentas cuyo titular ya inicio sesion alguna vez. */
+const yaEntraron = new Set<string>();
+
 beforeAll(async () => {
   // --- Servidor de mentira que imita la API de administracion de Supabase ---
   supabase = createServer((peticion, respuesta) => {
     let cuerpo = '';
     peticion.on('data', (t) => (cuerpo += t));
     peticion.on('end', () => {
+      const json = (): void => respuesta.writeHead(200, { 'content-type': 'application/json' });
+
+      /*
+       * CONSULTA DE UNA CUENTA: `GET /auth/v1/admin/users/{id}`.
+       *
+       * Es lo que permite distinguir «invitada y nunca entro» de «ya entra»,
+       * que en nuestra tabla se ven igual. `last_sign_in_at` solo aparece
+       * cuando la prueba lo pide.
+       */
+      const usuario = /\/auth\/v1\/admin\/users\/(.+)$/.exec(peticion.url ?? '');
+      if (peticion.method === 'GET' && usuario) {
+        const id = decodeURIComponent(usuario[1] ?? '');
+        const email = correoDeCuenta.get(id);
+
+        if (!email) {
+          respuesta.writeHead(404, { 'content-type': 'application/json' });
+          respuesta.end(JSON.stringify({ msg: 'User not found' }));
+          return;
+        }
+
+        json();
+        respuesta.end(
+          JSON.stringify({
+            id,
+            email,
+            ...(yaEntraron.has(id) ? { last_sign_in_at: '2026-09-01T10:00:00Z' } : {}),
+          }),
+        );
+        return;
+      }
+
       recibido = {
         email: (JSON.parse(cuerpo || '{}') as { email?: string }).email ?? null,
         apikey: (peticion.headers.apikey as string) ?? null,
@@ -142,11 +192,23 @@ beforeAll(async () => {
         return;
       }
 
-      respuesta.writeHead(200, { 'content-type': 'application/json' });
+      /*
+       * EL IDENTIFICADOR SE DERIVA DEL CORREO, como en el proveedor real.
+       *
+       * Importa mucho para que estas pruebas signifiquen algo: pedir
+       * invitacion para un correo que YA tiene cuenta no crea una segunda,
+       * devuelve la que hay. Un identificador fijo lo escondia; uno aleatorio
+       * fingiria que cada invitacion crea una cuenta nueva. Ninguno de los
+       * dos habria destapado el choque que rompio produccion.
+       */
+      const email = recibido.email ?? '';
+      const id = cuentaDe(email);
+
+      json();
       respuesta.end(
         JSON.stringify({
-          id: '99999999-9999-4999-8999-999999999999',
-          email: recibido.email,
+          id,
+          email,
           // `generate_link` devuelve el enlace en vez de mandar el correo.
           action_link: 'https://panel.example.com/#access_token=t&refresh_token=r&type=invite',
         }),
@@ -186,6 +248,8 @@ afterAll(async () => {
 beforeEach(async () => {
   rechazarInvitaciones = false;
   correo.sent.length = 0;
+  correoDeCuenta.clear();
+  yaEntraron.clear();
 
   // Estado de partida: una administradora y coordinacion, nada mas.
   await db.exec(`
@@ -550,16 +614,131 @@ describe('invitar al panel', () => {
       `SELECT "authUserId" FROM staff WHERE id = '${creada.body.staffId}'`,
     );
 
-    expect(fila.rows[0]?.authUserId).toBe('99999999-9999-4999-8999-999999999999');
+    expect(fila.rows[0]?.authUserId).toBeTruthy();
   });
 
-  it('no invita dos veces: crearia una segunda cuenta', async () => {
+  /*
+   * EL CASO QUE COSTO UN INCIDENTE EN PRODUCCION.
+   *
+   * El enlace de invitacion caduca. Antes, a quien no lo abria a tiempo se
+   * le quedaba una ficha que decia «invitada» y una puerta cerrada, sin
+   * ninguna salida desde el panel: volver a pulsar respondia «ya esta
+   * invitada» para siempre.
+   */
+  it('reenvia la invitacion a quien nunca llego a entrar', async () => {
     const creada = await crear();
     await invitar(creada.body.staffId);
+    correo.sent.length = 0;
+
+    const segunda = await invitar(creada.body.staffId);
+
+    expect(segunda.status).toBe(200);
+    expect(segunda.body.access).toBe('INVITED');
+    // Salio un correo nuevo, que es el punto de reenviar.
+    expect(correo.sent).toHaveLength(1);
+  });
+
+  it('el reenvio queda registrado como tal, no como una primera invitacion', async () => {
+    const creada = await crear();
+    await invitar(creada.body.staffId);
+    await invitar(creada.body.staffId);
+
+    const acciones = await db.query<{ action: string }>(
+      `SELECT action FROM audit_logs WHERE action LIKE 'staff.%invited%' OR action = 'staff.reinvited' ORDER BY "createdAt"`,
+    );
+
+    expect(acciones.rows.map((f) => f.action)).toEqual(['staff.invited', 'staff.reinvited']);
+  });
+
+  /*
+   * Reenviar a quien YA entra no procede: no es una invitacion pendiente,
+   * es una contrasena que se le olvido, y eso lo resuelve ella sola desde
+   * «he olvidado mi contrasena» sin depender de nadie.
+   */
+  it('no reenvia a quien ya entra con normalidad', async () => {
+    const creada = await crear();
+    await invitar(creada.body.staffId);
+
+    const fila = await db.query<{ authUserId: string }>(
+      `SELECT "authUserId" FROM staff WHERE id = '${creada.body.staffId}'`,
+    );
+    yaEntraron.add(fila.rows[0]!.authUserId);
+
     const segunda = await invitar(creada.body.staffId);
 
     expect(segunda.status).toBe(409);
     expect(segunda.body.code).toBe('STAFF_ALREADY_INVITED');
+  });
+
+  /*
+   * EL 500 QUE ROMPIO PRODUCCION, REPRODUCIDO PASO A PASO.
+   *
+   * Se invita a alguien; se le corrige despues el correo en su ficha (lo
+   * cual NO cambia su cuenta); se da de alta a la misma persona con el
+   * correo original; y se la invita. El proveedor devuelve la cuenta que ya
+   * existe, que pertenece a la primera ficha.
+   *
+   * Antes esto reventaba con «Unique constraint failed on
+   * staff_authUserId_key» y un 500 sin explicacion.
+   */
+  it('dice de quien es la cuenta en vez de reventar con un 500', async () => {
+    const primera = await crear();
+    await invitar(primera.body.staffId);
+    await editar(primera.body.staffId, {
+      ...FICHA,
+      isActive: true,
+      email: 'cleo.nueva@example.com',
+    });
+
+    const segunda = await crear({ ...FICHA, firstName: 'Cleo (duplicada)' });
+    const respuesta = await invitar(segunda.body.staffId);
+
+    expect(respuesta.status).toBe(409);
+    expect(respuesta.body.code).toBe('STAFF_ACCOUNT_TAKEN');
+    // Dice CUAL es la otra ficha: sin eso no hay forma de deshacer el lio.
+    expect(JSON.stringify(respuesta.body.fields)).toContain('cleo.nueva@example.com');
+  });
+
+  /*
+   * EL AVISO QUE HABRIA EVITADO TODO. Tras cambiar el correo de contacto, la
+   * ficha tiene que decir con cual se entra de verdad.
+   */
+  it('avisa con que correo entra cuando ya no es el de contacto', async () => {
+    const creada = await crear();
+    await invitar(creada.body.staffId);
+    const editada = await editar(creada.body.staffId, {
+      ...FICHA,
+      isActive: true,
+      email: 'otro@example.com',
+    });
+
+    expect(editada.body.signInEmail).toBe('cleo@example.com');
+  });
+
+  it('no avisa de nada cuando los dos correos coinciden', async () => {
+    const creada = await crear();
+    const invitada = await invitar(creada.body.staffId);
+
+    expect(invitada.body.signInEmail).toBeNull();
+  });
+
+  /*
+   * El reenvio va al correo de la CUENTA, no al de la ficha. Mandarlo al de
+   * contacto crearia una segunda cuenta y cambiaria en silencio con que
+   * correo entra esa persona.
+   */
+  it('el reenvio va al correo con el que se creo la cuenta', async () => {
+    const creada = await crear();
+    await invitar(creada.body.staffId);
+    await editar(creada.body.staffId, {
+      ...FICHA,
+      isActive: true,
+      email: 'otro@example.com',
+    });
+
+    await invitar(creada.body.staffId);
+
+    expect(recibido.email).toBe('cleo@example.com');
   });
 
   it('no invita a quien esta de baja', async () => {
