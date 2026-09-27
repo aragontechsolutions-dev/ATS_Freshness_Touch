@@ -93,14 +93,12 @@ export class ServiceAreaService {
       ...area.zones.map((zona): ZoneRule => ({
         code: zona.code,
         maxMiles: zona.maxMiles,
-        surchargeCents: zona.surchargeCents,
         serviceable: true,
         instantQuote: zona.instantQuote,
       })),
       {
         code: 'OUT_OF_RANGE',
         maxMiles: null,
-        surchargeCents: 0,
         serviceable: false,
         instantQuote: false,
       },
@@ -172,7 +170,7 @@ export class ServiceAreaService {
 
       if (!fila) return DEFAULT_SERVICE_AREA;
 
-      const validada = ServiceAreaSettingsSchema.safeParse(fila.value);
+      const validada = ServiceAreaSettingsSchema.safeParse(sinCamposRetirados(fila.value));
 
       if (!validada.success) {
         /*
@@ -197,4 +195,35 @@ export class ServiceAreaService {
       return DEFAULT_SERVICE_AREA;
     }
   }
+}
+
+/**
+ * LIMPIA LOS CAMPOS QUE YA NO EXISTEN antes de validar.
+ *
+ * Hay filas guardadas con `surchargeCents` en cada zona: el recargo fijo por
+ * franja que se retiro cuando el traslado paso a cobrarse por milla. El
+ * contrato es estricto —un campo de mas se rechaza, no se ignora— asi que
+ * sin esto una fila perfectamente buena caeria entera y la empresa
+ * volveria a las zonas de partida sin enterarse: sus 60 millas configuradas
+ * se convertirian en las 35 del codigo, y con ellas el precio de cada
+ * reserva posterior.
+ *
+ * Se limpia al LEER y no con una migracion de datos porque el valor es un
+ * JSON opaco para la base: en SQL habria que reescribirlo a ciegas. Al
+ * guardar de nuevo desde el panel la fila queda ya sin el campo.
+ */
+function sinCamposRetirados(valor: unknown): unknown {
+  if (valor === null || typeof valor !== 'object') return valor;
+
+  const { zones } = valor as { zones?: unknown };
+  if (!Array.isArray(zones)) return valor;
+
+  return {
+    ...valor,
+    zones: zones.map((zona) => {
+      if (zona === null || typeof zona !== 'object') return zona;
+      const { surchargeCents: _retirado, ...resto } = zona as Record<string, unknown>;
+      return resto;
+    }),
+  };
 }

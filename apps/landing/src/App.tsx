@@ -3,6 +3,7 @@ import { Footer } from './components/Footer';
 import { StickyMobileCta } from './components/StickyMobileCta';
 import { Hero } from './sections/Hero';
 import { Services } from './sections/Services';
+import { ScopeOfWork } from './sections/ScopeOfWork';
 import { QuoteCalculator } from './sections/QuoteCalculator';
 import { WhyUs } from './sections/WhyUs';
 import { ServiceAreas } from './sections/ServiceAreas';
@@ -22,6 +23,7 @@ export default function App() {
       <main className="pb-20 sm:pb-0">
         <Hero />
         <Services />
+        <ScopeOfWork />
         <QuoteCalculator />
         <WhyUs />
         <ServiceAreas />

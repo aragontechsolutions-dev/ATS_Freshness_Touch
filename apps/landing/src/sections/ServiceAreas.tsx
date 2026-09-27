@@ -1,8 +1,6 @@
 import { Suspense, lazy, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { Locale } from '@freshness/types';
 import { useCatalog } from '../hooks/useCatalog';
-import { formatCentsCompact } from '../lib/format';
 import { MapPinIcon } from '../components/Icons';
 import { Reveal } from '../components/Reveal';
 
@@ -21,8 +19,7 @@ const ServiceAreaMap = lazy(() => import('../components/ServiceAreaMap'));
  * si la empresa cambia sus zonas o recargos, la web se actualiza sola.
  */
 export function ServiceAreas() {
-  const { t, i18n } = useTranslation();
-  const locale = i18n.resolvedLanguage as Locale;
+  const { t } = useTranslation();
   const { catalog } = useCatalog();
 
   const zones = catalog?.zones ?? [];
@@ -74,6 +71,14 @@ export function ServiceAreas() {
     observador.observe(nodo);
     return () => observador.disconnect();
   }, []);
+  /*
+   * Las millas que no cuestan traslado. Viene del catalogo y no de la
+   * primera zona: aunque hoy coincidan a proposito, el dia que alguien
+   * mueva una sin la otra el sitio tiene que decir lo que se COBRA, no lo
+   * que dibuja el mapa.
+   */
+  const radioLibreMillas = catalog?.travel.freeRadiusMiles ?? 0;
+
   // Radio maximo atendido: el mayor limite de las zonas con distancia definida.
   const maxServiceableMiles = zones.reduce(
     (max, zone) => (zone.maxMiles !== null && zone.maxMiles > max ? zone.maxMiles : max),
@@ -110,10 +115,16 @@ export function ServiceAreas() {
                       ? t('areas.mapZoneInstant', {
                           zone: zone.code,
                           miles: zone.maxMiles,
+                          /*
+                           * LA ZONA YA NO LLEVA RECARGO PROPIO. El traslado
+                           * se cobra por milla a partir del radio libre, asi
+                           * que lo que distingue a una zona de otra es si el
+                           * viaje entra en el precio o se cuenta aparte.
+                           */
                           amount:
-                            zone.surchargeCents === 0
+                            zone.maxMiles !== null && zone.maxMiles <= radioLibreMillas
                               ? t('areas.noSurcharge')
-                              : formatCentsCompact(zone.surchargeCents, locale),
+                              : t('areas.travelByMile'),
                         })
                       : t('areas.mapZoneOnRequest', { miles: zone.maxMiles }),
                   }))}
@@ -191,11 +202,9 @@ export function ServiceAreas() {
                   <p className="mt-3 text-sm font-semibold text-slate-900 dark:text-white">
                     {!zone.instantQuote
                       ? t('areas.onRequest')
-                      : zone.surchargeCents === 0
+                      : zone.maxMiles !== null && zone.maxMiles <= radioLibreMillas
                         ? t('areas.noSurcharge')
-                        : t('areas.surcharge', {
-                            amount: formatCentsCompact(zone.surchargeCents, locale),
-                          })}
+                        : t('areas.travelByMile')}
                   </p>
                 </>
               )}

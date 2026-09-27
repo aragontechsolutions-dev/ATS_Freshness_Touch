@@ -11,6 +11,7 @@ import { hasStaffModifiers, openStaffEntrance } from '../lib/staff-entrance';
 
 const NAV_ITEMS = [
   { href: '#services', key: 'nav.services' },
+  { href: '#scope', key: 'nav.scope' },
   { href: '#quote', key: 'nav.quote' },
   { href: '#areas', key: 'nav.areas' },
   { href: '#why-us', key: 'nav.whyUs' },

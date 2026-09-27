@@ -1,58 +1,48 @@
 import { describe, expect, it } from 'vitest';
 import { calculateDeposit } from './deposit';
 import { defaultPricingConfig } from './config';
-import { resolveMileageRate, IRS_MILEAGE_RATES } from './mileage';
 
-const config = defaultPricingConfig;
-
+/**
+ * EL DEPOSITO
+ * -----------
+ * Ya no depende de la distancia: son 35 dolares siempre. Lo que se prueba
+ * aqui es justo lo que la cifra fija tiene de delicado —que se descuente y
+ * no se sume— y el unico caso que la mueve.
+ */
 describe('calculateDeposit', () => {
-  it('dentro del radio libre cobra solo la base', () => {
-    const deposit = calculateDeposit(15, config, new Date('2026-09-20T00:00:00Z'));
-    expect(deposit.amountCents).toBe(3000);
-    expect(deposit.billableMiles).toBe(0);
-    expect(deposit.capped).toBe(false);
-  });
-
-  it('cobra ida y vuelta de las millas que exceden el radio libre', () => {
-    const deposit = calculateDeposit(30, config, new Date('2026-09-20T00:00:00Z'));
-    // exceso 10 -> 20 millas facturables -> 3000 + 20*76 = 4520
-    expect(deposit.billableMiles).toBe(20);
-    expect(deposit.amountCents).toBe(4520);
-  });
-
-  it('respeta el tope maximo y lo senala', () => {
-    const deposit = calculateDeposit(90, config, new Date('2026-09-20T00:00:00Z'));
-    expect(deposit.amountCents).toBe(config.deposit.maxCents);
-    expect(deposit.capped).toBe(true);
-  });
-
-  it('usa la tarifa IRS vigente en la fecha del presupuesto', () => {
-    const before = calculateDeposit(40, config, new Date('2026-03-15T00:00:00Z'));
-    const after = calculateDeposit(40, config, new Date('2026-08-15T00:00:00Z'));
-
-    expect(before.mileageRateCentsPerMile).toBe(72.5);
-    expect(after.mileageRateCentsPerMile).toBe(76);
-    expect(after.amountCents).toBeGreaterThan(before.amountCents);
-  });
-
-  it('el importe siempre es un entero de centavos', () => {
-    for (const miles of [0, 7.3, 21.4, 33.7, 49.9]) {
-      const deposit = calculateDeposit(miles, config, new Date('2026-02-01T00:00:00Z'));
-      expect(Number.isInteger(deposit.amountCents)).toBe(true);
+  it('es la cifra configurada, mire donde mire', () => {
+    /*
+     * Antes cambiaba con las millas y dos clientes del mismo barrio veian
+     * retenciones distintas sin entender por que. Ahora se explica en una
+     * frase, y esta prueba existe para que siga siendo una frase.
+     */
+    for (const total of [20_000, 50_000, 120_000]) {
+      expect(calculateDeposit(total, defaultPricingConfig).amountCents).toBe(3500);
     }
   });
-});
 
-describe('resolveMileageRate', () => {
-  it('elige la ultima tarifa con vigencia anterior o igual a la fecha', () => {
-    expect(resolveMileageRate(new Date('2025-06-01T00:00:00Z')).centsPerMile).toBe(70);
-    expect(resolveMileageRate(new Date('2026-01-01T00:00:00Z')).centsPerMile).toBe(72.5);
-    expect(resolveMileageRate(new Date('2026-06-30T00:00:00Z')).centsPerMile).toBe(72.5);
-    expect(resolveMileageRate(new Date('2026-07-01T00:00:00Z')).centsPerMile).toBe(76);
+  it('nunca retiene mas de lo que cuesta el trabajo', () => {
+    const deposito = calculateDeposit(2000, defaultPricingConfig);
+
+    expect(deposito.amountCents).toBe(2000);
+    expect(deposito.capped).toBe(true);
   });
 
-  it('las tarifas estan ordenadas cronologicamente', () => {
-    const dates = IRS_MILEAGE_RATES.map((rate) => rate.effectiveFrom);
-    expect([...dates].sort()).toEqual(dates);
+  it('se acredita contra el total: NO es un cargo extra', () => {
+    /*
+     * Es la parte que mas se malinterpreta. Una limpieza estandar son 185
+     * dolares: 35 al reservar y 150 al terminar. A la empresa le llegan
+     * 185, no 220.
+     */
+    const total = 18_500;
+    const deposito = calculateDeposit(total, defaultPricingConfig);
+
+    expect(deposito.appliedToTotal).toBe(true);
+    expect(deposito.amountCents).toBe(3500);
+    expect(total - deposito.amountCents).toBe(15_000);
+  });
+
+  it('un total en cero no produce una retencion negativa', () => {
+    expect(calculateDeposit(0, defaultPricingConfig).amountCents).toBe(0);
   });
 });

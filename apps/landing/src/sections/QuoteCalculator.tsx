@@ -99,6 +99,26 @@ export function QuoteCalculator() {
     setForm((current) => ({ ...current, [key]: value }));
   };
 
+  /**
+   * Cambiar de servicio puede dejar elegida una cadencia que ese servicio no
+   * ofrece —de estándar semanal a profunda semanal, por ejemplo—.
+   *
+   * SE VUELVE A LA PUNTUAL, que todos los servicios con precio automático
+   * ofrecen por contrato. Sin esto, el cotizador contestaría «elige otra
+   * frecuencia» a alguien que no ha tocado la frecuencia, y la salida
+   * estaría en un botón que acaba de quedarse apagado.
+   */
+  const cambiarServicio = (code: ServiceType): void => {
+    const servicio = catalog?.services.find((item) => item.code === code);
+    const sigueValiendo = servicio ? servicio.rates[form.frequency] !== null : true;
+
+    setForm((current) => ({
+      ...current,
+      service: code,
+      frequency: sigueValiendo ? current.frequency : 'ONE_TIME',
+    }));
+  };
+
   const submit = useCallback(
     async (state: FormState): Promise<void> => {
       if (!POSTAL_CODE_PATTERN.test(state.postalCode)) {
@@ -137,6 +157,20 @@ export function QuoteCalculator() {
   useEffect(() => () => requestRef.current?.abort(), []);
 
   const limits = catalog?.limits;
+
+  /**
+   * El importe plano del servicio elegido en esa cadencia, o `null` si no se
+   * ofrece asi.
+   *
+   * Es EL IMPORTE PLANO y no el precio final: el final depende de los pies
+   * cuadrados y aqui todavia no se han escrito. Ensenarlo como referencia
+   * junto al boton es lo que permite comparar cadencias de un vistazo; la
+   * cifra exacta la da el presupuesto de abajo.
+   */
+  const tarifaPlanaDe = (frecuencia: Frequency): number | null => {
+    const servicio = catalog?.services.find((item) => item.code === form.service);
+    return servicio?.rates[frecuencia]?.flatCents ?? null;
+  };
   const showResult = quote !== null;
 
   /*
@@ -194,7 +228,7 @@ export function QuoteCalculator() {
                 id="service"
                 className="ft-input"
                 value={form.service}
-                onChange={(event) => update('service', event.target.value as ServiceType)}
+                onChange={(event) => cambiarServicio(event.target.value as ServiceType)}
               >
                 {(catalog?.services ?? []).map((service) => (
                   <option key={service.code} value={service.code}>
@@ -209,20 +243,45 @@ export function QuoteCalculator() {
               <div className="flex flex-wrap gap-2">
                 {(catalog?.frequencies ?? []).map((frequency) => {
                   const selected = form.frequency === frequency.code;
+                  const tarifa = tarifaPlanaDe(frequency.code);
+                  /*
+                   * Una limpieza profunda no se contrata cada semana: la casa
+                   * ya está profunda. El botón se apaga en vez de dejar
+                   * pulsar y contestar con un aviso: enseñar la puerta
+                   * cerrada es más honesto que dejar que se estrelle contra
+                   * ella. Se sigue VIENDO, porque para la estándar sí existe
+                   * y esconderlo haría que la lista cambiara de tamaño al
+                   * cambiar de servicio.
+                   */
+                  const disponible = tarifa !== null;
+
                   return (
                     <button
                       key={frequency.code}
                       type="button"
                       onClick={() => update('frequency', frequency.code)}
                       aria-pressed={selected}
+                      disabled={!disponible}
+                      title={disponible ? undefined : t('frequency.notOffered')}
                       className={`rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
-                        selected
-                          ? 'border-brand-700 bg-brand-700 text-white'
-                          : 'border-slate-300 text-slate-700 hover:bg-slate-50 dark:border-night-600 dark:text-slate-300 dark:hover:bg-night-700'
+                        !disponible
+                          ? 'cursor-not-allowed border-slate-200 text-slate-400 dark:border-night-700 dark:text-slate-600'
+                          : selected
+                            ? 'border-brand-700 bg-brand-700 text-white'
+                            : 'border-slate-300 text-slate-700 hover:bg-slate-50 dark:border-night-600 dark:text-slate-300 dark:hover:bg-night-700'
                       }`}
                     >
                       {t(`frequency.${frequency.code}`)}
-                      {frequency.discountPercent > 0 && (
+                      {/*
+                        SE ENSENA EL PRECIO, NO UN PORCENTAJE.
+                        La recurrencia dejo de ser un descuento sobre el
+                        precio puntual y paso a ser su propia tarifa, asi que
+                        lo honesto es decir lo que cuesta —«$120»— en vez de
+                        un «-35%» que obliga a hacer la cuenta para saber lo
+                        que se paga. Donde el servicio no se ofrece en esa
+                        cadencia no hay cifra que ensenar.
+                      */}
+                      {tarifa !== null && (
                         <span
                           className={
                             selected
@@ -230,7 +289,7 @@ export function QuoteCalculator() {
                               : 'ml-1.5 text-brand-700 dark:text-brand-300'
                           }
                         >
-                          −{frequency.discountPercent}%
+                          {formatCents(tarifa, locale)}
                         </span>
                       )}
                     </button>

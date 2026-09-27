@@ -118,12 +118,13 @@ describe('quien puede tocar el area', () => {
 
     expect(respuesta.status).toBe(200);
     expect(AdminServiceAreaSchema.safeParse(respuesta.body).success).toBe(true);
-    expect(respuesta.body.settings.zones).toHaveLength(5);
+    // Tres bandas, no cinco anillos: ver DEFAULT_SERVICE_AREA.
+    expect(respuesta.body.settings.zones).toHaveLength(3);
   });
 
   /*
    * Coordinacion mueve la agenda; no decide hasta donde llega la empresa ni
-   * cuanto se cobra por el traslado. Eso es una decision comercial.
+   * hasta donde el precio sale solo. Eso es una decision comercial.
    */
   it('coordinacion no puede leerla ni cambiarla', async () => {
     const token = await comoDiego();
@@ -156,8 +157,8 @@ describe('las reglas del conjunto', () => {
    */
   it('rechaza anillos que no crecen', async () => {
     const respuesta = await guardar([
-      { code: 'A', maxMiles: 50, surchargeCents: 0, instantQuote: true },
-      { code: 'B', maxMiles: 20, surchargeCents: 2500, instantQuote: true },
+      { code: 'A', maxMiles: 50, instantQuote: true },
+      { code: 'B', maxMiles: 20, instantQuote: true },
     ]);
 
     expect(respuesta.status).toBe(400);
@@ -170,18 +171,23 @@ describe('las reglas del conjunto', () => {
    */
   it('rechaza que el precio automatico vuelva mas lejos', async () => {
     const respuesta = await guardar([
-      { code: 'A', maxMiles: 20, surchargeCents: 0, instantQuote: true },
-      { code: 'B', maxMiles: 60, surchargeCents: 0, instantQuote: false },
-      { code: 'C', maxMiles: 100, surchargeCents: 5000, instantQuote: true },
+      { code: 'A', maxMiles: 20, instantQuote: true },
+      { code: 'B', maxMiles: 60, instantQuote: false },
+      { code: 'C', maxMiles: 100, instantQuote: true },
     ]);
 
     expect(respuesta.status).toBe(400);
   });
 
-  it('rechaza un recargo en una zona sin precio automatico', async () => {
+  /*
+   * SIN LA PRIMERA ZONA NO HAY COTIZADOR: el sitio pediria los datos para
+   * no dar ninguna cifra a nadie, ni siquiera a quien vive al lado. Es un
+   * area valida zona a zona que deja el negocio sin su puerta de entrada.
+   */
+  it('rechaza que ni siquiera la zona mas cercana de precio automatico', async () => {
     const respuesta = await guardar([
-      { code: 'A', maxMiles: 20, surchargeCents: 0, instantQuote: true },
-      { code: 'B', maxMiles: 100, surchargeCents: 5000, instantQuote: false },
+      { code: 'A', maxMiles: 20, instantQuote: false },
+      { code: 'B', maxMiles: 100, instantQuote: false },
     ]);
 
     expect(respuesta.status).toBe(400);
@@ -189,8 +195,8 @@ describe('las reglas del conjunto', () => {
 
   it('rechaza saltarse un codigo de zona', async () => {
     const respuesta = await guardar([
-      { code: 'A', maxMiles: 20, surchargeCents: 0, instantQuote: true },
-      { code: 'C', maxMiles: 60, surchargeCents: 5000, instantQuote: true },
+      { code: 'A', maxMiles: 20, instantQuote: true },
+      { code: 'C', maxMiles: 60, instantQuote: true },
     ]);
 
     expect(respuesta.status).toBe(400);
@@ -202,7 +208,7 @@ describe('las reglas del conjunto', () => {
    */
   it('rechaza una distancia absurda', async () => {
     const respuesta = await guardar([
-      { code: 'A', maxMiles: 9999, surchargeCents: 0, instantQuote: true },
+      { code: 'A', maxMiles: 9999, instantQuote: true },
     ]);
 
     expect(respuesta.status).toBe(400);
@@ -210,7 +216,7 @@ describe('las reglas del conjunto', () => {
 
   it('no se pueden inventar zonas fuera del catalogo', async () => {
     const respuesta = await guardar([
-      { code: 'Z', maxMiles: 20, surchargeCents: 0, instantQuote: true },
+      { code: 'Z', maxMiles: 20, instantQuote: true },
     ]);
 
     expect(respuesta.status).toBe(400);
@@ -228,7 +234,7 @@ describe('el cambio llega al cotizador', () => {
     const catalogoAntes = await request(app.getHttpServer()).get('/api/v1/pricing/catalog');
     expect(catalogoAntes.body.zones.at(-2).maxMiles).toBe(325);
 
-    await guardar([{ code: 'A', maxMiles: 15, surchargeCents: 0, instantQuote: true }]);
+    await guardar([{ code: 'A', maxMiles: 15, instantQuote: true }]);
     app.get(ServiceAreaService).invalidate();
 
     const catalogoDespues = await request(app.getHttpServer()).get('/api/v1/pricing/catalog');
@@ -240,10 +246,38 @@ describe('el cambio llega al cotizador', () => {
     expect(atendidas[0].maxMiles).toBe(15);
   });
 
+  /*
+   * LAS FILAS DE ANTES NO SE TIRAN. Hay areas guardadas con el recargo por
+   * zona que ya no existe. Si se descartaran enteras, la empresa volveria
+   * a las zonas de partida sin enterarse: sus 60 millas configuradas se
+   * convertirian en 35, y con ellas el precio de cada reserva posterior.
+   */
+  it('una fila guardada con el recargo antiguo se sigue leyendo', async () => {
+    await db.exec(`
+      INSERT INTO business_settings (key, value, "updatedAt")
+      VALUES (
+        'service_area',
+        '{"zones":[{"code":"A","maxMiles":40,"surchargeCents":0,"instantQuote":true},
+                   {"code":"B","maxMiles":90,"surchargeCents":2500,"instantQuote":false}]}'::jsonb,
+        now()
+      )
+      ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value;
+    `);
+    app.get(ServiceAreaService).invalidate();
+
+    const respuesta = await leer();
+
+    expect(respuesta.status).toBe(200);
+    expect(respuesta.body.settings.zones).toEqual([
+      { code: 'A', maxMiles: 40, instantQuote: true },
+      { code: 'B', maxMiles: 90, instantQuote: false },
+    ]);
+  });
+
   it('el cambio queda en el registro de auditoria, con las cifras', async () => {
     await guardar([
-      { code: 'A', maxMiles: 20, surchargeCents: 0, instantQuote: true },
-      { code: 'B', maxMiles: 200, surchargeCents: 0, instantQuote: false },
+      { code: 'A', maxMiles: 20, instantQuote: true },
+      { code: 'B', maxMiles: 200, instantQuote: false },
     ]);
 
     const filas = await db.query<{ action: string; metadata: unknown }>(

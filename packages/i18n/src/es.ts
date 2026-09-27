@@ -26,6 +26,7 @@ export const es: TranslationResources = {
 
   nav: {
     services: 'Servicios',
+    scope: 'Qué incluye',
     quote: 'Cotización',
     areas: 'Zonas de servicio',
     whyUs: 'Por qué nosotros',
@@ -97,13 +98,53 @@ export const es: TranslationResources = {
     BED_LINENS: 'Cambio de ropa de cama',
   },
 
+  /**
+   * QUE ENTRA Y QUE NO ENTRA EN UNA LIMPIEZA
+   * ----------------------------------------
+   * Sale de las plantillas de trabajo que usa el equipo, no de un texto
+   * comercial. Esa es la gracia: lo que el cliente lee aqui es EXACTAMENTE
+   * la lista que la persona que va a su casa tiene delante.
+   *
+   * La lista de lo que NO se limpia esta en el sitio a proposito, y no
+   * escondida en las condiciones. Casi todas las quejas de una limpieza
+   * salen de algo que el cliente daba por incluido; decirlo antes cuesta
+   * una seccion y evita la discusion entera.
+   */
+  scope: {
+    title: '¿Qué incluye una limpieza?',
+    subtitle:
+      'Esta es la misma lista de tareas que lleva el equipo cuando llega a tu casa. Sin letra pequeña.',
+
+    /** Los extras: se piden aparte y se cobran aparte. */
+    extrasTitle: 'Servicios adicionales',
+    extrasNote: 'Se añaden al cotizador y se suman al precio. No entran en la limpieza normal.',
+
+    /** Lo que se cobra por cada unidad, como las ventanas. */
+    perUnit: 'cada una',
+
+    notIncludedTitle: 'Lo que no limpiamos',
+    notIncludedNote:
+      'Lo decimos antes, no después: si necesitas algo de esta lista, dínoslo y te orientamos hacia quien sí lo hace.',
+    notIncluded: {
+      patios: 'Patios',
+      porches: 'Porches',
+      exteriorWindows: 'Ventanas por fuera',
+      windowTracks: 'Rieles de ventanas',
+      dishes: 'Platos y lavavajillas',
+      walls: 'Paredes',
+      fullFridgeAndCabinets: 'Refrigerador y gabinetes con cosas dentro',
+      smallAppliances: 'Mini hornos y freidoras de aire',
+    },
+  },
+
   frequency: {
+    /** Para la cadencia que un servicio concreto no ofrece. */
+    notOffered: 'Este servicio no se contrata con esta frecuencia',
     title: '¿Con qué frecuencia?',
     ONE_TIME: 'Una vez',
     WEEKLY: 'Semanal',
     BIWEEKLY: 'Cada 2 semanas',
     MONTHLY: 'Mensual',
-    savePercent: 'Ahorra {{percent}}%',
   },
 
   calculator: {
@@ -361,44 +402,38 @@ export const es: TranslationResources = {
       onlyFuture:
         'Lo que ya está reservado no cambia: cada reserva guarda los precios con los que se calculó. Esto afecta solo a las cotizaciones a partir de ahora.',
 
-      services: 'Precio por servicio',
+      services: 'Precio por servicio y frecuencia',
       servicesHelp:
-        'El total es el cargo base más las habitaciones, los baños y los pies cuadrados. Si sale por debajo del mínimo, se cobra el mínimo.',
-      base: 'Base',
-      perBedroom: 'Por dormitorio',
-      perBathroom: 'Por baño',
-      /* En centavos y no en dólares: el sector piensa así en este campo. */
+        'En cada frecuencia manda el importe más alto de los dos: el plano o el que sale por pies cuadrados. Desmarcar una frecuencia significa que ese servicio no se ofrece así.',
+      flat: 'Importe',
       perSquareFoot: 'Por pie²',
-      minimum: 'Mínimo',
+      noSize: 'no aplica',
+      notOffered: 'No se ofrece en esta frecuencia',
 
       addOns: 'Extras',
       amount: 'Importe',
       maxQuantity: 'Máx.',
 
-      discounts: 'Descuento por recurrencia',
-      discountsHelp:
-        'Sobre el servicio más los extras. A más frecuencia, más descuento: el sistema no deja guardarlo al revés.',
-
-      deposit: 'Depósito',
+      depositAndTravel: 'Depósito y traslado',
       depositHelp:
-        'Lo que se retiene en la tarjeta al reservar, no lo que se cobra. Se descuenta del total el día del servicio.',
-      depositBase: 'Base',
+        'El depósito se retiene al reservar y se descuenta del total: no es un cargo extra. El traslado no se cobra dentro del radio; más allá se cobran las millas que sobran.',
+      deposit: 'Depósito',
       freeRadius: 'Radio sin recargo',
-      depositMin: 'Mínimo',
-      depositMax: 'Máximo',
+      perMile: 'Por milla',
+      irsRate: 'tarifa del IRS',
       roundTrip: 'Cobrar las millas de ida y vuelta',
 
       save: 'Guardar tarifas',
       saved: 'Tarifas guardadas. Las cotizaciones nuevas ya usan estos precios.',
       invalidNumbers: 'Revisa los importes: hay algún campo que no es un número.',
       outOfRange: 'Ese importe está fuera de lo razonable. Revisa «{{field}}»: ¿sobra un cero?',
-      errMinimumZero:
-        'El importe mínimo tiene que ser mayor que cero: si no, una casa pequeña saldría gratis.',
-      errDiscountOrder:
-        'El descuento no puede bajar al aumentar la frecuencia: quien viene cada semana pagaría proporcionalmente más que quien viene una vez al mes.',
-      errDepositRange: 'El mínimo del depósito no puede superar al máximo.',
+      errOneTimeRequired:
+        'Un servicio tiene que poder contratarse una sola vez: deja marcada la frecuencia «Una vez».',
+      errFrequencyOrder:
+        'El precio no puede subir al aumentar la frecuencia: quien viene cada semana pagaría más que quien viene una vez.',
       currentVersion: 'Versión {{version}} · {{count}} guardadas en total',
     },
+
     /* ----------------------- Area de servicio ----------------------- */
     serviceArea: {
       title: 'Área de servicio',
@@ -928,6 +963,19 @@ export const es: TranslationResources = {
         PATIO: 'Balcón o patio',
         BED_LINENS: 'Ropa de cama (x{{quantity}})',
       },
+      /**
+       * El traslado que SE COBRA HOY: las millas que pasan del radio libre,
+       * contadas ida y vuelta.
+       */
+      travel:
+        'Traslado · {{miles}} millas ({{freeRadius}} incluidas, {{billableMiles}} facturadas ida y vuelta)',
+
+      /*
+       * LAS TRES DE ABAJO YA NO SE EMITEN. Se quedan porque el panel lee
+       * presupuestos y reservas guardados, y sus lineas siguen apuntando a
+       * estas claves: borrarlas dejaria el historial mostrando el nombre de
+       * la clave en vez del concepto.
+       */
       discount: {
         ONE_TIME: 'Descuento',
         WEEKLY: 'Descuento por servicio semanal ({{percent}}%)',
@@ -936,6 +984,7 @@ export const es: TranslationResources = {
       },
       minimumAdjustment: 'Mínimo del servicio (${{minimum}})',
       zoneSurcharge: 'Recargo por traslado · zona {{zone}} ({{miles}} millas)',
+
       salesTax: 'Impuesto sobre ventas ({{percent}}%)',
     },
     disclaimer: {
@@ -964,6 +1013,14 @@ export const es: TranslationResources = {
       outOfState: 'Por ahora operamos únicamente en el estado de Georgia.',
       largeProperty:
         'Las propiedades grandes se cotizan de forma individual para que el estimado sea preciso.',
+
+      /**
+       * El servicio existe, pero no en esa cadencia. Distinto de «no damos
+       * precio automático»: aquí la salida está en la misma pantalla —
+       * cambiar de frecuencia—, no en esperar una llamada.
+       */
+      frequencyUnavailable:
+        'Este servicio no se contrata con esa frecuencia. Elige otra cadencia o escríbenos y lo vemos contigo.',
     },
     tax: {
       gaExempt: 'Exento — los servicios de limpieza no pagan impuesto en Georgia',
@@ -998,7 +1055,13 @@ export const es: TranslationResources = {
     upToMiles: 'Hasta {{miles}} millas desde nuestra base',
     beyondMiles: 'Más allá de {{miles}} millas',
     noSurcharge: 'Sin recargo por traslado',
-    surcharge: 'Recargo por traslado de {{amount}}',
+
+    /**
+     * EL TRASLADO YA NO ES UN IMPORTE POR ZONA. Se cobra por milla a partir
+     * del radio libre, así que la tarjeta no puede prometer una cifra: lo
+     * honesto es decir cómo se cuenta y que el cotizador dé el número.
+     */
+    travelByMile: 'Traslado por milla a partir del radio incluido',
     outOfRange: 'Fuera del área que cubrimos — contáctanos para una propuesta personalizada',
 
     /* --------------------------- El mapa --------------------------- */

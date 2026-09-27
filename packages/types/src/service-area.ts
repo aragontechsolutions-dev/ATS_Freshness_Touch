@@ -47,19 +47,19 @@ export const ZONE_ORDER = EditableZoneCodeSchema.options;
  */
 export const MAX_ZONE_MILES = 500;
 
-/** Tope del recargo. Mil dolares por un traslado no es un recargo, es una errata. */
-export const MAX_ZONE_SURCHARGE_CENTS = 100_000;
-
+/**
+ * UNA ZONA YA NO LLEVA RECARGO.
+ *
+ * Los tenia —25, 50 y 75 dolares por franja— y se quitaron: dos casas
+ * separadas por una milla podian pagar veinticinco dolares de diferencia
+ * por caer a un lado u otro de una raya que el cliente no ve. Ahora el
+ * traslado se cobra POR MILLA (ver `pricing-rates.ts`), y lo unico que
+ * deciden las zonas es hasta donde se va y hasta donde el precio sale solo.
+ */
 export const ServiceAreaZoneSchema = z.strictObject({
   code: EditableZoneCodeSchema,
   /** Limite superior en millas, inclusive. */
   maxMiles: z.int().min(1).max(MAX_ZONE_MILES),
-  /**
-   * Recargo por traslado. SIEMPRE cero en las zonas sin precio automatico:
-   * no hay precio que recargar, y dejar un numero ahi haria creer que se
-   * cobra algo que nadie cobra.
-   */
-  surchargeCents: z.int().nonnegative().max(MAX_ZONE_SURCHARGE_CENTS),
   instantQuote: z.boolean(),
 });
 export type ServiceAreaZone = z.infer<typeof ServiceAreaZoneSchema>;
@@ -105,9 +105,13 @@ export const ServiceAreaSettingsSchema = z
       path: ['zones'],
     },
   )
-  /* Un recargo en una zona sin precio automatico no se cobra nunca. */
-  .refine(({ zones }) => zones.every((zona) => zona.instantQuote || zona.surchargeCents === 0), {
-    message: 'Una zona sin precio automatico no puede llevar recargo',
+  /*
+   * LA PRIMERA ZONA SIEMPRE DA PRECIO AUTOMATICO. Sin ella no habria
+   * cotizador: el sitio pediria los datos para no dar ninguna cifra a
+   * nadie, ni siquiera a quien vive al lado.
+   */
+  .refine(({ zones }) => zones[0]?.instantQuote === true, {
+    message: 'La zona mas cercana tiene que dar precio automatico',
     path: ['zones'],
   });
 
@@ -115,22 +119,28 @@ export type ServiceAreaSettings = z.infer<typeof ServiceAreaSettingsSchema>;
 export type ServiceAreaSettingsInput = z.input<typeof ServiceAreaSettingsSchema>;
 
 /**
- * El area de partida.
+ * El area de partida: TRES BANDAS, no cinco anillos.
  *
- * Las cuatro primeras son EXACTAMENTE las que ya estaban escritas en el
- * codigo: esta etapa amplia la cobertura, no cambia ningun precio vigente.
+ *   A  hasta 35 millas — dentro del radio que no cobra traslado
+ *   B  hasta 60 millas — se cobra el traslado, el precio sigue saliendo solo
+ *   C  hasta 325       — el resto de Georgia: se atiende, sin precio automatico
  *
- * `E` es lo nuevo y llega hasta las 325 millas, que cubre Georgia entera
- * desde Atlanta —Savannah queda sobre las 250 y la esquina sureste sobre las
- * 300—. Sin precio automatico, por lo dicho arriba.
+ * Las 35 de la zona A son el radio sin recargo, y no es casualidad: la
+ * frontera que el cliente nota es «me cobras el viaje o no», asi que la
+ * zona y el radio tienen que coincidir. El dia que se muevan por separado,
+ * el mapa dira una cosa y la factura otra.
+ *
+ * Las 325 cubren Georgia entera desde Atlanta: Savannah queda sobre las 250
+ * y la esquina sureste sobre las 300.
+ *
+ * `D` y `E` siguen en el enumerado aunque no se usen: estan escritas en
+ * reservas que ya existen.
  */
 export const DEFAULT_SERVICE_AREA: ServiceAreaSettings = {
   zones: [
-    { code: 'A', maxMiles: 20, surchargeCents: 0, instantQuote: true },
-    { code: 'B', maxMiles: 35, surchargeCents: 2500, instantQuote: true },
-    { code: 'C', maxMiles: 50, surchargeCents: 5000, instantQuote: true },
-    { code: 'D', maxMiles: 60, surchargeCents: 7500, instantQuote: true },
-    { code: 'E', maxMiles: 325, surchargeCents: 0, instantQuote: false },
+    { code: 'A', maxMiles: 35, instantQuote: true },
+    { code: 'B', maxMiles: 60, instantQuote: true },
+    { code: 'C', maxMiles: 325, instantQuote: false },
   ],
 };
 

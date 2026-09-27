@@ -153,6 +153,12 @@ Progreso:
   guarda en cada reserva desde el primer día prometiendo que un presupuesto
   antiguo se puede reproducir, y apuntando a un archivo del código esa
   promesa no se cumplía.
+- ✅ **El modelo de operaciones** (`docs/21-modelo-de-operaciones.md`): la
+  tarifa deja de ser una fórmula por habitaciones y pasa a ser un precio por
+  servicio y frecuencia; el depósito, 35 $ fijos descontados del total; el
+  traslado, las millas reales por encima de las 35 incluidas en vez de
+  franjas con escalón. El sitio dice además **qué no se limpia**, que es de
+  donde salen casi todas las quejas.
 - ⬜ Avisos por SMS.
 - Calendario de disponibilidad y reserva en línea.
 - **Stripe**: retención del depósito con `capture_method: 'manual'` al reservar y
@@ -170,12 +176,15 @@ Progreso:
     `packages/i18n`, así que cambiarlos exige un despliegue. **Es lo único
     que queda para cerrar la configuración por completo.**
   - ✅ Zona de servicio: hecha en la Etapa 2.18
-    (`docs/17-area-de-servicio.md`). Los límites, los recargos y si cada zona
-    da precio automático se editan desde el panel, con vista previa en el
-    mapa; el cambio queda en la auditoría con las cifras de antes y después.
+    (`docs/17-area-de-servicio.md`) y replanteada en la 2.23
+    (`docs/21-modelo-de-operaciones.md` §2). Son tres bandas —dentro del
+    radio incluido, con traslado por milla, y el resto de Georgia sin precio
+    automático—, editables desde el panel con vista previa en el mapa; el
+    cambio queda en la auditoría con las cifras de antes y después.
   - ✅ Las tarifas: hechas en la Etapa 2.22
-    (`docs/20-tarifas-editables.md`). Los precios por servicio, los extras,
-    los descuentos por recurrencia y el depósito se editan desde el panel;
+    (`docs/20-tarifas-editables.md`) y con el modelo nuevo en la 2.23
+    (`docs/21-modelo-de-operaciones.md`). El precio de cada servicio en cada
+    cadencia, los extras, el depósito y el traslado se editan desde el panel;
     cada guardado crea una versión nueva y ninguna se borra, que es lo que
     permite reproducir un presupuesto antiguo.
 

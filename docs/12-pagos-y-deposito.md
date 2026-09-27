@@ -20,9 +20,16 @@ cliente que:
   la tarjeta.
 
 El importe lo calcula el motor de precios en el servidor
-(`docs/02-motor-de-precios.md`): base de 30 USD más las millas que excedan el
-radio libre de 20, ida y vuelta, a la tarifa vigente del IRS, con un tope de
-120 USD.
+(`docs/02-motor-de-precios.md` §5): **35 USD fijos**, y lo único que lo puede
+bajar es que el trabajo entero cueste menos que eso.
+
+Desde la Etapa 2.23 **no depende de la distancia**. La dependía —una base de
+30 USD más las millas a la tarifa del IRS— y se separó en dos cosas que son
+dos cosas: la garantía, que es igual para todos, y el traslado, que es una
+línea del precio y se cobra por milla (`docs/21-modelo-de-operaciones.md`
+§1.3 y §1.4). El depósito se sigue descontando del total: en una estándar
+puntual de 185 USD se retienen 35 al reservar, se cobran 150 al terminar, y a
+la cuenta llegan 185.
 
 > **El navegador nunca envía importes.** Manda las características del
 > trabajo; el precio y el depósito salen del motor. Aceptar una cifra del

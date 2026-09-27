@@ -8,6 +8,7 @@ import type {
 import { defaultPricingConfig, type PricingConfig } from './config';
 import { calculateDeposit } from './deposit';
 import { percentOfCents, roundCents } from './money';
+import { calculateTravel } from './travel';
 import { resolveZone } from './zones';
 
 /** Datos que el motor NO calcula: se los inyecta quien lo llama (API). */
@@ -42,6 +43,15 @@ const MANUAL_REVIEW_REASONS = {
   farZone: 'quote.review.farZone',
   outOfState: 'quote.review.outOfState',
   largeProperty: 'quote.review.largeProperty',
+  /**
+   * El servicio existe, pero no en esa cadencia.
+   *
+   * Una limpieza profunda no se contrata cada semana: la casa ya esta
+   * profunda. Es distinto de «este servicio no tiene precio automatico», y
+   * la diferencia le importa a quien lo lee: aqui la salida es elegir otra
+   * frecuencia, no esperar una llamada.
+   */
+  frequencyUnavailable: 'quote.review.frequencyUnavailable',
 } as const;
 
 /**
@@ -49,14 +59,16 @@ const MANUAL_REVIEW_REASONS = {
  * salida. No accede a red, reloj ni base de datos.
  *
  * Orden de calculo (importa para el resultado):
- *   1. Servicio base (con ajuste al minimo facturable).
+ *   1. Servicio, segun cadencia: el mayor entre el importe plano y el
+ *      precio por pie cuadrado.
  *   2. Extras.
- *   3. Descuento por recurrencia, sobre servicio + extras (nunca sobre el
- *      recargo de desplazamiento: ese coste es real y no se descuenta).
- *   4. Recargo por zona.
- *   5. Impuesto (0 en Georgia para servicios de limpieza).
- *   6. Deposito por distancia, acotado ademas al total (nunca se retiene
- *      mas dinero del que cuesta el trabajo).
+ *   3. Traslado: las millas que pasan del radio libre, ida y vuelta.
+ *   4. Impuesto (0 en Georgia para servicios de limpieza).
+ *   5. Deposito: una cifra fija, acotada al total.
+ *
+ * YA NO HAY PASO DE DESCUENTO. La recurrencia dejo de ser un porcentaje
+ * sobre el precio puntual y paso a ser su propia tarifa: se anuncia «120 a
+ * la semana», no «185 menos un 35%».
  */
 export function calculateQuote(request: QuoteRequest, context: QuoteContext): QuoteResponse {
   const config = context.config ?? defaultPricingConfig;
@@ -66,8 +78,16 @@ export function calculateQuote(request: QuoteRequest, context: QuoteContext): Qu
   const lines: QuoteLine[] = [];
   const manualReviewReasons: string[] = [];
 
+  /*
+   * La tarifa de ESTA cadencia. `null` significa que el servicio no se
+   * ofrece asi, que no es lo mismo que no tener precio automatico.
+   */
+  const rate = service.byFrequency[request.frequency];
+
   if (!service.instantQuote) {
     manualReviewReasons.push(MANUAL_REVIEW_REASONS.commercial);
+  } else if (rate === null) {
+    manualReviewReasons.push(MANUAL_REVIEW_REASONS.frequencyUnavailable);
   }
   if (!zone.serviceable) {
     manualReviewReasons.push(MANUAL_REVIEW_REASONS.outOfRange);
@@ -88,17 +108,22 @@ export function calculateQuote(request: QuoteRequest, context: QuoteContext): Qu
    * todo Georgia sin que el cotizador suelte una cifra para un traslado de
    * ocho horas que nadie ha calculado.
    */
-  const quotable = service.instantQuote && zone.serviceable && zone.instantQuote;
+  const quotable = service.instantQuote && rate !== null && zone.serviceable && zone.instantQuote;
 
-  // --- 1. Servicio base -----------------------------------------------------
+  // --- 1. Servicio ----------------------------------------------------------
   let serviceCents = 0;
-  if (quotable) {
-    const computed = roundCents(
-      service.baseCents +
-        service.perBedroomCents * request.bedrooms +
-        service.perBathroomCents * request.bathrooms +
-        service.centsPerSquareFoot * request.squareFeet,
-    );
+  if (quotable && rate !== null) {
+    /*
+     * EL MAYOR DE LOS DOS, no un umbral por tamano. Con un umbral —«hasta
+     * 809 pies lo plano, por encima por pie»— aparece un escalon hacia
+     * abajo: a 810 pies saldrian 243 $ y a 809, 250 $. Siete dolares mas
+     * barata la casa mas grande, y nadie sabria explicarlo por telefono.
+     */
+    const porTamano =
+      rate.centsPerSquareFoot === null
+        ? 0
+        : roundCents(rate.centsPerSquareFoot * request.squareFeet);
+    const computed = Math.max(rate.flatCents, porTamano);
 
     lines.push({
       code: `SERVICE_${request.service}`,
@@ -108,35 +133,30 @@ export function calculateQuote(request: QuoteRequest, context: QuoteContext): Qu
         bedrooms: request.bedrooms,
         bathrooms: request.bathrooms,
         squareFeet: request.squareFeet,
+        frequency: request.frequency,
       },
       quantity: 1,
       unitAmountCents: computed,
       amountCents: computed,
     });
     serviceCents = computed;
-
-    if (computed < service.minimumCents) {
-      const adjustment = service.minimumCents - computed;
-      lines.push({
-        code: 'SERVICE_MINIMUM_ADJUSTMENT',
-        kind: 'SERVICE_BASE',
-        labelKey: 'quote.line.minimumAdjustment',
-        labelParams: { minimum: service.minimumCents / 100 },
-        quantity: 1,
-        unitAmountCents: adjustment,
-        amountCents: adjustment,
-      });
-      serviceCents = service.minimumCents;
-    }
   }
 
   // --- 2. Extras ------------------------------------------------------------
   let addOnsCents = 0;
   if (quotable) {
     for (const requested of request.addOns) {
-      const rate = config.addOns[requested.code];
-      const quantity = rate.unit === 'FLAT' ? 1 : Math.min(requested.quantity, rate.maxQuantity);
-      const amount = rate.unitAmountCents * quantity;
+      const extra = config.addOns[requested.code];
+      /*
+       * UN EXTRA RETIRADO NO SE COBRA, aunque venga en la peticion. Su
+       * codigo sigue existiendo para poder releer presupuestos antiguos, y
+       * sin esta linea alguien podria pedir por la API algo que el sitio ya
+       * no ofrece —y que quiza el equipo ya no sabe hacer—.
+       */
+      if (!extra.offered) continue;
+
+      const quantity = extra.unit === 'FLAT' ? 1 : Math.min(requested.quantity, extra.maxQuantity);
+      const amount = extra.unitAmountCents * quantity;
 
       lines.push({
         code: `ADDON_${requested.code}`,
@@ -144,47 +164,46 @@ export function calculateQuote(request: QuoteRequest, context: QuoteContext): Qu
         labelKey: `quote.line.addOn.${requested.code}`,
         labelParams: { quantity },
         quantity,
-        unitAmountCents: rate.unitAmountCents,
+        unitAmountCents: extra.unitAmountCents,
         amountCents: amount,
       });
       addOnsCents += amount;
     }
   }
 
-  // --- 3. Descuento por recurrencia ----------------------------------------
-  const discountPercent = quotable ? config.frequencyDiscountPercent[request.frequency] : 0;
-  let discountCents = 0;
-  if (discountPercent > 0) {
-    discountCents = percentOfCents(serviceCents + addOnsCents, discountPercent);
-    if (discountCents > 0) {
-      lines.push({
-        code: `DISCOUNT_${request.frequency}`,
-        kind: 'DISCOUNT',
-        labelKey: `quote.line.discount.${request.frequency}`,
-        labelParams: { percent: discountPercent },
-        quantity: 1,
-        unitAmountCents: -discountCents,
-        amountCents: -discountCents,
-      });
-    }
-  }
+  // --- 3. Traslado ----------------------------------------------------------
+  /*
+   * SE CALCULA SIEMPRE, tambien cuando no hay precio automatico: el desglose
+   * sirve para que quien cotice a mano sepa cuantas millas se cobran.
+   */
+  const travel = calculateTravel(context.distance.miles, config, context.now);
 
-  // --- 4. Recargo por zona --------------------------------------------------
   let surchargesCents = 0;
-  if (quotable && zone.surchargeCents > 0) {
-    surchargesCents = zone.surchargeCents;
+  if (quotable && travel.amountCents > 0) {
+    surchargesCents = travel.amountCents;
     lines.push({
-      code: `ZONE_SURCHARGE_${zone.code}`,
+      code: 'TRAVEL_SURCHARGE',
       kind: 'SURCHARGE',
-      labelKey: 'quote.line.zoneSurcharge',
-      labelParams: { zone: zone.code, miles: Math.round(context.distance.miles) },
+      labelKey: 'quote.line.travel',
+      labelParams: {
+        miles: Math.round(context.distance.miles),
+        freeRadius: travel.freeRadiusMiles,
+        billableMiles: travel.billableMiles,
+      },
       quantity: 1,
-      unitAmountCents: zone.surchargeCents,
-      amountCents: zone.surchargeCents,
+      unitAmountCents: travel.amountCents,
+      amountCents: travel.amountCents,
     });
   }
 
-  // --- 5. Impuesto ----------------------------------------------------------
+  /*
+   * El descuento desaparece del calculo pero NO del contrato: los totales
+   * lo siguen declarando en cero para que un presupuesto antiguo y uno
+   * nuevo tengan la misma forma y se puedan comparar.
+   */
+  const discountCents = 0;
+
+  // --- 4. Impuesto ----------------------------------------------------------
   const taxableCents = serviceCents + addOnsCents + surchargesCents - discountCents;
   const taxCents = config.taxExempt ? 0 : percentOfCents(taxableCents, config.taxRatePercent);
   if (taxCents > 0) {
@@ -210,16 +229,14 @@ export function calculateQuote(request: QuoteRequest, context: QuoteContext): Qu
     totalCents: Math.max(0, totalCents),
   };
 
-  // --- 6. Deposito ----------------------------------------------------------
-  const rawDeposit = calculateDeposit(context.distance.miles, config, context.now);
+  // --- 5. Deposito ----------------------------------------------------------
+  /*
+   * Sin precio automatico no hay nada que retener: no se sabe cuanto cuesta
+   * el trabajo, asi que retener contra el no significa nada.
+   */
   const deposit = quotable
-    ? {
-        ...rawDeposit,
-        // Nunca retener mas de lo que cuesta el trabajo.
-        amountCents: Math.min(rawDeposit.amountCents, totals.totalCents),
-        capped: rawDeposit.capped || rawDeposit.amountCents > totals.totalCents,
-      }
-    : { ...rawDeposit, amountCents: 0, capped: false };
+    ? calculateDeposit(totals.totalCents, config)
+    : { amountCents: 0, capped: false, appliedToTotal: true as const };
 
   const disclaimerKeys: string[] = [
     DISCLAIMERS.estimate,
@@ -258,6 +275,7 @@ export function calculateQuote(request: QuoteRequest, context: QuoteContext): Qu
       reasonKey: config.taxReasonKey,
     },
     deposit,
+    travel,
     balanceDueAtServiceCents: totals.totalCents - deposit.amountCents,
     manualReview: {
       required: manualReviewReasons.length > 0,

@@ -191,9 +191,11 @@ describe('creacion de reserva', () => {
 
     expect(response.body.reference).toMatch(/^FT-\d{4}-\d{4}$/);
     expect(response.body.status).toBe('PENDING_PAYMENT');
-    // 18500 del servicio + 3500 del extra
-    expect(response.body.totals.totalCents).toBe(22000);
-    expect(response.body.deposit.amountCents).toBeGreaterThan(0);
+    // 18500 la estandar puntual + 5000 el horno. La direccion esta dentro
+    // de las 35 millas incluidas, asi que el traslado no suma nada.
+    expect(response.body.totals.totalCents).toBe(23_500);
+    // La garantia es fija y se descuenta del total: no es un cargo aparte.
+    expect(response.body.deposit.amountCents).toBe(3500);
     expect(response.body.balanceDueAtServiceCents).toBe(
       response.body.totals.totalCents - response.body.deposit.amountCents,
     );

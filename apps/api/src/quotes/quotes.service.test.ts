@@ -55,11 +55,16 @@ describe('QuotesService', () => {
     const service = new QuotesService(fakeDistance(12), fakePricing);
     const quote = await service.estimate(request, new Date('2026-09-20T12:00:00Z'));
 
-    // 18500 servicio + 3500 extra - 10% descuento = 19800
-    expect(quote.totals.totalCents).toBe(19800);
+    /*
+     * 13500 la estandar quincenal + 5000 el horno = 18500. El traslado no
+     * suma: 12 millas caen dentro de las 35 incluidas.
+     */
+    expect(quote.totals.totalCents).toBe(18_500);
     expect(quote.distance.zone).toBe('A');
-    expect(quote.deposit.amountCents).toBe(3000);
-    expect(quote.balanceDueAtServiceCents).toBe(16800);
+    expect(quote.travel.amountCents).toBe(0);
+    // La garantia es fija y sale del total, no se suma a el.
+    expect(quote.deposit.amountCents).toBe(3500);
+    expect(quote.balanceDueAtServiceCents).toBe(15_000);
   });
 
   it('genera un identificador distinto por presupuesto', async () => {
@@ -78,10 +83,24 @@ describe('QuotesService', () => {
     const service = new QuotesService(fakeDistance(95), fakePricing);
     const quote = await service.estimate(request);
 
-    expect(quote.distance.zone).toBe('E');
+    expect(quote.distance.zone).toBe('C');
     expect(quote.manualReview.required).toBe(true);
     expect(quote.manualReview.reasonKeys).toContain('quote.review.farZone');
     expect(quote.totals.totalCents).toBe(0);
+  });
+
+  it('pasadas las 35 millas el traslado se cobra, ida y vuelta', async () => {
+    // 50 millas: 15 de exceso, 30 facturables a 76 centavos = 22,80 $.
+    const service = new QuotesService(fakeDistance(50), fakePricing);
+    const quote = await service.estimate(request, new Date('2026-09-20T12:00:00Z'));
+
+    expect(quote.distance.zone).toBe('B');
+    expect(quote.travel.billableMiles).toBe(30);
+    expect(quote.travel.amountCents).toBe(2280);
+    expect(quote.totals.surchargesCents).toBe(2280);
+    expect(quote.totals.totalCents).toBe(18_500 + 2280);
+    // La garantia no crece con el viaje: sigue siendo la misma cifra fija.
+    expect(quote.deposit.amountCents).toBe(3500);
   });
 
   it('publica un catalogo coherente con el motor de precios', async () => {
@@ -92,6 +111,14 @@ describe('QuotesService', () => {
     expect(catalog.services).toHaveLength(6);
     expect(catalog.addOns.length).toBeGreaterThan(0);
     expect(catalog.tax.exempt).toBe(true);
-    expect(catalog.deposit.mileageRateCentsPerMile).toBe(76);
+    expect(catalog.deposit.amountCents).toBe(3500);
+
+    /*
+     * El catalogo resuelve la tarifa por milla antes de publicarla: el sitio
+     * no tiene por que saber que detras hay una tabla del IRS con fechas de
+     * vigencia, solo cuanto cuesta la milla hoy.
+     */
+    expect(catalog.travel.freeRadiusMiles).toBe(35);
+    expect(catalog.travel.centsPerMile).toBe(76);
   });
 });

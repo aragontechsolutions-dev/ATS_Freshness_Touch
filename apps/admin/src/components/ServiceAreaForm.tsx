@@ -32,7 +32,6 @@ interface ServiceAreaFormProps {
 interface BorradorZona {
   code: ServiceAreaZone['code'];
   maxMiles: string;
-  surchargeDollars: string;
   instantQuote: boolean;
 }
 
@@ -76,7 +75,6 @@ export function ServiceAreaForm({ locale, onSessionLost }: ServiceAreaFormProps)
       area.zones.map((zona) => ({
         code: zona.code,
         maxMiles: String(zona.maxMiles),
-        surchargeDollars: (zona.surchargeCents / 100).toFixed(2),
         instantQuote: zona.instantQuote,
       })),
     );
@@ -113,13 +111,6 @@ export function ServiceAreaForm({ locale, onSessionLost }: ServiceAreaFormProps)
       actuales.map((zona, i) => {
         if (i !== indice) return zona;
         const siguiente = { ...zona, ...cambio };
-        /*
-         * Quitar el precio automatico borra el recargo. El contrato lo exige
-         * —un recargo que no se cobra nunca no significa nada— y hacerlo
-         * aqui evita que alguien guarde y reciba un error por un campo que
-         * ni siquiera ve.
-         */
-        if (siguiente.instantQuote === false) siguiente.surchargeDollars = '0.00';
         return siguiente;
       }),
     );
@@ -130,13 +121,10 @@ export function ServiceAreaForm({ locale, onSessionLost }: ServiceAreaFormProps)
     const zonasNumericas = zonas.map((zona) => ({
       code: zona.code,
       maxMiles: Number.parseInt(zona.maxMiles, 10),
-      surchargeCents: Math.round(Number.parseFloat(zona.surchargeDollars || '0') * 100),
       instantQuote: zona.instantQuote,
     }));
 
-    if (
-      zonasNumericas.some((z) => !Number.isFinite(z.maxMiles) || !Number.isFinite(z.surchargeCents))
-    ) {
+    if (zonasNumericas.some((z) => !Number.isFinite(z.maxMiles))) {
       return null;
     }
 
@@ -293,29 +281,7 @@ export function ServiceAreaForm({ locale, onSessionLost }: ServiceAreaFormProps)
                 />
               </div>
 
-              <div>
-                <label className="ft-label" htmlFor={`zona-${zona.code}-recargo`}>
-                  {t('admin.serviceArea.surcharge')}
-                </label>
-                <input
-                  id={`zona-${zona.code}-recargo`}
-                  className="ft-input"
-                  type="number"
-                  inputMode="decimal"
-                  min={0}
-                  step="0.01"
-                  /*
-                   * Sin precio automatico no hay recargo posible, asi que el
-                   * campo se apaga en vez de aceptar un numero que nunca se
-                   * cobraria. Apagarlo lo explica solo.
-                   */
-                  disabled={!zona.instantQuote}
-                  value={zona.surchargeDollars}
-                  onChange={(evento) => cambiar(indice, { surchargeDollars: evento.target.value })}
-                />
-              </div>
-
-              <label className="flex items-center gap-2 text-sm text-slate-700 sm:col-span-3 dark:text-slate-300">
+              <label className="flex items-center gap-2 text-sm text-slate-700 sm:col-span-2 dark:text-slate-300">
                 <input
                   type="checkbox"
                   checked={zona.instantQuote}

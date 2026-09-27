@@ -2,10 +2,11 @@ import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   EDITABLE_SERVICE_TYPES,
+  OFFERED_ADD_ON_CODES,
   PricingRatesSchema,
-  type AddOnCode,
-  type EditableServiceType,
+  type Frequency,
   type Locale,
+  type OfferedAddOnCode,
   type PricingRates,
 } from '@freshness/types';
 import { ApiClientError, fetchPricingRates, savePricingRates } from '../lib/api';
@@ -19,56 +20,39 @@ interface PricingRatesFormProps {
   onSessionLost: (reason?: 'expired' | 'noAccess') => void;
 }
 
+type ServicioEditable = (typeof EDITABLE_SERVICE_TYPES)[number];
+
+/** Las cadencias, de menos compromiso a mas. Es el orden en que se leen. */
+const CADENCIAS: readonly Frequency[] = ['ONE_TIME', 'MONTHLY', 'BIWEEKLY', 'WEEKLY'];
+
 /**
  * Lo que hay escrito en los campos. Todo cadenas: vienen de inputs, y un
  * campo a medio escribir («12.») no es un numero todavia.
  */
-interface CamposServicio {
-  base: string;
-  bedroom: string;
-  bathroom: string;
+interface CamposTarifa {
+  /** Si ese servicio se ofrece en esa cadencia. */
+  offered: boolean;
+  flat: string;
   /** En centavos, no en dolares: ver la cabecera del componente. */
   sqft: string;
-  minimum: string;
 }
 
-type ClaveServicio = keyof CamposServicio;
-
-type Borrador = {
-  services: Record<EditableServiceType, CamposServicio>;
-  addOns: Record<AddOnCode, { amount: string; max: string }>;
-  discounts: { weekly: string; biweekly: string; monthly: string };
-  deposit: { base: string; freeMiles: string; roundTrip: boolean; min: string; max: string };
-};
-
-const CODIGOS_EXTRA: AddOnCode[] = [
-  'INSIDE_FRIDGE',
-  'INSIDE_OVEN',
-  'INSIDE_CABINETS',
-  'INTERIOR_WINDOWS',
-  'LAUNDRY',
-  'BASEMENT',
-  'GARAGE',
-  'PET_HAIR',
-  'PATIO',
-  'BED_LINENS',
-];
+interface Borrador {
+  services: Record<ServicioEditable, Record<Frequency, CamposTarifa>>;
+  addOns: Record<OfferedAddOnCode, { amount: string; max: string }>;
+  deposit: string;
+  travel: { freeMiles: string; centsPerMile: string; roundTrip: boolean };
+}
 
 /** El nombre de cada campo, para poder decir CUAL revisar. */
 const ETIQUETA_CAMPO: Record<string, string> = {
-  baseCents: 'admin.rates.base',
-  perBedroomCents: 'admin.rates.perBedroom',
-  perBathroomCents: 'admin.rates.perBathroom',
+  flatCents: 'admin.rates.flat',
   centsPerSquareFoot: 'admin.rates.perSquareFoot',
-  minimumCents: 'admin.rates.minimum',
   unitAmountCents: 'admin.rates.amount',
   maxQuantity: 'admin.rates.maxQuantity',
-  weeklyPercent: 'frequency.WEEKLY',
-  biweeklyPercent: 'frequency.BIWEEKLY',
-  monthlyPercent: 'frequency.MONTHLY',
+  depositCents: 'admin.rates.deposit',
   freeRadiusMiles: 'admin.rates.freeRadius',
-  minCents: 'admin.rates.depositMin',
-  maxCents: 'admin.rates.depositMax',
+  centsPerMile: 'admin.rates.perMile',
 };
 
 const dolares = (cents: number): string => (cents / 100).toFixed(2);
@@ -87,25 +71,29 @@ const entero = (valor: string): number => Number.parseInt(valor, 10);
  * peligrosa justamente porque NO rompe nada. Un cero de mas en un precio
  * cotiza, cobra y factura con total normalidad. No hay pantalla roja.
  *
- * De ahi las tres decisiones que la gobiernan:
+ * COMO SE LEE EL MODELO. Cada servicio tiene una tarifa POR CADENCIA, y en
+ * cada una manda el mayor de dos numeros: un importe plano y, si el servicio
+ * mira el tamano de la casa, un precio por pie cuadrado. La limpieza
+ * estandar no lo mira —es el precio que se dice por telefono sin preguntar
+ * nada— y la profunda y la de mudanza si.
  *
- *   1. TODO EN DOLARES, no en centavos, salvo el precio por pie cuadrado.
+ * Desmarcar una cadencia significa QUE NO SE OFRECE ASI, que no es lo mismo
+ * que ponerla cara: una limpieza profunda no se contrata cada semana porque
+ * la casa ya esta profunda, y el cotizador responde distinto a cada cosa.
+ *
+ * Tres decisiones de forma:
+ *
+ *   1. TODO EN DOLARES, salvo el precio por pie cuadrado y el de la milla.
  *      Nadie piensa en centavos al fijar un precio, y un cero de mas en un
- *      campo de centavos es un precio diez veces mayor que nadie revisa. El
- *      pie cuadrado es la excepcion porque el sector SI piensa en centavos
- *      ahi —«cobramos tres centavos el pie»— y en dolares saldria 0,03.
+ *      campo de centavos es un precio diez veces mayor que nadie revisa.
+ *      Esos dos son la excepcion porque el sector SI piensa en centavos
+ *      ahi —«treinta centavos el pie»— y en dolares saldria 0,30.
  *
- *   2. SE VALIDA AQUI CON EL MISMO ESQUEMA QUE EL SERVIDOR. No por
- *      desconfiar de el —vuelve a validar igual— sino para que el error
- *      salga antes de guardar y diga cual de las reglas se ha roto.
+ *   2. SE VALIDA AQUI CON EL MISMO ESQUEMA QUE EL SERVIDOR, para que el
+ *      error salga antes de guardar y diga cual de las reglas se ha roto.
  *
  *   3. SE DICE QUE LO YA RESERVADO NO CAMBIA. Es la primera pregunta que
- *      hace cualquiera antes de tocar un precio, y no responderla en la
- *      pantalla lleva a no tocarlo o a llamar por telefono.
- *
- * Lo que NO se puede editar desde aqui —el servicio comercial, si un extra
- * es plano o por unidad, las duraciones, los limites y el impuesto— esta
- * razonado en `packages/types/src/pricing-rates.ts`.
+ *      hace cualquiera antes de tocar un precio.
  */
 export function PricingRatesForm({ locale, onSessionLost }: PricingRatesFormProps) {
   const { t } = useTranslation();
@@ -126,26 +114,22 @@ export function PricingRatesForm({ locale, onSessionLost }: PricingRatesFormProp
   const perdioSesion = onSessionLost;
 
   const asentar = useCallback((rates: PricingRates) => {
-    /*
-     * Se rellenan con bucles y no con `Object.fromEntries`: esa devuelve un
-     * indice abierto que hay que forzar con un `as`, y forzarlo es
-     * exactamente lo que deja pasar un servicio olvidado el dia que se
-     * anada uno nuevo.
-     */
     const services = {} as Borrador['services'];
     for (const tipo of EDITABLE_SERVICE_TYPES) {
-      const tarifa = rates.services[tipo];
-      services[tipo] = {
-        base: dolares(tarifa.baseCents),
-        bedroom: dolares(tarifa.perBedroomCents),
-        bathroom: dolares(tarifa.perBathroomCents),
-        sqft: String(tarifa.centsPerSquareFoot),
-        minimum: dolares(tarifa.minimumCents),
-      };
+      const porCadencia = {} as Record<Frequency, CamposTarifa>;
+      for (const cadencia of CADENCIAS) {
+        const tarifa = rates.services[tipo]?.[cadencia] ?? null;
+        porCadencia[cadencia] = {
+          offered: tarifa !== null,
+          flat: tarifa === null ? '' : dolares(tarifa.flatCents),
+          sqft: tarifa?.centsPerSquareFoot === null ? '' : String(tarifa?.centsPerSquareFoot ?? ''),
+        };
+      }
+      services[tipo] = porCadencia;
     }
 
     const addOns = {} as Borrador['addOns'];
-    for (const codigo of CODIGOS_EXTRA) {
+    for (const codigo of OFFERED_ADD_ON_CODES) {
       addOns[codigo] = {
         amount: dolares(rates.addOns[codigo]?.unitAmountCents ?? 0),
         max: String(rates.addOns[codigo]?.maxQuantity ?? 1),
@@ -155,17 +139,11 @@ export function PricingRatesForm({ locale, onSessionLost }: PricingRatesFormProp
     setBorrador({
       services,
       addOns,
-      discounts: {
-        weekly: String(rates.frequencyDiscounts.weeklyPercent),
-        biweekly: String(rates.frequencyDiscounts.biweeklyPercent),
-        monthly: String(rates.frequencyDiscounts.monthlyPercent),
-      },
-      deposit: {
-        base: dolares(rates.deposit.baseCents),
-        freeMiles: String(rates.deposit.freeRadiusMiles),
-        roundTrip: rates.deposit.roundTrip,
-        min: dolares(rates.deposit.minCents),
-        max: dolares(rates.deposit.maxCents),
+      deposit: dolares(rates.depositCents),
+      travel: {
+        freeMiles: String(rates.travel.freeRadiusMiles),
+        centsPerMile: rates.travel.centsPerMile === null ? '' : String(rates.travel.centsPerMile),
+        roundTrip: rates.travel.roundTrip,
       },
     });
   }, []);
@@ -201,24 +179,57 @@ export function PricingRatesForm({ locale, onSessionLost }: PricingRatesFormProp
     void cargar();
   }, [cargar]);
 
+  /** Recorre el objeto entero buscando un numero que no lo es. */
+  const todoSonNumeros = (valor: unknown): boolean => {
+    if (typeof valor === 'number') return Number.isFinite(valor);
+    if (typeof valor !== 'object' || valor === null) return true;
+    return Object.values(valor).every((v) => todoSonNumeros(v));
+  };
+
+  /**
+   * El fallo del esquema, en el idioma de quien mira.
+   *
+   * NO SE ENSENA EL MENSAJE DE ZOD TAL CUAL: sus textos son tecnicos y van
+   * siempre en ingles («Too big: expected number to be <=1000000»). Las
+   * reglas del conjunto llevan clave de traduccion en el contrato; el resto
+   * son numeros fuera de rango, y de esos lo util es QUE CAMPO revisar.
+   */
+  const mensajeDe = (fallo: { message: string; path: PropertyKey[] }): string => {
+    if (fallo.message.startsWith('admin.rates.')) return t(fallo.message);
+
+    const ultimo = String(fallo.path.at(-1) ?? '');
+    const campo = ETIQUETA_CAMPO[ultimo];
+    return t('admin.rates.outOfRange', { field: campo === undefined ? ultimo : t(campo) });
+  };
+
   /** Lo tecleado, en la forma del contrato. `null` si hay algo que no es un numero. */
   const aContrato = (): PricingRates | null => {
     if (!borrador) return null;
 
     const services = {} as PricingRates['services'];
     for (const tipo of EDITABLE_SERVICE_TYPES) {
-      const campos = borrador.services[tipo];
-      services[tipo] = {
-        baseCents: aCentavos(campos.base),
-        perBedroomCents: aCentavos(campos.bedroom),
-        perBathroomCents: aCentavos(campos.bathroom),
-        centsPerSquareFoot: Number.parseFloat(campos.sqft || ''),
-        minimumCents: aCentavos(campos.minimum),
-      };
+      const porCadencia = {} as PricingRates['services'][ServicioEditable];
+      for (const cadencia of CADENCIAS) {
+        const campos = borrador.services[tipo][cadencia];
+        porCadencia[cadencia] = !campos.offered
+          ? null
+          : {
+              flatCents: aCentavos(campos.flat),
+              /*
+               * Vacio significa «este servicio no mira el tamano», que es
+               * `null` y no cero: con cero el maximo lo ganaria siempre el
+               * importe plano y daria igual, pero el dia que alguien mire la
+               * tabla vería un precio por pie que no existe.
+               */
+              centsPerSquareFoot:
+                campos.sqft.trim() === '' ? null : Number.parseFloat(campos.sqft),
+            };
+      }
+      services[tipo] = porCadencia;
     }
 
     const addOns = {} as PricingRates['addOns'];
-    for (const codigo of CODIGOS_EXTRA) {
+    for (const codigo of OFFERED_ADD_ON_CODES) {
       addOns[codigo] = {
         unitAmountCents: aCentavos(borrador.addOns[codigo].amount),
         maxQuantity: entero(borrador.addOns[codigo].max),
@@ -228,57 +239,19 @@ export function PricingRatesForm({ locale, onSessionLost }: PricingRatesFormProp
     const candidato: PricingRates = {
       services,
       addOns,
-      frequencyDiscounts: {
-        weeklyPercent: entero(borrador.discounts.weekly),
-        biweeklyPercent: entero(borrador.discounts.biweekly),
-        monthlyPercent: entero(borrador.discounts.monthly),
-      },
-      deposit: {
-        baseCents: aCentavos(borrador.deposit.base),
-        freeRadiusMiles: entero(borrador.deposit.freeMiles),
-        roundTrip: borrador.deposit.roundTrip,
-        minCents: aCentavos(borrador.deposit.min),
-        maxCents: aCentavos(borrador.deposit.max),
+      depositCents: aCentavos(borrador.deposit),
+      travel: {
+        freeRadiusMiles: entero(borrador.travel.freeMiles),
+        roundTrip: borrador.travel.roundTrip,
+        // Vacio = la tarifa vigente del IRS.
+        centsPerMile:
+          borrador.travel.centsPerMile.trim() === ''
+            ? null
+            : Number.parseFloat(borrador.travel.centsPerMile),
       },
     };
 
-    /*
-     * UN CAMPO A MEDIO ESCRIBIR ES NaN, NO CERO, y aqui esta la diferencia
-     * entre avisar y estropear: si un NaN se colara como cero, guardar
-     * dejaria un precio en cero que nadie escribio y el cotizador empezaria
-     * a regalar limpiezas. El esquema no lo atrapa —`z.number()` acepta
-     * NaN— asi que se comprueba a mano.
-     */
     return todoSonNumeros(candidato) ? candidato : null;
-  };
-
-  /**
-   * El fallo del esquema, en el idioma de quien mira.
-   *
-   * NO SE ENSEÑA EL MENSAJE DE ZOD TAL CUAL. Sus textos son tecnicos y van
-   * siempre en ingles («Too big: expected number to be <=1000000»), asi que
-   * en un panel en español apareceria en ingles y sin decir que campo es.
-   *
-   * Las reglas del conjunto —las que escribimos nosotros— llevan clave de
-   * traduccion en el propio contrato y se traducen tal cual. El resto son
-   * numeros fuera de rango, y de esos lo util no es el limite exacto sino
-   * QUE CAMPO revisar: casi siempre sobra un cero.
-   */
-  const mensajeDe = (fallo: { message: string; path: PropertyKey[] }): string => {
-    if (fallo.message.startsWith('admin.rates.')) return t(fallo.message);
-
-    const ultimo = String(fallo.path.at(-1) ?? '');
-    const campo = ETIQUETA_CAMPO[ultimo];
-    return t('admin.rates.outOfRange', {
-      field: campo === undefined ? ultimo : t(campo),
-    });
-  };
-
-  /** Recorre el objeto entero buscando un numero que no lo es. */
-  const todoSonNumeros = (valor: unknown): boolean => {
-    if (typeof valor === 'number') return Number.isFinite(valor);
-    if (typeof valor !== 'object' || valor === null) return true;
-    return Object.values(valor).every((v) => todoSonNumeros(v));
   };
 
   const enviar = async (evento: FormEvent): Promise<void> => {
@@ -336,7 +309,11 @@ export function PricingRatesForm({ locale, onSessionLost }: PricingRatesFormProp
 
   if (!borrador) return null;
 
-  const campoServicio = (tipo: EditableServiceType, clave: ClaveServicio, valor: string): void => {
+  const cambiarTarifa = (
+    tipo: ServicioEditable,
+    cadencia: Frequency,
+    cambio: Partial<CamposTarifa>,
+  ): void => {
     setBorrador((actual) =>
       actual === null
         ? actual
@@ -344,7 +321,10 @@ export function PricingRatesForm({ locale, onSessionLost }: PricingRatesFormProp
             ...actual,
             services: {
               ...actual.services,
-              [tipo]: { ...actual.services[tipo], [clave]: valor },
+              [tipo]: {
+                ...actual.services[tipo],
+                [cadencia]: { ...actual.services[tipo][cadencia], ...cambio },
+              },
             },
           },
     );
@@ -357,11 +337,6 @@ export function PricingRatesForm({ locale, onSessionLost }: PricingRatesFormProp
           {t('admin.rates.title')}
         </h2>
         <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">{t('admin.rates.intro')}</p>
-        {/*
-          LO YA RESERVADO NO CAMBIA. Es la primera pregunta que hace
-          cualquiera antes de tocar un precio, y no responderla en la
-          pantalla lleva a no tocarlo o a llamar por telefono.
-        */}
         <p
           className="mt-3 flex items-start gap-2 rounded-lg border border-sun-600/40 bg-sun-50 p-3
                      text-sm text-slate-800 dark:border-sun-300/30 dark:bg-night-700
@@ -373,7 +348,7 @@ export function PricingRatesForm({ locale, onSessionLost }: PricingRatesFormProp
         </p>
       </header>
 
-      {/* --- Servicios ------------------------------------------------- */}
+      {/* --- Tarifas por servicio y cadencia ---------------------------- */}
       <section className="ft-card space-y-4 p-4">
         <div>
           <h3 className="font-semibold text-slate-900 dark:text-white">
@@ -394,35 +369,80 @@ export function PricingRatesForm({ locale, onSessionLost }: PricingRatesFormProp
                 {t(`services.${tipo}.name`)}
               </legend>
 
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-                {(
-                  [
-                    ['base', 'admin.rates.base', '$'],
-                    ['bedroom', 'admin.rates.perBedroom', '$'],
-                    ['bathroom', 'admin.rates.perBathroom', '$'],
-                    ['sqft', 'admin.rates.perSquareFoot', '¢'],
-                    ['minimum', 'admin.rates.minimum', '$'],
-                  ] as const
-                ).map(([clave, etiqueta, unidad]) => (
-                  <label key={clave} className="block">
-                    <span className="ft-label">{t(etiqueta)}</span>
-                    <div className="relative">
-                      <span
-                        aria-hidden="true"
-                        className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-sm text-slate-500 dark:text-slate-400"
-                      >
-                        {unidad}
-                      </span>
-                      <input
-                        type="text"
-                        inputMode="decimal"
-                        className="ft-input w-full pl-7"
-                        value={borrador.services[tipo][clave]}
-                        onChange={(evento) => campoServicio(tipo, clave, evento.target.value)}
-                      />
+              <div className="space-y-2">
+                {CADENCIAS.map((cadencia) => {
+                  const campos = borrador.services[tipo][cadencia];
+                  return (
+                    <div
+                      key={cadencia}
+                      className="flex flex-wrap items-end gap-3 border-t border-slate-100 pt-2
+                                 first:border-0 first:pt-0 dark:border-night-700"
+                    >
+                      <label className="flex w-40 items-center gap-2 pb-2 text-sm text-slate-800 dark:text-slate-200">
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4"
+                          checked={campos.offered}
+                          onChange={(evento) =>
+                            cambiarTarifa(tipo, cadencia, { offered: evento.target.checked })
+                          }
+                        />
+                        {t(`frequency.${cadencia}`)}
+                      </label>
+
+                      {campos.offered ? (
+                        <>
+                          <label className="w-32">
+                            <span className="ft-label">{t('admin.rates.flat')}</span>
+                            <div className="relative">
+                              <span
+                                aria-hidden="true"
+                                className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-sm text-slate-500 dark:text-slate-400"
+                              >
+                                $
+                              </span>
+                              <input
+                                type="text"
+                                inputMode="decimal"
+                                className="ft-input w-full pl-7"
+                                value={campos.flat}
+                                onChange={(evento) =>
+                                  cambiarTarifa(tipo, cadencia, { flat: evento.target.value })
+                                }
+                              />
+                            </div>
+                          </label>
+
+                          <label className="w-32">
+                            <span className="ft-label">{t('admin.rates.perSquareFoot')}</span>
+                            <div className="relative">
+                              <span
+                                aria-hidden="true"
+                                className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-sm text-slate-500 dark:text-slate-400"
+                              >
+                                ¢
+                              </span>
+                              <input
+                                type="text"
+                                inputMode="decimal"
+                                className="ft-input w-full pl-7"
+                                placeholder={t('admin.rates.noSize')}
+                                value={campos.sqft}
+                                onChange={(evento) =>
+                                  cambiarTarifa(tipo, cadencia, { sqft: evento.target.value })
+                                }
+                              />
+                            </div>
+                          </label>
+                        </>
+                      ) : (
+                        <p className="pb-2 text-sm text-slate-500 dark:text-slate-400">
+                          {t('admin.rates.notOffered')}
+                        </p>
+                      )}
                     </div>
-                  </label>
-                ))}
+                  );
+                })}
               </div>
             </fieldset>
           ))}
@@ -434,7 +454,7 @@ export function PricingRatesForm({ locale, onSessionLost }: PricingRatesFormProp
         <h3 className="font-semibold text-slate-900 dark:text-white">{t('admin.rates.addOns')}</h3>
 
         <div className="grid gap-3 sm:grid-cols-2">
-          {CODIGOS_EXTRA.map((codigo) => (
+          {OFFERED_ADD_ON_CODES.map((codigo) => (
             <div
               key={codigo}
               className="flex items-end gap-3 rounded-lg border border-slate-200 p-3 dark:border-night-600"
@@ -491,119 +511,106 @@ export function PricingRatesForm({ locale, onSessionLost }: PricingRatesFormProp
         </div>
       </section>
 
-      {/* --- Descuentos por recurrencia ---------------------------------- */}
+      {/* --- Deposito y traslado ------------------------------------------ */}
       <section className="ft-card space-y-4 p-4">
         <div>
           <h3 className="font-semibold text-slate-900 dark:text-white">
-            {t('admin.rates.discounts')}
-          </h3>
-          <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
-            {t('admin.rates.discountsHelp')}
-          </p>
-        </div>
-
-        <div className="grid grid-cols-3 gap-3">
-          {(
-            [
-              ['weekly', 'frequency.WEEKLY'],
-              ['biweekly', 'frequency.BIWEEKLY'],
-              ['monthly', 'frequency.MONTHLY'],
-            ] as const
-          ).map(([clave, etiqueta]) => (
-            <label key={clave} className="block">
-              <span className="ft-label">{t(etiqueta)}</span>
-              <div className="relative">
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  className="ft-input w-full pr-7"
-                  value={borrador.discounts[clave]}
-                  onChange={(evento) =>
-                    setBorrador((actual) =>
-                      actual === null
-                        ? actual
-                        : {
-                            ...actual,
-                            discounts: { ...actual.discounts, [clave]: evento.target.value },
-                          },
-                    )
-                  }
-                />
-                <span
-                  aria-hidden="true"
-                  className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-sm text-slate-500 dark:text-slate-400"
-                >
-                  %
-                </span>
-              </div>
-            </label>
-          ))}
-        </div>
-      </section>
-
-      {/* --- Deposito ----------------------------------------------------- */}
-      <section className="ft-card space-y-4 p-4">
-        <div>
-          <h3 className="font-semibold text-slate-900 dark:text-white">
-            {t('admin.rates.deposit')}
+            {t('admin.rates.depositAndTravel')}
           </h3>
           <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
             {t('admin.rates.depositHelp')}
           </p>
         </div>
 
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          {(
-            [
-              ['base', 'admin.rates.depositBase', '$'],
-              ['freeMiles', 'admin.rates.freeRadius', 'mi'],
-              ['min', 'admin.rates.depositMin', '$'],
-              ['max', 'admin.rates.depositMax', '$'],
-            ] as const
-          ).map(([clave, etiqueta, unidad]) => (
-            <label key={clave} className="block">
-              <span className="ft-label">{t(etiqueta)}</span>
-              <div className="relative">
-                <span
-                  aria-hidden="true"
-                  className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-sm text-slate-500 dark:text-slate-400"
-                >
-                  {unidad}
-                </span>
-                <input
-                  type="text"
-                  inputMode="decimal"
-                  className="ft-input w-full pl-9"
-                  value={borrador.deposit[clave]}
-                  onChange={(evento) =>
-                    setBorrador((actual) =>
-                      actual === null
-                        ? actual
-                        : {
-                            ...actual,
-                            deposit: { ...actual.deposit, [clave]: evento.target.value },
-                          },
-                    )
-                  }
-                />
-              </div>
-            </label>
-          ))}
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+          <label className="block">
+            <span className="ft-label">{t('admin.rates.deposit')}</span>
+            <div className="relative">
+              <span
+                aria-hidden="true"
+                className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-sm text-slate-500 dark:text-slate-400"
+              >
+                $
+              </span>
+              <input
+                type="text"
+                inputMode="decimal"
+                className="ft-input w-full pl-7"
+                value={borrador.deposit}
+                onChange={(evento) =>
+                  setBorrador((actual) =>
+                    actual === null ? actual : { ...actual, deposit: evento.target.value },
+                  )
+                }
+              />
+            </div>
+          </label>
+
+          <label className="block">
+            <span className="ft-label">{t('admin.rates.freeRadius')}</span>
+            <div className="relative">
+              <span
+                aria-hidden="true"
+                className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-sm text-slate-500 dark:text-slate-400"
+              >
+                mi
+              </span>
+              <input
+                type="text"
+                inputMode="numeric"
+                className="ft-input w-full pl-9"
+                value={borrador.travel.freeMiles}
+                onChange={(evento) =>
+                  setBorrador((actual) =>
+                    actual === null
+                      ? actual
+                      : { ...actual, travel: { ...actual.travel, freeMiles: evento.target.value } },
+                  )
+                }
+              />
+            </div>
+          </label>
+
+          <label className="block">
+            <span className="ft-label">{t('admin.rates.perMile')}</span>
+            <div className="relative">
+              <span
+                aria-hidden="true"
+                className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-sm text-slate-500 dark:text-slate-400"
+              >
+                ¢
+              </span>
+              <input
+                type="text"
+                inputMode="decimal"
+                className="ft-input w-full pl-7"
+                placeholder={t('admin.rates.irsRate')}
+                value={borrador.travel.centsPerMile}
+                onChange={(evento) =>
+                  setBorrador((actual) =>
+                    actual === null
+                      ? actual
+                      : {
+                          ...actual,
+                          travel: { ...actual.travel, centsPerMile: evento.target.value },
+                        },
+                  )
+                }
+              />
+            </div>
+          </label>
         </div>
 
         <label className="flex items-center gap-2 text-sm text-slate-800 dark:text-slate-200">
           <input
             type="checkbox"
             className="h-4 w-4"
-            checked={borrador.deposit.roundTrip}
+            checked={borrador.travel.roundTrip}
             onChange={(evento) =>
               setBorrador((actual) =>
                 actual === null
                   ? actual
-                  : {
-                      ...actual,
-                      deposit: { ...actual.deposit, roundTrip: evento.target.checked },
-                    },
+                  : { ...actual, travel: { ...actual.travel, roundTrip: evento.target.checked } },
               )
             }
           />
@@ -633,10 +640,7 @@ export function PricingRatesForm({ locale, onSessionLost }: PricingRatesFormProp
 
         {meta !== null && (
           <p className="text-xs text-slate-600 dark:text-slate-400">
-            {t('admin.rates.currentVersion', {
-              version: meta.version,
-              count: meta.versionCount,
-            })}
+            {t('admin.rates.currentVersion', { version: meta.version, count: meta.versionCount })}
             {meta.updatedAt !== null && meta.updatedBy !== null && (
               <>
                 {' · '}

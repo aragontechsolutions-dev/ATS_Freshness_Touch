@@ -22,7 +22,6 @@ export function resolveZone(miles: number, config: PricingConfig): ZoneRule {
     fallback ?? {
       code: 'OUT_OF_RANGE',
       maxMiles: null,
-      surchargeCents: 0,
       serviceable: false,
       instantQuote: false,
     }

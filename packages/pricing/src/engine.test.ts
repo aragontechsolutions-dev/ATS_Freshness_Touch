@@ -36,25 +36,66 @@ function buildContext(miles: number, overrides: Partial<QuoteContext> = {}): Quo
 }
 
 describe('calculateQuote - servicio base', () => {
-  it('calcula base + habitaciones + banos + pies cuadrados', () => {
-    const quote = calculateQuote(buildRequest(), buildContext(10));
+  it('la estandar es plana: 185 dolares, mire el tamano que mire', () => {
+    /*
+     * ES EL PRECIO QUE SE DICE POR TELEFONO SIN PREGUNTAR NADA, y por eso
+     * no mira habitaciones ni pies cuadrados. Dos casas muy distintas
+     * pagan lo mismo, y es deliberado.
+     */
+    const pequena = calculateQuote(buildRequest({ squareFeet: 600 }), buildContext(10));
+    const grande = calculateQuote(buildRequest({ squareFeet: 3000 }), buildContext(10));
 
-    // 6500 + 3*1200 + 2*1500 + 3.0*1800 = 18500 centavos = 185.00 USD
-    expect(quote.totals.serviceCents).toBe(18500);
-    expect(quote.totals.totalCents).toBe(18500);
-    expect(quote.totals.taxCents).toBe(0);
+    expect(pequena.totals.serviceCents).toBe(18500);
+    expect(grande.totals.serviceCents).toBe(18500);
+    expect(pequena.totals.taxCents).toBe(0);
   });
 
-  it('aplica el minimo facturable con una linea de ajuste visible', () => {
-    const quote = calculateQuote(
-      buildRequest({ service: 'AIRBNB_TURNOVER', bedrooms: 0, bathrooms: 1, squareFeet: 200 }),
+  it('el deposito son 35 de los 185, y los otros 150 se cobran al terminar', () => {
+    /*
+     * EL EJEMPLO DEL NEGOCIO, TAL CUAL. A la empresa le llegan 185: 35
+     * retenidos al reservar y 150 al terminar. El deposito no es un cargo
+     * extra, y esta prueba existe para que nadie lo convierta en uno.
+     */
+    const quote = calculateQuote(buildRequest(), buildContext(10));
+
+    expect(quote.totals.totalCents).toBe(18500);
+    expect(quote.deposit.amountCents).toBe(3500);
+    expect(quote.balanceDueAtServiceCents).toBe(15000);
+  });
+
+  it('la profunda cobra el mayor entre el plano y los pies cuadrados', () => {
+    // 700 pies * 30 centavos = 21 000 < 25 000 -> manda el plano.
+    const pequena = calculateQuote(
+      buildRequest({ service: 'DEEP', squareFeet: 700 }),
       buildContext(5),
     );
+    expect(pequena.totals.serviceCents).toBe(25000);
 
-    // 5500 + 0 + 1500 + 2.2*200 = 7440 -> minimo 9000
-    const adjustment = quote.lines.find((line) => line.code === 'SERVICE_MINIMUM_ADJUSTMENT');
-    expect(adjustment?.amountCents).toBe(1560);
-    expect(quote.totals.serviceCents).toBe(9000);
+    // 2 000 pies * 30 = 60 000 > 25 000 -> manda el tamano.
+    const grande = calculateQuote(
+      buildRequest({ service: 'DEEP', squareFeet: 2000 }),
+      buildContext(5),
+    );
+    expect(grande.totals.serviceCents).toBe(60000);
+  });
+
+  it('NO HAY ESCALON al pasar del importe plano al precio por pie', () => {
+    /*
+     * ES EL MOTIVO DE USAR EL MAYOR Y NO UN UMBRAL. Con «hasta 809 pies lo
+     * plano, por encima por pie» aparecia un salto hacia abajo: a 810 pies
+     * saldrian 243 $ y a 809, 250 $. La casa mas grande, mas barata, y
+     * nadie sabria explicarlo por telefono.
+     */
+    let anterior = 0;
+    for (const pies of [600, 800, 809, 810, 833, 834, 900, 1500]) {
+      const actual = calculateQuote(
+        buildRequest({ service: 'DEEP', squareFeet: pies }),
+        buildContext(5),
+      ).totals.serviceCents;
+
+      expect(actual).toBeGreaterThanOrEqual(anterior);
+      anterior = actual;
+    }
   });
 
   it('la suma de las lineas siempre cuadra con el total', () => {
@@ -85,7 +126,7 @@ describe('calculateQuote - extras', () => {
 
     const line = quote.lines.find((item) => item.code === 'ADDON_INSIDE_FRIDGE');
     expect(line?.quantity).toBe(1);
-    expect(quote.totals.addOnsCents).toBe(3500);
+    expect(quote.totals.addOnsCents).toBe(5000);
   });
 
   it('limita los extras por unidad a su cantidad maxima', () => {
@@ -100,59 +141,117 @@ describe('calculateQuote - extras', () => {
   });
 });
 
-describe('calculateQuote - descuento por recurrencia', () => {
-  it('descuenta el porcentaje sobre servicio + extras', () => {
-    const quote = calculateQuote(buildRequest({ frequency: 'WEEKLY' }), buildContext(10));
+describe('calculateQuote - tarifa por cadencia', () => {
+  /*
+   * LA RECURRENCIA YA NO ES UN DESCUENTO, es su propia tarifa. Se anuncia
+   * «120 a la semana», no «185 menos un 35%»: un porcentaje obliga a hacer
+   * la cuenta para saber lo que se paga, y el redondeo lo dejaba en cifras
+   * raras.
+   */
+  it('cada cadencia tiene su precio, y no hay linea de descuento', () => {
+    const precios = {
+      ONE_TIME: 18500,
+      MONTHLY: 15000,
+      BIWEEKLY: 13500,
+      WEEKLY: 12000,
+    } as const;
 
-    // 15% de 18500 = 2775
-    expect(quote.totals.discountCents).toBe(2775);
-    expect(quote.totals.totalCents).toBe(18500 - 2775);
+    for (const [cadencia, esperado] of Object.entries(precios)) {
+      const quote = calculateQuote(
+        buildRequest({ frequency: cadencia as keyof typeof precios }),
+        buildContext(10),
+      );
+
+      expect(quote.totals.serviceCents).toBe(esperado);
+      expect(quote.totals.discountCents).toBe(0);
+      expect(quote.lines.some((line) => line.kind === 'DISCOUNT')).toBe(false);
+    }
   });
 
-  it('NO descuenta el recargo por desplazamiento', () => {
-    const quote = calculateQuote(buildRequest({ frequency: 'WEEKLY' }), buildContext(45));
+  it('a mas compromiso, nunca mas caro', () => {
+    const orden = ['ONE_TIME', 'MONTHLY', 'BIWEEKLY', 'WEEKLY'] as const;
+    let tope = Number.POSITIVE_INFINITY;
 
-    // zona C: recargo 5000, que no entra en la base del descuento
-    expect(quote.totals.discountCents).toBe(2775);
-    expect(quote.totals.surchargesCents).toBe(5000);
-    expect(quote.totals.totalCents).toBe(18500 - 2775 + 5000);
+    for (const cadencia of orden) {
+      const actual = calculateQuote(buildRequest({ frequency: cadencia }), buildContext(10)).totals
+        .serviceCents;
+      expect(actual).toBeLessThanOrEqual(tope);
+      tope = actual;
+    }
   });
 
-  it('no genera linea de descuento en servicios puntuales', () => {
-    const quote = calculateQuote(buildRequest({ frequency: 'ONE_TIME' }), buildContext(10));
-    expect(quote.lines.some((line) => line.kind === 'DISCOUNT')).toBe(false);
+  it('una profunda semanal no se ofrece, y lo dice con su propio motivo', () => {
+    /*
+     * La casa ya esta profunda: no se contrata cada semana. Es distinto de
+     * «este servicio no tiene precio automatico», y la diferencia le
+     * importa a quien lo lee: aqui la salida es elegir otra frecuencia, no
+     * esperar una llamada.
+     */
+    const quote = calculateQuote(
+      buildRequest({ service: 'DEEP', frequency: 'WEEKLY' }),
+      buildContext(10),
+    );
+
+    expect(quote.manualReview.required).toBe(true);
+    expect(quote.manualReview.reasonKeys).toContain('quote.review.frequencyUnavailable');
+    expect(quote.manualReview.reasonKeys).not.toContain('quote.review.commercialWalkthrough');
+    expect(quote.totals.totalCents).toBe(0);
   });
 });
 
-describe('calculateQuote - zonas y deposito', () => {
-  it('zona A no tiene recargo y el deposito es solo la base', () => {
+describe('calculateQuote - traslado y deposito', () => {
+  it('dentro de las 35 millas no se cobra traslado', () => {
     const quote = calculateQuote(buildRequest(), buildContext(12));
 
     expect(quote.distance.zone).toBe('A');
     expect(quote.totals.surchargesCents).toBe(0);
-    expect(quote.deposit.amountCents).toBe(3000);
-    expect(quote.deposit.billableMiles).toBe(0);
+    expect(quote.travel.billableMiles).toBe(0);
+    expect(quote.deposit.amountCents).toBe(3500);
   });
 
-  it('zona C cobra recargo y deposito por millas (ida y vuelta, tarifa IRS)', () => {
+  it('mas alla del radio se cobran las millas que sobran, ida y vuelta', () => {
     const quote = calculateQuote(buildRequest(), buildContext(45));
 
-    // exceso 25 millas -> 50 millas ida y vuelta -> 3000 + 50*76 = 6800
-    expect(quote.distance.zone).toBe('C');
-    expect(quote.totals.surchargesCents).toBe(5000);
-    expect(quote.deposit.billableMiles).toBe(50);
-    expect(quote.deposit.mileageRateCentsPerMile).toBe(76);
-    expect(quote.deposit.amountCents).toBe(6800);
+    // 10 millas de exceso, ida y vuelta, a la tarifa del IRS de 2026.
+    expect(quote.distance.zone).toBe('B');
+    expect(quote.travel.billableMiles).toBe(20);
+    expect(quote.travel.centsPerMile).toBe(76);
+    expect(quote.totals.surchargesCents).toBe(1520);
+    expect(quote.totals.totalCents).toBe(18500 + 1520);
+  });
+
+  it('el deposito son 35 dolares, este donde este la casa', () => {
+    /*
+     * Antes crecia con la distancia y dos clientes del mismo barrio veian
+     * retenciones distintas. Lo que crece ahora es el traslado, que va en
+     * el precio y se ve sumado.
+     */
+    for (const millas of [5, 30, 45, 58]) {
+      expect(calculateQuote(buildRequest(), buildContext(millas)).deposit.amountCents).toBe(3500);
+    }
   });
 
   it('el deposito nunca supera el total del trabajo', () => {
-    const quote = calculateQuote(
-      buildRequest({ service: 'AIRBNB_TURNOVER', bedrooms: 0, bathrooms: 1, squareFeet: 200 }),
-      buildContext(55),
-    );
+    const config = {
+      ...defaultPricingConfig,
+      services: {
+        ...defaultPricingConfig.services,
+        STANDARD: {
+          instantQuote: true,
+          byFrequency: {
+            ...defaultPricingConfig.services.STANDARD.byFrequency,
+            ONE_TIME: { flatCents: 2000, centsPerSquareFoot: null },
+          },
+        },
+      },
+    };
 
-    expect(quote.deposit.amountCents).toBeLessThanOrEqual(quote.totals.totalCents);
-    expect(quote.balanceDueAtServiceCents).toBeGreaterThanOrEqual(0);
+    const quote = calculateQuote(buildRequest(), buildContext(5, { config }));
+
+    expect(quote.totals.totalCents).toBe(2000);
+    expect(quote.deposit.amountCents).toBe(2000);
+    expect(quote.deposit.capped).toBe(true);
+    expect(quote.balanceDueAtServiceCents).toBe(0);
   });
 
   it('el saldo pendiente es siempre total menos deposito', () => {
@@ -176,7 +275,7 @@ describe('calculateQuote - revision manual', () => {
   it('a media distancia se atiende, pero sin precio automatico', () => {
     const quote = calculateQuote(buildRequest(), buildContext(80));
 
-    expect(quote.distance.zone).toBe('E');
+    expect(quote.distance.zone).toBe('C');
     expect(quote.manualReview.required).toBe(true);
     expect(quote.manualReview.reasonKeys).toContain('quote.review.farZone');
     expect(quote.manualReview.reasonKeys).not.toContain('quote.review.outOfServiceArea');
@@ -197,17 +296,19 @@ describe('calculateQuote - revision manual', () => {
   });
 
   /*
-   * Las zonas cercanas NO cambian con esta etapa. Se amplia la cobertura; no
-   * se toca ningun precio vigente.
+   * TRES BANDAS, no cinco anillos: dentro del radio libre, con traslado, y
+   * el resto del estado sin precio automatico.
    */
-  it('las zonas con precio automatico siguen cotizando igual que antes', () => {
+  it('las tres bandas caen donde deben', () => {
     expect(calculateQuote(buildRequest(), buildContext(10)).distance.zone).toBe('A');
-    expect(calculateQuote(buildRequest(), buildContext(45)).distance.zone).toBe('C');
+    expect(calculateQuote(buildRequest(), buildContext(35)).distance.zone).toBe('A');
+    expect(calculateQuote(buildRequest(), buildContext(36)).distance.zone).toBe('B');
+    expect(calculateQuote(buildRequest(), buildContext(60)).distance.zone).toBe('B');
+    expect(calculateQuote(buildRequest(), buildContext(61)).distance.zone).toBe('C');
 
-    const cerca = calculateQuote(buildRequest(), buildContext(55));
-    expect(cerca.distance.zone).toBe('D');
-    expect(cerca.totals.surchargesCents).toBe(7500);
-    expect(cerca.manualReview.reasonKeys).not.toContain('quote.review.farZone');
+    const conTraslado = calculateQuote(buildRequest(), buildContext(55));
+    expect(conTraslado.totals.surchargesCents).toBeGreaterThan(0);
+    expect(conTraslado.manualReview.reasonKeys).not.toContain('quote.review.farZone');
   });
 
   it('el servicio comercial no recibe precio instantaneo', () => {

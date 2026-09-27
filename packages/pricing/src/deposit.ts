@@ -1,39 +1,33 @@
 import type { QuoteDeposit } from '@freshness/types';
 import type { PricingConfig } from './config';
-import { resolveMileageRate } from './mileage';
-import { clamp, roundCents } from './money';
 
 /**
- * DEPOSITO POR DESPLAZAMIENTO
- * ---------------------------
- * Objetivo de negocio: si el cliente cancela cuando el equipo ya salio, la
- * empresa recupera al menos el combustible y el tiempo de traslado.
+ * EL DEPOSITO
+ * -----------
+ * Una cifra fija —35 dolares— que se RETIENE al reservar y se DESCUENTA del
+ * total. No es un cargo extra: una limpieza estandar son 185 dolares, de los
+ * que 35 se retienen al reservar y 150 se cobran al terminar. A la empresa
+ * le llegan 185.
  *
- * Formula:
- *   millasFacturables = max(0, millas - radioLibre) * (ida y vuelta ? 2 : 1)
- *   deposito = limitar(base + millasFacturables * tarifaIRS, minimo, maximo)
+ * Para que sirve: si el cliente cancela con el equipo ya en camino, o nadie
+ * abre la puerta porque se olvidaron la llave, esos 35 cubren el viaje.
  *
- * La tarifa por milla es la del IRS vigente en la fecha del presupuesto, lo
- * que da una justificacion objetiva y defendible ante el cliente.
+ * ANTES DEPENDIA DE LA DISTANCIA, y eso era el problema. El deposito llevaba
+ * dentro las millas y un tope, asi que dos clientes del mismo barrio veian
+ * retenciones distintas sin entender por que, y parte del coste del traslado
+ * se perdia al recortarlo contra el total. El traslado ahora es una linea
+ * del precio (`travel.ts`) y el deposito es una frase: se retienen 35 y se
+ * descuentan.
  *
- * El deposito se RETIENE (autorizacion), no se cobra, y se acredita contra
- * el total al finalizar el trabajo.
+ * LO UNICO QUE LO MUEVE es un trabajo que cueste menos que el propio
+ * deposito: nunca se retiene mas dinero del que vale el servicio.
  */
-export function calculateDeposit(miles: number, config: PricingConfig, now: Date): QuoteDeposit {
-  const rate = resolveMileageRate(now);
-  const excessMiles = Math.max(0, miles - config.deposit.freeRadiusMiles);
-  const billableMiles = config.deposit.roundTrip ? excessMiles * 2 : excessMiles;
-
-  const rawCents = roundCents(config.deposit.baseCents + billableMiles * rate.centsPerMile);
-  const amountCents = clamp(rawCents, config.deposit.minCents, config.deposit.maxCents);
+export function calculateDeposit(totalCents: number, config: PricingConfig): QuoteDeposit {
+  const amountCents = Math.min(config.deposit.amountCents, Math.max(0, totalCents));
 
   return {
     amountCents,
-    baseCents: config.deposit.baseCents,
-    freeRadiusMiles: config.deposit.freeRadiusMiles,
-    billableMiles: Number(billableMiles.toFixed(2)),
-    mileageRateCentsPerMile: rate.centsPerMile,
-    capped: rawCents > config.deposit.maxCents,
+    capped: amountCents < config.deposit.amountCents,
     appliedToTotal: true,
   };
 }
