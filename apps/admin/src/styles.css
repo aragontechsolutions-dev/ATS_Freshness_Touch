@@ -340,3 +340,60 @@
     scroll-behavior: auto !important;
   }
 }
+
+/* ===========================================================================
+ * EL MAPA DE ZONAS
+ * ===========================================================================
+ * Mismas reglas que en el sitio publico, y por lo mismo: Leaflet trae su
+ * hoja de estilos y solo necesita que se le de tamano. Ver el comentario de
+ * `apps/landing/src/styles.css`.
+ * =========================================================================== */
+
+@layer components {
+  .ft-map,
+  .ft-map-hueco {
+    @apply h-64 w-full overflow-hidden rounded-xl border border-slate-200 sm:h-80;
+  }
+
+  .dark .ft-map,
+  .dark .ft-map-hueco {
+    @apply border-night-600;
+  }
+
+  .ft-map-hueco {
+    @apply animate-pulse bg-slate-200;
+  }
+
+  .dark .ft-map-hueco {
+    @apply bg-night-700;
+  }
+
+  .ft-map-clave {
+    @apply inline-block h-3 w-3 rounded-sm border-2;
+  }
+
+  .ft-map-clave-instantanea {
+    border-color: #145788;
+    background-color: rgb(20 87 136 / 0.15);
+  }
+
+  .ft-map-clave-peticion {
+    border-color: #f0b429;
+    background-color: rgb(240 180 41 / 0.15);
+  }
+}
+
+/* Modo oscuro: se invierten SOLO las teselas, para que los circulos de las
+   zonas y la atribucion conserven su color. */
+.dark .ft-map .leaflet-tile-pane {
+  filter: invert(1) hue-rotate(180deg) brightness(0.95) contrast(0.9);
+}
+
+.dark .ft-map .leaflet-control-attribution {
+  background: rgb(27 31 36 / 0.85);
+  color: #cbd5e1;
+}
+
+.dark .ft-map .leaflet-control-attribution a {
+  color: #93c5fd;
+}

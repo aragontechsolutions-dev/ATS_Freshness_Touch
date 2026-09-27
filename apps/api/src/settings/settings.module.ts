@@ -1,15 +1,17 @@
 import { Module } from '@nestjs/common';
 import { BusinessSettingsController } from './business-settings.controller';
 import { BusinessSettingsService } from './business-settings.service';
+import { PricingConfigService } from './pricing-config.service';
+import { ServiceAreaService } from './service-area.service';
 
 /**
- * El servicio se exporta porque lo necesitan dos sitios ademas del endpoint
- * publico: el motor de agenda (para saber el horario) y el panel (para
- * editarlo).
+ * Los servicios se exportan porque los necesitan varios sitios ademas de los
+ * endpoints publicos: el motor de agenda (para el horario), el cotizador y
+ * las reservas (para el area de servicio) y el panel (para editarlo todo).
  */
 @Module({
   controllers: [BusinessSettingsController],
-  providers: [BusinessSettingsService],
-  exports: [BusinessSettingsService],
+  providers: [BusinessSettingsService, ServiceAreaService, PricingConfigService],
+  exports: [BusinessSettingsService, ServiceAreaService, PricingConfigService],
 })
 export class SettingsModule {}

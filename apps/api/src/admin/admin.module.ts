@@ -21,6 +21,7 @@ import { StaffAdminService } from './staff-admin.service';
 import { STAFF_INVITE_PROVIDER } from './staff-invite.types';
 import {
   NotificationSettingsController,
+  ServiceAreaAdminController,
   SettingsAdminController,
 } from './settings-admin.controller';
 import type { Env } from '../common/config/env';
@@ -33,6 +34,7 @@ import type { Env } from '../common/config/env';
     BookingActionsController,
     SettingsAdminController,
     NotificationSettingsController,
+    ServiceAreaAdminController,
     AssignmentsController,
     StaffListController,
     StaffAdminController,

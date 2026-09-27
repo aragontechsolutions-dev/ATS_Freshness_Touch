@@ -7,6 +7,7 @@ import {
   MyJobsSchema,
   AdminStaffDirectoryItemSchema,
   AdminBusinessSettingsSchema,
+  AdminServiceAreaSchema,
   AuditPageSchema,
   API_ERROR_CODES,
   NotificationSettingsSchema,
@@ -22,6 +23,7 @@ import {
   type AdminStaffDirectory,
   type AdminStaffDirectoryItem,
   type AdminStaffList,
+  type AdminServiceArea,
   type AuditPage,
   type AuditQueryInput,
   type MyJob,
@@ -33,6 +35,7 @@ import {
   type ApiError,
   type BusinessSettings,
   type NotificationSettings,
+  type ServiceAreaSettings,
   type AuthenticatedStaff,
 } from '@freshness/types';
 import { auth } from './supabase';
@@ -454,4 +457,45 @@ export function fetchAuditLog(query: AuditQueryInput = {}): Promise<AuditPage> {
     if (!parsed.success) throw contractError('/admin/audit', parsed.error.issues);
     return parsed.data;
   });
+}
+
+/* ------------------------------------------------------------------------ */
+/*  Area de servicio. Solo administracion.                                   */
+/* ------------------------------------------------------------------------ */
+
+const AREA = '/admin/service-area';
+
+/**
+ * Hasta donde va la empresa y donde el precio sale solo.
+ *
+ * La API responde 403 a todo lo que no sea administracion, tambien para
+ * leer. Aqui no es solo comodidad: CADA RESERVA QUE ENTRE DESPUES SE COBRA
+ * CON ESTO, asi que no es una pantalla de coordinacion.
+ */
+export function fetchServiceArea(): Promise<AdminServiceArea> {
+  return request(AREA, (payload) => {
+    const parsed = AdminServiceAreaSchema.safeParse(payload);
+    if (!parsed.success) throw contractError(AREA, parsed.error.issues);
+    return parsed.data;
+  });
+}
+
+/**
+ * Guarda el area entera.
+ *
+ * Va completa y no por zonas: sus reglas —que cada anillo llegue mas lejos
+ * que el anterior, que el precio automatico no vuelva— son sobre el
+ * CONJUNTO, y no se pueden comprobar sobre un cambio suelto.
+ */
+export function saveServiceArea(settings: ServiceAreaSettings): Promise<AdminServiceArea> {
+  return request(
+    AREA,
+    (payload) => {
+      const parsed = AdminServiceAreaSchema.safeParse(payload);
+      if (!parsed.success)
+        throw contractError('guardado del area de servicio', parsed.error.issues);
+      return parsed.data;
+    },
+    { method: 'PUT', body: settings },
+  );
 }

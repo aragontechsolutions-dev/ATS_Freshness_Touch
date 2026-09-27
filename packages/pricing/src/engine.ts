@@ -32,6 +32,14 @@ const DISCLAIMERS = {
 const MANUAL_REVIEW_REASONS = {
   commercial: 'quote.review.commercialWalkthrough',
   outOfRange: 'quote.review.outOfServiceArea',
+  /**
+   * Se atiende, pero tan lejos que el precio se da en persona.
+   *
+   * Es distinto de `outOfRange` y la diferencia le importa mucho a quien lo
+   * lee: «no vamos» y «vamos, te llamamos con el precio» son dos respuestas
+   * opuestas para el cliente.
+   */
+  farZone: 'quote.review.farZone',
   outOfState: 'quote.review.outOfState',
   largeProperty: 'quote.review.largeProperty',
 } as const;
@@ -63,6 +71,10 @@ export function calculateQuote(request: QuoteRequest, context: QuoteContext): Qu
   }
   if (!zone.serviceable) {
     manualReviewReasons.push(MANUAL_REVIEW_REASONS.outOfRange);
+  } else if (!zone.instantQuote) {
+    // `else if`: o no se atiende, o se atiende sin precio. Las dos cosas a la
+    // vez no significan nada, y decirselas juntas a un cliente menos.
+    manualReviewReasons.push(MANUAL_REVIEW_REASONS.farZone);
   }
   if (request.destination.state !== config.baseOfOperations.state) {
     manualReviewReasons.push(MANUAL_REVIEW_REASONS.outOfState);
@@ -71,7 +83,12 @@ export function calculateQuote(request: QuoteRequest, context: QuoteContext): Qu
     manualReviewReasons.push(MANUAL_REVIEW_REASONS.largeProperty);
   }
 
-  const quotable = service.instantQuote && zone.serviceable;
+  /*
+   * Hacen falta las tres. `zone.instantQuote` es la nueva: permite cubrir
+   * todo Georgia sin que el cotizador suelte una cifra para un traslado de
+   * ocho horas que nadie ha calculado.
+   */
+  const quotable = service.instantQuote && zone.serviceable && zone.instantQuote;
 
   // --- 1. Servicio base -----------------------------------------------------
   let serviceCents = 0;

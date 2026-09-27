@@ -63,6 +63,8 @@ enum ServiceZone {
   B
   C
   D
+  /// El resto de Georgia. Se atiende, pero sin precio automatico.
+  E
   OUT_OF_RANGE
 }
 

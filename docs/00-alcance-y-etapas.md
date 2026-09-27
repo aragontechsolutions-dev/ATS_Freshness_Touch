@@ -131,6 +131,12 @@ Progreso:
   de reenviarlo; ahora sí, y el panel avisa cuando el correo de contacto de
   alguien ya no es el correo con el que entra. Un 500 ilegible pasa a ser un
   mensaje que dice de quién es la cuenta.
+- ✅ **Todo Georgia, con las zonas en un mapa** (`docs/17-area-de-servicio.md`):
+  la empresa pasa a operar en todo el estado. Cerca el precio sale al
+  instante como siempre; lejos se atiende igual pero el precio se da en
+  persona, porque a trescientas millas el traslado pesa más que la limpieza.
+  Las zonas se editan desde el panel y se ven en un mapa (Leaflet y
+  OpenStreetMap, sin clave de API) tanto en el sitio como en el panel.
 - ⬜ Avisos por SMS.
 - Calendario de disponibilidad y reserva en línea.
 - **Stripe**: retención del depósito con `capture_method: 'manual'` al reservar y
@@ -145,9 +151,14 @@ Progreso:
     anuncia.
   - Textos y afirmaciones del sitio que deben mantenerse veraces
     (seguros, verificación de antecedentes, garantía).
-  - Zona de servicio y, más adelante, las tarifas: pasarlas de archivo a base
-    de datos permite ajustar precios sin desplegar, pero exige registrar quién
-    cambió qué y cuándo, porque afecta directamente a la facturación.
+  - ✅ Zona de servicio: hecha en la Etapa 2.18
+    (`docs/17-area-de-servicio.md`). Los límites, los recargos y si cada zona
+    da precio automático se editan desde el panel, con vista previa en el
+    mapa; el cambio queda en la auditoría con las cifras de antes y después.
+  - Las tarifas: pasarlas de archivo a base de datos permite ajustar precios
+    sin desplegar, pero exige registrar quién cambió qué y cuándo, porque
+    afecta directamente a la facturación. **Es lo que queda para cerrar la
+    configuración por completo.**
 
 **Requisitos previos:** cuentas de Supabase y Stripe, y la dirección completa
 del cliente (que en la Etapa 1 no se pide a propósito).

@@ -195,6 +195,17 @@ export const EnvSchema = z
       .string()
       .regex(/^\d{5}$/)
       .default('30303'),
+    /**
+     * Coordenadas de la base, para centrar el mapa de zonas.
+     *
+     * Van junto al resto de la base y no sueltas en el sitio web a
+     * proposito: si la empresa se muda y solo se cambia la direccion, el
+     * mapa seguiria dibujando circulos alrededor del sitio antiguo mientras
+     * los precios se calculan desde el nuevo. El mapa mentiria y nadie lo
+     * notaria hasta que un cliente reclamara.
+     */
+    COMPANY_BASE_LATITUDE: z.coerce.number().min(-90).max(90).default(33.749),
+    COMPANY_BASE_LONGITUDE: z.coerce.number().min(-180).max(180).default(-84.388),
   })
   /*
    * UN CERO APAGA LA PURGA; UN UNO BORRARIA CASI TODO EL REGISTRO.

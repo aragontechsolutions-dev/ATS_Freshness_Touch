@@ -1,8 +1,7 @@
 import { BadRequestException, ConflictException, Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { randomUUID } from 'node:crypto';
 import { DateTime } from 'luxon';
-import { calculateQuote, type PricingConfig } from '@freshness/pricing';
+import { calculateQuote } from '@freshness/pricing';
 import {
   API_ERROR_CODES,
   type BookingRequest,
@@ -10,12 +9,11 @@ import {
   type PaymentIntent,
   type QuoteResponse,
 } from '@freshness/types';
-import type { Env } from '../common/config/env';
-import { buildPricingConfig } from '../common/pricing-config';
 import { PrismaService } from '../database/prisma.service';
 import { Prisma } from '../generated/prisma/client';
 import { DistanceService } from '../distance/distance.service';
 import { PaymentsService } from '../payments/payments.service';
+import { PricingConfigService } from '../settings/pricing-config.service';
 import { AuditService } from '../audit/audit.service';
 import { AvailabilityService } from '../scheduling/availability.service';
 import type { SchedulingConfig } from '../scheduling/scheduling.config';
@@ -24,7 +22,6 @@ import { isSlotStillAvailable } from '../scheduling/slots';
 @Injectable()
 export class BookingsService {
   private readonly logger = new Logger(BookingsService.name);
-  private readonly pricingConfig: PricingConfig;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -32,10 +29,12 @@ export class BookingsService {
     private readonly availability: AvailabilityService,
     private readonly payments: PaymentsService,
     private readonly audit: AuditService,
-    config: ConfigService<Env, true>,
-  ) {
-    this.pricingConfig = buildPricingConfig(config);
-  }
+    /*
+     * La configuracion se pide EN CADA RESERVA, no una vez al arrancar: el
+     * area de servicio se edita desde el panel. Ver `PricingConfigService`.
+     */
+    private readonly pricing: PricingConfigService,
+  ) {}
 
   /**
    * Crea una reserva a partir del formulario publico.
@@ -177,7 +176,7 @@ export class BookingsService {
         },
         locale: request.contact.locale,
       },
-      { quoteId: randomUUID(), now, distance, config: this.pricingConfig },
+      { quoteId: randomUUID(), now, distance, config: await this.pricing.current() },
     );
   }
 
@@ -203,6 +202,13 @@ export class BookingsService {
   }): Promise<Omit<BookingResponse, 'payment'>> {
     const { request, quote, startsAt, endsAt, durationMinutes, now, holdExpiresAt, ip } = args;
     const { schedulingConfig } = args;
+
+    /*
+     * La version de tarifas QUEDA CONGELADA con la reserva: es lo que permite
+     * reconstruir meses despues con que precios se calculo. Se lee de la
+     * configuracion vigente, la misma con la que se acaba de cotizar.
+     */
+    const { version } = await this.pricing.current();
 
     /*
      * Con la tarifa actual el deposito minimo son 30 dolares, asi que siempre
@@ -316,7 +322,7 @@ export class BookingsService {
           taxCents: quote.totals.taxCents,
           totalCents: quote.totals.totalCents,
           depositCents: quote.deposit.amountCents,
-          pricingVersion: this.pricingConfig.version,
+          pricingVersion: version,
           manualReviewReasons: quote.manualReview.reasonKeys,
           expiresAt: new Date(quote.expiresAt),
         },
@@ -351,7 +357,7 @@ export class BookingsService {
           totalCents: quote.totals.totalCents,
           depositCents: quote.deposit.amountCents,
           balanceDueCents: quote.balanceDueAtServiceCents,
-          pricingVersion: this.pricingConfig.version,
+          pricingVersion: version,
           customerNotes: request.customerNotes ?? null,
         },
       });

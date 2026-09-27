@@ -107,6 +107,15 @@ const ACCIONES_FIJAS = [
   /* --- Configuracion --------------------------------------------------- */
   'settings.updated',
   'notifications.updated',
+  /**
+   * Cambio el area de servicio: hasta donde se va y donde el precio sale
+   * solo.
+   *
+   * Se distingue de `settings.updated` porque no es lo mismo cambiar un
+   * telefono que cambiar hasta donde llega la empresa: lo segundo mueve
+   * dinero en cada reserva que entre despues.
+   */
+  'service_area.updated',
 
   /* --- Lecturas de datos sensibles ------------------------------------- */
   /** Alguien abrio la ficha completa de una reserva, con datos del cliente. */

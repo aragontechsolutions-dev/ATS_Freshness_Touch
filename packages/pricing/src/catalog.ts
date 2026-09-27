@@ -52,6 +52,7 @@ export function buildCatalog(
       maxMiles: zone.maxMiles,
       surchargeCents: zone.surchargeCents,
       serviceable: zone.serviceable,
+      instantQuote: zone.instantQuote,
     })),
     deposit: {
       baseCents: config.deposit.baseCents,
