@@ -1,6 +1,7 @@
 import { Suspense, lazy, useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
+  DEFAULT_COMPANY_LOCATION,
   MAX_ZONE_MILES,
   ServiceAreaSettingsSchema,
   ZONE_ORDER,
@@ -10,7 +11,12 @@ import {
   type ServiceAreaSettings,
   type ServiceAreaZone,
 } from '@freshness/types';
-import { ApiClientError, fetchServiceArea, saveServiceArea } from '../lib/api';
+import {
+  ApiClientError,
+  fetchCompanyLocation,
+  fetchServiceArea,
+  saveServiceArea,
+} from '../lib/api';
 import { useToast } from './ToastProvider';
 import { SkeletonFormulario } from './Skeletons';
 import { MapPinIcon, SpinnerIcon } from './Icons';
@@ -80,6 +86,19 @@ export function ServiceAreaForm({ locale, onSessionLost }: ServiceAreaFormProps)
     );
   }, []);
 
+  /*
+   * DE DONDE SE CENTRA LA VISTA PREVIA.
+   *
+   * Estaba ESCRITO A MANO aqui, con un comentario que avisaba de que al
+   * mudarse habria que tocar dos sitios. Desde que la sede se edita en su
+   * propia pantalla ya no hace falta: se pide, y el circulo se dibuja
+   * alrededor del punto desde el que de verdad se mide.
+   */
+  const [base, setBase] = useState({
+    lat: DEFAULT_COMPANY_LOCATION.latitude,
+    lon: DEFAULT_COMPANY_LOCATION.longitude,
+  });
+
   const cargar = useCallback(async () => {
     setCargando(true);
     setErrorKey(null);
@@ -99,6 +118,22 @@ export function ServiceAreaForm({ locale, onSessionLost }: ServiceAreaFormProps)
       setErrorKey(error instanceof ApiClientError ? error.messageKey : 'admin.errorGeneric');
     } finally {
       setCargando(false);
+    }
+
+    /*
+     * LA SEDE, PARA CENTRAR LA VISTA PREVIA. Va aparte y despues: es
+     * decoracion del mapa, y si fallara dentro del try de arriba una
+     * pantalla utilizable se quedaria en blanco por no haber podido
+     * centrar un circulo. Si falla, se dibuja sobre la de partida.
+     */
+    try {
+      const ubicacion = await fetchCompanyLocation();
+      setBase({ lat: ubicacion.settings.latitude, lon: ubicacion.settings.longitude });
+    } catch {
+      setBase({
+        lat: DEFAULT_COMPANY_LOCATION.latitude,
+        lon: DEFAULT_COMPANY_LOCATION.longitude,
+      });
     }
   }, [asentar, perdioSesion]);
 
@@ -218,7 +253,7 @@ export function ServiceAreaForm({ locale, onSessionLost }: ServiceAreaFormProps)
           <Suspense fallback={<div className="ft-map-hueco" aria-hidden="true" />}>
             <ServiceAreaMap
               className="ft-map"
-              centro={{ lat: BASE.lat, lon: BASE.lon }}
+              centro={{ lat: base.lat, lon: base.lon }}
               descripcion={t('admin.serviceArea.mapDescription', { miles: radio })}
               focoMillas={radio}
               zonas={dibujables}
@@ -321,18 +356,6 @@ export function ServiceAreaForm({ locale, onSessionLost }: ServiceAreaFormProps)
     </form>
   );
 }
-
-/*
- * LA BASE DE OPERACIONES, SOLO PARA CENTRAR EL MAPA.
- *
- * La de verdad vive en el entorno del servidor y viaja en el catalogo
- * publico; el panel no lo consume. Se repite aqui porque una vista previa
- * centrada en el sitio equivocado es peor que no tenerla, y pedir el
- * catalogo entero desde el panel solo para dos numeros seria una llamada de
- * mas en cada apertura. Si la empresa se muda, este es el segundo sitio que
- * hay que tocar: esta anotado en `docs/17-area-de-servicio.md`.
- */
-const BASE = { lat: 33.749, lon: -84.388 };
 
 /** El catalogo de zonas configurables, para que la pantalla no lo invente. */
 export const ZONAS_CONFIGURABLES = ZONE_ORDER;

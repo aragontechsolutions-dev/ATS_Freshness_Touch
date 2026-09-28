@@ -372,10 +372,23 @@ configuran desde el panel, no aquí.
 | `COMPANY_BASE_LATITUDE`  | 33.749 por defecto  | No          |
 | `COMPANY_BASE_LONGITUDE` | -84.388 por defecto | No          |
 
-Centran el mapa de zonas del sitio y del panel. Van junto al resto de la base
-porque es el mismo punto desde el que se mide la distancia: guardadas por
-separado, el día que la empresa se mude el mapa dibujaría los círculos
-alrededor del sitio antiguo mientras los precios se calculan desde el nuevo.
+**Desde la Etapa 2.26 son solo el VALOR DE PARTIDA.** La ubicación de la
+empresa se marca desde el panel (_Configuración → Ubicación de la empresa_) y
+se guarda en la base; en cuanto hay una guardada, es la que manda.
+
+Estas variables siguen sirviendo para dos cosas, y por eso no se retiran:
+
+1. **De dónde mide una instalación nueva**, antes de que nadie abra esa
+   pantalla.
+2. **El último recurso si la base de datos no responde.** El servicio de
+   ubicación nunca falla al leer: si no puede, cae en estas — y solo si estas
+   tampoco describen un punto válido dentro de Georgia, en el valor del
+   contrato.
+
+Es deliberado que el respaldo sean las variables y no una constante del
+código: hay instalaciones con estas puestas apuntando a una sede que no es el
+centro de Atlanta, y un respaldo escrito a mano habría movido la base sola en
+el primer despliegue de esa etapa.
 
 Ver `docs/17-area-de-servicio.md` §7.
 
