@@ -15,6 +15,7 @@ import { useFlashOnChange } from '../hooks/useFlashOnChange';
 import { ApiClientError, requestQuote } from '../lib/api';
 import { formatCents, formatDate, formatMiles } from '../lib/format';
 import { PhoneIcon } from '../components/Icons';
+import { NumberField, clampNumber } from '../components/NumberField';
 import type { BookingJob } from '../components/BookingDialog';
 
 /*
@@ -27,11 +28,21 @@ const BookingDialog = lazy(() =>
   import('../components/BookingDialog').then((module) => ({ default: module.BookingDialog })),
 );
 
+/**
+ * EL COTIZADOR SOLO PREGUNTA LO QUE CAMBIA EL PRECIO.
+ *
+ * Habitaciones y banos no estan, y no es un olvido: la estandar es plana y
+ * la profunda y la de mudanza miran los pies cuadrados. Ninguna de las dos
+ * los usa, asi que pedirlos alargaba el formulario que genera los ingresos
+ * a cambio de nada.
+ *
+ * Donde SI se piden es en el dialogo de reserva, antes de elegir la hora:
+ * alli deciden cuanto dura el trabajo, y con ello cuanto tiempo se bloquea
+ * en la agenda.
+ */
 interface FormState {
   service: ServiceType;
   frequency: Frequency;
-  bedrooms: number;
-  bathrooms: number;
   squareFeet: number;
   postalCode: string;
   /** Cantidad por extra; 0 significa "no seleccionado". */
@@ -41,8 +52,6 @@ interface FormState {
 const INITIAL_FORM: FormState = {
   service: 'STANDARD',
   frequency: 'ONE_TIME',
-  bedrooms: 3,
-  bathrooms: 2,
   squareFeet: 1800,
   postalCode: '',
   addOns: {},
@@ -61,8 +70,6 @@ function toRequest(form: FormState, locale: Locale): QuoteRequestInput {
   return {
     service: form.service,
     frequency: form.frequency,
-    bedrooms: form.bedrooms,
-    bathrooms: form.bathrooms,
     squareFeet: form.squareFeet,
     addOns: selectedAddOns(form),
     destination: { postalCode: form.postalCode },
@@ -188,8 +195,6 @@ export function QuoteCalculator() {
     setBookingJob({
       service: form.service,
       frequency: form.frequency,
-      bedrooms: form.bedrooms,
-      bathrooms: form.bathrooms,
       squareFeet: form.squareFeet,
       addOns: selectedAddOns(form),
       postalCode: form.postalCode,
@@ -298,23 +303,7 @@ export function QuoteCalculator() {
               </div>
             </fieldset>
 
-            <div className="grid gap-4 sm:grid-cols-3">
-              <NumberField
-                id="bedrooms"
-                label={t('calculator.bedroomsLabel')}
-                value={form.bedrooms}
-                min={limits?.bedrooms.min ?? 0}
-                max={limits?.bedrooms.max ?? 12}
-                onChange={(value) => update('bedrooms', value)}
-              />
-              <NumberField
-                id="bathrooms"
-                label={t('calculator.bathroomsLabel')}
-                value={form.bathrooms}
-                min={limits?.bathrooms.min ?? 0}
-                max={limits?.bathrooms.max ?? 12}
-                onChange={(value) => update('bathrooms', value)}
-              />
+            <div className="grid gap-4 sm:grid-cols-2">
               <NumberField
                 id="squareFeet"
                 label={t('calculator.squareFeetLabel')}
@@ -485,44 +474,6 @@ export function QuoteCalculator() {
       )}
     </section>
   );
-}
-
-/* -------------------------------------------------------------------------- */
-
-interface NumberFieldProps {
-  id: string;
-  label: string;
-  value: number;
-  min: number;
-  max: number;
-  step?: number;
-  onChange: (value: number) => void;
-}
-
-function NumberField({ id, label, value, min, max, step = 1, onChange }: NumberFieldProps) {
-  return (
-    <div>
-      <label className="ft-label" htmlFor={id}>
-        {label}
-      </label>
-      <input
-        id={id}
-        type="number"
-        className="ft-input"
-        inputMode="numeric"
-        min={min}
-        max={max}
-        step={step}
-        value={value}
-        onChange={(event) => onChange(clampNumber(Number(event.target.value), min, max))}
-      />
-    </div>
-  );
-}
-
-function clampNumber(value: number, min: number, max: number): number {
-  if (!Number.isFinite(value)) return min;
-  return Math.min(Math.max(Math.round(value), min), max);
 }
 
 /* -------------------------------------------------------------------------- */

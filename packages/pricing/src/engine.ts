@@ -129,9 +129,12 @@ export function calculateQuote(request: QuoteRequest, context: QuoteContext): Qu
       code: `SERVICE_${request.service}`,
       kind: 'SERVICE_BASE',
       labelKey: `quote.line.service.${request.service}`,
+      /*
+       * SOLO LO QUE ENTRA EN EL PRECIO. Las habitaciones y los banos no lo
+       * mueven, asi que nombrarlos en la linea haria creer que si: quien lee
+       * «3 hab / 2 banos · 185 $» da por hecho que con cuatro costaria mas.
+       */
       labelParams: {
-        bedrooms: request.bedrooms,
-        bathrooms: request.bathrooms,
         squareFeet: request.squareFeet,
         frequency: request.frequency,
       },
@@ -261,8 +264,6 @@ export function calculateQuote(request: QuoteRequest, context: QuoteContext): Qu
     input: {
       service: request.service,
       frequency: request.frequency,
-      bedrooms: request.bedrooms,
-      bathrooms: request.bathrooms,
       squareFeet: request.squareFeet,
       destination: request.destination,
     },

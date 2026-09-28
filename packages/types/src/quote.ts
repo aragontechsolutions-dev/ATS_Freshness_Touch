@@ -44,8 +44,22 @@ export const QuoteRequestSchema = z
   .strictObject({
     service: ServiceTypeSchema,
     frequency: FrequencySchema.default('ONE_TIME'),
-    bedrooms: z.int().min(0).max(12),
-    bathrooms: z.int().min(0).max(12),
+    /*
+     * HABITACIONES Y BANOS NO ENTRAN EN EL PRECIO, y por eso el cotizador ya
+     * no los pregunta: la estandar es plana y la profunda y la de mudanza
+     * miran los pies cuadrados. Preguntar dos datos que no mueven la cifra
+     * alarga el formulario que genera los ingresos a cambio de nada.
+     *
+     * SIGUEN ADMITIENDOSE, y es deliberado: el esquema es estricto, asi que
+     * sin esto una pestana abierta con el paquete anterior empezaria a
+     * recibir 400 en cuanto se despliegue. Se aceptan y se ignoran.
+     *
+     * Donde SI hacen falta es al reservar (`booking.ts`) y al consultar la
+     * agenda (`availability.ts`): ahi deciden cuanto dura el trabajo, y con
+     * ellos cuanto tiempo se bloquea. Alli son obligatorios.
+     */
+    bedrooms: z.int().min(0).max(12).optional(),
+    bathrooms: z.int().min(0).max(12).optional(),
     squareFeet: z.int().min(200).max(20000),
     addOns: z.array(QuoteAddOnInputSchema).max(20).default([]),
     destination: QuoteDestinationSchema,
@@ -165,11 +179,16 @@ export const QuoteResponseSchema = z.strictObject({
   expiresAt: z.iso.datetime(),
   currency: z.literal('USD'),
   locale: LocaleSchema,
+  /**
+   * Lo que se pidio, devuelto tal cual.
+   *
+   * SIN HABITACIONES NI BANOS: el precio no los mira, y devolver un numero
+   * que quiza no se recibio seria inventarselo. La reserva si los guarda,
+   * porque alli deciden cuanto dura el trabajo.
+   */
   input: z.strictObject({
     service: ServiceTypeSchema,
     frequency: FrequencySchema,
-    bedrooms: z.int(),
-    bathrooms: z.int(),
     squareFeet: z.int(),
     destination: QuoteDestinationSchema,
   }),

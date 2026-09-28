@@ -174,6 +174,35 @@ discusión entera, que siempre acaba costando más.
 
 ---
 
+## 4 bis. Qué se pregunta en cada paso
+
+Consecuencia directa del modelo: **el cotizador solo pregunta lo que cambia
+la cifra.**
+
+| Dato                                                        | Dónde se pide             | Por qué ahí                                                |
+| ----------------------------------------------------------- | ------------------------- | ---------------------------------------------------------- |
+| Servicio, frecuencia, pies cuadrados, código postal, extras | Cotizador                 | Entran en el precio                                        |
+| Habitaciones y baños                                        | Primer paso de la reserva | No entran en el precio: fijan **cuánto tiempo se bloquea** |
+
+Habitaciones y baños estaban en el cotizador hasta la Etapa 2.24. Leerlos
+junto al importe hacía creer que lo movían, y no lo mueven: la estándar es
+plana y la profunda y la de mudanza miran los pies cuadrados.
+
+**Quitarlos del todo no era una opción**, y conviene tenerlo escrito porque
+no se ve en el precio: alimentan `estimateDurationMinutes`, que decide qué
+huecos caben en la agenda. Una estándar de 3 hab y 2 baños de 900 pies² pasa
+de reservar 3 horas a reservar 1,5 sin ellos. El detalle está en
+`docs/11-flujo-de-reserva.md`.
+
+En el contrato, `QuoteRequest` los admite pero **los ignora** —una pestaña
+abierta con el paquete anterior los sigue mandando, y el esquema es
+estricto— y `QuoteResponse.input` ya no los devuelve: informar de un número
+que quizá no se recibió sería inventárselo. En `BookingRequest` y en la
+consulta de agenda siguen siendo **obligatorios**, y hay prueba de las dos
+mitades.
+
+---
+
 ## 5. Cómo se lee un presupuesto ahora
 
 El orden importa, porque determina el resultado:

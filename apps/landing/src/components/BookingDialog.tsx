@@ -25,16 +25,30 @@ import { DoneStep, type BookingOutcome } from './booking/DoneStep';
 
 const TIMEZONE = 'America/New_York';
 
-/** Trabajo ya definido en el cotizador; el dialogo no lo vuelve a preguntar. */
+/**
+ * Trabajo ya definido en el cotizador; el dialogo no lo vuelve a preguntar.
+ *
+ * SIN HABITACIONES NI BANOS: el cotizador no los pide porque no cambian el
+ * precio. Los pide este dialogo, que es donde empiezan a importar.
+ */
 export interface BookingJob {
   service: ServiceType;
   frequency: BookingRequestInput['frequency'];
-  bedrooms: number;
-  bathrooms: number;
   squareFeet: number;
   addOns: QuoteAddOnInput[];
   postalCode: string;
 }
+
+/**
+ * CUANTAS HABITACIONES Y BANOS SE SUPONEN MIENTRAS NADIE LO DIGA.
+ *
+ * Hace falta un punto de partida porque la primera consulta de agenda sale
+ * en cuanto se abre el dialogo, y sin numeros no hay duracion que calcular
+ * ni franjas que ofrecer. Son los valores de una casa corriente en Georgia,
+ * y estan a la vista y editables en el primer paso: quien tenga otra cosa
+ * lo cambia antes de elegir la hora.
+ */
+const CASA_TIPICA = { bedrooms: 3, bathrooms: 2 } as const;
 
 interface BookingDialogProps {
   open: boolean;
@@ -68,6 +82,12 @@ export function BookingDialog({ open, job, quote, locale, onClose }: BookingDial
   const dialogRef = useRef<HTMLDialogElement>(null);
 
   const [phase, setPhase] = useState<Phase>('schedule');
+  /*
+   * NO VIENEN DEL COTIZADOR: fijan cuanto dura el trabajo, no lo que cuesta.
+   * Viven aqui porque es aqui donde se usan —la consulta de franjas y la
+   * reserva— y donde se pueden corregir antes de comprometer una hora.
+   */
+  const [property, setProperty] = useState<{ bedrooms: number; bathrooms: number }>(CASA_TIPICA);
   // Se empieza dos dias adelante: con 24 horas de antelacion minima, hoy y
   // casi todo manana estan descartados y abrir en un dia vacio desanima.
   const [date, setDate] = useState(() => addDays(todayInTimezone(TIMEZONE), 2));
@@ -107,6 +127,7 @@ export function BookingDialog({ open, job, quote, locale, onClose }: BookingDial
 
   const reiniciar = useCallback(() => {
     setPhase('schedule');
+    setProperty(CASA_TIPICA);
     setSlot(null);
     setBooking(null);
     setOutcome('CONFIRMED');
@@ -138,8 +159,8 @@ export function BookingDialog({ open, job, quote, locale, onClose }: BookingDial
         {
           service: job.service,
           frequency: job.frequency,
-          bedrooms: job.bedrooms,
-          bathrooms: job.bathrooms,
+          bedrooms: property.bedrooms,
+          bathrooms: property.bathrooms,
           squareFeet: job.squareFeet,
           addOns: job.addOns,
           startsAt: slot,
@@ -187,7 +208,7 @@ export function BookingDialog({ open, job, quote, locale, onClose }: BookingDial
     } finally {
       if (!controller.signal.aborted) setSending(false);
     }
-  }, [slot, details, job, locale]);
+  }, [slot, details, job, property, locale]);
 
   const onPaymentResolved = useCallback((resultado: PaymentOutcome) => {
     setOutcome(resultado === 'AUTHORISED' ? 'CONFIRMED' : 'DECLINED');
@@ -268,14 +289,26 @@ export function BookingDialog({ open, job, quote, locale, onClose }: BookingDial
             <ScheduleStep
               query={{
                 service: job.service,
-                bedrooms: job.bedrooms,
-                bathrooms: job.bathrooms,
+                bedrooms: property.bedrooms,
+                bathrooms: property.bathrooms,
                 squareFeet: job.squareFeet,
                 addOns: job.addOns,
               }}
+              property={property}
               date={date}
               slot={slot}
               locale={locale}
+              onPropertyChange={(cambio) => {
+                setProperty((actual) => ({ ...actual, ...cambio }));
+                /*
+                 * Cambiar el tamano de la casa cambia cuanto dura el trabajo,
+                 * y con ello que franjas caben. La que estuviera elegida se
+                 * calculo con la duracion anterior, asi que se suelta: mejor
+                 * volver a elegir hora que reservar una franja demasiado
+                 * corta y llegar tarde al cliente siguiente.
+                 */
+                setSlot(null);
+              }}
               onDateChange={setDate}
               onSlotChange={setSlot}
             />
