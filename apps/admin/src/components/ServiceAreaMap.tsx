@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import { GEORGIA_OUTLINE, farthestGeorgiaMiles } from '@freshness/types';
 
 /**
  * EL AREA DE SERVICIO, EN UN MAPA
@@ -68,6 +69,19 @@ const METROS_POR_MILLA = 1609.34;
 const COLOR_INSTANTANEO = '#145788';
 const COLOR_A_PETICION = '#f0b429';
 
+/**
+ * El borde del estado, siempre visible y en gris.
+ *
+ * En gris y no en color de marca a proposito: NO es una zona, es el limite
+ * de donde se opera. Pintarlo con los colores de las zonas lo convertiria
+ * en una mas y volveria a confundir «hasta aqui llegamos» con «esto es un
+ * area de precio».
+ */
+const COLOR_ESTADO = '#64748b';
+
+/** El contorno, en el formato que quiere Leaflet. Se construye una vez. */
+const CONTORNO_GEORGIA = GEORGIA_OUTLINE.map(([lat, lon]) => [lat, lon] as L.LatLngTuple);
+
 export function ServiceAreaMap({
   centro,
   zonas,
@@ -129,18 +143,62 @@ export function ServiceAreaMap({
      */
     const deFueraHaciaDentro = [...zonas].sort((a, b) => b.maxMiles - a.maxMiles);
 
+    /*
+     * A CUANTAS MILLAS SE ACABA GEORGIA desde la base. Es la unica cuenta
+     * que decide la forma de cada zona, y por eso se hace aqui arriba.
+     */
+    const millasHastaElFinDelEstado = farthestGeorgiaMiles(centro.lat, centro.lon);
+
+    /*
+     * EL BORDE DEL ESTADO, SALVO CUANDO YA LO DIBUJA UNA ZONA.
+     *
+     * Con el area de partida, la zona mas lejana ES el estado, asi que
+     * pintar tambien la linea de referencia seria repetir el mismo trazado
+     * de 476 puntos por debajo del otro: mismo dibujo, el doble de trabajo.
+     * Hace falta cuando ninguna zona llega tan lejos, que es cuando el
+     * cliente necesita ver donde se acaba Georgia para situar los circulos.
+     *
+     * Va lo primero para quedar por debajo de las zonas, y sin relleno ni
+     * interaccion: es una referencia, no algo que se pueda pulsar.
+     */
+    const algunaZonaDibujaElEstado = zonas.some(
+      (zona) => zona.maxMiles >= millasHastaElFinDelEstado,
+    );
+
+    if (!algunaZonaDibujaElEstado) {
+      L.polygon(CONTORNO_GEORGIA, {
+        color: COLOR_ESTADO,
+        weight: 1,
+        dashArray: '4 3',
+        fill: false,
+        interactive: false,
+      }).addTo(instancia);
+    }
+
     for (const zona of deFueraHaciaDentro) {
       const color = zona.instantQuote ? COLOR_INSTANTANEO : COLOR_A_PETICION;
+      const estilo = { color, weight: 2, fillColor: color, fillOpacity: 0.08 };
 
-      L.circle(puntoCentral, {
-        radius: zona.maxMiles * METROS_POR_MILLA,
-        color,
-        weight: 2,
-        fillColor: color,
-        fillOpacity: 0.08,
-      })
-        .addTo(instancia)
-        .bindPopup(zona.etiqueta);
+      /*
+       * UNA ZONA QUE LLEGA MAS LEJOS QUE EL ESTADO SE DIBUJA COMO EL ESTADO.
+       *
+       * El circulo de 325 millas entraba en Tennessee, Carolina del Sur,
+       * Alabama, Carolina del Norte y Florida, y a ninguno de esos sitios
+       * se va: el motor marca `outOfState` en cuanto el codigo postal no es
+       * de Georgia. El contorno no es una aproximacion del circulo, es la
+       * cobertura DE VERDAD, asi que esto es mas preciso y no menos.
+       *
+       * Las zonas cercanas —35 y 60 millas— se quedan dentro del estado por
+       * todos lados, asi que siguen siendo circulos: ahi el circulo si dice
+       * la verdad, y ademas es lo que se entiende de un vistazo.
+       */
+      const cubreElEstado = zona.maxMiles >= millasHastaElFinDelEstado;
+
+      const forma = cubreElEstado
+        ? L.polygon(CONTORNO_GEORGIA, estilo)
+        : L.circle(puntoCentral, { radius: zona.maxMiles * METROS_POR_MILLA, ...estilo });
+
+      forma.addTo(instancia).bindPopup(zona.etiqueta);
     }
 
     mapa.current = instancia;
@@ -176,10 +234,20 @@ export function ServiceAreaMap({
     const instancia = mapa.current;
     if (!instancia || focoMillas <= 0) return;
 
-    instancia.flyToBounds(
-      L.latLng(centro.lat, centro.lon).toBounds(focoMillas * METROS_POR_MILLA * 2),
-      { padding: [16, 16], duration: 0.6 },
-    );
+    /*
+     * SI EL ENCUADRE ABARCA EL ESTADO, SE ENCUADRA EL ESTADO.
+     *
+     * Un cuadrado de 325 millas de radio centrado en Atlanta deja media
+     * Carolina y medio Alabama en pantalla, y Georgia pequena en el medio:
+     * el mapa dedicaba la mayor parte del espacio a sitios donde no se
+     * trabaja. Ajustandose al poligono, el estado llena el recuadro.
+     */
+    const limites =
+      focoMillas >= farthestGeorgiaMiles(centro.lat, centro.lon)
+        ? L.latLngBounds(CONTORNO_GEORGIA)
+        : L.latLng(centro.lat, centro.lon).toBounds(focoMillas * METROS_POR_MILLA * 2);
+
+    instancia.flyToBounds(limites, { padding: [16, 16], duration: 0.6 });
   }, [centro.lat, centro.lon, focoMillas]);
 
   return (

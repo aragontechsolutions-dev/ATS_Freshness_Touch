@@ -285,6 +285,84 @@ consumidor, toca extraerlo.**
 
 ---
 
+## 6 bis. El anillo exterior es el estado, no un círculo
+
+Un círculo de 325 millas centrado en Atlanta entra en **Tennessee, Carolina
+del Sur, Alabama, Carolina del Norte y Florida**. A ninguno de esos sitios se
+va: el propio motor marca `outOfState` en cuanto el código postal no es de
+Georgia. El mapa prometía cobertura en cinco estados que el sistema rechaza.
+
+Desde la Etapa 2.25, **una zona cuyo radio llega más lejos que el estado se
+dibuja con el contorno real de Georgia**.
+
+### Por qué esto es más preciso, y no una aproximación
+
+El punto de Georgia más lejano de Atlanta está a **275 millas** —la esquina
+sureste, hacia St. Marys—, así que las 325 de la zona C cubren el estado
+entero con 50 millas de sobra. El contorno no es un recorte del círculo: es
+la cobertura de verdad, y el círculo era lo que sobraba.
+
+Las zonas cercanas **siguen siendo círculos**, y también por medirlo: el
+borde de Georgia más cercano a la base está a 65,1 millas, así que los
+anillos de 35 y 60 se quedan dentro del estado por todos lados. Ahí el
+círculo dice la verdad y además se entiende de un vistazo.
+
+### La regla, y por qué se calcula en vez de escribirse
+
+```ts
+const cubreElEstado = zona.maxMiles >= farthestGeorgiaMiles(centro.lat, centro.lon);
+```
+
+`farthestGeorgiaMiles` recorre el contorno y devuelve la distancia al punto
+más lejano. **No es una constante a propósito:** la base de operaciones es
+configurable, y el día que la empresa se mude la respuesta cambia sola en vez
+de quedarse un número escrito mintiendo. Son 476 puntos y una raíz cuadrada
+por punto, una vez al montar el mapa.
+
+El borde del estado se dibuja además como línea gris discontinua **cuando
+ninguna zona llega tan lejos**, para que se vea dónde acaba Georgia. Si una
+zona ya lo dibuja, pintarlo otra vez sería repetir el mismo trazado de 476
+puntos por debajo del otro.
+
+Y el encuadre de «todo el estado» se ajusta ahora al polígono: un cuadrado de
+325 millas de lado dejaba media Carolina en pantalla y Georgia pequeña en el
+medio.
+
+### De dónde salen las coordenadas
+
+`packages/types/src/georgia-outline.ts`. Derivadas de los límites estatales
+del censo de Estados Unidos, obtenidas del proyecto
+[`unitedstates/districts`](https://github.com/unitedstates/districts), que
+está en **dominio público**.
+
+|                       |                                    |
+| --------------------- | ---------------------------------- |
+| Vértices del original | 4.826                              |
+| Vértices publicados   | 476                                |
+| Simplificación        | Douglas-Peucker, tolerancia 0,005° |
+| Desviación máxima     | ~557 m                             |
+| Peso                  | 11,5 kB de fuente                  |
+
+557 metros a la escala a la que se ve el estado entero es **menos de un
+píxel**. Es un mapa para decir «venimos a tu casa», no para replantear una
+linde.
+
+**No pesa en la carga inicial del sitio.** Se comprobó en el paquete
+construido: el contorno aparece en el trozo diferido del mapa y no en el
+principal, así que solo se descarga cuando la sección de zonas entra en
+pantalla, junto a Leaflet.
+
+### Lo que esto NO hace
+
+Las zonas que **no** cubren el estado se siguen dibujando como círculos
+completos. Con el área de partida no hay ninguna en ese caso, pero si alguien
+configurara una zona de, digamos, 150 millas, su círculo entraría un poco en
+Alabama y Tennessee. Recortar un círculo contra un polígono cóncavo exige un
+algoritmo de intersección que hoy no está; lo que sí está es el borde gris,
+que en ese caso se dibuja y deja ver dónde se acaba el estado.
+
+---
+
 ## 7. Las coordenadas de la base
 
 El mapa se centra en `COMPANY_BASE_LATITUDE` / `COMPANY_BASE_LONGITUDE`
@@ -331,6 +409,17 @@ El mapa mentiría, y nadie lo notaría hasta que un cliente reclamara.
   catálogo público lo refleja. Es el punto de toda la etapa — si el área se
   guarda pero el cotizador sigue con la del código, no se ha sacado nada del
   código.
+  `packages/types/src/georgia-outline.test.ts` comprueba el contorno con la
+  pregunta que el mapa existe para contestar, en sitios donde la respuesta se
+  sabe de antemano: siete ciudades de Georgia caen **dentro** y cinco de los
+  estados vecinos —Chattanooga, Greenville, Birmingham, Jacksonville,
+  Asheville— caen **fuera**. Es la prueba que justifica el archivo entero: el
+  círculo de 325 millas metía a las cinco dentro del área de servicio.
+
+También comprueba que las coordenadas caben en la caja real del estado, que
+es como se detecta el fallo clásico de intercambiar latitud y longitud al
+pasar de GeoJSON a Leaflet —y que deja Georgia en medio del océano Índico.
+
 - Que el cambio quede en la auditoría **con las cifras** (`service_area.updated`
   guarda de cuántas millas a cuántas, no un volcado).
 
