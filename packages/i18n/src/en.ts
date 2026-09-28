@@ -715,6 +715,9 @@ export const en = {
         service_area: {
           updated: 'Service area changed',
         },
+        company_location: {
+          updated: 'Company location moved',
+        },
         pricing: {
           updated: 'Rates changed',
         },

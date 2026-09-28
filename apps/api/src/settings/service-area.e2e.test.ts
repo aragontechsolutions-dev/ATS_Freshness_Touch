@@ -118,8 +118,8 @@ describe('quien puede tocar el area', () => {
 
     expect(respuesta.status).toBe(200);
     expect(AdminServiceAreaSchema.safeParse(respuesta.body).success).toBe(true);
-    // Tres bandas, no cinco anillos: ver DEFAULT_SERVICE_AREA.
-    expect(respuesta.body.settings.zones).toHaveLength(3);
+    // DOS zonas: la de las 35 millas y el resto de Georgia. La B se retiro.
+    expect(respuesta.body.settings.zones.map((z: { code: string }) => z.code)).toEqual(['A', 'C']);
   });
 
   /*
@@ -193,10 +193,34 @@ describe('las reglas del conjunto', () => {
     expect(respuesta.status).toBe(400);
   });
 
-  it('rechaza saltarse un codigo de zona', async () => {
+  /*
+   * SALTARSE UN CODIGO AHORA VALE, y es lo que permite retirar la zona B
+   * sin reutilizar su letra: hay reservas guardadas con zona B que
+   * significan «hasta 60 millas con precio automatico», y renombrar la C a
+   * B las volveria ambiguas.
+   */
+  it('permite saltarse un codigo de zona', async () => {
     const respuesta = await guardar([
       { code: 'A', maxMiles: 20, instantQuote: true },
       { code: 'C', maxMiles: 60, instantQuote: true },
+    ]);
+
+    expect(respuesta.status).toBe(200);
+  });
+
+  it('pero sigue rechazando los codigos al reves', async () => {
+    const respuesta = await guardar([
+      { code: 'C', maxMiles: 20, instantQuote: true },
+      { code: 'A', maxMiles: 60, instantQuote: true },
+    ]);
+
+    expect(respuesta.status).toBe(400);
+  });
+
+  it('y repetir el mismo codigo', async () => {
+    const respuesta = await guardar([
+      { code: 'A', maxMiles: 20, instantQuote: true },
+      { code: 'A', maxMiles: 60, instantQuote: true },
     ]);
 
     expect(respuesta.status).toBe(400);

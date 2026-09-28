@@ -69,17 +69,33 @@ export const ServiceAreaSettingsSchema = z
     zones: z.array(ServiceAreaZoneSchema).min(1).max(ZONE_ORDER.length),
   })
   /*
-   * LOS CODIGOS VAN EN ORDEN Y SIN SALTOS: A, luego B, luego C...
+   * LOS CODIGOS VAN EN ORDEN, PERO SE PERMITEN SALTOS.
    *
-   * No es una mania de orden. El motor recorre la lista y se queda con la
-   * primera zona cuyo limite alcanza la distancia, asi que una lista
-   * desordenada asignaria la zona equivocada —y con ella el recargo
-   * equivocado— sin fallar por ningun sitio.
+   * En orden porque el motor recorre la lista y se queda con la primera
+   * zona cuyo limite alcanza la distancia: desordenada, asignaria la zona
+   * equivocada sin fallar por ningun sitio.
+   *
+   * CON SALTOS PORQUE UN CODIGO RETIRADO NO SE REAPROVECHA. Al quitar la
+   * zona B —las 60 millas con precio automatico— el area quedo en A y C, y
+   * la tentacion era renombrar la C a B para que fueran seguidas. No se
+   * hizo: el codigo de zona SE GUARDA EN CADA RESERVA, y hay reservas
+   * antiguas con zona B que significan «hasta 60 millas, con precio
+   * automatico». Si B pasara a ser «el resto de Georgia, a mano», una
+   * consulta sobre el pasado mezclaria trabajos a 50 millas con trabajos a
+   * 250 y nada avisaria de la mezcla.
+   *
+   * Lo que si se sigue impidiendo es repetir un codigo o ponerlos al reves.
    */
-  .refine(({ zones }) => zones.every((zona, indice) => zona.code === ZONE_ORDER[indice]), {
-    message: 'Las zonas deben ir en orden y sin saltos: A, B, C...',
-    path: ['zones'],
-  })
+  .refine(
+    ({ zones }) => {
+      const posiciones = zones.map((zona) => ZONE_ORDER.indexOf(zona.code));
+      return posiciones.every((actual, i) => i === 0 || actual > (posiciones[i - 1] ?? -1));
+    },
+    {
+      message: 'Las zonas deben ir en orden: A, luego B, luego C...',
+      path: ['zones'],
+    },
+  )
   /*
    * CADA ANILLO MAS LEJOS QUE EL ANTERIOR. Dos zonas con el mismo limite, o
    * una mas cercana detras de otra mas lejana, dejarian un tramo que nunca
@@ -119,27 +135,30 @@ export type ServiceAreaSettings = z.infer<typeof ServiceAreaSettingsSchema>;
 export type ServiceAreaSettingsInput = z.input<typeof ServiceAreaSettingsSchema>;
 
 /**
- * El area de partida: TRES BANDAS, no cinco anillos.
+ * El area de partida: DOS ZONAS.
  *
- *   A  hasta 35 millas — dentro del radio que no cobra traslado
- *   B  hasta 60 millas — se cobra el traslado, el precio sigue saliendo solo
+ *   A  hasta 35 millas — el radio que no cobra traslado
  *   C  hasta 325       — el resto de Georgia: se atiende, sin precio automatico
  *
  * Las 35 de la zona A son el radio sin recargo, y no es casualidad: la
  * frontera que el cliente nota es «me cobras el viaje o no», asi que la
- * zona y el radio tienen que coincidir. El dia que se muevan por separado,
- * el mapa dira una cosa y la factura otra.
+ * zona y el radio tienen que coincidir. Pasado ese circulo, el motor de
+ * distancia cobra las millas reales.
  *
- * Las 325 cubren Georgia entera desde Atlanta: Savannah queda sobre las 250
- * y la esquina sureste sobre las 300.
+ * Las 325 cubren Georgia entera: el punto mas lejano del estado desde
+ * Atlanta esta a 275 millas, asi que esa zona se dibuja con el contorno
+ * real y no como un circulo.
  *
- * `D` y `E` siguen en el enumerado aunque no se usen: estan escritas en
- * reservas que ya existen.
+ * POR QUE FALTA LA B. Eran 60 millas con precio automatico, y desaparecio:
+ * el traslado ya se cobra por milla desde las 35, asi que una banda
+ * intermedia no decidia nada. Su codigo NO se reutiliza —ver la regla de
+ * los saltos, mas arriba—: esta escrito en reservas que ya existen.
+ *
+ * `B`, `D` y `E` siguen en el enumerado por lo mismo.
  */
 export const DEFAULT_SERVICE_AREA: ServiceAreaSettings = {
   zones: [
     { code: 'A', maxMiles: 35, instantQuote: true },
-    { code: 'B', maxMiles: 60, instantQuote: true },
     { code: 'C', maxMiles: 325, instantQuote: false },
   ],
 };

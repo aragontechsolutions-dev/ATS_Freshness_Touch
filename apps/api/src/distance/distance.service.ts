@@ -3,28 +3,39 @@ import { ConfigService } from '@nestjs/config';
 import type { Env } from '../common/config/env';
 import { DISTANCE_PROVIDER, type DistanceProvider, type DistanceResult } from './distance.types';
 import { TtlCache } from '../common/ttl-cache';
+import { CompanyLocationService } from '../settings/company-location.service';
 
 export type ResolvedDistance = DistanceResult & { cached: boolean };
 
 /**
  * Resuelve la distancia entre la base de operaciones y el destino,
  * delegando en el proveedor configurado y cacheando el resultado.
+ *
+ * EL ORIGEN SE PREGUNTA EN CADA LLAMADA, no se guarda al arrancar.
+ *
+ * Se leia una vez del entorno en el constructor, y desde que la ubicacion
+ * se edita desde el panel eso era un fallo esperando: mover la sede
+ * habria recentrado el mapa y las zonas mientras ESTE servicio seguia
+ * midiendo desde el sitio viejo hasta el siguiente reinicio. El mapa
+ * diciendo una cosa y la factura otra, sin un solo error por ningun sitio.
+ *
+ * No cuesta una consulta por peticion: la ubicacion va cacheada treinta
+ * segundos en su propio servicio.
  */
 @Injectable()
 export class DistanceService {
   private readonly logger = new Logger(DistanceService.name);
   private readonly cache: TtlCache<DistanceResult>;
-  private readonly originPostalCode: string;
 
   constructor(
     @Inject(DISTANCE_PROVIDER) private readonly provider: DistanceProvider,
     private readonly config: ConfigService<Env, true>,
+    private readonly ubicacion: CompanyLocationService,
   ) {
     this.cache = new TtlCache<DistanceResult>(
       this.config.get('DISTANCE_CACHE_TTL_SECONDS', { infer: true }) * 1000,
       this.config.get('DISTANCE_CACHE_MAX_ENTRIES', { infer: true }),
     );
-    this.originPostalCode = this.config.get('COMPANY_BASE_POSTAL_CODE', { infer: true });
   }
 
   async resolve(
@@ -33,12 +44,21 @@ export class DistanceService {
     /** Calle y ciudad, si se conocen (solo al reservar). */
     detail: { line1?: string; city?: string } = {},
   ): Promise<ResolvedDistance> {
-    // El detalle forma parte de la clave: la distancia hasta un portal
-    // concreto no es la misma que hasta el centro del codigo postal, y
-    // mezclarlas en la cache daria depositos incorrectos.
+    const originPostalCode = (await this.ubicacion.get()).postalCode;
+
+    /*
+     * EL ORIGEN VA EN LA CLAVE, y no es decorativo: si la empresa se muda,
+     * lo cacheado se midio desde el sitio anterior. Sin el origen en la
+     * clave, esas distancias viejas seguirian sirviendose durante horas y
+     * cobrarian traslados que ya no corresponden.
+     *
+     * El detalle tambien: la distancia hasta un portal concreto no es la
+     * misma que hasta el centro del codigo postal, y mezclarlas daria
+     * depositos incorrectos.
+     */
     const key = [
       this.provider.name,
-      this.originPostalCode,
+      originPostalCode,
       state,
       destinationPostalCode,
       detail.line1 ?? '',
@@ -51,7 +71,7 @@ export class DistanceService {
     }
 
     const result = await this.provider.resolve({
-      originPostalCode: this.originPostalCode,
+      originPostalCode,
       destinationPostalCode,
       state,
       ...(detail.line1 ? { destinationLine1: detail.line1 } : {}),

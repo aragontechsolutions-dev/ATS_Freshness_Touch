@@ -719,6 +719,9 @@ export const es: TranslationResources = {
         service_area: {
           updated: 'Cambió el área de servicio',
         },
+        company_location: {
+          updated: 'Movió la ubicación de la empresa',
+        },
         pricing: {
           updated: 'Cambió las tarifas',
         },
