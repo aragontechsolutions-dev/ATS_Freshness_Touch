@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { GEORGIA_OUTLINE, farthestGeorgiaMiles } from './georgia-outline';
+import { GEORGIA_OUTLINE, farthestGeorgiaMiles, isInsideGeorgia } from './georgia-outline';
 
 /**
  * EL CONTORNO DEL ESTADO
@@ -10,26 +10,6 @@ import { GEORGIA_OUTLINE, farthestGeorgiaMiles } from './georgia-outline';
  * para contestar —«¿venis a mi ciudad?»— en sitios donde la respuesta se
  * sabe de antemano.
  */
-
-/**
- * Punto dentro de poligono por el metodo del rayo.
- *
- * Se cuenta cuantas veces un rayo horizontal hacia el este cruza el borde:
- * impar es dentro, par es fuera. Va aqui y no en el codigo de produccion
- * porque el mapa no necesita preguntarselo: dibuja el poligono y ya.
- */
-function dentro(lat: number, lon: number): boolean {
-  let cruces = false;
-  for (let i = 0, j = GEORGIA_OUTLINE.length - 1; i < GEORGIA_OUTLINE.length; j = i++) {
-    const [latI, lonI] = GEORGIA_OUTLINE[i] as readonly [number, number];
-    const [latJ, lonJ] = GEORGIA_OUTLINE[j] as readonly [number, number];
-
-    if (latI > lat !== latJ > lat && lon < ((lonJ - lonI) * (lat - latI)) / (latJ - latI) + lonI) {
-      cruces = !cruces;
-    }
-  }
-  return cruces;
-}
 
 describe('el poligono es Georgia', () => {
   it('las ciudades de Georgia caen dentro', () => {
@@ -44,7 +24,7 @@ describe('el poligono es Georgia', () => {
     ];
 
     for (const [nombre, lat, lon] of dentroDelEstado) {
-      expect(dentro(lat, lon), nombre).toBe(true);
+      expect(isInsideGeorgia(lat, lon), nombre).toBe(true);
     }
   });
 
@@ -63,7 +43,7 @@ describe('el poligono es Georgia', () => {
     ];
 
     for (const [nombre, lat, lon] of fueraDelEstado) {
-      expect(dentro(lat, lon), nombre).toBe(false);
+      expect(isInsideGeorgia(lat, lon), nombre).toBe(false);
     }
   });
 });

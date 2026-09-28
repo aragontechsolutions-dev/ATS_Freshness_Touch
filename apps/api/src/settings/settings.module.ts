@@ -4,6 +4,7 @@ import { BusinessSettingsService } from './business-settings.service';
 import { PricingConfigService } from './pricing-config.service';
 import { PricingRatesService } from './pricing-rates.service';
 import { ServiceAreaService } from './service-area.service';
+import { CompanyLocationService } from './company-location.service';
 
 /**
  * Los servicios se exportan porque los necesitan varios sitios ademas de los
@@ -15,9 +16,16 @@ import { ServiceAreaService } from './service-area.service';
   providers: [
     BusinessSettingsService,
     ServiceAreaService,
+    CompanyLocationService,
     PricingRatesService,
     PricingConfigService,
   ],
-  exports: [BusinessSettingsService, ServiceAreaService, PricingRatesService, PricingConfigService],
+  exports: [
+    BusinessSettingsService,
+    ServiceAreaService,
+    CompanyLocationService,
+    PricingRatesService,
+    PricingConfigService,
+  ],
 })
 export class SettingsModule {}

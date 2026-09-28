@@ -127,6 +127,16 @@ const ACCIONES_FIJAS = [
    */
   'service_area.updated',
   /**
+   * Se movio la ubicacion de la empresa.
+   *
+   * Accion propia porque es el origen desde el que se mide TODO: cambiarla
+   * recalcula la distancia, el traslado y la zona de cada reserva
+   * posterior. La metadata guarda cuantas millas se movio, que es lo que
+   * de verdad explica por que los precios de esta semana no cuadran con
+   * los de la pasada.
+   */
+  'company_location.updated',
+  /**
    * Cambiaron las tarifas.
    *
    * Tiene accion propia y no `settings.updated` por lo mismo que el area de

@@ -24,6 +24,7 @@ import { STAFF_INVITE_PROVIDER } from './staff-invite.types';
 import {
   NotificationSettingsController,
   PricingRatesAdminController,
+  CompanyLocationAdminController,
   ServiceAreaAdminController,
   SettingsAdminController,
 } from './settings-admin.controller';
@@ -38,6 +39,7 @@ import type { Env } from '../common/config/env';
     SettingsAdminController,
     NotificationSettingsController,
     ServiceAreaAdminController,
+    CompanyLocationAdminController,
     PricingRatesAdminController,
     AssignmentsController,
     StaffListController,

@@ -554,3 +554,36 @@ function haversineMiles(lat1: number, lon1: number, lat2: number, lon2: number):
 
   return 2 * RADIO_TIERRA_MILLAS * Math.asin(Math.sqrt(a));
 }
+
+/**
+ * Si un punto cae DENTRO del estado de Georgia.
+ *
+ * Existe para una guardia concreta y que mueve dinero: la ubicacion de la
+ * empresa es el origen desde el que se mide CADA distancia, asi que un
+ * dedazo en las coordenadas no rompe nada —recentra el area de servicio y
+ * recalcula todos los traslados— y nadie lo nota hasta ver una factura con
+ * doscientas millas de recargo. Si la base no esta en Georgia, algo se ha
+ * tecleado mal.
+ *
+ * Metodo del rayo: se cuenta cuantas veces un rayo horizontal hacia el este
+ * cruza el borde. Impar es dentro, par es fuera.
+ *
+ * Un punto EXACTAMENTE sobre la linea puede dar cualquiera de las dos
+ * respuestas, y da igual: no hay ninguna decision de negocio que dependa de
+ * medio metro en la frontera.
+ */
+export function isInsideGeorgia(lat: number, lon: number): boolean {
+  let dentro = false;
+
+  for (let i = 0, j = GEORGIA_OUTLINE.length - 1; i < GEORGIA_OUTLINE.length; j = i++) {
+    const [latI, lonI] = GEORGIA_OUTLINE[i] as readonly [number, number];
+    const [latJ, lonJ] = GEORGIA_OUTLINE[j] as readonly [number, number];
+
+    const cruzaLaLatitud = latI > lat !== latJ > lat;
+    if (cruzaLaLatitud && lon < ((lonJ - lonI) * (lat - latI)) / (latJ - latI) + lonI) {
+      dentro = !dentro;
+    }
+  }
+
+  return dentro;
+}

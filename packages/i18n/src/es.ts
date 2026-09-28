@@ -442,6 +442,43 @@ export const es: TranslationResources = {
     },
 
     /* ----------------------- Area de servicio ----------------------- */
+    /* ------------------------- Ubicación de la empresa ------------------------- */
+    /**
+     * ES EL ORIGEN DESDE EL QUE SE MIDE TODO. Los textos lo dicen sin
+     * rodeos: quien abre esta pantalla tiene que entender, antes de tocar
+     * nada, que mover el punto mueve el precio de cada reserva posterior.
+     */
+    location: {
+      title: 'Ubicación de la empresa',
+      intro:
+        'Desde aquí se mide todo: la distancia de cada presupuesto, las millas de traslado que se cobran y el centro del mapa del sitio.',
+      onlyFuture:
+        'Lo ya reservado no cambia: cada reserva guarda la distancia con la que se calculó. Esto afecta a los presupuestos de ahora en adelante.',
+
+      pickTitle: 'Marca el punto en el mapa',
+      pickHelp:
+        'Pulsa sobre el mapa para colocar la sede. Es más seguro que teclear coordenadas: un signo cambiado la manda a otro continente.',
+      mapDescription:
+        'Mapa del estado de Georgia con la ubicación de la empresa marcada y el radio sin recargo por traslado.',
+      radiusNote: 'El círculo son las {{miles}} millas que no cobran traslado.',
+
+      latitude: 'Latitud',
+      longitude: 'Longitud',
+      city: 'Ciudad',
+      postalCode: 'Código postal',
+      postalCodeNote:
+        'El código postal es desde el que el motor calcula la distancia hasta cada cliente.',
+
+      save: 'Guardar ubicación',
+      saved: 'Ubicación guardada. Los presupuestos nuevos ya se miden desde aquí.',
+      lastChanged: 'La movió {{who}} el {{when}}',
+
+      errOutsideGeorgia:
+        'Ese punto está fuera de Georgia. La empresa opera solo en este estado: marca un punto dentro.',
+      errNotNumbers: 'Revisa la latitud y la longitud: alguna no es un número.',
+      errInvalid: 'Revisa los datos: falta algo o el código postal no tiene cinco dígitos.',
+    },
+
     serviceArea: {
       title: 'Área de servicio',
       intro:
@@ -718,6 +755,9 @@ export const es: TranslationResources = {
         },
         service_area: {
           updated: 'Cambió el área de servicio',
+        },
+        company_location: {
+          updated: 'Movió la ubicación de la empresa',
         },
         pricing: {
           updated: 'Cambió las tarifas',

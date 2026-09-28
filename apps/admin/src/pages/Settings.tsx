@@ -15,6 +15,7 @@ import { ApiClientError, fetchSettings, saveSettings } from '../lib/api';
 import { AuditLog } from '../components/AuditLog';
 import { PricingRatesForm } from '../components/PricingRatesForm';
 import { ServiceAreaForm } from '../components/ServiceAreaForm';
+import { CompanyLocationForm } from '../components/CompanyLocationForm';
 import { NotificationSettingsForm } from '../components/NotificationSettingsForm';
 import { StaffDirectory } from '../components/StaffDirectory';
 import { useToast } from '../components/ToastProvider';
@@ -65,7 +66,8 @@ interface SettingsShellProps extends SettingsPageProps {
  *      numero inventado de relleno, que es peor: un cliente lo marca y
  *      termina llamando a un desconocido.
  */
-type Seccion = 'business' | 'serviceArea' | 'pricing' | 'notifications' | 'staff' | 'audit';
+type Seccion =
+  'business' | 'location' | 'serviceArea' | 'pricing' | 'notifications' | 'staff' | 'audit';
 
 /**
  * Dos bloques que se guardan por separado.
@@ -94,6 +96,19 @@ export function SettingsPage({ staff, locale, onSessionLost }: SettingsShellProp
           las dos cosas que definen QUE ofrece la empresa, antes de como se
           avisa y de quien trabaja aqui.
         */}
+        {/*
+          LA UBICACION VA ANTES QUE EL AREA, y el orden cuenta una historia:
+          primero donde esta la empresa, y despues hasta donde llega. Al
+          reves, alguien configuraria un radio de 35 millas sin saber
+          alrededor de que punto se dibuja.
+        */}
+        <Pestana
+          activa={seccion === 'location'}
+          onClick={() => setSeccion('location')}
+          icono={<MapPinIcon className="h-4 w-4" />}
+        >
+          {t('admin.location.title')}
+        </Pestana>
         <Pestana
           activa={seccion === 'serviceArea'}
           onClick={() => setSeccion('serviceArea')}
@@ -145,6 +160,8 @@ export function SettingsPage({ staff, locale, onSessionLost }: SettingsShellProp
 
       {seccion === 'business' ? (
         <BusinessSettingsForm locale={locale} onSessionLost={onSessionLost} />
+      ) : seccion === 'location' ? (
+        <CompanyLocationForm locale={locale} onSessionLost={onSessionLost} />
       ) : seccion === 'serviceArea' ? (
         <ServiceAreaForm locale={locale} onSessionLost={onSessionLost} />
       ) : seccion === 'pricing' ? (

@@ -40,6 +40,9 @@ import {
   type PricingRates,
   type ServiceAreaSettings,
   type AuthenticatedStaff,
+  AdminCompanyLocationSchema,
+  type AdminCompanyLocation,
+  type CompanyLocation,
 } from '@freshness/types';
 import { auth } from './supabase';
 
@@ -460,6 +463,43 @@ export function fetchAuditLog(query: AuditQueryInput = {}): Promise<AuditPage> {
     if (!parsed.success) throw contractError('/admin/audit', parsed.error.issues);
     return parsed.data;
   });
+}
+
+/* ------------------------------------------------------------------------ */
+/*  Ubicacion de la empresa. Solo administracion.                           */
+/* ------------------------------------------------------------------------ */
+
+const UBICACION = '/admin/company-location';
+
+/**
+ * De donde se mide todo: la distancia de cada presupuesto, el radio sin
+ * traslado y el centro del mapa.
+ */
+export function fetchCompanyLocation(): Promise<AdminCompanyLocation> {
+  return request(UBICACION, (payload) => {
+    const parsed = AdminCompanyLocationSchema.safeParse(payload);
+    if (!parsed.success) throw contractError(UBICACION, parsed.error.issues);
+    return parsed.data;
+  });
+}
+
+/**
+ * Mueve la sede.
+ *
+ * Va completa y no por campos: las coordenadas, la ciudad y el codigo postal
+ * describen UN punto, y dejar cambiar la latitud sin la ciudad permitiria
+ * guardar una ficha que se contradice a si misma.
+ */
+export function saveCompanyLocation(settings: CompanyLocation): Promise<AdminCompanyLocation> {
+  return request(
+    UBICACION,
+    (payload) => {
+      const parsed = AdminCompanyLocationSchema.safeParse(payload);
+      if (!parsed.success) throw contractError('guardado de la ubicacion', parsed.error.issues);
+      return parsed.data;
+    },
+    { method: 'PUT', body: settings },
+  );
 }
 
 /* ------------------------------------------------------------------------ */

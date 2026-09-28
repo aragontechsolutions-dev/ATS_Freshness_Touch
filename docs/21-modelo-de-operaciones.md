@@ -79,14 +79,19 @@ cuesta menos que el depósito.
 
 ## 2. Las tres bandas del área de servicio
 
-Las cinco zonas con recargo pasaron a tres bandas sin recargo propio:
+Las cinco zonas con recargo pasaron a tres bandas, y desde la Etapa 2.26 a
+**dos**:
 
-| Zona           | Hasta      | Qué significa                                                     |
-| -------------- | ---------- | ----------------------------------------------------------------- |
-| **A**          | 35 millas  | Dentro del radio incluido: **el traslado no se cobra**            |
-| **B**          | 60 millas  | Se cobra el traslado por milla, **el precio sigue saliendo solo** |
-| **C**          | 325 millas | El resto de Georgia: **se atiende, sin precio automático**        |
-| `OUT_OF_RANGE` | —          | Más allá de la última. No se configura: no es una zona            |
+| Zona           | Hasta      | Qué significa                                              |
+| -------------- | ---------- | ---------------------------------------------------------- |
+| **A**          | 35 millas  | Dentro del radio incluido: **el traslado no se cobra**     |
+| **C**          | 325 millas | El resto de Georgia: **se atiende, sin precio automático** |
+| `OUT_OF_RANGE` | —          | Más allá de la última. No se configura: no es una zona     |
+
+**La B se retiró**: eran 60 millas con precio automático, y dejó de decidir
+nada en cuanto el traslado pasó a cobrarse por milla desde las 35. Su código
+no se reutiliza porque está escrito en reservas que ya existen; el porqué
+completo está en `docs/17-area-de-servicio.md` §3.
 
 **Las 35 millas de la zona A son el radio sin recargo, y no es casualidad.**
 La frontera que el cliente nota es «me cobras el viaje o no», así que la zona

@@ -12,7 +12,13 @@ import type { DistanceProvider, DistanceQuery, DistanceResult } from '../distanc
  *  - Determinismo: el mismo codigo postal devuelve siempre la misma distancia
  *    (imprescindible para que un cliente no vea precios distintos al recargar).
  *  - Realismo suficiente: los prefijos de Georgia caen en rangos verosimiles,
- *    de modo que se pueden probar todas las zonas (A, B, C, D y fuera de area).
+ *    de modo que se pueden probar todas las zonas.
+ *
+ * LO QUE NO HACE, Y HAY QUE SABERLO: ignora el ORIGEN. Es una tabla de
+ * millas desde el centro de Atlanta por prefijo del destino, asi que mover
+ * la sede desde el panel no cambia lo que devuelve. Con el proveedor real
+ * si cambia. No sirve, por tanto, para comprobar que la ubicacion guardada
+ * llega al calculo: eso se prueba en `distance.service.test.ts`.
  */
 @Injectable()
 export class MockDistanceProvider implements DistanceProvider {

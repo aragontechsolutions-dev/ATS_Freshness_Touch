@@ -5,6 +5,7 @@ import type { Env } from '../common/config/env';
 import { buildPricingConfig } from '../common/pricing-config';
 import { PricingRatesService } from './pricing-rates.service';
 import { ServiceAreaService } from './service-area.service';
+import { CompanyLocationService } from './company-location.service';
 
 /**
  * LA CONFIGURACION DE PRECIOS VIGENTE
@@ -13,7 +14,8 @@ import { ServiceAreaService } from './service-area.service';
  *
  *   - LAS TARIFAS, que desde la etapa 2.22 tambien se editan desde el panel
  *     y viven en la base, versionadas.
- *   - La base de operaciones, que es del despliegue y viene del entorno.
+ *   - LA UBICACION DE LA EMPRESA, que desde la etapa 2.26 tambien se edita
+ *     desde el panel: es el origen desde el que se mide cada distancia.
  *   - EL AREA DE SERVICIO, que ahora se edita desde el panel y por tanto
  *     vive en la base de datos.
  *
@@ -34,16 +36,28 @@ export class PricingConfigService {
     private readonly config: ConfigService<Env, true>,
     private readonly serviceArea: ServiceAreaService,
     private readonly rates: PricingRatesService,
+    private readonly ubicacion: CompanyLocationService,
   ) {}
 
   async current(): Promise<PricingConfig> {
-    const [tarifas, zones] = await Promise.all([
+    const [tarifas, zones, base] = await Promise.all([
       this.rates.current(),
       this.serviceArea.zoneRules(),
+      this.ubicacion.get(),
     ]);
 
     return {
       ...applyPricingRates(buildPricingConfig(this.config), tarifas.rates),
+      /*
+       * LA UBICACION MANDA SOBRE EL ENTORNO. `buildPricingConfig` sigue
+       * leyendo las variables, y eso es deliberado: son el valor de partida
+       * de una instalacion nueva y el ultimo recurso si la base no responde.
+       * Pero en cuanto hay una guardada, es la que decide, y tiene que
+       * decidir aqui y no en cada servicio: la distancia, las zonas y el
+       * centro del mapa se miden todos desde el mismo punto o el mapa acaba
+       * diciendo una cosa y la factura otra.
+       */
+      baseOfOperations: base,
       /*
        * LA VERSION VIENE DE LAS TARIFAS, no del codigo. Es lo que se guarda
        * en cada cotizacion y en cada reserva, y lo que permite volver a
@@ -63,11 +77,11 @@ export class PricingConfigService {
    * guardada, que le pasa a cualquier cotizacion anterior a esta etapa cuya
    * tabla nunca llego a escribirse.
    *
-   * EL AREA DE SERVICIO NO SE RECONSTRUYE, y hay que decirlo: las zonas no
-   * se versionan, asi que esto reproduce los PRECIOS de entonces con las
-   * zonas de HOY. Para revisar una factura es lo que importa —el recargo
-   * por zona ya esta escrito en la reserva—, pero no es un viaje completo
-   * en el tiempo.
+   * EL AREA DE SERVICIO Y LA UBICACION NO SE RECONSTRUYEN, y hay que
+   * decirlo: ninguna de las dos se versiona, asi que esto reproduce los
+   * PRECIOS de entonces con las zonas y la sede de HOY. Para revisar una
+   * factura es lo que importa —la distancia y la zona ya estan escritas en
+   * la reserva—, pero no es un viaje completo en el tiempo.
    */
   async atVersion(version: string): Promise<PricingConfig | null> {
     const tarifas = await this.rates.atVersion(version);
@@ -76,6 +90,7 @@ export class PricingConfigService {
     return {
       ...applyPricingRates(buildPricingConfig(this.config), tarifas),
       version,
+      baseOfOperations: await this.ubicacion.get(),
       zones: await this.serviceArea.zoneRules(),
     };
   }

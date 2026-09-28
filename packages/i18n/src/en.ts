@@ -439,6 +439,42 @@ export const en = {
     },
 
     /* ----------------------- Area de servicio ----------------------- */
+    /* ------------------------- Ubicación de la empresa ------------------------- */
+    /**
+     * ES EL ORIGEN DESDE EL QUE SE MIDE TODO. Los textos lo dicen sin
+     * rodeos: quien abre esta pantalla tiene que entender, antes de tocar
+     * nada, que mover el punto mueve el precio de cada reserva posterior.
+     */
+    location: {
+      title: 'Company location',
+      intro:
+        'Everything is measured from here: the distance on every quote, the travel miles we charge, and the centre of the map on the website.',
+      onlyFuture:
+        'Anything already booked does not change: each booking stores the distance it was calculated with. This affects quotes from now on.',
+
+      pickTitle: 'Mark the spot on the map',
+      pickHelp:
+        'Click the map to place the base. It is safer than typing coordinates: one wrong sign sends it to another continent.',
+      mapDescription:
+        'Map of the State of Georgia showing the company location and the radius with no travel surcharge.',
+      radiusNote: 'The circle is the {{miles}} miles with no travel charge.',
+
+      latitude: 'Latitude',
+      longitude: 'Longitude',
+      city: 'City',
+      postalCode: 'ZIP code',
+      postalCodeNote: 'The ZIP code is what the engine measures from to reach each customer.',
+
+      save: 'Save location',
+      saved: 'Location saved. New quotes are measured from here.',
+      lastChanged: 'Moved by {{who}} on {{when}}',
+
+      errOutsideGeorgia:
+        'That point is outside Georgia. The company operates in this state only: pick a point inside it.',
+      errNotNumbers: 'Check the latitude and longitude: one of them is not a number.',
+      errInvalid: 'Check the details: something is missing, or the ZIP code is not five digits.',
+    },
+
     serviceArea: {
       title: 'Service area',
       intro:
@@ -714,6 +750,9 @@ export const en = {
         },
         service_area: {
           updated: 'Service area changed',
+        },
+        company_location: {
+          updated: 'Company location moved',
         },
         pricing: {
           updated: 'Rates changed',

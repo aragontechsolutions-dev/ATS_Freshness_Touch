@@ -5,13 +5,18 @@ import { DistanceService } from './distance.service';
 import { DISTANCE_PROVIDER, type DistanceProvider } from './distance.types';
 import { GoogleDistanceProvider } from './providers/google-distance.provider';
 import { MockDistanceProvider } from './providers/mock-distance.provider';
+import { SettingsModule } from '../settings/settings.module';
 
 /**
  * Selecciona el proveedor de distancia segun DISTANCE_PROVIDER.
  * Es el unico punto del sistema que conoce ambas implementaciones.
+ *
+ * Importa `SettingsModule` porque el origen de la medida ya no es una
+ * variable de entorno: es la ubicacion que administracion guarda desde el
+ * panel.
  */
 @Module({
-  imports: [ConfigModule],
+  imports: [ConfigModule, SettingsModule],
   providers: [
     {
       provide: DISTANCE_PROVIDER,

@@ -64,23 +64,39 @@ pierde un cliente que sí se podía atender.
 
 ## 3. Las zonas de partida
 
-Tres bandas desde la Etapa 2.23. Antes eran cinco anillos con recargo propio;
-el porqué del cambio está en `docs/21-modelo-de-operaciones.md` §2.
+**Dos zonas desde la Etapa 2.26.** Eran cinco anillos con recargo propio,
+luego tres bandas, y ahora quedan dos.
 
-| Zona           | Hasta      | Traslado               | Precio automático |
-| -------------- | ---------- | ---------------------- | ----------------- |
-| A              | 35 mi      | **No se cobra**        | Sí                |
-| B              | 60 mi      | Por milla desde las 35 | Sí                |
-| C              | **325 mi** | Se calcula en persona  | **No**            |
-| `OUT_OF_RANGE` | más allá   | —                      | No se atiende     |
+| Zona           | Hasta      | Traslado              | Precio automático |
+| -------------- | ---------- | --------------------- | ----------------- |
+| A              | 35 mi      | **No se cobra**       | Sí                |
+| C              | **325 mi** | Se calcula en persona | **No**            |
+| `OUT_OF_RANGE` | más allá   | —                     | No se atiende     |
 
 **Las 35 millas de la zona A son el radio sin recargo**, y no es casualidad:
 la frontera que el cliente nota es «me cobras el viaje o no», así que la zona
 y el radio tienen que coincidir. El día que se muevan por separado, el mapa
 dirá una cosa y la factura otra.
 
-`D` y `E` siguen en el enumerado aunque el área de partida ya no las use:
-**están escritas en reservas que ya existen**.
+### Por qué falta la B, y por qué no se renombró la C
+
+Eran 60 millas con precio automático, y dejó de decidir nada en cuanto el
+traslado pasó a cobrarse **por milla desde las 35**: una banda intermedia ya
+no cambiaba ni lo que se cobra ni lo que se promete.
+
+La tentación era renombrar la C a B para que fueran seguidas. **No se hizo:**
+el código de zona **se guarda en cada reserva**, y hay reservas antiguas con
+zona B que significan «hasta 60 millas, con precio automático». Si B pasara a
+ser «el resto de Georgia, a mano», una consulta sobre el pasado mezclaría
+trabajos a 50 millas con trabajos a 250 y nada avisaría de la mezcla.
+
+Por eso la regla del contrato pasó de «en orden y **sin saltos**» a «en
+orden», permitiendo huecos. Lo que se sigue impidiendo es **repetir un código
+o ponerlos al revés**, que es lo que de verdad rompería la resolución de
+zonas.
+
+`B`, `D` y `E` siguen en el enumerado aunque el área de partida ya no las
+use: **están escritas en reservas que ya existen**.
 
 `OUT_OF_RANGE` **no se configura desde el panel**, y es deliberado: no es una
 zona, es lo que hay más allá de la última. Ofrecerla para editar invitaría a
@@ -363,22 +379,79 @@ que en ese caso se dibuja y deja ver dónde se acaba el estado.
 
 ---
 
-## 7. Las coordenadas de la base
+## 7. La ubicación de la empresa
 
-El mapa se centra en `COMPANY_BASE_LATITUDE` / `COMPANY_BASE_LONGITUDE`
-(Atlanta por defecto), que viajan en el catálogo público junto al resto de la
-base de operaciones.
+Es el **origen desde el que se mide todo**: la distancia de cada presupuesto,
+las millas de traslado que se cobran, la zona que se guarda en cada reserva y
+el centro del mapa. Desde la Etapa 2.26 se marca desde el panel, en
+_Configuración → Ubicación de la empresa_.
 
-**Van ahí y no sueltas en el sitio web a propósito:** si se guardaran por
-separado, el día que la empresa se mude el mapa seguiría dibujando círculos
-alrededor del sitio antiguo mientras los precios se calculan desde el nuevo.
-El mapa mentiría, y nadie lo notaría hasta que un cliente reclamara.
+### Por qué salió de las variables de entorno
 
-> **Si la empresa se muda** hay que tocar **dos** sitios: las variables de
-> entorno de la API, y la constante `BASE` de
-> `apps/admin/src/components/ServiceAreaForm.tsx`. El panel no consume el
-> catálogo público, y pedirlo entero para dos números sería una llamada de más
-> en cada apertura.
+Dos motivos, y el segundo ya estaba pasando:
+
+1. Mudarse exigía un redespliegue.
+2. **El mapa del panel llevaba las coordenadas escritas a mano.** Si alguien
+   cambiaba la variable, administración seguía dibujando círculos alrededor
+   del sitio antiguo mientras los precios se calculaban desde el nuevo. La
+   propia documentación avisaba de que había «dos sitios que tocar»; ya no
+   los hay.
+
+### Quién puede verla y moverla
+
+**Solo ADMIN**, tanto para leer como para escribir. Quien mueva este punto
+cambia lo que factura la empresa en cada reserva posterior; coordinación
+mueve la agenda, no la sede.
+
+> **Lo que NO es privado, y conviene saberlo.** Las coordenadas siguen
+> saliendo en el catálogo público, y tienen que salir: el mapa del sitio
+> dibuja el círculo de las 35 millas centrado aquí, y **un círculo en un mapa
+> enseña dónde está su centro** — se puede situar a ojo con un par de millas
+> de error. Lo que es solo de administración es la ficha y poder cambiarla,
+> no el hecho de que el área de servicio tenga un centro visible. Quien
+> quiera el punto exacto fuera del alcance del público tendría que renunciar
+> a dibujar esa zona en el sitio.
+
+### La guardia: el punto tiene que estar dentro de Georgia
+
+Es la regla que de verdad importa, porque **el fallo que atrapa no rompe
+nada**: recentra el área de servicio y recalcula todos los traslados en
+silencio.
+
+| Dedazo                            | A dónde va la sede                            |
+| --------------------------------- | --------------------------------------------- |
+| `+84` en vez de `-84`             | Asia. Todos los clientes quedan fuera de área |
+| Latitud y longitud intercambiadas | El océano Índico                              |
+| Un dígito de más                  | Kansas                                        |
+
+Ninguna de las tres falla por ningún sitio: el sistema sigue cotizando,
+cobrando y facturando. Por eso el contrato las rechaza, y por eso la pantalla
+deja **marcar el punto pulsando en el mapa**, que es la forma de no poder
+cometer ese error.
+
+El estado también se comprueba (`GA`): es la misma verdad dicha dos veces,
+porque el motor usa ese campo para decidir si un cliente queda fuera de
+estado, y puesto mal **ningún** presupuesto de Georgia daría precio.
+
+### Dos fallos que se arreglaron al montarlo
+
+- **El servicio de distancia leía el origen una sola vez al arrancar.** Mover
+  la sede habría recentrado el mapa y las zonas mientras las millas
+  facturadas seguían siendo las de antes. Ahora se pregunta en cada llamada,
+  y **el origen entra en la clave de la caché**: sin eso, lo cacheado desde
+  la sede anterior se seguiría sirviendo durante horas.
+- **El respaldo iba a ser un punto escrito en el código.** Una instalación
+  con `COMPANY_BASE_*` apuntando a otro sitio habría movido la base sola en
+  el primer despliegue. El respaldo son esas variables; el valor del contrato
+  es el último recurso.
+
+### Lo que el proveedor simulado no puede comprobar
+
+`MockDistanceProvider` **ignora el origen**: es una tabla de millas desde el
+centro de Atlanta por prefijo del destino. Mover la sede no cambia lo que
+devuelve, así que no sirve para probar esto. Queda escrito en el propio
+proveedor, y la comprobación se hace en `distance.service.test.ts` con un
+proveedor falso que delata lo que recibe.
 
 ---
 

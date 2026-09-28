@@ -13,6 +13,9 @@ import {
   type NotificationSettings,
   type PricingRates,
   type ServiceAreaSettings,
+  AdminCompanyLocation,
+  CompanyLocation,
+  CompanyLocationSchema,
 } from '@freshness/types';
 import type { Request } from 'express';
 import { ADMIN_ROUTE, CurrentStaff, Roles } from '../auth/auth.decorators';
@@ -22,6 +25,7 @@ import { NotificationSettingsService } from '../notifications/notification-setti
 import { BusinessSettingsService } from '../settings/business-settings.service';
 import { PricingRatesService } from '../settings/pricing-rates.service';
 import { ServiceAreaService } from '../settings/service-area.service';
+import { CompanyLocationService } from '../settings/company-location.service';
 
 /**
  * CONFIGURACION DEL NEGOCIO DESDE EL PANEL
@@ -217,5 +221,51 @@ export class PricingRatesAdminController {
     @Req() request: Request,
   ): Promise<AdminPricingRates> {
     return this.rates.save(rates, staff, request.ip ?? null);
+  }
+}
+
+/**
+ * LA UBICACION DE LA EMPRESA
+ * --------------------------
+ * SOLO ADMINISTRACION, y el motivo es el mismo que el de las tarifas dicho
+ * de otra forma: este punto es el ORIGEN DESDE EL QUE SE MIDE TODO. La
+ * distancia de cada presupuesto, las millas de traslado que se cobran, la
+ * zona que se guarda en cada reserva y el centro del mapa salen de aqui.
+ *
+ * Moverlo unas millas cambia el recargo de todas las casas de la frontera;
+ * moverlo de ciudad cambia el precio de todas. Y no falla por ningun sitio:
+ * el sistema sigue cotizando, cobrando y facturando, desde el sitio
+ * equivocado. Coordinacion mueve la agenda, no la sede.
+ *
+ * QUE NO SE PUEDE HACER DESDE AQUI: poner la base fuera de Georgia. El
+ * contrato lo rechaza, y esa guardia existe para el dedazo —un signo
+ * cambiado deja la empresa en el Tibet y a todos los clientes fuera de
+ * area— mas que para el capricho.
+ */
+@SkipThrottle(SKIP_QUOTE_THROTTLER)
+@Controller(`${ADMIN_ROUTE}/company-location`)
+export class CompanyLocationAdminController {
+  constructor(private readonly ubicacion: CompanyLocationService) {}
+
+  @Get()
+  @Roles('ADMIN')
+  get(): Promise<AdminCompanyLocation> {
+    return this.ubicacion.getForAdmin();
+  }
+
+  /**
+   * PUT y no PATCH: las coordenadas, la ciudad y el codigo postal describen
+   * UN punto. Dejar cambiar la latitud sin la ciudad permitiria guardar una
+   * ficha que se contradice a si misma.
+   */
+  @Put()
+  @Roles('ADMIN')
+  update(
+    @Body(new ZodValidationPipe<CompanyLocation>(CompanyLocationSchema))
+    settings: CompanyLocation,
+    @CurrentStaff() staff: AuthenticatedStaff,
+    @Req() request: Request,
+  ): Promise<AdminCompanyLocation> {
+    return this.ubicacion.save(settings, staff, request.ip ?? null);
   }
 }
