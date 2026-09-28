@@ -17,8 +17,43 @@ Etapa 2.
 
 No basta con la fecha: **la duración decide qué huecos caben**. Una limpieza
 profunda de 2.600 pies cuadrados ocupa cinco horas y no entra donde sí entra
-una rotación de Airbnb de hora y media. Por eso la consulta lleva servicio,
+una estándar de hora y media. Por eso la consulta lleva servicio,
 habitaciones, baños, pies cuadrados y extras.
+
+### Qué pregunta cada paso, y por qué no es lo mismo
+
+|                                                             | Lo pregunta               | Por qué                                                 |
+| ----------------------------------------------------------- | ------------------------- | ------------------------------------------------------- |
+| Servicio, frecuencia, pies cuadrados, código postal, extras | **El cotizador**          | Son los que mueven la cifra                             |
+| **Habitaciones y baños**                                    | **El diálogo de reserva** | No mueven la cifra: mueven **cuánto tiempo se bloquea** |
+
+Habitaciones y baños estaban en el cotizador y se movieron en la Etapa 2.24.
+Ninguno de los dos entra en el precio —la estándar es plana y la profunda y
+la de mudanza miran los pies cuadrados—, así que preguntarlos junto al
+importe alargaba el formulario que genera los ingresos y, peor, hacía creer
+que lo movían: quien lee «3 hab / 2 baños · 185 $» da por hecho que con
+cuatro costaría más, y llama para discutirlo.
+
+**Pero no se podían quitar sin más.** Con una estándar de 3 habitaciones y 2
+baños de 900 pies²:
+
+```
+con ellos:  45 + 3×15 + 2×20 + 0,02×900 = 148 min  →  se reservan 3 h
+sin ellos:  45 +                0,02×900 =  63 min  →  se reservan 1,5 h
+```
+
+La mitad del tiempo. Se solaparían citas y el equipo llegaría tarde al
+cliente siguiente el resto del día. Por eso se piden en el **primer paso de
+la reserva, arriba del todo y antes de la rejilla de horas**: las franjas que
+se ofrecen dependen de ellos, y debajo de la rejilla cambiarlos invalidaría
+la hora recién elegida sin que se entendiera por qué. Cambiarlos suelta la
+franja elegida a propósito.
+
+El campo lleva escrito **«no cambia el precio: nos sirve para reservarte el
+tiempo suficiente»**, que contesta la pregunta obvia antes de que se haga.
+
+Arrancan en 3 y 2 —una casa corriente— porque la primera consulta de agenda
+sale en cuanto se abre el diálogo y sin números no hay duración que calcular.
 
 ## Reglas del flujo
 

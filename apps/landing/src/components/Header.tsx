@@ -99,13 +99,21 @@ export function Header() {
           <Logo size="sm" />
         </a>
 
-        <nav className="hidden items-center gap-6 lg:flex" aria-label={t('nav.menu')}>
+        {/*
+          `whitespace-nowrap` NO ES DECORATIVO. Sin el, cuando la fila se
+          queda sin sitio cada enlace parte su propio texto en dos lineas
+          —«Zonas / de servicio»— y la cabecera parece rota en vez de
+          apretada. Con el, o caben todos o el texto se sale, que es un
+          fallo que se ve en cuanto pasa; el otro pasa desapercibido hasta
+          que alguien manda una captura.
+        */}
+        <nav className="hidden items-center gap-5 lg:flex xl:gap-6" aria-label={t('nav.menu')}>
           {NAV_ITEMS.map((item) => (
             <a
               key={item.href}
               href={item.href}
-              className="text-sm font-medium text-slate-600 transition-colors hover:text-brand-700
-                         dark:text-slate-300 dark:hover:text-brand-300"
+              className="text-sm font-medium whitespace-nowrap text-slate-600 transition-colors
+                         hover:text-brand-700 dark:text-slate-300 dark:hover:text-brand-300"
             >
               {t(item.key)}
             </a>

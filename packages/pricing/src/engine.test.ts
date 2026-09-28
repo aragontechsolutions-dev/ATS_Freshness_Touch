@@ -10,8 +10,8 @@ function buildRequest(overrides: Partial<QuoteRequest> = {}): QuoteRequest {
   return {
     service: 'STANDARD',
     frequency: 'ONE_TIME',
-    bedrooms: 3,
-    bathrooms: 2,
+    // Sin habitaciones ni banos, que es lo que manda el cotizador: el
+    // precio no los mira y por eso dejaron de preguntarse.
     squareFeet: 1800,
     addOns: [],
     destination: { postalCode: '30303', state: 'GA' },
@@ -34,6 +34,40 @@ function buildContext(miles: number, overrides: Partial<QuoteContext> = {}): Quo
     ...overrides,
   };
 }
+
+describe('calculateQuote - que datos entran y cuales no', () => {
+  it('la linea del servicio no nombra habitaciones ni banos', () => {
+    /*
+     * Ninguno de los dos mueve la cifra, y leerlos junto al importe hace
+     * pensar que si: quien ve «3 hab / 2 banos · 185 $» da por hecho que
+     * con cuatro costaria mas, y llama para discutirlo.
+     */
+    const quote = calculateQuote(buildRequest(), buildContext(10));
+    const linea = quote.lines.find((item) => item.kind === 'SERVICE_BASE');
+
+    expect(linea?.labelParams).toEqual({ squareFeet: 1800, frequency: 'ONE_TIME' });
+  });
+
+  it('el presupuesto devuelto tampoco los lleva', () => {
+    // Devolver un numero que quiza no se recibio seria inventarselo.
+    const quote = calculateQuote(buildRequest(), buildContext(10));
+
+    expect(quote.input).not.toHaveProperty('bedrooms');
+    expect(quote.input).not.toHaveProperty('bathrooms');
+  });
+
+  it('si llegan de todas formas, el precio no se mueve', () => {
+    /*
+     * Una pestana abierta con el paquete anterior los sigue mandando. El
+     * contrato los admite, y aqui se comprueba que ademas no hacen nada:
+     * admitirlos y que cambiaran el precio seria peor que rechazarlos.
+     */
+    const sin = calculateQuote(buildRequest(), buildContext(10));
+    const con = calculateQuote(buildRequest({ bedrooms: 12, bathrooms: 12 }), buildContext(10));
+
+    expect(con.totals.totalCents).toBe(sin.totals.totalCents);
+  });
+});
 
 describe('calculateQuote - servicio base', () => {
   it('la estandar es plana: 185 dolares, mire el tamano que mire', () => {

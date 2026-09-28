@@ -1,23 +1,38 @@
 import { useTranslation } from 'react-i18next';
 import type { AvailabilitySlot, Locale } from '@freshness/types';
 import { useAvailability } from '../../hooks/useAvailability';
+import { useCatalog } from '../../hooks/useCatalog';
 import type { AvailabilityQuery } from '../../lib/api';
 import { addDays, formatDuration, formatTime, todayInTimezone } from '../../lib/format';
+import { NumberField } from '../NumberField';
 
 /** Zona horaria de la empresa mientras no venga de la configuracion. */
 const TIMEZONE = 'America/New_York';
 
 interface ScheduleStepProps {
   query: Omit<AvailabilityQuery, 'date'>;
+  /** Habitaciones y banos: fijan cuanto dura el trabajo, no lo que cuesta. */
+  property: { bedrooms: number; bathrooms: number };
   date: string;
   slot: string | null;
   locale: Locale;
+  onPropertyChange: (cambio: Partial<{ bedrooms: number; bathrooms: number }>) => void;
   onDateChange: (date: string) => void;
   onSlotChange: (slot: string | null) => void;
 }
 
 /**
- * PASO 1: DIA Y HORA
+ * PASO 1: LA CASA, EL DIA Y LA HORA
+ *
+ * AQUI SE PREGUNTAN HABITACIONES Y BANOS, y no en el cotizador, porque no
+ * cambian el precio: cambian cuanto dura el trabajo. Preguntarlos junto al
+ * precio hacia creer que lo movian —«3 hab / 2 banos · 185 $» invita a pensar
+ * que con cuatro costaria mas— y alargaba el formulario que genera los
+ * ingresos con dos datos que no lo tocan.
+ *
+ * Van ARRIBA DEL TODO y no al final: las franjas que se ofrecen dependen de
+ * ellos. Debajo de la rejilla, cambiarlos invalidaria la hora recien elegida
+ * y nadie entenderia por que.
  *
  * Las franjas no disponibles se muestran igualmente, apagadas y con el motivo.
  * Ocultarlas dejaria un hueco inexplicable en la rejilla y la sensacion de que
@@ -25,19 +40,43 @@ interface ScheduleStepProps {
  */
 export function ScheduleStep({
   query,
+  property,
   date,
   slot,
   locale,
+  onPropertyChange,
   onDateChange,
   onSlotChange,
 }: ScheduleStepProps) {
   const { t } = useTranslation();
   const { data, loading, errorKey } = useAvailability({ ...query, date });
+  const { catalog } = useCatalog();
+  const limits = catalog?.limits;
 
   const hoy = todayInTimezone(TIMEZONE);
 
   return (
     <div className="space-y-5">
+      <div className="grid gap-4 sm:grid-cols-2">
+        <NumberField
+          id="booking-bedrooms"
+          label={t('calculator.bedroomsLabel')}
+          value={property.bedrooms}
+          min={limits?.bedrooms.min ?? 0}
+          max={limits?.bedrooms.max ?? 12}
+          help={t('booking.schedule.sizeHelp')}
+          onChange={(value) => onPropertyChange({ bedrooms: value })}
+        />
+        <NumberField
+          id="booking-bathrooms"
+          label={t('calculator.bathroomsLabel')}
+          value={property.bathrooms}
+          min={limits?.bathrooms.min ?? 0}
+          max={limits?.bathrooms.max ?? 12}
+          onChange={(value) => onPropertyChange({ bathrooms: value })}
+        />
+      </div>
+
       <div>
         <label className="ft-label" htmlFor="booking-date">
           {t('booking.schedule.dateLabel')}

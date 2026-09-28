@@ -22,11 +22,18 @@ export const en = {
     theme: { light: 'Light mode', dark: 'Dark mode' },
   },
 
+  /*
+   * LAS ETIQUETAS DEL MENU SON MAS CORTAS QUE LOS TITULOS DE SECCION, y es
+   * deliberado: en la cabecera compiten por sitio con el logotipo, el
+   * telefono, el idioma y el tema, y el contenedor no pasa de 1152 px.
+   * «Zonas» en el menu y «Zonas de servicio» como titulo dicen lo mismo, y
+   * el titulo es donde hace falta la frase entera.
+   */
   nav: {
     services: 'Services',
     scope: "What's included",
-    quote: 'Instant quote',
-    areas: 'Service areas',
+    quote: 'Quote',
+    areas: 'Areas',
     whyUs: 'Why us',
     faq: 'FAQ',
     contact: 'Contact',
@@ -824,14 +831,20 @@ export const en = {
     next: 'Continue',
     stepOf: 'Step {{current}} of {{total}}',
     steps: {
-      schedule: 'Date & time',
+      schedule: 'Home & time',
       details: 'Your details',
       payment: 'Card',
     },
 
     /* ------------------------- 1. Fecha y hora ------------------------- */
     schedule: {
-      title: 'Pick a date and time',
+      title: 'Your home, the day and the time',
+      /**
+       * POR QUE SE PIDEN AQUI Y NO EN EL COTIZADOR. No cambian el precio,
+       * cambian cuánto dura el trabajo. Decirlo evita la pregunta obvia
+       * —«¿y esto qué me cuesta?»— y justifica que se pidan ahora.
+       */
+      sizeHelp: 'This does not change the price: it tells us how much time to set aside.',
       dateLabel: 'Date',
       loading: 'Checking availability…',
       closed: 'We are closed that day. Please pick another one.',
@@ -931,15 +944,19 @@ export const en = {
   },
   quote: {
     line: {
+      /*
+       * LA LINEA DICE LO QUE ENTRA EN EL PRECIO, Y NADA MAS. Antes nombraba
+       * habitaciones y banos; ninguno de los dos mueve la cifra, y leerlos
+       * junto al importe hace pensar que con una habitacion mas costaria
+       * mas. Los presupuestos guardados siguen pintandose bien: sus
+       * parametros de sobra se ignoran al traducir.
+       */
       service: {
-        STANDARD: 'Standard cleaning · {{bedrooms}} bd / {{bathrooms}} ba · {{squareFeet}} sq ft',
-        DEEP: 'Deep cleaning · {{bedrooms}} bd / {{bathrooms}} ba · {{squareFeet}} sq ft',
-        MOVE_IN_OUT:
-          'Move in / move out · {{bedrooms}} bd / {{bathrooms}} ba · {{squareFeet}} sq ft',
-        POST_CONSTRUCTION:
-          'Post-construction · {{bedrooms}} bd / {{bathrooms}} ba · {{squareFeet}} sq ft',
-        AIRBNB_TURNOVER:
-          'Airbnb turnover · {{bedrooms}} bd / {{bathrooms}} ba · {{squareFeet}} sq ft',
+        STANDARD: 'Standard cleaning · {{squareFeet}} sq ft',
+        DEEP: 'Deep cleaning · {{squareFeet}} sq ft',
+        MOVE_IN_OUT: 'Move in / move out · {{squareFeet}} sq ft',
+        POST_CONSTRUCTION: 'Post-construction · {{squareFeet}} sq ft',
+        AIRBNB_TURNOVER: 'Airbnb turnover · {{squareFeet}} sq ft',
         COMMERCIAL: 'Commercial cleaning',
       },
       addOn: {
