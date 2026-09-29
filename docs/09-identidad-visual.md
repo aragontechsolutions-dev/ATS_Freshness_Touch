@@ -141,6 +141,82 @@ tejado blanco) es brillante y la marca se reconoce sin dificultad.
 Regla: **un solo botón amarillo por pantalla visible.** Si hay dos, ninguno
 destaca y se pierde su función.
 
+## Iconografía
+
+Los iconos son **SVG escritos a mano dentro del repositorio**, no una librería.
+La razón es la de siempre: no arrastrar una dependencia entera —y su peso— por
+unos pocos símbolos. Viven en dos archivos del sitio público:
+
+| Archivo                       | Qué contiene                                                     |
+| ----------------------------- | ---------------------------------------------------------------- |
+| `components/Icons.tsx`        | Los de interfaz: teléfono, correo, escudo, idioma, menú, flecha… |
+| `components/ServiceIcons.tsx` | Los seis de los servicios, más el mapa `ICONO_POR_SERVICIO`      |
+
+### El contrato del dibujo
+
+Todos cumplen lo mismo, y hay una prueba que lo comprueba
+(`ServiceIcons.test.tsx`):
+
+- `viewBox="0 0 24 24"` — la misma rejilla para todos. Uno con otra rejilla se
+  vería de distinto grosor al lado de los demás.
+- `stroke="currentColor"` y `fill="none"` — **el color no se escribe dentro del
+  icono**. Lo hereda de quien lo usa. Un `#145788` metido en un `path`
+  rompería el modo oscuro en silencio: el icono seguiría pintándose, pero del
+  color equivocado sobre una superficie aclarada.
+- Trazo `1.8`.
+- `aria-hidden="true"` — son decorativos. La tarjeta o el botón que los
+  acompaña ya lleva su texto de verdad; anunciar «pulverizador» antes de
+  «Limpieza estándar» sería repetir con menos precisión.
+- El tamaño se manda desde fuera, por `className`.
+
+### Un icono por servicio, y que no se pueda olvidar
+
+| Servicio            | Símbolo              | Por qué ese                                 |
+| ------------------- | -------------------- | ------------------------------------------- |
+| `STANDARD`          | Pulverizador         | La herramienta del día a día                |
+| `DEEP`              | Cepillo de cerdas    | Lo que se usa cuando no basta pasar un paño |
+| `MOVE_IN_OUT`       | Caja de mudanza      | La vivienda vacía                           |
+| `AIRBNB_TURNOVER`   | Cama hecha           | El entregable de una rotación               |
+| `POST_CONSTRUCTION` | Casco de obra        | Símbolo universal de que aún hay obra       |
+| `COMMERCIAL`        | Edificio de oficinas | Un edificio, no una casa                    |
+
+`ICONO_POR_SERVICIO` es un `Record<ServiceType, …>` **completo a propósito**:
+añadir un servicio al catálogo y olvidar su icono **no compila**. Si fuese un
+objeto parcial, el servicio nuevo saldría en producción con un hueco en blanco
+y nadie se enteraría hasta que lo viese un cliente.
+
+### La placa de color, y por qué el azul cambia de tono
+
+El símbolo no va suelto sobre la tarjeta: va sobre una **placa de color sólido
+de 44×44**. Un trazo de una línea flotando sobre una tarjeta blanca se pierde;
+sobre una placa sólida es lo primero que se ve.
+
+| Modo   | Placa                 | Símbolo | Símbolo sobre placa | Placa sobre tarjeta |
+| ------ | --------------------- | ------- | ------------------- | ------------------- |
+| Claro  | `brand-700` `#145788` | Blanco  | **7.64:1**          | **7.64:1**          |
+| Oscuro | `brand-500` `#2a73a9` | Blanco  | **5.09:1**          | **3.25:1**          |
+
+El azul oficial **no puede usarse en oscuro**: sobre la tarjeta `#1b1f24` da
+**2.17:1**, por debajo del 3:1 que se exige a un elemento gráfico, y la placa
+se desdibuja dentro de la tarjeta. Por eso se aclara al 500, que es la misma
+regla que ya gobierna los botones.
+
+**El amarillo se descartó a propósito**, aunque medía de sobra (11.62:1 el
+símbolo y 10.19:1 la placa): es el color del botón de acción, y la regla de un
+solo amarillo por pantalla visible manda. Seis placas amarillas en la
+cuadrícula de servicios le quitarían el sitio al presupuesto gratis.
+
+### Qué había antes, y por qué se cambió
+
+Las seis tarjetas de servicios llevaban **la misma imagen**: el girasol de la
+marca, un `.webp` de 14 kB repetido seis veces. Un adorno repetido no distingue
+una limpieza estándar de una post-obra; ocupaba el sitio donde debía haber
+información y no decía nada. El archivo se retiró del repositorio al quedarse
+sin uso, y la página ya no descarga esa imagen.
+
+La prueba que cierra la puerta a que vuelva a pasar no comprueba que los iconos
+existan, sino que **los seis dibujan seis cosas distintas**.
+
 ## Interfaz pensada primero para móvil
 
 La mayoría del tráfico de un servicio de limpieza es móvil, así que el ancho de

@@ -2,7 +2,7 @@
  * Iconos en linea (SVG). Se evita una libreria de iconos para no anadir
  * dependencias ni peso al bundle por unos pocos simbolos.
  */
-interface IconProps {
+export interface IconProps {
   className?: string;
 }
 
