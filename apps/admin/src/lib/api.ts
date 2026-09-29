@@ -41,8 +41,11 @@ import {
   type ServiceAreaSettings,
   type AuthenticatedStaff,
   AdminCompanyLocationSchema,
+  AdminSiteCopySchema,
   type AdminCompanyLocation,
+  type AdminSiteCopy,
   type CompanyLocation,
+  type SiteCopy,
 } from '@freshness/types';
 import { auth } from './supabase';
 
@@ -499,6 +502,48 @@ export function saveCompanyLocation(settings: CompanyLocation): Promise<AdminCom
       return parsed.data;
     },
     { method: 'PUT', body: settings },
+  );
+}
+
+/* ------------------------------------------------------------------------ */
+/*  Textos de la web. Solo administracion.                                   */
+/* ------------------------------------------------------------------------ */
+
+const TEXTOS = '/admin/site-copy';
+
+/**
+ * Las promesas y las preguntas frecuentes que la empresa ha reescrito.
+ *
+ * Solo administracion, TAMBIEN PARA LEER. El texto en si es publico —sale
+ * impreso en la portada—, pero esta respuesta trae ademas quien lo escribio
+ * y cuando, que es informacion interna. Y sobre todo: quien puede abrir esta
+ * pantalla puede cambiar lo que la empresa promete por escrito a todo el que
+ * entre en la web.
+ */
+export function fetchSiteCopy(): Promise<AdminSiteCopy> {
+  return request(TEXTOS, (payload) => {
+    const parsed = AdminSiteCopySchema.safeParse(payload);
+    if (!parsed.success) throw contractError(TEXTOS, parsed.error.issues);
+    return parsed.data;
+  });
+}
+
+/**
+ * Guarda los textos enteros de una vez.
+ *
+ * No por campos: las promesas se contradicen entre si. Cambiar la garantia a
+ * 48 horas obliga a tocar tambien la pregunta frecuente que la menciona, y
+ * mandarlo junto es lo que garantiza que entren las dos o no entre ninguna.
+ */
+export function saveSiteCopy(copy: SiteCopy): Promise<AdminSiteCopy> {
+  return request(
+    TEXTOS,
+    (payload) => {
+      const parsed = AdminSiteCopySchema.safeParse(payload);
+      if (!parsed.success) throw contractError('guardado de los textos', parsed.error.issues);
+      return parsed.data;
+    },
+    { method: 'PUT', body: copy },
   );
 }
 

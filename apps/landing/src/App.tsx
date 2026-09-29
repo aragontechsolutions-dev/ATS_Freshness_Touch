@@ -10,6 +10,7 @@ import { ServiceAreas } from './sections/ServiceAreas';
 import { Faq } from './sections/Faq';
 import { Contact } from './sections/Contact';
 import { BusinessSettingsProvider } from './hooks/useBusinessSettings';
+import { SiteCopyProvider } from './hooks/useSiteCopy';
 
 export default function App() {
   return (
@@ -19,19 +20,26 @@ export default function App() {
      * cada sitio donde sale el telefono, que son siete.
      */
     <BusinessSettingsProvider>
-      <Header />
-      <main className="pb-20 sm:pb-0">
-        <Hero />
-        <Services />
-        <ScopeOfWork />
-        <QuoteCalculator />
-        <WhyUs />
-        <ServiceAreas />
-        <Faq />
-        <Contact />
-      </main>
-      <Footer />
-      <StickyMobileCta />
+      {/*
+        Los textos editables se leen tambien una sola vez y se reparten desde
+        aqui, por lo mismo: dos secciones los usan, y una peticion por
+        seccion serian dos peticiones para la misma respuesta.
+      */}
+      <SiteCopyProvider>
+        <Header />
+        <main className="pb-20 sm:pb-0">
+          <Hero />
+          <Services />
+          <ScopeOfWork />
+          <QuoteCalculator />
+          <WhyUs />
+          <ServiceAreas />
+          <Faq />
+          <Contact />
+        </main>
+        <Footer />
+        <StickyMobileCta />
+      </SiteCopyProvider>
     </BusinessSettingsProvider>
   );
 }

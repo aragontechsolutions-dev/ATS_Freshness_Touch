@@ -146,6 +146,20 @@ const ACCIONES_FIJAS = [
    * leyendo cincuenta cambios de telefono.
    */
   'pricing.updated',
+  /**
+   * Cambiaron los textos que el sitio publica: las promesas y las preguntas
+   * frecuentes.
+   *
+   * Accion propia porque lo que se edita aqui son COMPROMISOS —el seguro, la
+   * verificacion de antecedentes, la garantia, el plazo para cancelar—, y
+   * ante una reclamacion la pregunta es «que prometia la web el dia que este
+   * cliente reservo». Mezclado con los cambios de telefono, eso no se
+   * responde.
+   *
+   * La metadata guarda que claves cambiaron y sus valores. No hay nada
+   * secreto: es texto escrito para publicarse.
+   */
+  'site_copy.updated',
 
   /* --- Lecturas de datos sensibles ------------------------------------- */
   /** Alguien abrio la ficha completa de una reserva, con datos del cliente. */

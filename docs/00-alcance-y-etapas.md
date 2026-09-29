@@ -159,6 +159,12 @@ Progreso:
   traslado, las millas reales por encima de las 35 incluidas en vez de
   franjas con escalón. El sitio dice además **qué no se limpia**, que es de
   donde salen casi todas las quejas.
+- ✅ **Los textos del sitio salen del código** (`docs/22-textos-editables.md`):
+  las promesas y las preguntas frecuentes se reescriben desde el panel, en
+  inglés y en español. Son compromisos, no adornos, así que van con las
+  mismas guardias que las tarifas: solo administración, auditoría con acción
+  propia y el texto nuevo, y el texto se pinta siempre **como texto**, nunca
+  como HTML.
 - ⬜ Avisos por SMS.
 - Calendario de disponibilidad y reserva en línea.
 - **Stripe**: retención del depósito con `capture_method: 'manual'` al reservar y
@@ -171,10 +177,14 @@ Progreso:
     (`docs/13-panel-y-permisos.md` §12). El horario que se guarda es además el
     que usa el motor de agenda, así que no puede desajustarse de lo que se
     anuncia.
-  - ⬜ Textos y afirmaciones del sitio que deben mantenerse veraces
-    (seguros, verificación de antecedentes, garantía). Hoy viven en
-    `packages/i18n`, así que cambiarlos exige un despliegue. **Es lo único
-    que queda para cerrar la configuración por completo.**
+  - ✅ Textos y afirmaciones del sitio que deben mantenerse veraces: hechos
+    en la Etapa 2.28 (`docs/22-textos-editables.md`). Las cuatro promesas
+    —seguro, verificación de antecedentes, precios transparentes y garantía—
+    y las seis preguntas frecuentes se editan desde el panel, **en los dos
+    idiomas**, y la pantalla avisa si uno se queda a medias: una garantía que
+    dijera 24 horas en inglés y 48 en español es un problema de verdad. Lo
+    que no se escriba conserva el texto del código. **Con esto la
+    configuración queda cerrada.**
   - ✅ Zona de servicio: hecha en la Etapa 2.18
     (`docs/17-area-de-servicio.md`) y replanteada en la 2.23
     (`docs/21-modelo-de-operaciones.md` §2). Son tres bandas —dentro del

@@ -16,6 +16,9 @@ import {
   AdminCompanyLocation,
   CompanyLocation,
   CompanyLocationSchema,
+  AdminSiteCopy,
+  SiteCopy,
+  SiteCopySchema,
 } from '@freshness/types';
 import type { Request } from 'express';
 import { ADMIN_ROUTE, CurrentStaff, Roles } from '../auth/auth.decorators';
@@ -26,6 +29,7 @@ import { BusinessSettingsService } from '../settings/business-settings.service';
 import { PricingRatesService } from '../settings/pricing-rates.service';
 import { ServiceAreaService } from '../settings/service-area.service';
 import { CompanyLocationService } from '../settings/company-location.service';
+import { SiteCopyService } from '../settings/site-copy.service';
 
 /**
  * CONFIGURACION DEL NEGOCIO DESDE EL PANEL
@@ -267,5 +271,53 @@ export class CompanyLocationAdminController {
     @Req() request: Request,
   ): Promise<AdminCompanyLocation> {
     return this.ubicacion.save(settings, staff, request.ip ?? null);
+  }
+}
+
+/**
+ * LOS TEXTOS DE LA WEB DESDE EL PANEL
+ * -----------------------------------
+ * SOLO ADMINISTRACION, tambien para leer, y aqui el motivo es mas fuerte que
+ * en ninguna otra pantalla de configuracion.
+ *
+ * Lo que se edita aqui no son ajustes: son COMPROMISOS. "Estamos asegurados",
+ * "todo el equipo pasa verificacion de antecedentes", "si no quedas conforme
+ * volvemos en 24 horas". Quien pueda cambiarlos puede hacer que la empresa
+ * prometa por escrito, a todo el que entre en la web, algo que no piensa
+ * cumplir —o borrar una promesa que si cumple y perder ventas—. Eso no tiene
+ * nada que ver con coordinar una agenda, que es lo que hace coordinacion.
+ *
+ * Leer tambien queda restringido por lo de siempre: el texto es publico, pero
+ * esta pantalla dice ademas quien lo escribio y cuando. Quien solo necesita
+ * el texto lo tiene en el endpoint publico, sin sesion.
+ */
+@SkipThrottle(SKIP_QUOTE_THROTTLER)
+@Controller(`${ADMIN_ROUTE}/site-copy`)
+export class SiteCopyAdminController {
+  constructor(private readonly copy: SiteCopyService) {}
+
+  @Get()
+  @Roles('ADMIN')
+  get(): Promise<AdminSiteCopy> {
+    return this.copy.getForAdmin();
+  }
+
+  /**
+   * PUT y no PATCH: se manda el conjunto entero.
+   *
+   * Las promesas se reescriben en tandas, porque se contradicen entre si. Si
+   * se cambia la garantia a 48 horas hay que tocar tambien la pregunta
+   * frecuente que la menciona, y mandarlo todo junto es lo que garantiza que
+   * las dos entren o no entre ninguna. Con parches independientes, la web
+   * podria quedarse prometiendo 48 horas en la tarjeta y 24 en el FAQ.
+   */
+  @Put()
+  @Roles('ADMIN')
+  update(
+    @Body(new ZodValidationPipe<SiteCopy>(SiteCopySchema)) copy: SiteCopy,
+    @CurrentStaff() staff: AuthenticatedStaff,
+    @Req() request: Request,
+  ): Promise<AdminSiteCopy> {
+    return this.copy.save(copy, staff, request.ip ?? null);
   }
 }

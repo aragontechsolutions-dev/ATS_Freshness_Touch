@@ -8,6 +8,7 @@ export * from './payment';
 export * from './booking-transitions';
 export * from './admin';
 export * from './business-settings';
+export * from './site-copy';
 export * from './service-area';
 export * from './georgia-outline';
 export * from './company-location';
