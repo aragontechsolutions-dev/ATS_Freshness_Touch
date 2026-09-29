@@ -8,6 +8,7 @@ import './styles.css';
 import './i18n';
 import App from './App';
 import { ToastProvider } from './components/ToastProvider';
+import { UpdatePrompt } from './components/UpdatePrompt';
 
 const container = document.getElementById('root');
 if (!container) {
@@ -23,6 +24,13 @@ createRoot(container).render(
     */}
     <ToastProvider>
       <App />
+      {/*
+        El aviso de version nueva va FUERA de <App> y al final, por lo mismo
+        que los avisos envuelven todo: puede aparecer estando en la pantalla
+        de acceso, y una version vieja del panel es justo lo que conviene
+        renovar antes de empezar a trabajar.
+      */}
+      <UpdatePrompt />
     </ToastProvider>
   </StrictMode>,
 );

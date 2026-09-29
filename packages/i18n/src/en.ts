@@ -445,6 +445,11 @@ export const en = {
      * rodeos: quien abre esta pantalla tiene que entender, antes de tocar
      * nada, que mover el punto mueve el precio de cada reserva posterior.
      */
+    pwa: {
+      updateAvailable: 'A new version of the panel is ready',
+      updateNow: 'Update',
+      updateLater: 'Later',
+    },
     siteCopy: {
       title: 'Website wording',
       intro:
