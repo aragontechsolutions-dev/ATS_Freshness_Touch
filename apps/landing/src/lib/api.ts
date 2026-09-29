@@ -3,6 +3,7 @@ import {
   ApiErrorSchema,
   AvailabilityResponseSchema,
   BusinessSettingsSchema,
+  SiteCopySchema,
   BookingResponseSchema,
   CatalogResponseSchema,
   MockPaymentConfirmResponseSchema,
@@ -11,6 +12,7 @@ import {
   type AvailabilityResponse,
   type BookingRequestInput,
   type BusinessSettings,
+  type SiteCopy,
   type BookingResponse,
   type CatalogResponse,
   type MockPaymentConfirmRequestInput,
@@ -266,6 +268,26 @@ export function fetchBusinessSettings(signal?: AbortSignal): Promise<BusinessSet
     const parsed = BusinessSettingsSchema.safeParse(payload);
     if (!parsed.success) {
       console.error('[Freshness Touch] Configuracion del negocio inesperada:', parsed.error.issues);
+      throw new ApiClientError('BAD_CONTRACT', 'calculator.errorGeneric');
+    }
+    return parsed.data;
+  });
+}
+
+/**
+ * Los textos que la empresa ha reescrito desde el panel.
+ *
+ * Solo vienen los CONFIGURADOS: una clave que la empresa no ha tocado
+ * simplemente no esta, y el sitio usa la suya. Que la API no devuelva los
+ * veinte textos ya resueltos es deliberado: si lo hiciera, las traducciones
+ * del sitio vivirian en el servidor y corregir una errata de la portada
+ * exigiria desplegar la API.
+ */
+export function fetchSiteCopy(signal?: AbortSignal): Promise<SiteCopy> {
+  return request('/site-copy', { method: 'GET', signal }, (payload) => {
+    const parsed = SiteCopySchema.safeParse(payload);
+    if (!parsed.success) {
+      console.error('[Freshness Touch] Textos del sitio inesperados:', parsed.error.issues);
       throw new ApiClientError('BAD_CONTRACT', 'calculator.errorGeneric');
     }
     return parsed.data;

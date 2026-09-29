@@ -448,6 +448,39 @@ export const es: TranslationResources = {
      * rodeos: quien abre esta pantalla tiene que entender, antes de tocar
      * nada, que mover el punto mueve el precio de cada reserva posterior.
      */
+    siteCopy: {
+      title: 'Textos de la web',
+      intro:
+        'Las promesas y las preguntas frecuentes que publica la web. Son compromisos, no adorno: lo que escribas aquí es lo que un cliente te va a reclamar.',
+      onlyNew:
+        'Cambiar el texto no cambia lo que se le prometió a quien ya reservó. Su correo de confirmación conserva lo que decía.',
+      promises: 'Nuestras promesas',
+      promisesHelp: 'Las cuatro tarjetas de «Por qué Freshness Touch».',
+      faq: 'Preguntas frecuentes',
+      faqHelp: 'Las seis preguntas del final de la página.',
+      fieldTitle: 'Título',
+      fieldBody: 'Texto',
+      fieldQuestion: 'Pregunta',
+      fieldAnswer: 'Respuesta',
+      english: 'Inglés',
+      spanish: 'Español',
+      current: 'Ahora en el sitio',
+      placeholder: 'Déjalo vacío para conservar el texto de arriba',
+      charCount: '{{count}} de {{max}}',
+      tooLong: 'Te pasas por {{count}}',
+      halfDone_one: 'Hay {{count}} texto escrito en un solo idioma',
+      halfDone_other: 'Hay {{count}} textos escritos en un solo idioma',
+      halfDoneHelp:
+        'Quien visite el sitio en el otro idioma verá el texto original, así que la web prometerá dos cosas distintas. Rellena los dos, o vacía los dos.',
+      halfDoneHere: 'Falta en el otro idioma',
+      save: 'Guardar textos',
+      saved: 'Textos guardados.',
+      reset: 'Deshacer los cambios',
+      errInvalid: 'Revisa los campos marcados abajo.',
+      lastChange: 'Último cambio {{when}} por {{who}}',
+      lastChangeUnknown: 'Último cambio {{when}}',
+      never: 'La web está mostrando sus textos originales.',
+    },
     location: {
       title: 'Ubicación de la empresa',
       intro:
@@ -758,6 +791,9 @@ export const es: TranslationResources = {
         },
         company_location: {
           updated: 'Movió la ubicación de la empresa',
+        },
+        site_copy: {
+          updated: 'Cambió los textos de la web',
         },
         pricing: {
           updated: 'Cambió las tarifas',

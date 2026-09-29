@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { CheckIcon, RefreshIcon, ShieldIcon, TagIcon } from '../components/Icons';
+import { useSiteText } from '../hooks/useSiteCopy';
 import { Reveal } from '../components/Reveal';
 
 const ITEMS = [
@@ -11,6 +12,13 @@ const ITEMS = [
 
 export function WhyUs() {
   const { t } = useTranslation();
+  /*
+   * Las cuatro promesas se pueden reescribir desde el panel: son
+   * afirmaciones sobre como opera la empresa —la poliza, la verificacion de
+   * antecedentes, la garantia— y cambian cuando cambia el negocio, no
+   * cuando se despliega. El titulo de la seccion no: ese es rotulo.
+   */
+  const { texto } = useSiteText();
 
   return (
     <section id="why-us" className="bg-brand-50 py-12 sm:py-16 lg:py-20 dark:bg-night-800">
@@ -32,10 +40,10 @@ export function WhyUs() {
                 <Icon className="h-5 w-5" />
               </span>
               <h3 className="mt-3 font-semibold text-slate-900 dark:text-white">
-                {t(`whyUs.${key}.title`)}
+                {texto(`whyUs.${key}.title`)}
               </h3>
               <p className="mt-1.5 text-sm leading-relaxed text-slate-600 dark:text-slate-400">
-                {t(`whyUs.${key}.body`)}
+                {texto(`whyUs.${key}.body`)}
               </p>
             </Reveal>
           ))}

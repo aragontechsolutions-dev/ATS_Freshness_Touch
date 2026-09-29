@@ -445,6 +445,39 @@ export const en = {
      * rodeos: quien abre esta pantalla tiene que entender, antes de tocar
      * nada, que mover el punto mueve el precio de cada reserva posterior.
      */
+    siteCopy: {
+      title: 'Website wording',
+      intro:
+        'The promises and the frequently asked questions the website publishes. These are commitments, not decoration: what you write here is what a customer will hold us to.',
+      onlyNew:
+        'Changing the wording does not change what was promised to someone who already booked. Their confirmation email keeps what it said.',
+      promises: 'Our promises',
+      promisesHelp: 'The four cards under "Why Freshness Touch".',
+      faq: 'Frequently asked questions',
+      faqHelp: 'The six questions at the bottom of the page.',
+      fieldTitle: 'Heading',
+      fieldBody: 'Text',
+      fieldQuestion: 'Question',
+      fieldAnswer: 'Answer',
+      english: 'English',
+      spanish: 'Spanish',
+      current: 'On the site now',
+      placeholder: 'Leave empty to keep the wording above',
+      charCount: '{{count}} of {{max}}',
+      tooLong: 'Too long by {{count}}',
+      halfDone_one: '{{count}} text is written in one language only',
+      halfDone_other: '{{count}} texts are written in one language only',
+      halfDoneHelp:
+        'Visitors reading the other language will see the original wording, so the site will promise two different things. Fill both, or clear both.',
+      halfDoneHere: 'Missing in the other language',
+      save: 'Save wording',
+      saved: 'Wording saved.',
+      reset: 'Undo changes',
+      errInvalid: 'Check the fields marked below.',
+      lastChange: 'Last changed {{when}} by {{who}}',
+      lastChangeUnknown: 'Last changed {{when}}',
+      never: 'The website is showing its original wording.',
+    },
     location: {
       title: 'Company location',
       intro:
@@ -756,6 +789,9 @@ export const en = {
         },
         pricing: {
           updated: 'Rates changed',
+        },
+        site_copy: {
+          updated: 'Website wording changed',
         },
         notifications: {
           updated: 'Alert settings changed',
