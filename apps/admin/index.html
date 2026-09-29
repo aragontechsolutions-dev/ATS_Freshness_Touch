@@ -18,6 +18,21 @@
     <link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png" />
 
     <!--
+      iOS NO LEE EL MANIFIESTO para el icono de la pantalla de inicio: usa
+      este enlace y solo este. Sin el, al anadir el panel a la pantalla de
+      inicio de un iPhone sale una captura borrosa de la pagina en vez del
+      isotipo.
+    -->
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180" />
+    <!--
+      Y tampoco lee `display: standalone`: esta es la unica forma de que en
+      iOS se abra a pantalla completa, sin la barra de Safari.
+    -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Freshness" />
+
+    <!--
       Aplica el tema y decide si se permite el movimiento ANTES del primer
       pintado. Va aqui, sincrono y sin `defer`, a proposito: si se retrasara,
       el panel se veria un instante en claro antes de pasar a oscuro.
