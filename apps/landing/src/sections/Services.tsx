@@ -3,7 +3,7 @@ import type { Locale, ServiceType } from '@freshness/types';
 import { useCatalog } from '../hooks/useCatalog';
 import { formatCentsCompact } from '../lib/format';
 import { Reveal } from '../components/Reveal';
-import sunflower from '../assets/sunflower.webp';
+import { ICONO_POR_SERVICIO } from '../components/ServiceIcons';
 
 const SERVICE_ORDER: ServiceType[] = [
   'STANDARD',
@@ -35,6 +35,7 @@ export function Services() {
         <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {SERVICE_ORDER.map((code, indice) => {
             const entry = catalog?.services.find((service) => service.code === code);
+            const Icono = ICONO_POR_SERVICIO[code];
 
             return (
               <Reveal
@@ -46,28 +47,34 @@ export function Services() {
                 className="ft-card ft-card-interactive flex flex-col p-6"
               >
                 {/*
-                  EL GIRASOL VA SUELTO, SIN EL CUADRO DE COLOR QUE TENIA ANTES.
-                  Ese recuadro existia para dar fondo a un simbolo de una sola
-                  linea; con un girasol a todo color, un cuadrado azul palido
-                  detras solo ensucia.
+                  LA PLACA DE COLOR, NO EL SIMBOLO SUELTO.
+                  Un icono de una sola linea flotando sobre la tarjeta blanca
+                  se pierde; sobre una placa de color solido es lo primero que
+                  se ve de la tarjeta. Mide 44x44, igual que el girasol que
+                  habia antes, asi que la cuadricula no cambia de alto.
 
-                  Es DECORATIVO: `alt` vacio. Las seis tarjetas llevan el mismo
-                  girasol, asi que anunciarlo seria repetir «girasol» seis
-                  veces sin aportar nada; lo que distingue a cada tarjeta es su
-                  titulo, que ya es texto de verdad.
+                  LOS DOS AZULES SON DELIBERADOS, Y ESTAN MEDIDOS:
+                    claro   `brand-700` #145788 -> icono blanco a 7.64:1,
+                                                   placa sobre tarjeta a 7.64:1
+                    oscuro  `brand-500` #2a73a9 -> icono blanco a 5.09:1,
+                                                   placa sobre tarjeta a 3.25:1
+
+                  El azul oficial sobre el fondo casi negro solo da 2.17:1: la
+                  placa se desdibujaria dentro de la tarjeta oscura. Por eso se
+                  aclara al 500 en oscuro, la misma regla que ya gobierna los
+                  botones del sitio.
+
+                  EL AMARILLO SE DESCARTO A PROPOSITO. Medía de sobra (10:1 y
+                  11:1), pero es el color del boton de accion, y la identidad
+                  fija un solo amarillo por pantalla visible: seis placas
+                  amarillas aqui le quitarian el sitio al presupuesto gratis.
                 */}
-                <img
-                  src={sunflower}
-                  alt=""
-                  className="h-11 w-11"
-                  // Medidas reales: reservan el hueco antes de descargar y
-                  // evitan que la tarjeta pegue un salto al aparecer.
-                  width={192}
-                  height={192}
-                  loading="lazy"
-                  decoding="async"
-                  draggable={false}
-                />
+                <span
+                  className="inline-flex w-fit rounded-xl bg-brand-700 p-2.5 text-white
+                             shadow-sm dark:bg-brand-500"
+                >
+                  <Icono className="h-6 w-6" />
+                </span>
 
                 <h3 className="mt-4 text-lg font-semibold text-slate-900 dark:text-white">
                   {t(`services.${code}.name`)}
@@ -79,7 +86,7 @@ export function Services() {
                 <p className="mt-5 text-sm font-semibold text-brand-700 dark:text-brand-300">
                   {/* El «desde X» sale de la tarifa mas barata que se ofrezca: el minimo facturable ya no existe. */}
                   {entry === undefined
-                    ? ' '
+                    ? ' '
                     : entry.instantQuote && entry.fromCents !== null
                       ? `${t('services.startingAt')} ${formatCentsCompact(entry.fromCents, locale)}`
                       : t('services.requiresVisit')}
