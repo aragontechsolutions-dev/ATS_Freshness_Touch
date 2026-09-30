@@ -132,18 +132,23 @@ pocas veces al año y nunca desde la calle. Se siguen cargando bajo demanda.
 `devOptions.enabled: false`. Un service worker vivo mientras se programa sirve
 archivos viejos y hace perder tardes persiguiendo cambios que sí estaban hechos.
 
-## 7. Pendiente, y conviene no perderlo de vista
+## 7. Los permisos del navegador, abiertos de uno en uno
 
 `apps/admin/vercel.json` lleva:
 
 ```
-"Permissions-Policy": "geolocation=(), camera=(), microphone=(), payment=()"
+"Permissions-Policy": "geolocation=(self), camera=(), microphone=(), payment=()"
 ```
 
-**`geolocation=()` bloquea la geolocalización por completo, incluido el propio
-sitio.** No afecta al PWA, pero el **fichaje con ubicación** no funcionará en
-producción hasta que eso pase a `geolocation=(self)`, y el navegador no dará un
-error claro: simplemente denegará el permiso.
+**`geolocation` se abrió en la Etapa 3.3** (`docs/25-fichaje-con-ubicacion.md`),
+porque el fichaje con ubicación la necesita. Estaba en `()`, que bloquea la
+geolocalización por completo —incluido el propio sitio— sin dar ningún error
+claro: el navegador simplemente deniega el permiso.
 
-Lo mismo valdrá para `camera=()` el día que se hagan las fotos de antes y
-después.
+> Si tras desplegar el fichaje **todos** los registros salen como «sin
+> ubicación», esta cabecera es lo primero que hay que mirar: un panel
+> desplegado antes de ese cambio la sigue sirviendo bloqueada.
+
+**El resto siguen cerrados, y se abren de uno en uno cuando hacen falta.**
+`camera=()` le tocará el día que se hagan las fotos de antes y después; abrirla
+ahora sería dar un permiso que nada usa.

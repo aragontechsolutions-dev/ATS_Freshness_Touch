@@ -60,6 +60,7 @@ describe('migraciones', () => {
       'addresses',
       'audit_logs',
       'booking_assignments',
+      'booking_clock_ins',
       'bookings',
       'business_settings',
       'customers',

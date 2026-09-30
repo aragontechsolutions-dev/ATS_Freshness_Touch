@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { Locale, MyJob } from '@freshness/types';
+import { CLOCK_IN_STATE_TEXT_KEY } from '@freshness/types';
+import type { ClockInKind, Locale, MyJob } from '@freshness/types';
 import {
   ApiClientError,
   fetchMyJobs,
@@ -23,7 +24,13 @@ import {
   SpinnerIcon,
   UsersIcon,
 } from '../components/Icons';
-import { dateInTimezone, formatDateTime, todayInTimezone } from '../lib/format';
+import {
+  dateInTimezone,
+  formatDateTime,
+  formatDistanciaDeFichaje,
+  todayInTimezone,
+} from '../lib/format';
+import { ubicacionParaFichar } from '../lib/geolocalizacion';
 
 interface MyJobsProps {
   locale: Locale;
@@ -84,7 +91,21 @@ export function MyJobs({ locale, onSessionLost }: MyJobsProps) {
     setOcupado(job.bookingId);
 
     try {
-      const actualizado = await markMyJobProgress(job.bookingId, { status });
+      /*
+       * LA UBICACION SE PIDE AQUI, AL PULSAR, y no al abrir la pantalla.
+       *
+       * El navegador muestra su dialogo de permiso la primera vez, y que
+       * aparezca al abrir la aplicacion —sin que la persona haya hecho nada
+       * que lo justifique— es la forma mas rapida de que le de a «Bloquear»
+       * para siempre. Pulsado «He llegado», el dialogo tiene un porque
+       * evidente.
+       *
+       * Y NO PUEDE FALLAR: `ubicacionParaFichar` nunca lanza. Si no hay
+       * ubicacion devuelve el motivo, y el fichaje sale igual.
+       */
+      const ubicacion = await ubicacionParaFichar();
+
+      const actualizado = await markMyJobProgress(job.bookingId, { status, ...ubicacion });
       setJobs((actual) =>
         (actual ?? []).map((j) => (j.bookingId === actualizado.bookingId ? actualizado : j)),
       );
@@ -94,8 +115,17 @@ export function MyJobs({ locale, onSessionLost }: MyJobsProps) {
        * una casa, no habia forma de estar seguro de que habia quedado
        * registrado, y se pulsaba dos veces.
        */
+      /*
+       * EL AVISO DICE LA DISTANCIA QUE QUEDO REGISTRADA.
+       *
+       * Fue una decision explicita: no hay un expediente secreto sobre
+       * nadie. Quien ficha ve exactamente el mismo dato que vera
+       * coordinacion, y si esta mal puede decirlo en el momento en vez de
+       * enterarse en una revision tres meses despues.
+       */
       toast.success(
         status === 'IN_PROGRESS' ? 'admin.toast.jobStarted' : 'admin.toast.jobFinished',
+        { detail: textoDeFichaje(actualizado, status, t, locale) },
       );
     } catch (error) {
       if (isSessionError(error)) {
@@ -357,4 +387,52 @@ function Acciones({
       {t('admin.myJobs.finished')}
     </p>
   );
+}
+
+/**
+ * EL TEXTO QUE VE QUIEN ACABA DE FICHAR.
+ *
+ * «a 60 m de la casa», o el motivo de que no haya distancia. Se muestra
+ * porque no hay un expediente secreto sobre nadie: es el mismo dato que vera
+ * coordinacion.
+ *
+ * Devuelve `undefined` cuando no hay nada que anadir, que el aviso trata como
+ * «sin detalle» y no pinta una linea vacia.
+ */
+function textoDeFichaje(
+  job: MyJob,
+  status: 'IN_PROGRESS' | 'COMPLETED',
+  t: (clave: string, params?: Record<string, string | number>) => string,
+  locale: Locale,
+): string | undefined {
+  const esperado: ClockInKind = status === 'IN_PROGRESS' ? 'ARRIVAL' : 'DEPARTURE';
+
+  /*
+   * EL ULTIMO DEL TIPO QUE SE ACABA DE HACER, no simplemente el ultimo de la
+   * lista: los fichajes vienen ordenados por hora e incluyen los de los
+   * companeros, asi que coger el ultimo sin mas mostraria la distancia de
+   * otra persona al fichar uno mismo.
+   */
+  const mio = [...job.clockIns].reverse().find((f) => f.kind === esperado);
+  if (!mio) return undefined;
+
+  if (mio.locationState === 'RECORDED' && mio.distanceMeters !== null) {
+    /*
+     * Dos claves distintas, una por unidad, en vez de una sola con la unidad
+     * interpolada: «3 pies» y «3 millas» no se dicen igual en los dos
+     * idiomas, y una sola clave obligaria a construir la frase juntando
+     * trozos, que es como salen las traducciones raras.
+     */
+    const { value, unit } = formatDistanciaDeFichaje(mio.distanceMeters, locale);
+    return t(
+      unit === 'feet' ? 'admin.myJobs.clockIn.distanceFeet' : 'admin.myJobs.clockIn.distanceMiles',
+      { value },
+    );
+  }
+
+  /*
+   * Los tres motivos tienen su propio texto. `NO_HOUSE` en particular dice
+   * que el fallo es NUESTRO, para que nadie crea que su movil va mal.
+   */
+  return t(`admin.myJobs.clockIn.${CLOCK_IN_STATE_TEXT_KEY[mio.locationState]}`);
 }

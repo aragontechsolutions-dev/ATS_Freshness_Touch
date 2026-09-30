@@ -82,3 +82,57 @@ export function formatTimestamp(iso: string, locale: Locale = 'en'): string {
     timeStyle: 'short',
   }).format(new Date(iso));
 }
+
+/**
+ * UNA DISTANCIA DE FICHAJE, EN LAS UNIDADES DEL PAIS.
+ *
+ * ========================================================================
+ * PIES POR DEBAJO, MILLAS POR ENCIMA. NI METROS NI KILOMETROS.
+ * ========================================================================
+ * La empresa opera en Georgia y el resto de la interfaz ya habla en millas
+ * —las del area de servicio, las del recargo por traslado—, asi que decir
+ * los metros aqui obligaria a quien lee a cambiar de sistema a media
+ * pantalla.
+ *
+ * Y millas a secas no sirve: los 60 metros de estar en la puerta son «0,04
+ * millas», que no se puede leer. Por eso hay dos escalas.
+ *
+ * El corte esta en 1000 pies (unos 300 metros). Por debajo se cuentan pies,
+ * que es como se habla de la distancia dentro de un barrio; por encima,
+ * millas con un decimal.
+ *
+ * La API guarda METROS, que es lo correcto para un dato: una unidad sin
+ * ambigüedad, sin conversion y sin decimales. La traduccion a pies pasa aqui,
+ * en el unico sitio que se ocupa de como se lee algo.
+ */
+const PIES_POR_METRO = 3.280839895;
+const PIES_POR_MILLA = 5280;
+const CORTE_EN_PIES = 1000;
+
+export function formatDistanciaDeFichaje(
+  metros: number,
+  locale: Locale = 'en',
+): { value: string; unit: 'feet' | 'miles' } {
+  const pies = metros * PIES_POR_METRO;
+
+  if (pies < CORTE_EN_PIES) {
+    /*
+     * Redondeado a diez pies. Un fichaje viene de un GPS de movil contra un
+     * punto interpolado sobre una calle: decir «187 pies» finge una
+     * exactitud que no existe por ninguno de los dos lados.
+     */
+    const redondeado = Math.round(pies / 10) * 10;
+    return {
+      value: new Intl.NumberFormat(localeTag[locale]).format(redondeado),
+      unit: 'feet',
+    };
+  }
+
+  return {
+    value: new Intl.NumberFormat(localeTag[locale], {
+      minimumFractionDigits: 1,
+      maximumFractionDigits: 1,
+    }).format(pies / PIES_POR_MILLA),
+    unit: 'miles',
+  };
+}

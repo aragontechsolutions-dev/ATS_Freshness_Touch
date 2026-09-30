@@ -67,11 +67,59 @@ async function misTrabajos(token?: string) {
     .set('authorization', `Bearer ${token ?? (await comoCleo())}`);
 }
 
-async function marcar(bookingId: string, status: string, token?: string) {
+async function marcar(
+  bookingId: string,
+  status: string,
+  token?: string,
+  resto: Record<string, unknown> = {},
+) {
   return request(app.getHttpServer())
     .patch(`${RUTA}/${bookingId}/progress`)
     .set('authorization', `Bearer ${token ?? (await comoCleo())}`)
-    .send({ status });
+    .send({ status, ...resto });
+}
+
+/** La casa de estas pruebas: centro de Atlanta. */
+const CASA = { latitude: 33.749, longitude: -84.388 };
+
+/** En la puerta de la casa, con un GPS decente. */
+const EN_LA_PUERTA = { latitude: 33.7491, longitude: -84.3881, accuracyMeters: 12 };
+
+/** Marietta: a unos 25 km. El «fiche desde mi casa» del enunciado. */
+const EN_SU_CASA = { latitude: 33.9526, longitude: -84.5499, accuracyMeters: 18 };
+
+/** Le da coordenadas a la casa de las pruebas. */
+async function geocodificarLaCasa() {
+  await db.exec(`
+    UPDATE addresses
+       SET latitude = ${CASA.latitude}, longitude = ${CASA.longitude},
+           "geocodePrecision" = 'INTERPOLATED', "geocodeProvider" = 'census',
+           "geocodedAt" = now()
+     WHERE id = '${ADDRESS}';
+  `);
+}
+
+/** Se la quita, que es el estado de una casa recien reservada. */
+async function casaSinCoordenadas() {
+  await db.exec(
+    `UPDATE addresses SET latitude = NULL, longitude = NULL, "geocodedAt" = NULL
+      WHERE id = '${ADDRESS}';`,
+  );
+}
+
+interface FilaFichaje {
+  kind: string;
+  locationState: string;
+  distanceMeters: number | null;
+  accuracyMeters: number | null;
+}
+
+async function fichajes(bookingId: string): Promise<FilaFichaje[]> {
+  const filas = await db.query<FilaFichaje>(
+    `SELECT kind, "locationState", "distanceMeters", "accuracyMeters"
+       FROM booking_clock_ins WHERE "bookingId" = '${bookingId}' ORDER BY "occurredAt"`,
+  );
+  return filas.rows;
 }
 
 /** Una reserva dentro de la ventana que mira la pantalla. */
@@ -139,7 +187,11 @@ afterAll(async () => {
 });
 
 beforeEach(async () => {
-  await db.exec('DELETE FROM audit_logs; DELETE FROM booking_assignments; DELETE FROM bookings;');
+  await db.exec(
+    'DELETE FROM audit_logs; DELETE FROM booking_clock_ins; ' +
+      'DELETE FROM booking_assignments; DELETE FROM bookings;',
+  );
+  await geocodificarLaCasa();
 
   await sembrarReserva(DE_CLEO, 'FT-M-0001', 26);
   await sembrarReserva(DE_DARIO, 'FT-M-0002', 30);
@@ -332,5 +384,251 @@ describe('marcar empezado y terminado', () => {
 
     expect(registros.rows).toHaveLength(1);
     expect(registros.rows[0]?.metadata).toMatchObject({ source: 'my-jobs', to: 'IN_PROGRESS' });
+  });
+});
+
+describe('el fichaje con ubicacion', () => {
+  it('guarda la distancia a la casa y el margen del GPS', async () => {
+    const respuesta = await marcar(DE_CLEO, 'IN_PROGRESS', undefined, {
+      location: EN_LA_PUERTA,
+    });
+
+    expect(respuesta.status).toBe(200);
+
+    const [fichaje] = await fichajes(DE_CLEO);
+    expect(fichaje.kind).toBe('ARRIVAL');
+    expect(fichaje.locationState).toBe('RECORDED');
+    expect(fichaje.distanceMeters).toBeLessThan(30);
+    expect(fichaje.accuracyMeters).toBe(12);
+  });
+
+  it('distingue quien llego a la casa de quien ficho desde la suya', async () => {
+    // LA PREGUNTA QUE JUSTIFICA TODA LA ETAPA, en una sola prueba.
+    await marcar(DE_CLEO, 'IN_PROGRESS', undefined, { location: EN_SU_CASA });
+
+    const [fichaje] = await fichajes(DE_CLEO);
+    expect(fichaje.locationState).toBe('RECORDED');
+    expect(fichaje.distanceMeters).toBeGreaterThan(25_000);
+  });
+
+  it('la salida se ficha como DEPARTURE', async () => {
+    await marcar(DE_CLEO, 'IN_PROGRESS', undefined, { location: EN_LA_PUERTA });
+    await marcar(DE_CLEO, 'COMPLETED', undefined, { location: EN_LA_PUERTA });
+
+    expect((await fichajes(DE_CLEO)).map((f) => f.kind)).toEqual(['ARRIVAL', 'DEPARTURE']);
+  });
+
+  it('cada persona del equipo ficha lo suyo, sin pisar a la otra', async () => {
+    /*
+     * POR ESTO EL FICHAJE ES UNA TABLA Y NO COLUMNAS EN `bookings`. Cleo esta
+     * en la puerta y Dario todavia en el coche a dos manzanas: los dos datos
+     * tienen que caber, y con columnas en la reserva el segundo borraria al
+     * primero.
+     */
+    await marcar(DE_CLEO, 'IN_PROGRESS', undefined, { location: EN_LA_PUERTA });
+    await marcar(DE_CLEO, 'COMPLETED', await comoDario(), { location: EN_SU_CASA });
+
+    const filas = await fichajes(DE_CLEO);
+    expect(filas).toHaveLength(2);
+    expect(filas[0].distanceMeters).toBeLessThan(30);
+    expect(filas[1].distanceMeters).toBeGreaterThan(25_000);
+  });
+});
+
+describe('LAS COORDENADAS DEL EMPLEADO NO ACABAN EN NINGUN SITIO', () => {
+  /*
+   * ======================================================================
+   * LA PRUEBA QUE SOSTIENE LA PROMESA DE PRIVACIDAD DE TODA LA ETAPA
+   * ======================================================================
+   * Se dice en el contrato, en la migracion y en el servicio que la
+   * ubicacion de quien ficha no se guarda. Esto lo COMPRUEBA, y lo comprueba
+   * de la forma mas bruta posible: buscando los numeros por toda la base de
+   * datos.
+   *
+   * Es la clase de promesa que se rompe sin que nadie lo note —basta que
+   * alguien anada un campo a una metadata «por si acaso»—, asi que la
+   * comprobacion no puede ser mirar un sitio concreto.
+   */
+
+  const COORDENADAS_ENVIADAS = [
+    String(EN_SU_CASA.latitude),
+    String(EN_SU_CASA.longitude),
+    // Y sin el signo, por si alguien las guardara en valor absoluto.
+    String(Math.abs(EN_SU_CASA.longitude)),
+  ];
+
+  it('no estan en la tabla de fichajes: no hay columna donde ponerlas', async () => {
+    await marcar(DE_CLEO, 'IN_PROGRESS', undefined, { location: EN_SU_CASA });
+
+    const columnas = await db.query<{ column_name: string }>(
+      `SELECT column_name FROM information_schema.columns
+        WHERE table_name = 'booking_clock_ins'`,
+    );
+    const nombres = columnas.rows.map((c) => c.column_name.toLowerCase());
+
+    expect(nombres).not.toContain('latitude');
+    expect(nombres).not.toContain('longitude');
+    // Ni con cualquier otro nombre que suene a posicion.
+    for (const nombre of nombres) {
+      expect(nombre).not.toMatch(/lat|lon|coord|position|geo/);
+    }
+  });
+
+  it('no estan en la auditoria, que es por donde se colarian', async () => {
+    await marcar(DE_CLEO, 'IN_PROGRESS', undefined, { location: EN_SU_CASA });
+
+    const filas = await db.query<{ metadata: unknown }>(
+      `SELECT metadata FROM audit_logs WHERE "entityId" = '${DE_CLEO}'`,
+    );
+    const serializada = JSON.stringify(filas.rows);
+
+    for (const numero of COORDENADAS_ENVIADAS) {
+      expect(serializada).not.toContain(numero);
+    }
+
+    // Pero SI esta la distancia, que es el dato que resuelve un «esto se
+    // cerro sin hacerse» sin decir donde estaba nadie.
+    expect(serializada).toContain('distanceMeters');
+  });
+
+  it('no estan en NINGUNA tabla de la base de datos', async () => {
+    /*
+     * La comprobacion de fuerza bruta: recorre todas las columnas de texto y
+     * numericas de todo el esquema buscando los valores que se enviaron. Si
+     * alguien los guardara en cualquier sitio —una metadata, una nota, un
+     * campo nuevo—, esto lo encuentra.
+     */
+    await marcar(DE_CLEO, 'IN_PROGRESS', undefined, { location: EN_SU_CASA });
+
+    const columnas = await db.query<{ table_name: string; column_name: string }>(
+      `SELECT table_name, column_name FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND data_type IN ('text','character varying','jsonb','json',
+                            'double precision','numeric','real')`,
+    );
+
+    const hallazgos: string[] = [];
+    for (const { table_name, column_name } of columnas.rows) {
+      for (const numero of COORDENADAS_ENVIADAS) {
+        const encontrado = await db.query<{ n: number }>(
+          `SELECT count(*)::int AS n FROM "${table_name}"
+            WHERE "${column_name}"::text LIKE '%${numero}%'`,
+        );
+        if ((encontrado.rows[0]?.n ?? 0) > 0) {
+          hallazgos.push(`${table_name}.${column_name} contiene ${numero}`);
+        }
+      }
+    }
+
+    expect(hallazgos).toEqual([]);
+  });
+
+  it('tampoco viajan de vuelta en la respuesta', async () => {
+    const respuesta = await marcar(DE_CLEO, 'IN_PROGRESS', undefined, { location: EN_SU_CASA });
+    const serializada = JSON.stringify(respuesta.body);
+
+    for (const numero of COORDENADAS_ENVIADAS) {
+      expect(serializada).not.toContain(numero);
+    }
+  });
+
+  it('y la posicion de la CASA tampoco sale hacia el movil', async () => {
+    /*
+     * La otra mitad, que es facil de olvidar: la casa SI tiene coordenadas
+     * guardadas, y se usan para calcular. Pero no hay razon para que la
+     * posicion exacta del domicilio de un cliente viaje a un telefono.
+     */
+    const respuesta = await marcar(DE_CLEO, 'IN_PROGRESS', undefined, { location: EN_LA_PUERTA });
+    const serializada = JSON.stringify(respuesta.body);
+
+    expect(serializada).not.toContain(String(CASA.latitude));
+    expect(serializada).not.toContain(String(CASA.longitude));
+  });
+});
+
+describe('el fichaje NUNCA se bloquea', () => {
+  it('sin ubicacion se ficha igual, marcado como no disponible', async () => {
+    const respuesta = await marcar(DE_CLEO, 'IN_PROGRESS');
+
+    expect(respuesta.status).toBe(200);
+    expect(respuesta.body.status).toBe('IN_PROGRESS');
+
+    const [fichaje] = await fichajes(DE_CLEO);
+    expect(fichaje.locationState).toBe('UNAVAILABLE');
+    expect(fichaje.distanceMeters).toBeNull();
+  });
+
+  it('si la persona deniega el permiso, queda anotado como tal', async () => {
+    await marcar(DE_CLEO, 'IN_PROGRESS', undefined, { locationState: 'DENIED' });
+
+    expect((await fichajes(DE_CLEO))[0].locationState).toBe('DENIED');
+  });
+
+  it('si la casa no tiene coordenadas, el fallo es NUESTRO y se distingue', async () => {
+    /*
+     * IMPORTA QUE NO SE CONFUNDA CON `UNAVAILABLE`. Si se anotara asi
+     * pareceria que el GPS de esa persona no funciona, cuando lo que pasa es
+     * que nuestra geocodificacion no habia resuelto la casa todavia.
+     */
+    await casaSinCoordenadas();
+
+    const respuesta = await marcar(DE_CLEO, 'IN_PROGRESS', undefined, {
+      location: EN_LA_PUERTA,
+    });
+
+    expect(respuesta.status).toBe(200);
+
+    const [fichaje] = await fichajes(DE_CLEO);
+    expect(fichaje.locationState).toBe('NO_HOUSE');
+    expect(fichaje.distanceMeters).toBeNull();
+  });
+
+  it('un trabajo que no es suyo sigue siendo 404, ubicacion o no', async () => {
+    // La ubicacion no abre ninguna puerta: el filtro por asignacion manda.
+    const respuesta = await marcar(DE_DARIO, 'IN_PROGRESS', undefined, {
+      location: EN_LA_PUERTA,
+    });
+
+    expect(respuesta.status).toBe(404);
+    expect(await fichajes(DE_DARIO)).toHaveLength(0);
+  });
+});
+
+describe('el cliente no puede mentir sobre su ubicacion', () => {
+  it('RECHAZA que se declare RECORDED sin mandar coordenadas', async () => {
+    /*
+     * Seria afirmar que se comprobo algo que nadie comprobo. Lo pone el
+     * servidor, y solo despues de calcular los metros.
+     */
+    const respuesta = await marcar(DE_CLEO, 'IN_PROGRESS', undefined, {
+      locationState: 'RECORDED',
+    });
+
+    expect(respuesta.status).toBe(400);
+    expect(await fichajes(DE_CLEO)).toHaveLength(0);
+  });
+
+  it('RECHAZA que se declare NO_HOUSE, que es un hecho de nuestra base', async () => {
+    const respuesta = await marcar(DE_CLEO, 'IN_PROGRESS', undefined, {
+      locationState: 'NO_HOUSE',
+    });
+
+    expect(respuesta.status).toBe(400);
+  });
+
+  it('RECHAZA una distancia enviada a mano', async () => {
+    // La distancia la calcula el servidor. Aceptarla del cliente seria
+    // dejarle escribir el dato que la funcion existe para comprobar.
+    const respuesta = await marcar(DE_CLEO, 'IN_PROGRESS', undefined, { distanceMeters: 5 });
+
+    expect(respuesta.status).toBe(400);
+  });
+
+  it('RECHAZA los campos de mas que da la API del navegador', async () => {
+    const respuesta = await marcar(DE_CLEO, 'IN_PROGRESS', undefined, {
+      location: { ...EN_LA_PUERTA, altitude: 320, speed: 0 },
+    });
+
+    expect(respuesta.status).toBe(400);
   });
 });

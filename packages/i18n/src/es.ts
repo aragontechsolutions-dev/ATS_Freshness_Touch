@@ -873,6 +873,31 @@ export const es: TranslationResources = {
       finishHint:
         'Marca «He llegado» al entrar en la casa. Queda la hora, y es lo que respalda tu trabajo si alguien pregunta.',
       noActions: 'Coordinación se encarga del resto.',
+
+      clockIn: {
+        distanceFeet: 'Registrado a {{value}} pies de la casa. Tu ubicación no se guarda.',
+        distanceMiles: 'Registrado a {{value}} millas de la casa. Tu ubicación no se guarda.',
+        denied: 'Registrado sin ubicación, porque está desactivada para esta aplicación.',
+        unavailable: 'Registrado sin ubicación: tu teléfono no pudo captar el GPS.',
+        noHouse: 'Registrado sin distancia: todavía no tenemos esta casa en el mapa.',
+        far: 'Lejos de la casa',
+      },
+    },
+
+    /* ------------------------ Fichajes ------------------------ */
+    clockIns: {
+      title: 'Fichajes',
+      arrived: 'Llegó',
+      left: 'Salió',
+      feet: 'a {{value}} pies de la casa',
+      miles: 'a {{value}} millas de la casa',
+      accuracy: '(±{{value}} {{unit}})',
+      unit: { feet: 'pies', miles: 'millas' },
+      denied: 'Sin ubicación (desactivada en su teléfono)',
+      unavailable: 'Sin ubicación (el GPS no respondió)',
+      noHouse: 'Sin distancia: todavía no tenemos esta casa en el mapa',
+      privacyNote:
+        'Solo se guarda la distancia. La ubicación de quien ficha no se guarda nunca: se convierte en una distancia y se descarta.',
     },
 
     unreachable: {

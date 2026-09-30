@@ -410,6 +410,7 @@ model Booking {
   payments      Payment[]
   assignments   BookingAssignment[]
   notifications Notification[]
+  clockIns      BookingClockIn[]
 
   createdAt DateTime @default(now()) @db.Timestamptz(3)
   updatedAt DateTime @updatedAt @db.Timestamptz(3)
@@ -606,6 +607,7 @@ model Staff {
   isActive  Boolean   @default(true)
 
   assignments BookingAssignment[]
+  clockIns    BookingClockIn[]
   createdAt   DateTime            @default(now()) @db.Timestamptz(3)
   updatedAt   DateTime            @updatedAt @db.Timestamptz(3)
 
@@ -742,4 +744,87 @@ model AuditLog {
   /// «Ensename todas las cancelaciones» o «todos los accesos denegados».
   @@index([action, createdAt])
   @@map("audit_logs")
+}
+
+/// Los dos momentos que se fichan.
+enum ClockInKind {
+  ARRIVAL
+  DEPARTURE
+}
+
+/// Por que un fichaje lleva o no lleva distancia.
+///
+/// No es un nulo con adornos: «sin ubicacion» significa tres cosas muy
+/// distintas, y meterlas en el mismo cajon señalaria a una empleada por un
+/// fallo de nuestra geocodificacion (NO_HOUSE).
+enum ClockInLocationState {
+  /// Hay distancia calculada.
+  RECORDED
+  /// La persona no dio permiso al navegador.
+  DENIED
+  /// El GPS no pudo dar una posicion: sotano, zona sin cobertura, movil viejo.
+  UNAVAILABLE
+  /// La casa todavia no tiene coordenadas. El fallo es NUESTRO.
+  NO_HOUSE
+}
+
+/// FICHAJE CON UBICACION
+///
+/// Una fila por PERSONA y por EVENTO, no columnas en `Booking`: si van dos a
+/// una casa, cada una ficha su llegada y una puede estar en la puerta con la
+/// otra todavia en el coche. En `Booking` solo cabria una de las dos.
+///
+/// ==========================================================================
+/// NO HAY LATITUD NI LONGITUD DEL EMPLEADO, Y ES LA DECISION MAS IMPORTANTE
+/// DE ESTA ETAPA.
+/// ==========================================================================
+/// Las coordenadas de quien ficha llegan al servidor, se convierten en metros
+/// y se descartan en el mismo metodo. No hay columna donde ponerlas.
+///
+/// La pregunta del negocio es «¿estaba en la casa?», y para eso la distancia
+/// sobra. Guardar el punto construiria un historial de por donde anda cada
+/// empleada —donde vive, a que hora sale— que no hace falta para nada. Y un
+/// dato que no se guarda no se puede filtrar, ni citar en un juicio, ni pedir
+/// por una orden judicial.
+///
+/// La base de datos ademas tiene un CHECK que obliga a que haya distancia si
+/// y solo si el estado es RECORDED. Prisma no puede expresar un CHECK, asi
+/// que vive solo en el archivo de migracion; esta anotado ahi.
+model BookingClockIn {
+  id String @id @default(uuid(4)) @db.Uuid
+
+  bookingId String  @db.Uuid
+  booking   Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  /// RESTRICT y no CASCADE: un fichaje es el registro de que alguien estuvo
+  /// en una casa a una hora, y no debe borrarse porque se de de baja a esa
+  /// persona en el sistema.
+  staffId String @db.Uuid
+  staff   Staff  @relation(fields: [staffId], references: [id], onDelete: Restrict)
+
+  kind ClockInKind
+
+  /// Segun el reloj del SERVIDOR, no del movil: un reloj de telefono se
+  /// cambia a mano, y la hora del fichaje es justo el dato que alguien
+  /// tendria interes en mover.
+  occurredAt DateTime @default(now()) @db.Timestamptz(3)
+
+  locationState ClockInLocationState
+
+  /// Metros en linea recta hasta la casa. Null si no hubo ubicacion.
+  distanceMeters Int?
+
+  /// El margen de error que reporto el navegador. SIN ESTE NUMERO LA
+  /// DISTANCIA NO SE PUEDE INTERPRETAR: «a 250 m» con margen de 30 dice que
+  /// no estaba en la puerta; con margen de 2000 no dice nada.
+  accuracyMeters Int?
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+
+  @@index([bookingId])
+  /// Para el futuro modulo de nominas: los fichajes de una persona en un
+  /// periodo. Se crea con la tabla vacia porque añadirlo mas tarde, con
+  /// historial dentro, es una migracion que bloquea escrituras.
+  @@index([staffId, occurredAt])
+  @@map("booking_clock_ins")
 }
