@@ -6,7 +6,8 @@ import { Test } from '@nestjs/testing';
 import type { INestApplication } from '@nestjs/common';
 import { DateTime } from 'luxon';
 import request from 'supertest';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { isInsideGeorgia } from '@freshness/types';
 import { AppModule } from '../app.module';
 
 /**
@@ -88,6 +89,13 @@ beforeAll(async () => {
   process.env.DATABASE_URL = `postgresql://postgres:postgres@127.0.0.1:${PORT}/postgres`;
   process.env.QUOTE_RATE_LIMIT_MAX = '100';
   process.env.RATE_LIMIT_MAX = '200';
+  /*
+   * El barrido de geocodificacion, APAGADO. Si estuviera encendido tambien
+   * resolveria la direccion y la prueba de abajo pasaria aunque el enganche
+   * de la reserva estuviera roto. Apagado, lo unico que puede geocodificar
+   * es el enganche, que es justo lo que se quiere comprobar.
+   */
+  process.env.GEOCODING_SWEEP_MINUTES = '0';
 
   const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
   app = moduleRef.createNestApplication();
@@ -260,6 +268,43 @@ describe('creacion de reserva', () => {
     expect(serializada).not.toContain(CONTACTO.email);
     expect(serializada).not.toContain(CONTACTO.firstName);
     expect(serializada).not.toContain(DIRECCION.line1);
+  });
+
+  it('la direccion de la reserva acaba geocodificada, sin que la reserva espere', async () => {
+    /*
+     * EL ENGANCHE DEL CAMINO DEL DINERO, QUE ES LO QUE NINGUNA OTRA PRUEBA
+     * TOCABA.
+     *
+     * La reserva de arriba ya devolvio 201. Eso es lo primero que se
+     * comprueba aqui, y sin decir nada: si la geocodificacion se hubiera
+     * metido dentro de la transaccion o se esperara con `await`, la reserva
+     * habria tardado de mas o habria fallado con el servicio caido.
+     *
+     * Y lo segundo es que la direccion acaba con coordenadas. Se espera
+     * activamente porque el enganche es `void`: se lanza y no se espera, asi
+     * que el 201 puede llegar antes de que la direccion este resuelta. Eso
+     * NO es una carrera de la prueba, es el comportamiento que se pidio.
+     *
+     * El barrido esta apagado en esta prueba (ver arriba), asi que lo unico
+     * que puede haber geocodificado es el enganche.
+     */
+    await vi.waitFor(
+      async () => {
+        const filas = await db.query<{ latitude: number | null; provider: string | null }>(
+          `SELECT latitude, "geocodeProvider" AS provider FROM addresses LIMIT 1`,
+        );
+        expect(filas.rows[0]?.latitude).not.toBeNull();
+        expect(filas.rows[0]?.provider).toBe('mock');
+      },
+      { timeout: 5000, interval: 50 },
+    );
+
+    // Y cae dentro de Georgia, que es lo que la guardia del contrato exige
+    // para haber guardado nada.
+    const filas = await db.query<{ latitude: number; longitude: number }>(
+      `SELECT latitude, longitude FROM addresses LIMIT 1`,
+    );
+    expect(isInsideGeorgia(filas.rows[0].latitude, filas.rows[0].longitude)).toBe(true);
   });
 
   it('rechaza el doble envio del formulario del mismo cliente', async () => {

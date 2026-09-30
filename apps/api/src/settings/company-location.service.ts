@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
+  haversineMiles,
   CompanyLocationSchema,
   DEFAULT_COMPANY_LOCATION,
   type AdminCompanyLocation,
@@ -144,7 +145,7 @@ export class CompanyLocationService {
             latitudeAfter: settings.latitude,
             longitudeAfter: settings.longitude,
             movedMiles: Number(
-              distanciaEnMillas(
+              haversineMiles(
                 anterior.latitude,
                 anterior.longitude,
                 settings.latitude,
@@ -211,26 +212,4 @@ export class CompanyLocationService {
       return this.desdeElEntorno();
     }
   }
-}
-
-/** Radio medio de la Tierra en millas. */
-const RADIO_TIERRA_MILLAS = 3958.7613;
-
-/**
- * Cuanto se movio la base, en linea recta.
- *
- * Solo alimenta la auditoria: es la cifra que convierte «se cambio la
- * ubicacion» en algo que explica una factura.
- */
-function distanciaEnMillas(lat1: number, lon1: number, lat2: number, lon2: number): number {
-  const aRadianes = Math.PI / 180;
-  const phi1 = lat1 * aRadianes;
-  const phi2 = lat2 * aRadianes;
-  const deltaPhi = (lat2 - lat1) * aRadianes;
-  const deltaLambda = (lon2 - lon1) * aRadianes;
-
-  const a =
-    Math.sin(deltaPhi / 2) ** 2 + Math.cos(phi1) * Math.cos(phi2) * Math.sin(deltaLambda / 2) ** 2;
-
-  return 2 * RADIO_TIERRA_MILLAS * Math.asin(Math.sqrt(a));
 }

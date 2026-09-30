@@ -14,6 +14,7 @@ import { Prisma } from '../generated/prisma/client';
 import { DistanceService } from '../distance/distance.service';
 import { PaymentsService } from '../payments/payments.service';
 import { PricingConfigService } from '../settings/pricing-config.service';
+import { GeocodingService } from '../geocoding/geocoding.service';
 import { AuditService } from '../audit/audit.service';
 import { AvailabilityService } from '../scheduling/availability.service';
 import type { SchedulingConfig } from '../scheduling/scheduling.config';
@@ -34,6 +35,11 @@ export class BookingsService {
      * area de servicio se edita desde el panel. Ver `PricingConfigService`.
      */
     private readonly pricing: PricingConfigService,
+    /*
+     * Para convertir la direccion en un punto del mapa. Se usa FUERA de la
+     * transaccion y sin esperarla: ver el final de `create`.
+     */
+    private readonly geocoding: GeocodingService,
   ) {}
 
   /**
@@ -222,199 +228,244 @@ export class BookingsService {
       .setZone(schedulingConfig.timezone)
       .toFormat('yyyy-MM-dd');
 
-    return this.prisma.db.$transaction(async (tx) => {
-      /*
-       * Bloqueo por dia durante toda la transaccion.
-       *
-       * Sin el, dos clientes que reservan a la vez pueden pasar los dos la
-       * comprobacion de disponibilidad y quedarse con el mismo hueco: entre
-       * consultar y escribir hay una ventana. El bloqueo serializa las
-       * reservas del mismo dia, que son pocas, sin afectar al resto.
-       */
-      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`booking:${localDate}`}))`;
+    /*
+     * El identificador de la direccion, para geocodificarla DESPUES de que
+     * la transaccion confirme. Ver el comentario del final de este metodo.
+     */
+    let direccionAGeocodificar: string | null = null;
 
-      const occupied = await this.availability.findOccupied(localDate, now, tx);
-      const libre = isSlotStillAvailable(startsAt, {
-        durationMinutes,
-        now,
-        occupied,
-        config: schedulingConfig,
-      });
+    /*
+     * El tipo se anota a mano porque, al guardar el resultado en una
+     * variable en vez de devolverlo directamente, TypeScript ensancha
+     * `status` de sus valores literales a `string` y deja de encajar con el
+     * contrato. Anotarlo tambien hace que un campo mal puesto se vea aqui y
+     * no tres capas mas arriba.
+     */
+    const respuesta: Omit<BookingResponse, 'payment'> = await this.prisma.db.$transaction(
+      async (tx) => {
+        /*
+         * Bloqueo por dia durante toda la transaccion.
+         *
+         * Sin el, dos clientes que reservan a la vez pueden pasar los dos la
+         * comprobacion de disponibilidad y quedarse con el mismo hueco: entre
+         * consultar y escribir hay una ventana. El bloqueo serializa las
+         * reservas del mismo dia, que son pocas, sin afectar al resto.
+         */
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`booking:${localDate}`}))`;
 
-      if (!libre) {
-        throw new ConflictException({
-          code: API_ERROR_CODES.SLOT_UNAVAILABLE,
-          messageKey: 'booking.errorSlotTaken',
+        const occupied = await this.availability.findOccupied(localDate, now, tx);
+        const libre = isSlotStillAvailable(startsAt, {
+          durationMinutes,
+          now,
+          occupied,
+          config: schedulingConfig,
         });
-      }
 
-      // --- Cliente: se reutiliza si ya existe ese correo -------------------
-      const customer = await tx.customer.upsert({
-        where: { email: request.contact.email },
-        create: {
-          email: request.contact.email,
-          firstName: request.contact.firstName,
-          lastName: request.contact.lastName,
-          phone: request.contact.phone,
-          locale: request.contact.locale,
-          marketingOptIn: request.contact.marketingOptIn,
-        },
-        update: {
-          firstName: request.contact.firstName,
-          lastName: request.contact.lastName,
-          phone: request.contact.phone,
-          locale: request.contact.locale,
-          // El consentimiento comercial solo se concede, nunca se revoca
-          // silenciosamente por rellenar otro formulario.
-          ...(request.contact.marketingOptIn ? { marketingOptIn: true } : {}),
-        },
-      });
-
-      // --- Direccion: se reutiliza la misma calle del mismo cliente --------
-      const existing = await tx.address.findFirst({
-        where: {
-          customerId: customer.id,
-          line1: request.address.line1,
-          postalCode: request.address.postalCode,
-        },
-      });
-
-      const addressData = {
-        line1: request.address.line1,
-        line2: request.address.line2 ?? null,
-        city: request.address.city,
-        state: request.address.state,
-        postalCode: request.address.postalCode,
-        accessNotes: request.address.accessNotes ?? null,
-        distanceMiles: quote.distance.miles,
-        zone: quote.distance.zone,
-        distanceProvider: quote.distance.provider,
-        distanceComputedAt: now,
-      };
-
-      const address = existing
-        ? await tx.address.update({ where: { id: existing.id }, data: addressData })
-        : await tx.address.create({
-            data: { ...addressData, customerId: customer.id, isPrimary: true },
+        if (!libre) {
+          throw new ConflictException({
+            code: API_ERROR_CODES.SLOT_UNAVAILABLE,
+            messageKey: 'booking.errorSlotTaken',
           });
+        }
 
-      // --- Cotizacion que origina la reserva -------------------------------
-      const savedQuote = await tx.quote.create({
-        data: {
-          customerId: customer.id,
-          source: 'WEB',
-          locale: request.contact.locale,
-          service: request.service,
-          frequency: request.frequency,
-          bedrooms: request.bedrooms,
-          bathrooms: request.bathrooms,
-          squareFeet: request.squareFeet,
-          addOns: request.addOns,
-          postalCode: request.address.postalCode,
-          state: request.address.state,
-          distanceMiles: quote.distance.miles,
-          zone: quote.distance.zone,
-          lines: quote.lines,
-          serviceCents: quote.totals.serviceCents,
-          addOnsCents: quote.totals.addOnsCents,
-          surchargesCents: quote.totals.surchargesCents,
-          discountCents: quote.totals.discountCents,
-          taxCents: quote.totals.taxCents,
-          totalCents: quote.totals.totalCents,
-          depositCents: quote.deposit.amountCents,
-          pricingVersion: version,
-          manualReviewReasons: quote.manualReview.reasonKeys,
-          expiresAt: new Date(quote.expiresAt),
-        },
-      });
-
-      const reference = await this.nextReference(tx, now);
-
-      const booking = await tx.booking.create({
-        data: {
-          reference,
-          customerId: customer.id,
-          addressId: address.id,
-          quoteId: savedQuote.id,
-          status: requierePago ? 'PENDING_PAYMENT' : 'CONFIRMED',
-          service: request.service,
-          frequency: request.frequency,
-          bedrooms: request.bedrooms,
-          bathrooms: request.bathrooms,
-          squareFeet: request.squareFeet,
-          addOns: request.addOns,
-          scheduledStart: startsAt,
-          scheduledEnd: endsAt,
-          timezone: schedulingConfig.timezone,
-          distanceMiles: quote.distance.miles,
-          zone: quote.distance.zone,
-          lines: quote.lines,
-          serviceCents: quote.totals.serviceCents,
-          addOnsCents: quote.totals.addOnsCents,
-          surchargesCents: quote.totals.surchargesCents,
-          discountCents: quote.totals.discountCents,
-          taxCents: quote.totals.taxCents,
-          totalCents: quote.totals.totalCents,
-          depositCents: quote.deposit.amountCents,
-          balanceDueCents: quote.balanceDueAtServiceCents,
-          pricingVersion: version,
-          customerNotes: request.customerNotes ?? null,
-        },
-      });
-
-      // Se registra la referencia y la zona, nunca el nombre ni la direccion.
-      this.logger.log(`Reserva ${booking.reference} creada en zona ${quote.distance.zone}`);
-
-      /*
-       * RASTRO DE LA RESERVA, dentro de la misma transaccion: o queda la
-       * reserva y su registro, o no queda ninguna de las dos.
-       *
-       * El actor es CUSTOMER y no hay identificador: quien reserva no tiene
-       * ficha de personal. Lo que identifica la fila es la reserva en si.
-       *
-       * En la metadata va lo que sirve para investigar un patron raro —diez
-       * reservas seguidas, todas canceladas— y NADA MAS. Ni nombre, ni
-       * correo, ni telefono, ni direccion: todo eso ya esta en la reserva,
-       * que es su sitio, y duplicarlo aqui solo multiplica por dos los
-       * lugares donde hay datos personales que borrar el dia que un cliente
-       * lo pida.
-       */
-      await this.audit.record(
-        {
-          staff: null,
-          actorType: 'CUSTOMER',
-          surface: 'SITE',
-          action: 'booking.created',
-          entityType: 'booking',
-          entityId: booking.id,
-          metadata: {
-            reference: booking.reference,
-            service: request.service,
-            zone: quote.distance.zone,
-            totalCents: quote.totals.totalCents,
-            scheduledStart: startsAt.toISOString(),
+        // --- Cliente: se reutiliza si ya existe ese correo -------------------
+        const customer = await tx.customer.upsert({
+          where: { email: request.contact.email },
+          create: {
+            email: request.contact.email,
+            firstName: request.contact.firstName,
+            lastName: request.contact.lastName,
+            phone: request.contact.phone,
+            locale: request.contact.locale,
+            marketingOptIn: request.contact.marketingOptIn,
           },
-          ipAddress: ip,
-        },
-        tx,
-      );
+          update: {
+            firstName: request.contact.firstName,
+            lastName: request.contact.lastName,
+            phone: request.contact.phone,
+            locale: request.contact.locale,
+            // El consentimiento comercial solo se concede, nunca se revoca
+            // silenciosamente por rellenar otro formulario.
+            ...(request.contact.marketingOptIn ? { marketingOptIn: true } : {}),
+          },
+        });
 
-      return {
-        bookingId: booking.id,
-        reference: booking.reference,
-        status: requierePago ? 'PENDING_PAYMENT' : 'CONFIRMED',
-        scheduledStart: startsAt.toISOString(),
-        scheduledEnd: endsAt.toISOString(),
-        timezone: booking.timezone,
-        durationMinutes,
-        currency: 'USD',
-        totals: quote.totals,
-        deposit: quote.deposit,
-        balanceDueAtServiceCents: quote.balanceDueAtServiceCents,
-        nextStep: requierePago ? 'PAYMENT' : 'NONE',
-        holdExpiresAt: requierePago ? holdExpiresAt.toISOString() : null,
-      };
-    });
+        // --- Direccion: se reutiliza la misma calle del mismo cliente --------
+        const existing = await tx.address.findFirst({
+          where: {
+            customerId: customer.id,
+            line1: request.address.line1,
+            postalCode: request.address.postalCode,
+          },
+        });
+
+        const addressData = {
+          line1: request.address.line1,
+          line2: request.address.line2 ?? null,
+          city: request.address.city,
+          state: request.address.state,
+          postalCode: request.address.postalCode,
+          accessNotes: request.address.accessNotes ?? null,
+          distanceMiles: quote.distance.miles,
+          zone: quote.distance.zone,
+          distanceProvider: quote.distance.provider,
+          distanceComputedAt: now,
+        };
+
+        const address = existing
+          ? await tx.address.update({ where: { id: existing.id }, data: addressData })
+          : await tx.address.create({
+              data: { ...addressData, customerId: customer.id, isPrimary: true },
+            });
+
+        direccionAGeocodificar = address.id;
+
+        // --- Cotizacion que origina la reserva -------------------------------
+        const savedQuote = await tx.quote.create({
+          data: {
+            customerId: customer.id,
+            source: 'WEB',
+            locale: request.contact.locale,
+            service: request.service,
+            frequency: request.frequency,
+            bedrooms: request.bedrooms,
+            bathrooms: request.bathrooms,
+            squareFeet: request.squareFeet,
+            addOns: request.addOns,
+            postalCode: request.address.postalCode,
+            state: request.address.state,
+            distanceMiles: quote.distance.miles,
+            zone: quote.distance.zone,
+            lines: quote.lines,
+            serviceCents: quote.totals.serviceCents,
+            addOnsCents: quote.totals.addOnsCents,
+            surchargesCents: quote.totals.surchargesCents,
+            discountCents: quote.totals.discountCents,
+            taxCents: quote.totals.taxCents,
+            totalCents: quote.totals.totalCents,
+            depositCents: quote.deposit.amountCents,
+            pricingVersion: version,
+            manualReviewReasons: quote.manualReview.reasonKeys,
+            expiresAt: new Date(quote.expiresAt),
+          },
+        });
+
+        const reference = await this.nextReference(tx, now);
+
+        const booking = await tx.booking.create({
+          data: {
+            reference,
+            customerId: customer.id,
+            addressId: address.id,
+            quoteId: savedQuote.id,
+            status: requierePago ? 'PENDING_PAYMENT' : 'CONFIRMED',
+            service: request.service,
+            frequency: request.frequency,
+            bedrooms: request.bedrooms,
+            bathrooms: request.bathrooms,
+            squareFeet: request.squareFeet,
+            addOns: request.addOns,
+            scheduledStart: startsAt,
+            scheduledEnd: endsAt,
+            timezone: schedulingConfig.timezone,
+            distanceMiles: quote.distance.miles,
+            zone: quote.distance.zone,
+            lines: quote.lines,
+            serviceCents: quote.totals.serviceCents,
+            addOnsCents: quote.totals.addOnsCents,
+            surchargesCents: quote.totals.surchargesCents,
+            discountCents: quote.totals.discountCents,
+            taxCents: quote.totals.taxCents,
+            totalCents: quote.totals.totalCents,
+            depositCents: quote.deposit.amountCents,
+            balanceDueCents: quote.balanceDueAtServiceCents,
+            pricingVersion: version,
+            customerNotes: request.customerNotes ?? null,
+          },
+        });
+
+        // Se registra la referencia y la zona, nunca el nombre ni la direccion.
+        this.logger.log(`Reserva ${booking.reference} creada en zona ${quote.distance.zone}`);
+
+        /*
+         * RASTRO DE LA RESERVA, dentro de la misma transaccion: o queda la
+         * reserva y su registro, o no queda ninguna de las dos.
+         *
+         * El actor es CUSTOMER y no hay identificador: quien reserva no tiene
+         * ficha de personal. Lo que identifica la fila es la reserva en si.
+         *
+         * En la metadata va lo que sirve para investigar un patron raro —diez
+         * reservas seguidas, todas canceladas— y NADA MAS. Ni nombre, ni
+         * correo, ni telefono, ni direccion: todo eso ya esta en la reserva,
+         * que es su sitio, y duplicarlo aqui solo multiplica por dos los
+         * lugares donde hay datos personales que borrar el dia que un cliente
+         * lo pida.
+         */
+        await this.audit.record(
+          {
+            staff: null,
+            actorType: 'CUSTOMER',
+            surface: 'SITE',
+            action: 'booking.created',
+            entityType: 'booking',
+            entityId: booking.id,
+            metadata: {
+              reference: booking.reference,
+              service: request.service,
+              zone: quote.distance.zone,
+              totalCents: quote.totals.totalCents,
+              scheduledStart: startsAt.toISOString(),
+            },
+            ipAddress: ip,
+          },
+          tx,
+        );
+
+        return {
+          bookingId: booking.id,
+          reference: booking.reference,
+          status: requierePago ? 'PENDING_PAYMENT' : 'CONFIRMED',
+          scheduledStart: startsAt.toISOString(),
+          scheduledEnd: endsAt.toISOString(),
+          timezone: booking.timezone,
+          durationMinutes,
+          currency: 'USD',
+          totals: quote.totals,
+          deposit: quote.deposit,
+          balanceDueAtServiceCents: quote.balanceDueAtServiceCents,
+          nextStep: requierePago ? 'PAYMENT' : 'NONE',
+          holdExpiresAt: requierePago ? holdExpiresAt.toISOString() : null,
+        };
+      },
+    );
+
+    /*
+     * ========================================================================
+     * LA GEOCODIFICACION VA AQUI: FUERA DE LA TRANSACCION Y SIN ESPERARLA
+     * ========================================================================
+     * Convertir la direccion en un punto del mapa hace falta para el fichaje
+     * con ubicacion, pero NO para reservar. Por eso no entra en ninguna de
+     * las dos cosas de las que depende una reserva:
+     *
+     *   - NO dentro de la transaccion. Una llamada de red dentro de una
+     *     transaccion la mantiene abierta —con el bloqueo del dia tomado—
+     *     durante segundos, y si el servicio tarda, bloquea las reservas del
+     *     resto de clientes de ese dia.
+     *
+     *   - NO con `await`. Quien acaba de reservar no tiene por que esperar a
+     *     un servicio del gobierno federal para ver su confirmacion.
+     *
+     * `void` es deliberado, no un olvido: se lanza y se sigue. El servicio
+     * de geocodificacion no lanza nunca hacia arriba, asi que no puede dejar
+     * una promesa rechazada sin capturar; y si falla, el barrido periodico
+     * recoge la direccion mas tarde. Peor caso: esa casa tarda unos minutos
+     * en tener coordenadas.
+     */
+    if (direccionAGeocodificar !== null) {
+      void this.geocoding.resolveAndStore(direccionAGeocodificar);
+    }
+
+    return respuesta;
   }
 
   /**

@@ -58,6 +58,17 @@ enum Frequency {
   MONTHLY
 }
 
+/// Como de fina es la coincidencia del geocodificador.
+///
+/// NO es un adorno: decide si la distancia de un fichaje significa algo.
+/// ROOFTOP es el portal; INTERPOLATED es un punto estimado sobre el tramo de
+/// calle, que es lo que devuelve el Censo casi siempre y puede errar la casa
+/// por decenas de metros (cientos, en una manzana rural larga).
+enum GeocodePrecision {
+  ROOFTOP
+  INTERPOLATED
+}
+
 enum ServiceZone {
   A
   B
@@ -232,6 +243,32 @@ model Address {
   zone               ServiceZone?
   distanceProvider   String?
   distanceComputedAt DateTime?    @db.Timestamptz(3)
+
+  /// Donde cae la casa en el mapa. Se resuelve UNA vez desde la direccion y
+  /// se guarda, porque una casa no se mueve.
+  ///
+  /// Todo nulo mientras no se haya geocodificado, que es el estado normal al
+  /// crear la direccion y lo sigue siendo si el servicio externo no la
+  /// encuentra. Nada del sistema depende de que esto tenga valor: sin
+  /// coordenadas, el fichaje simplemente no registra distancia.
+  ///
+  /// NO añade exposicion de privacidad: la direccion completa ya esta arriba,
+  /// en texto plano. Lo que NO se guarda en ninguna parte es la ubicacion del
+  /// empleado.
+  latitude         Float?
+  longitude        Float?
+  geocodePrecision GeocodePrecision?
+  geocodeProvider  String?
+  geocodedAt       DateTime?         @db.Timestamptz(3)
+
+  /// La direccion tal y como la entendio el geocodificador.
+  ///
+  /// Es lo unico que revela la coincidencia PLAUSIBLE pero equivocada: se
+  /// pidio «123 Main St» y el servicio entendio «123 Main Ave», misma ciudad.
+  /// Eso pasa la guardia del estado, guarda coordenadas validas y deja la
+  /// casa a kilometro y medio. No falla: miente. Comparando las dos cadenas
+  /// se ve; sin esta columna, no.
+  geocodeMatchedAddress String?
 
   isPrimary Boolean @default(false)
 

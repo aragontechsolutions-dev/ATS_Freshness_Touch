@@ -201,14 +201,29 @@ Progreso:
 **Requisitos previos:** cuentas de Supabase y Stripe, y la dirección completa
 del cliente (que en la Etapa 1 no se pide a propósito).
 
-## Etapa 3 — Operación en campo
+## Etapa 3 — Operación en campo 🔄 EN CURSO
 
-- Aplicación web instalable (PWA) para el personal de limpieza.
-- Detalle del trabajo, listas de verificación, fotos antes y después.
-- Fichaje de entrada y salida con ubicación.
-- Funcionamiento sin conexión con cola de sincronización (zonas rurales de Georgia).
-- Avisos automáticos por SMS y correo: confirmación, recordatorio, "vamos en
-  camino", solicitud de reseña y de propina.
+- ✅ **Aplicación web instalable (PWA)** para el personal de limpieza
+  (`docs/23-aplicacion-instalable.md`): el panel se instala en el móvil desde
+  el navegador, con aviso cuando hay versión nueva. **La API no se cachea
+  nunca**, a propósito.
+- ✅ **Geocodificación de las direcciones** (`docs/24-geocodificacion.md`): cada
+  casa tiene su punto en el mapa, resuelto por el geocodificador del Censo de
+  EE. UU. No estaba en el plan original y salió al planificar el fichaje: sin
+  saber dónde está la casa, no hay forma de decir si alguien estaba en ella.
+- ⬜ **Fichaje de entrada y salida con ubicación.** Va detrás de lo anterior.
+  Decidido ya: se guarda **solo la distancia a la casa** —las coordenadas del
+  empleado se descartan en el servidor— y **nunca bloquea el fichaje**; sin
+  ubicación se ficha igual, marcado como tal.
+- ⬜ Detalle del trabajo, listas de verificación, fotos antes y después.
+  Requiere decidir dónde se almacenan las fotos.
+- ⬜ Funcionamiento sin conexión con cola de sincronización (zonas rurales de
+  Georgia).
+- ⬜ Avisos por SMS: confirmación, recordatorio, "vamos en camino", solicitud
+  de reseña y de propina. **Bloqueado por trámite externo**: el envío de
+  SMS a números de EE. UU. exige registro A2P 10DLC, que lo tramita el
+  titular del negocio y tarda semanas. Lo demás ya funciona por correo
+  (`docs/14-avisos.md`).
 
 ## Etapa 4 — Escala y administración
 

@@ -10,6 +10,8 @@ export * from './admin';
 export * from './business-settings';
 export * from './site-copy';
 export * from './service-area';
+export * from './geo-distance';
+export * from './geocoding';
 export * from './georgia-outline';
 export * from './company-location';
 export * from './notifications';
