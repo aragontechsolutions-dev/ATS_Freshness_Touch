@@ -8,6 +8,7 @@ import {
   type AdminBookingListItem,
   type AdminBookingQuery,
   type AuthenticatedStaff,
+  type ClockInRecord,
 } from '@freshness/types';
 import { PrismaService } from '../database/prisma.service';
 import { AuditService } from '../audit/audit.service';
@@ -134,6 +135,26 @@ export class BookingsAdminService {
             accessNotes: true,
           },
         },
+        /*
+         * LOS FICHAJES DEL EQUIPO. Es para lo que existe la etapa 3.3: ante
+         * un «esto se cerro sin hacerse», ver a que hora llego cada persona y
+         * a que distancia de la casa estaba.
+         *
+         * Aqui tampoco se lee ninguna coordenada de nadie, porque la tabla no
+         * las tiene.
+         */
+        clockIns: {
+          select: {
+            staffId: true,
+            kind: true,
+            occurredAt: true,
+            locationState: true,
+            distanceMeters: true,
+            accuracyMeters: true,
+            staff: { select: { firstName: true } },
+          },
+          orderBy: { occurredAt: 'asc' },
+        },
         payments: {
           where: { kind: 'DEPOSIT_HOLD' },
           orderBy: { createdAt: 'desc' },
@@ -250,6 +271,15 @@ export class BookingsAdminService {
       cancelledAt: booking.cancelledAt?.toISOString() ?? null,
       cancelledBy: booking.cancelledBy,
       cancellationReason: booking.cancellationReason,
+      clockIns: booking.clockIns.map((f): ClockInRecord => ({
+        staffId: f.staffId,
+        staffFirstName: f.staff.firstName,
+        kind: f.kind,
+        occurredAt: f.occurredAt.toISOString(),
+        locationState: f.locationState,
+        distanceMeters: f.distanceMeters,
+        accuracyMeters: f.accuracyMeters,
+      })),
     };
   }
 

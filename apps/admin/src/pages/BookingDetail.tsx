@@ -5,6 +5,7 @@ import { ApiClientError, fetchBookingDetail, isSessionError, sessionLostReason }
 import { BookingActions } from '../components/BookingActions';
 import { StatusChip } from '../components/StatusChip';
 import { TeamSection } from '../components/TeamSection';
+import { ClockInsSection } from '../components/ClockInsSection';
 import { SkeletonDetalleReserva } from '../components/Skeletons';
 import {
   AlertIcon,
@@ -177,6 +178,14 @@ export function BookingDetailPage({
         onUpdated={setBooking}
         onSessionLost={onSessionLost}
       />
+
+      {/*
+        LOS FICHAJES, JUNTO AL EQUIPO Y NO AL FINAL.
+        Es la continuacion de «quien va»: quien fue, a que hora y desde donde.
+        No se pinta si nadie ha fichado todavia, que es el caso normal de un
+        trabajo aun por hacer.
+      */}
+      <ClockInsSection booking={booking} locale={locale} />
 
       {/* -------------------------------- Precio ------------------------------- */}
       <section className="ft-card p-5">

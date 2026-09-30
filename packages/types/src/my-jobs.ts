@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { BookingStatusSchema } from './booking';
+import { ClockInLocationSchema, ClockInRecordSchema } from './clock-in';
 import { ServiceTypeSchema } from './enums';
 
 /**
@@ -76,6 +77,21 @@ export const MyJobSchema = z.strictObject({
   teammates: z.array(z.strictObject({ name: z.string(), isLead: z.boolean() })),
   /** Si quien mira es la responsable de este trabajo. */
   iAmLead: z.boolean(),
+
+  /**
+   * LOS FICHAJES DE ESTE TRABAJO, INCLUIDOS LOS DE LOS COMPANEROS.
+   *
+   * Que una empleada vea su propio fichaje fue una decision explicita: no hay
+   * un expediente secreto sobre nadie. Ve exactamente el mismo dato que vera
+   * coordinacion, y si esta mal puede decirlo en el momento en vez de
+   * enterarse en una revision tres meses despues.
+   *
+   * Y ve tambien los del resto del equipo, que es lo que ya ocurre con el
+   * resto de esta pantalla: quien va a una casa sabe quien mas va y si ya ha
+   * llegado. Aqui no se abre nada nuevo —la distancia no dice donde vive
+   * nadie— y sirve para lo de siempre: saber si hay que esperar en la puerta.
+   */
+  clockIns: z.array(ClockInRecordSchema),
 });
 export type MyJob = z.infer<typeof MyJobSchema>;
 
@@ -92,5 +108,33 @@ export type MyJobs = z.infer<typeof MyJobsSchema>;
  */
 export const MyJobProgressSchema = z.strictObject({
   status: z.enum(['IN_PROGRESS', 'COMPLETED']),
+
+  /**
+   * La ubicacion del movil, si la hubo. Ver `clock-in.ts`.
+   *
+   * Llega, se convierte en metros y se descarta. No se guarda en ningun
+   * sitio.
+   */
+  location: ClockInLocationSchema.optional(),
+
+  /**
+   * Por que NO hubo ubicacion, cuando el movil puede decirlo.
+   *
+   * ========================================================================
+   * SOLO DOS VALORES, Y LA RESTRICCION ES DE SEGURIDAD
+   * ========================================================================
+   * `RECORDED` y `NO_HOUSE` NO se aceptan aqui, aunque existan en el
+   * enumerado, porque no son del cliente:
+   *
+   *   - `RECORDED` significa «hay una distancia calculada». Un cliente que lo
+   *     declarara sin mandar coordenadas estaria afirmando que se comprobo
+   *     algo que nadie comprobo. Lo pone el servidor, y solo despues de
+   *     calcular los metros.
+   *   - `NO_HOUSE` es un hecho de NUESTRA base de datos —la casa no tiene
+   *     coordenadas—, que el movil no puede saber ni le corresponde opinar.
+   *
+   * Dicho de otra forma: el movil puede decir «no pude», nunca «si pude».
+   */
+  locationState: z.enum(['DENIED', 'UNAVAILABLE']).optional(),
 });
 export type MyJobProgress = z.infer<typeof MyJobProgressSchema>;

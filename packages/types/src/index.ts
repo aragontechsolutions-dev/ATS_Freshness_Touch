@@ -11,6 +11,7 @@ export * from './business-settings';
 export * from './site-copy';
 export * from './service-area';
 export * from './geo-distance';
+export * from './clock-in';
 export * from './geocoding';
 export * from './georgia-outline';
 export * from './company-location';

@@ -861,6 +861,46 @@ export const en = {
       finishHint:
         'Tap "I have arrived" when you enter the house. The time is recorded, and it is what backs up your work if anyone asks.',
       noActions: 'Dispatch handles the rest.',
+
+      /*
+       * EL FICHAJE CON UBICACION.
+       *
+       * Estos textos los lee quien acaba de fichar, y por eso dicen la
+       * distancia que quedo registrada: no hay un expediente secreto sobre
+       * nadie. Los tres motivos de «sin ubicacion» tienen texto propio, y
+       * `noHouse` dice que el fallo es NUESTRO para que nadie crea que su
+       * movil va mal.
+       */
+      clockIn: {
+        distanceFeet: 'Recorded {{value}} ft from the house. Your location is not saved.',
+        distanceMiles: 'Recorded {{value}} mi from the house. Your location is not saved.',
+        denied: 'Recorded without location, because location is turned off for this app.',
+        unavailable: 'Recorded without location: your phone could not get a GPS fix.',
+        noHouse: 'Recorded without distance: we do not have this house on the map yet.',
+        far: 'Far from the house',
+      },
+    },
+
+    /* ------------------------ Fichajes ------------------------ */
+    /*
+     * Lo que ve coordinacion en el detalle de un trabajo. El margen del GPS
+     * se muestra junto a la distancia a proposito: «a 2.4 mi» invita a una
+     * conversacion, y «a 2.4 mi ±30 ft» invita a la misma sabiendo que el
+     * dato es solido.
+     */
+    clockIns: {
+      title: 'Clock-ins',
+      arrived: 'Arrived',
+      left: 'Left',
+      feet: '{{value}} ft from the house',
+      miles: '{{value}} mi from the house',
+      accuracy: '(±{{value}} {{unit}})',
+      unit: { feet: 'ft', miles: 'mi' },
+      denied: 'No location (turned off on their phone)',
+      unavailable: 'No location (no GPS fix)',
+      noHouse: 'No distance: we do not have this house on the map yet',
+      privacyNote:
+        'Only the distance is stored. The location of whoever clocked in is never saved: it is turned into a distance and discarded.',
     },
 
     unreachable: {

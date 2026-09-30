@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ClockInRecordSchema } from './clock-in';
 import { BookingStatusSchema } from './booking';
 import { FrequencySchema, ServiceTypeSchema, ServiceZoneSchema } from './enums';
 import { QuoteLineSchema } from './quote';
@@ -155,6 +156,19 @@ export const AdminBookingDetailSchema = AdminBookingListItemSchema.extend({
   cancelledAt: z.iso.datetime().nullable(),
   cancelledBy: z.string().nullable(),
   cancellationReason: z.string().nullable(),
+
+  /**
+   * LOS FICHAJES DEL EQUIPO EN ESTE TRABAJO.
+   *
+   * Es para lo que existe toda la etapa 3.3: ante un «esto se cerro sin
+   * hacerse», coordinacion ve a que hora llego cada persona y a que distancia
+   * de la casa estaba.
+   *
+   * SIN AVISOS Y SIN DESTACADO EN LA AGENDA, que fue una decision explicita:
+   * solo queda registrado. Con una precision interpolada de cientos de metros
+   * en zonas rurales, una alarma automatica avisaria de cosas que no son.
+   */
+  clockIns: z.array(ClockInRecordSchema),
 });
 export type AdminBookingDetail = z.infer<typeof AdminBookingDetailSchema>;
 
