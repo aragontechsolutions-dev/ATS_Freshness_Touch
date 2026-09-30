@@ -1,3 +1,5 @@
+import { haversineMiles } from './geo-distance';
+
 /**
  * EL CONTORNO DEL ESTADO DE GEORGIA
  * ---------------------------------
@@ -533,27 +535,6 @@ export function farthestGeorgiaMiles(lat: number, lon: number): number {
 }
 
 /** Radio medio de la Tierra en millas. */
-const RADIO_TIERRA_MILLAS = 3958.7613;
-
-/**
- * Distancia en millas entre dos coordenadas, sobre la esfera.
- *
- * No es la distancia por carretera —eso lo resuelve el proveedor de
- * distancias en la API— sino la linea recta, que es lo que dibuja un
- * circulo en un mapa y lo unico que hace falta aqui.
- */
-function haversineMiles(lat1: number, lon1: number, lat2: number, lon2: number): number {
-  const aRadianes = Math.PI / 180;
-  const phi1 = lat1 * aRadianes;
-  const phi2 = lat2 * aRadianes;
-  const deltaPhi = (lat2 - lat1) * aRadianes;
-  const deltaLambda = (lon2 - lon1) * aRadianes;
-
-  const a =
-    Math.sin(deltaPhi / 2) ** 2 + Math.cos(phi1) * Math.cos(phi2) * Math.sin(deltaLambda / 2) ** 2;
-
-  return 2 * RADIO_TIERRA_MILLAS * Math.asin(Math.sqrt(a));
-}
 
 /**
  * Si un punto cae DENTRO del estado de Georgia.

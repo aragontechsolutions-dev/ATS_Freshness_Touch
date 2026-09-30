@@ -25,6 +25,37 @@ export const EnvSchema = z
 
     /** Proveedor de distancia: "mock" (simulado, sin coste) o "google". */
     DISTANCE_PROVIDER: z.enum(['mock', 'google']).default('mock'),
+
+    /**
+     * Quien convierte una direccion en un punto del mapa.
+     *
+     * `census` es el geocodificador oficial del gobierno de Estados Unidos:
+     * gratuito, SIN CLAVE DE API y sin limite practico para el volumen de
+     * esta empresa. Que no haya clave importa: no hay nada que rotar, que
+     * filtrar en un despliegue, ni que se pueda gastar.
+     *
+     * Por defecto `mock` para que desarrollo y las pruebas no salgan a
+     * internet. En produccion se pone `census`.
+     */
+    GEOCODING_PROVIDER: z.enum(['mock', 'census']).default('mock'),
+    /**
+     * Cuanto se espera al geocodificador antes de rendirse.
+     *
+     * Generoso a proposito: el servicio del Censo es gratis y a veces tarda
+     * varios segundos. Como esto corre EN SEGUNDO PLANO y no bloquea
+     * ninguna reserva, esperar no le cuesta nada a nadie; rendirse pronto
+     * solo conseguiria dejar direcciones sin coordenadas.
+     */
+    GEOCODING_TIMEOUT_MS: z.coerce.number().int().min(1000).max(60_000).default(15_000),
+    /**
+     * Cada cuanto se repasan las direcciones que quedaron sin coordenadas.
+     *
+     * Cero lo apaga, que es lo que hacen las pruebas. Igual que el barrido
+     * de recordatorios.
+     */
+    GEOCODING_SWEEP_MINUTES: z.coerce.number().int().min(0).max(1440).default(15),
+    /** Cuantas se intentan en cada pasada, para no atacar al servicio. */
+    GEOCODING_SWEEP_BATCH: z.coerce.number().int().min(1).max(200).default(20),
     GOOGLE_MAPS_API_KEY: z.string().min(1).optional(),
     DISTANCE_CACHE_TTL_SECONDS: z.coerce.number().int().min(0).default(86400),
     DISTANCE_CACHE_MAX_ENTRIES: z.coerce.number().int().min(1).default(5000),

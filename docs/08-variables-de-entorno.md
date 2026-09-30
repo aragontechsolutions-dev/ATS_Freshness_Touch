@@ -406,6 +406,35 @@ borraría casi todo el registro, y eso no se deshace.
 
 Ver `docs/16-auditoria.md` §7.
 
+### Geocodificación de las direcciones (Etapa 3.2)
+
+| Variable                  | Valor                          | Obligatoria |
+| ------------------------- | ------------------------------ | ----------- |
+| `GEOCODING_PROVIDER`      | `mock` por defecto, o `census` | No          |
+| `GEOCODING_TIMEOUT_MS`    | 15000 por defecto              | No          |
+| `GEOCODING_SWEEP_MINUTES` | 15 por defecto, 0 lo apaga     | No          |
+| `GEOCODING_SWEEP_BATCH`   | 20 por defecto                 | No          |
+
+**No hay clave de API, y es la razón principal por la que se eligió este
+servicio.** El geocodificador del Censo de Estados Unidos es gratuito y
+público: no hay nada que rotar, ni que filtrar en un despliegue, ni que se
+pueda gastar. No aparece en la tabla de secretos del §6 porque no hay secreto.
+
+**Hay que poner `GEOCODING_PROVIDER=census` en Render para que esto sirva de
+algo.** Con el valor por defecto (`mock`) las coordenadas se inventan —de
+forma estable y siempre dentro de Georgia, para que el desarrollo funcione—,
+pero **no corresponden a la casa real**. Es el mismo criterio que
+`DISTANCE_PROVIDER` y `PAYMENT_PROVIDER`: en el repositorio queda lo inocuo, y
+el de verdad se enciende en el servidor.
+
+`GEOCODING_SWEEP_BATCH` es el tope de direcciones por pasada. Al desplegar
+esto por primera vez **todas** las direcciones existentes están sin
+geocodificar, y resolverlas de golpe sería atacar a un servicio público
+gratuito: con 20 cada 15 minutos son 1920 al día, de sobra, y nada depende de
+ello con urgencia.
+
+Ver `docs/24-geocodificacion.md`.
+
 **El identificador de chat NO va aquí**: se configura desde el panel, en
 Datos del negocio → Avisos. Sin el token no sirve para enviar nada, así que no
 es un secreto.
