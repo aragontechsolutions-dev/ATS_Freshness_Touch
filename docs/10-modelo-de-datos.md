@@ -244,3 +244,71 @@ de conexión **ya no se escriben en `schema.prisma`**, sino en
 Mucha documentación y muchos tutoriales todavía muestran el formato antiguo con
 `url = env("DATABASE_URL")` dentro del esquema: eso ya no es válido y produce
 un error de validación.
+
+## Deriva entre el esquema y la base, y cómo comprobarla
+
+**El esquema de Prisma y lo que hay realmente en la base pueden separarse sin
+que nada falle.** Pasa cuando una migración se escribe a mano —que en este
+proyecto es lo normal— y crea algo que el esquema no declara, o lo declara de
+otra forma.
+
+> **Por qué importa:** la siguiente vez que alguien ejecute `prisma migrate
+dev`, Prisma genera una migración «corrigiendo» la diferencia **a su
+> manera**, mezclada con el trabajo que esa persona estuviera haciendo. Un
+> cambio de esquema que nadie pidió y que nadie revisa — incluido borrar un
+> índice útil.
+
+### Cómo comprobarlo sin tocar ninguna base real
+
+Se levanta un PostgreSQL en memoria, se le aplican **todas** las migraciones
+del repositorio, y se le pregunta a Prisma qué diferencia ve:
+
+```js
+// Levantar PGlite por TCP y aplicar las migraciones en orden.
+const db = await PGlite.create();
+const socket = new PGLiteSocketServer({ db, port: 55921, host: '127.0.0.1' });
+await socket.start();
+for (const m of readdirSync(DIR, { withFileTypes: true })
+  .filter((e) => e.isDirectory())
+  .sort((a, b) => a.name.localeCompare(b.name))) {
+  await db.exec(readFileSync(join(DIR, m.name, 'migration.sql'), 'utf8'));
+}
+```
+
+```bash
+DATABASE_URL="postgresql://postgres:postgres@127.0.0.1:55921/postgres" \
+DIRECT_URL="postgresql://postgres:postgres@127.0.0.1:55921/postgres" \
+pnpm exec prisma migrate diff --from-config-datasource \
+  --to-schema prisma/schema.prisma --script
+```
+
+**`-- This is an empty migration.` significa que no hay deriva.** Cualquier
+otra cosa es una diferencia real que conviene mirar antes de que Prisma la
+«arregle» sola.
+
+> Hacen falta **las dos** variables de entorno: `prisma.config.ts` lee
+> `DIRECT_URL` y sin ella el comando falla con `P1013`.
+
+### Lo que Prisma NO ve
+
+- **Las restricciones `CHECK`.** Son invisibles para él: no las introspecciona
+  y no intenta reconciliarlas, así que viven solo en el archivo de migración
+  **sin causar deriva**. El fichaje con ubicación usa una
+  (`docs/25-fichaje-con-ubicacion.md` §8), y se comprobó con este
+  procedimiento antes de darla por buena.
+- **Los índices parciales** (`CREATE INDEX ... WHERE ...`) sí los ve, y no se
+  pueden expresar en el esquema: ahí la deriva es inevitable, y por eso en la
+  Etapa 3.2 se decidió no usar ninguno.
+
+### Las dos que había, corregidas en octubre de 2026
+
+Aparecieron con este procedimiento, y llevaban meses:
+
+| Qué                                                                  | Desde      | Cómo se arregló                                                      |
+| -------------------------------------------------------------------- | ---------- | -------------------------------------------------------------------- |
+| `pricing_tables_createdAt_idx` existía en la base y no en el esquema | Etapa 2.22 | **Declarándolo**, no borrándolo: acelera «cuál es la tarifa vigente» |
+| `notifications_bookingId_fkey` sin `ON UPDATE`                       | Etapa 2.5  | Recreada con `ON UPDATE CASCADE`, como las demás                     |
+
+Ninguna rompía nada: el identificador de una reserva es un UUID que no cambia
+nunca, así que la regla de actualización no llegaba a aplicarse. Se alinearon
+para que el esquema y la base digan lo mismo.

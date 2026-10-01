@@ -678,6 +678,16 @@ model PricingTable {
   /// cambio alguien que ya no esta" no sirve al revisar una factura.
   createdByName String? @db.VarChar(160)
 
+  /// Para «cual es la vigente», que es la consulta de cada peticion del
+  /// cotizador. La version se ordena sola por texto (AAAA.MM.DD.n), pero se
+  /// indexa la fecha porque es lo que no depende del formato del
+  /// identificador.
+  ///
+  /// EL INDICE YA EXISTIA EN LA BASE: lo creaba la migracion de la etapa
+  /// 2.22, pero nadie lo declaro aqui. Prisma no lo veia, y la siguiente
+  /// `migrate dev` que alguien ejecutara habria generado una migracion
+  /// BORRANDOLO, mezclada con lo que esa persona estuviera haciendo.
+  @@index([createdAt(sort: Desc)])
   @@map("pricing_tables")
 }
 
