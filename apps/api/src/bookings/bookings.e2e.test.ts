@@ -57,11 +57,21 @@ const DIRECCION = {
 
 const TRABAJO = {
   service: 'STANDARD' as const,
+  frequency: 'MONTHLY' as const,
   bedrooms: 3,
   bathrooms: 2,
   squareFeet: 1800,
   addOns: [{ code: 'INSIDE_OVEN' as const, quantity: 1 }],
 };
+
+/**
+ * Lo mismo, SIN la cadencia: la consulta de disponibilidad no la acepta.
+ *
+ * Su contrato es estricto a proposito —un campo de mas se rechaza en vez de
+ * ignorarse—, y la agenda no depende de cada cuanto se repite una limpieza:
+ * depende de cuanto dura, y eso sale del servicio y del tamano.
+ */
+const { frequency: _cadencia, ...TRABAJO_SIN_CADENCIA } = TRABAJO;
 
 beforeAll(async () => {
   db = await PGlite.create();
@@ -122,7 +132,7 @@ describe('consulta de disponibilidad', () => {
   it('devuelve franjas para un dia laborable', async () => {
     const response = await request(app.getHttpServer())
       .get('/api/v1/availability')
-      .query({ date: proximoDiaLaborable(), ...TRABAJO, addOns: [] })
+      .query({ date: proximoDiaLaborable(), ...TRABAJO_SIN_CADENCIA, addOns: [] })
       .expect(200);
 
     expect(response.body.businessOpen).toBe(true);
@@ -141,12 +151,12 @@ describe('consulta de disponibilidad', () => {
     const dia = proximoDiaLaborable();
     const sinExtras = await request(app.getHttpServer())
       .get('/api/v1/availability')
-      .query({ date: dia, ...TRABAJO, addOns: [] })
+      .query({ date: dia, ...TRABAJO_SIN_CADENCIA, addOns: [] })
       .expect(200);
 
     const conExtras = await request(app.getHttpServer())
       .get('/api/v1/availability')
-      .query({ date: dia, ...TRABAJO, addOns: 'INSIDE_OVEN:1,INTERIOR_WINDOWS:4' })
+      .query({ date: dia, ...TRABAJO_SIN_CADENCIA, addOns: 'INSIDE_OVEN:1,INTERIOR_WINDOWS:4' })
       .expect(200);
 
     expect(conExtras.body.durationMinutes).toBeGreaterThan(sinExtras.body.durationMinutes);
@@ -155,7 +165,7 @@ describe('consulta de disponibilidad', () => {
   it('rechaza un extra que no existe en vez de ignorarlo', async () => {
     const response = await request(app.getHttpServer())
       .get('/api/v1/availability')
-      .query({ date: proximoDiaLaborable(), ...TRABAJO, addOns: 'NO_EXISTE:1' })
+      .query({ date: proximoDiaLaborable(), ...TRABAJO_SIN_CADENCIA, addOns: 'NO_EXISTE:1' })
       .expect(400);
 
     expect(response.body.code).toBe('VALIDATION_ERROR');
@@ -164,7 +174,12 @@ describe('consulta de disponibilidad', () => {
   it('el servicio comercial no se puede agendar desde la web', async () => {
     const response = await request(app.getHttpServer())
       .get('/api/v1/availability')
-      .query({ date: proximoDiaLaborable(), ...TRABAJO, service: 'COMMERCIAL', addOns: [] })
+      .query({
+        date: proximoDiaLaborable(),
+        ...TRABAJO_SIN_CADENCIA,
+        service: 'COMMERCIAL',
+        addOns: [],
+      })
       .expect(400);
 
     expect(response.body.code).toBe('BOOKING_NOT_QUOTABLE');
@@ -174,7 +189,7 @@ describe('consulta de disponibilidad', () => {
     const lejos = DateTime.now().plus({ years: 2 }).toFormat('yyyy-MM-dd');
     await request(app.getHttpServer())
       .get('/api/v1/availability')
-      .query({ date: lejos, ...TRABAJO, addOns: [] })
+      .query({ date: lejos, ...TRABAJO_SIN_CADENCIA, addOns: [] })
       .expect(400);
   });
 });
@@ -185,7 +200,7 @@ describe('creacion de reserva', () => {
   it('crea la reserva y devuelve precio y deposito calculados en el servidor', async () => {
     const disponibilidad = await request(app.getHttpServer())
       .get('/api/v1/availability')
-      .query({ date: proximoDiaLaborable(), ...TRABAJO, addOns: [] })
+      .query({ date: proximoDiaLaborable(), ...TRABAJO_SIN_CADENCIA, addOns: [] })
       .expect(200);
 
     franja = disponibilidad.body.slots.find(
@@ -199,9 +214,9 @@ describe('creacion de reserva', () => {
 
     expect(response.body.reference).toMatch(/^FT-\d{4}-\d{4}$/);
     expect(response.body.status).toBe('PENDING_PAYMENT');
-    // 18500 la estandar puntual + 5000 el horno. La direccion esta dentro
-    // de las 35 millas incluidas, asi que el traslado no suma nada.
-    expect(response.body.totals.totalCents).toBe(23_500);
+    // 18000 la estandar mensual de una casa de 1.800 pies + 5000 el horno.
+    // La direccion esta dentro de las 35 millas, asi que el traslado no suma.
+    expect(response.body.totals.totalCents).toBe(23_000);
     // La garantia es fija y se descuenta del total: no es un cargo aparte.
     expect(response.body.deposit.amountCents).toBe(3500);
     expect(response.body.balanceDueAtServiceCents).toBe(

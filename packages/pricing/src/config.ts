@@ -1,4 +1,11 @@
-import type { AddOnCode, AddOnUnit, Frequency, ServiceType, ServiceZone } from '@freshness/types';
+import type {
+  AddOnCode,
+  AddOnUnit,
+  Frequency,
+  PricingSizeBand,
+  ServiceType,
+  ServiceZone,
+} from '@freshness/types';
 
 /**
  * CONFIGURACION COMERCIAL DE FRESHNESS TOUCH
@@ -41,35 +48,73 @@ import type { AddOnCode, AddOnUnit, Frequency, ServiceType, ServiceZone } from '
  * regla dice lo mismo: hasta que el tamano alcanza al importe plano, se paga
  * el plano.
  */
-export interface FrequencyRate {
-  /** Lo que se cobra cuando el tamano no manda. */
-  flatCents: number;
-  /**
-   * Centavos por pie cuadrado, o `null` si este servicio no mira el tamano.
-   *
-   * La limpieza estandar no lo mira a proposito: es un precio que se dice por
-   * telefono sin preguntar nada.
-   */
-  centsPerSquareFoot: number | null;
-}
+/**
+ * QUE COLUMNA DE LA TABLA POR TRAMOS LEE UNA CADENCIA.
+ *
+ * El precio ya no esta aqui: esta en `sizeBands`. Lo que queda en el codigo
+ * es el ENLACE entre un servicio y la columna que le corresponde, que es
+ * decision de producto y no una tarifa:
+ *
+ *   - La profunda y las dos de mudanza leen la misma columna, porque son el
+ *     mismo trabajo con distinto nombre segun por que se pida.
+ *   - La estandar lee una columna por cadencia.
+ */
+export type BandColumn =
+  'deepCents' | 'standardMonthlyCents' | 'standardBiweeklyCents' | 'standardWeeklyCents';
 
 export interface ServiceRate {
+  /**
+   * Si se ofrece hoy en el sitio.
+   *
+   * NO ES LO MISMO QUE `instantQuote`, y la diferencia importa:
+   *
+   *   - `offered: false` -> no aparece en ningun sitio. Ni en la lista de
+   *     servicios, ni en el cotizador, ni en el formulario de reserva.
+   *   - `instantQuote: false` -> si aparece, pero sin precio automatico: se
+   *     recoge la solicitud y se llama al cliente.
+   *
+   * LOS RETIRADOS NO SE BORRAN DEL ENUMERADO. Su codigo esta escrito en
+   * reservas que ya existen, y quitarlo haria ilegible una del mes pasado.
+   * Se apagan, y el dia que vuelvan a ofrecerse se enciende esta linea.
+   */
+  offered: boolean;
   /** false = requiere visita previa y propuesta manual. */
   instantQuote: boolean;
   /**
-   * La tarifa de cada cadencia. `null` = ESE SERVICIO NO SE OFRECE ASI.
+   * De que columna sale el precio en cada cadencia. `null` = ESE SERVICIO NO
+   * SE OFRECE ASI.
    *
    * Una limpieza profunda no se contrata cada semana: la casa ya esta
-   * profunda. Dejarlo en `null` y no en un precio alto es la diferencia
-   * entre «no se ofrece» y «se ofrece caro», y el cotizador responde
-   * distinto a cada cosa.
+   * profunda. Y desde la etapa 3.4 la ESTANDAR NO SE OFRECE PUNTUAL: la
+   * tabla del cliente solo le pone precio mensual, quincenal y semanal, y
+   * quien quiere una limpieza suelta contrata la profunda. Es practica
+   * habitual del sector —la primera limpieza de una casa siempre es
+   * profunda—.
+   *
+   * `null` y «sin precio automatico» NO son lo mismo, y el cotizador
+   * responde distinto a cada cosa: «elige otra frecuencia» frente a «te
+   * llamamos».
    */
-  byFrequency: Record<Frequency, FrequencyRate | null>;
+  byFrequency: Record<Frequency, BandColumn | null>;
 }
 
 export interface AddOnRate {
   unit: AddOnUnit;
+  /**
+   * Lo que cuesta. SE IGNORA cuando `pricedBySize` es true: en ese caso el
+   * importe sale de la tabla por tramos, y dejarlo aqui seria tener el
+   * precio en dos sitios.
+   */
   unitAmountCents: number;
+  /**
+   * Si el precio lo pone el tramo de tamano de la casa.
+   *
+   * Solo lo usa «ventanas y gabinetes interiores», que en la tabla del
+   * cliente cuesta de 30 a 85 dolares segun el tamano. El horno y la nevera
+   * son planos a proposito: limpiar un horno cuesta lo mismo en un
+   * apartamento que en una mansion.
+   */
+  pricedBySize: boolean;
   maxQuantity: number;
   /**
    * Si se ofrece hoy.
@@ -177,6 +222,11 @@ export interface PricingConfig {
     latitude: number;
     longitude: number;
   };
+  /**
+   * LA TABLA DE PRECIOS POR TAMANO. De aqui sale el precio de cada limpieza.
+   * `services` ya no lleva importes: dice que columna lee cada cadencia.
+   */
+  sizeBands: PricingSizeBand[];
   services: Record<ServiceType, ServiceRate>;
   addOns: Record<AddOnCode, AddOnRate>;
   /*
@@ -225,58 +275,287 @@ export const defaultPricingConfig: PricingConfig = {
   },
 
   /*
-   * LOS PRECIOS DE FRESHNESS TOUCH.
+   * ========================================================================
+   * LOS PRECIOS DE FRESHNESS TOUCH: UNA TABLA, NO UNA FORMULA
+   * ========================================================================
+   * Transcritos de la hoja de calculo que paso el cliente en octubre de
+   * 2026. UNA FILA POR TRAMO DE TAMANO, con el tope del tramo inclusive, y
+   * una casa toma el primer tramo cuyo tope alcanza (ver `sizeBandFor`).
    *
-   * La estandar es PLANA y no mira el tamano: es el precio que se dice por
-   * telefono sin preguntar nada, y baja segun el compromiso. La profunda y
-   * la de mudanza si miran los pies cuadrados, porque el trabajo escala con
-   * la casa, y solo se contratan puntualmente.
+   * LA TRANSCRIPCION ESTA VERIFICADA, no leida a ojo: la suma de las 26
+   * filas por las ocho columnas da 47.275, exactamente el total que mostraba
+   * la hoja. Hay una prueba que lo vuelve a comprobar.
+   *
+   * ------------------------------------------------------------------------
+   * UNA INCOHERENCIA DE LA HOJA, CONSERVADA A PROPOSITO
+   * ------------------------------------------------------------------------
+   * La estandar MENSUAL de 900 pies cuesta 160 $ y la de 1.200 cuesta 150 $:
+   * la casa mas grande paga diez dolares menos al mes. Es la unica columna
+   * donde el precio baja al crecer la casa, y parece una errata del cliente.
+   *
+   * NO SE CORRIGE AQUI. Son sus precios, y arreglarlos en silencio seria
+   * cobrar algo distinto de lo que el dijo. Queda anotado, en la
+   * documentacion y en una prueba que lo deja por escrito, para que quien lo
+   * vea sepa que esta visto y no es un fallo de la transcripcion.
+   */
+  sizeBands: [
+    /* 900          */ {
+      maxSquareFeet: 900,
+      deepCents: 26000,
+      standardMonthlyCents: 16000,
+      standardBiweeklyCents: 13500,
+      standardWeeklyCents: 12000,
+      windowsAndCabinetsCents: 3000,
+    },
+    /* 1.200        */ {
+      maxSquareFeet: 1200,
+      deepCents: 27000,
+      standardMonthlyCents: 15000,
+      standardBiweeklyCents: 14000,
+      standardWeeklyCents: 13000,
+      windowsAndCabinetsCents: 3000,
+    },
+    /* 1.400        */ {
+      maxSquareFeet: 1400,
+      deepCents: 29000,
+      standardMonthlyCents: 16000,
+      standardBiweeklyCents: 15000,
+      standardWeeklyCents: 14000,
+      windowsAndCabinetsCents: 3000,
+    },
+    /* 1.500        */ {
+      maxSquareFeet: 1500,
+      deepCents: 29000,
+      standardMonthlyCents: 16000,
+      standardBiweeklyCents: 15000,
+      standardWeeklyCents: 14000,
+      windowsAndCabinetsCents: 3000,
+    },
+    /* 1.600        */ {
+      maxSquareFeet: 1600,
+      deepCents: 29000,
+      standardMonthlyCents: 16000,
+      standardBiweeklyCents: 15000,
+      standardWeeklyCents: 14000,
+      windowsAndCabinetsCents: 4000,
+    },
+    /* 1.700        */ {
+      maxSquareFeet: 1700,
+      deepCents: 30000,
+      standardMonthlyCents: 17500,
+      standardBiweeklyCents: 15000,
+      standardWeeklyCents: 14000,
+      windowsAndCabinetsCents: 4000,
+    },
+    /* 1.800        */ {
+      maxSquareFeet: 1800,
+      deepCents: 31000,
+      standardMonthlyCents: 18000,
+      standardBiweeklyCents: 16000,
+      standardWeeklyCents: 14000,
+      windowsAndCabinetsCents: 4500,
+    },
+    /* 1.900        */ {
+      maxSquareFeet: 1900,
+      deepCents: 31500,
+      standardMonthlyCents: 18000,
+      standardBiweeklyCents: 16500,
+      standardWeeklyCents: 14000,
+      windowsAndCabinetsCents: 4500,
+    },
+    /* 2.000        */ {
+      maxSquareFeet: 2000,
+      deepCents: 32000,
+      standardMonthlyCents: 18500,
+      standardBiweeklyCents: 16500,
+      standardWeeklyCents: 15000,
+      windowsAndCabinetsCents: 5000,
+    },
+    /* 2.100-2.200  */ {
+      maxSquareFeet: 2200,
+      deepCents: 32000,
+      standardMonthlyCents: 19000,
+      standardBiweeklyCents: 17000,
+      standardWeeklyCents: 16000,
+      windowsAndCabinetsCents: 5000,
+    },
+    /* 2.300-2.400  */ {
+      maxSquareFeet: 2400,
+      deepCents: 32500,
+      standardMonthlyCents: 19000,
+      standardBiweeklyCents: 17000,
+      standardWeeklyCents: 16000,
+      windowsAndCabinetsCents: 5000,
+    },
+    /* 2.500-2.600  */ {
+      maxSquareFeet: 2600,
+      deepCents: 33000,
+      standardMonthlyCents: 19000,
+      standardBiweeklyCents: 17500,
+      standardWeeklyCents: 16500,
+      windowsAndCabinetsCents: 5000,
+    },
+    /* 2.700-2.900  */ {
+      maxSquareFeet: 2900,
+      deepCents: 33000,
+      standardMonthlyCents: 19500,
+      standardBiweeklyCents: 18000,
+      standardWeeklyCents: 17000,
+      windowsAndCabinetsCents: 5500,
+    },
+    /* 3.000-3.100  */ {
+      maxSquareFeet: 3100,
+      deepCents: 33500,
+      standardMonthlyCents: 20000,
+      standardBiweeklyCents: 19000,
+      standardWeeklyCents: 17000,
+      windowsAndCabinetsCents: 6000,
+    },
+    /* 3.200-3.500  */ {
+      maxSquareFeet: 3500,
+      deepCents: 34500,
+      standardMonthlyCents: 22000,
+      standardBiweeklyCents: 19000,
+      standardWeeklyCents: 17000,
+      windowsAndCabinetsCents: 6000,
+    },
+    /* 3.600        */ {
+      maxSquareFeet: 3600,
+      deepCents: 35000,
+      standardMonthlyCents: 23000,
+      standardBiweeklyCents: 20000,
+      standardWeeklyCents: 18000,
+      windowsAndCabinetsCents: 6500,
+    },
+    /* 3.700-3.800  */ {
+      maxSquareFeet: 3800,
+      deepCents: 37500,
+      standardMonthlyCents: 23500,
+      standardBiweeklyCents: 20500,
+      standardWeeklyCents: 18000,
+      windowsAndCabinetsCents: 6500,
+    },
+    /* 3.900-4.000  */ {
+      maxSquareFeet: 4000,
+      deepCents: 38000,
+      standardMonthlyCents: 28000,
+      standardBiweeklyCents: 21000,
+      standardWeeklyCents: 18500,
+      windowsAndCabinetsCents: 7000,
+    },
+    /* 4.100-4.300  */ {
+      maxSquareFeet: 4300,
+      deepCents: 40000,
+      standardMonthlyCents: 28000,
+      standardBiweeklyCents: 23000,
+      standardWeeklyCents: 18500,
+      windowsAndCabinetsCents: 7000,
+    },
+    /* 4.400-4.800  */ {
+      maxSquareFeet: 4800,
+      deepCents: 42500,
+      standardMonthlyCents: 30500,
+      standardBiweeklyCents: 23500,
+      standardWeeklyCents: 19000,
+      windowsAndCabinetsCents: 7000,
+    },
+    /* 4.900-5.100  */ {
+      maxSquareFeet: 5100,
+      deepCents: 45000,
+      standardMonthlyCents: 32500,
+      standardBiweeklyCents: 24000,
+      standardWeeklyCents: 20000,
+      windowsAndCabinetsCents: 7500,
+    },
+    /* 5.200-5.400  */ {
+      maxSquareFeet: 5400,
+      deepCents: 50000,
+      standardMonthlyCents: 34000,
+      standardBiweeklyCents: 25000,
+      standardWeeklyCents: 20000,
+      windowsAndCabinetsCents: 7500,
+    },
+    /* 5.500-5.700  */ {
+      maxSquareFeet: 5700,
+      deepCents: 53000,
+      standardMonthlyCents: 35000,
+      standardBiweeklyCents: 25500,
+      standardWeeklyCents: 22000,
+      windowsAndCabinetsCents: 8000,
+    },
+    /* 5.800-6.000  */ {
+      maxSquareFeet: 6000,
+      deepCents: 55000,
+      standardMonthlyCents: 35500,
+      standardBiweeklyCents: 26000,
+      standardWeeklyCents: 24000,
+      windowsAndCabinetsCents: 8000,
+    },
+    /* 6.100-6.600  */ {
+      maxSquareFeet: 6600,
+      deepCents: 58500,
+      standardMonthlyCents: 37500,
+      standardBiweeklyCents: 28000,
+      standardWeeklyCents: 26000,
+      windowsAndCabinetsCents: 8500,
+    },
+    /* 6.700-6.900  */ {
+      maxSquareFeet: 6900,
+      deepCents: 60000,
+      standardMonthlyCents: 39500,
+      standardBiweeklyCents: 30000,
+      standardWeeklyCents: 27000,
+      windowsAndCabinetsCents: 8500,
+    },
+  ],
+
+  /*
+   * De donde saca el precio cada servicio. Los importes estan arriba.
    */
   services: {
     STANDARD: {
+      offered: true,
       instantQuote: true,
       byFrequency: {
-        ONE_TIME: { flatCents: 18500, centsPerSquareFoot: null },
-        MONTHLY: { flatCents: 15000, centsPerSquareFoot: null },
-        BIWEEKLY: { flatCents: 13500, centsPerSquareFoot: null },
-        WEEKLY: { flatCents: 12000, centsPerSquareFoot: null },
+        /*
+         * SIN PUNTUAL, DESDE LA ETAPA 3.4. La tabla del cliente solo pone
+         * precio a la estandar en plan recurrente; una limpieza suelta es
+         * una profunda.
+         */
+        ONE_TIME: null,
+        MONTHLY: 'standardMonthlyCents',
+        BIWEEKLY: 'standardBiweeklyCents',
+        WEEKLY: 'standardWeeklyCents',
       },
     },
     DEEP: {
+      offered: true,
       instantQuote: true,
-      byFrequency: {
-        // 250 $ o 30 centavos el pie, lo que salga mas alto: se igualan a
-        // los 833 pies cuadrados.
-        ONE_TIME: { flatCents: 25000, centsPerSquareFoot: 30 },
-        MONTHLY: null,
-        BIWEEKLY: null,
-        WEEKLY: null,
-      },
+      byFrequency: { ONE_TIME: 'deepCents', MONTHLY: null, BIWEEKLY: null, WEEKLY: null },
     },
     MOVE_IN_OUT: {
+      offered: true,
       instantQuote: true,
-      byFrequency: {
-        ONE_TIME: { flatCents: 25000, centsPerSquareFoot: 30 },
-        MONTHLY: null,
-        BIWEEKLY: null,
-        WEEKLY: null,
-      },
+      byFrequency: { ONE_TIME: 'deepCents', MONTHLY: null, BIWEEKLY: null, WEEKLY: null },
     },
     /*
-     * A CONSULTAR, las tres. Una obra recien terminada y un apartamento de
-     * alquiler vacacional se parecen en lo unico que importa aqui: lo que
-     * cuestan depende de como esten, y a ciegas no se acierta. El cotizador
-     * recoge la solicitud y el precio se da tras ver la casa.
+     * A CONSULTAR, las tres, y desde la etapa 3.4 tampoco aparecen en el
+     * formulario del sitio: el cliente ha pedido retirarlas de momento. No
+     * se borran del enumerado porque su codigo esta escrito en reservas que
+     * ya existen.
      */
     POST_CONSTRUCTION: {
+      offered: false,
       instantQuote: false,
       byFrequency: { ONE_TIME: null, MONTHLY: null, BIWEEKLY: null, WEEKLY: null },
     },
     AIRBNB_TURNOVER: {
+      offered: false,
       instantQuote: false,
       byFrequency: { ONE_TIME: null, MONTHLY: null, BIWEEKLY: null, WEEKLY: null },
     },
     COMMERCIAL: {
+      offered: false,
       instantQuote: false,
       byFrequency: { ONE_TIME: null, MONTHLY: null, BIWEEKLY: null, WEEKLY: null },
     },
@@ -287,18 +566,99 @@ export const defaultPricingConfig: PricingConfig = {
    * ver `offered` en `AddOnRate` para por que no se borran.
    */
   addOns: {
-    INSIDE_OVEN: { unit: 'FLAT', unitAmountCents: 5000, maxQuantity: 1, offered: true },
-    INSIDE_FRIDGE: { unit: 'FLAT', unitAmountCents: 5000, maxQuantity: 1, offered: true },
-    INSIDE_CABINETS: { unit: 'FLAT', unitAmountCents: 2500, maxQuantity: 1, offered: true },
-    INTERIOR_WINDOWS: { unit: 'PER_UNIT', unitAmountCents: 600, maxQuantity: 40, offered: true },
+    /* --- Planos: cuestan lo mismo en cualquier casa ------------------- */
+    INSIDE_OVEN: {
+      unit: 'FLAT',
+      unitAmountCents: 5000,
+      maxQuantity: 1,
+      offered: true,
+      pricedBySize: false,
+    },
+    INSIDE_FRIDGE: {
+      unit: 'FLAT',
+      unitAmountCents: 5000,
+      maxQuantity: 1,
+      offered: true,
+      pricedBySize: false,
+    },
+
+    /* --- Por tamano: el importe sale de la tabla de arriba ------------ */
+    /*
+     * De 30 a 85 dolares segun el tramo. `unitAmountCents: 0` no es un
+     * descuido: con `pricedBySize` el importe de aqui se ignora, y poner un
+     * numero que no se usa es justo como acaban dos precios distintos para
+     * la misma cosa.
+     */
+    WINDOWS_AND_CABINETS: {
+      unit: 'FLAT',
+      unitAmountCents: 0,
+      maxQuantity: 1,
+      offered: true,
+      pricedBySize: true,
+    },
 
     /* --- Retirados del catalogo, conservados para el historico --------- */
-    LAUNDRY: { unit: 'PER_UNIT', unitAmountCents: 2000, maxQuantity: 6, offered: false },
-    BASEMENT: { unit: 'FLAT', unitAmountCents: 4000, maxQuantity: 1, offered: false },
-    GARAGE: { unit: 'FLAT', unitAmountCents: 4500, maxQuantity: 1, offered: false },
-    PET_HAIR: { unit: 'FLAT', unitAmountCents: 3000, maxQuantity: 1, offered: false },
-    PATIO: { unit: 'FLAT', unitAmountCents: 2500, maxQuantity: 1, offered: false },
-    BED_LINENS: { unit: 'PER_UNIT', unitAmountCents: 1000, maxQuantity: 10, offered: false },
+    /*
+     * Estos dos se ofrecian por separado hasta la etapa 3.4. La tabla del
+     * cliente los junta en una sola columna, asi que se apagan; sus codigos
+     * siguen escritos en cotizaciones y reservas que ya existen.
+     */
+    INSIDE_CABINETS: {
+      unit: 'FLAT',
+      unitAmountCents: 2500,
+      maxQuantity: 1,
+      offered: false,
+      pricedBySize: false,
+    },
+    INTERIOR_WINDOWS: {
+      unit: 'PER_UNIT',
+      unitAmountCents: 600,
+      maxQuantity: 40,
+      offered: false,
+      pricedBySize: false,
+    },
+    LAUNDRY: {
+      unit: 'PER_UNIT',
+      unitAmountCents: 2000,
+      maxQuantity: 6,
+      offered: false,
+      pricedBySize: false,
+    },
+    BASEMENT: {
+      unit: 'FLAT',
+      unitAmountCents: 4000,
+      maxQuantity: 1,
+      offered: false,
+      pricedBySize: false,
+    },
+    GARAGE: {
+      unit: 'FLAT',
+      unitAmountCents: 4500,
+      maxQuantity: 1,
+      offered: false,
+      pricedBySize: false,
+    },
+    PET_HAIR: {
+      unit: 'FLAT',
+      unitAmountCents: 3000,
+      maxQuantity: 1,
+      offered: false,
+      pricedBySize: false,
+    },
+    PATIO: {
+      unit: 'FLAT',
+      unitAmountCents: 2500,
+      maxQuantity: 1,
+      offered: false,
+      pricedBySize: false,
+    },
+    BED_LINENS: {
+      unit: 'PER_UNIT',
+      unitAmountCents: 1000,
+      maxQuantity: 10,
+      offered: false,
+      pricedBySize: false,
+    },
   },
 
   /**
@@ -377,6 +737,11 @@ export const defaultPricingConfig: PricingConfig = {
   addOnMinutes: {
     INSIDE_FRIDGE: 20,
     INSIDE_OVEN: 25,
+    /*
+     * Los dos juntos. Era la suma de los dos sueltos —30 de gabinetes mas
+     * 25 de ventanas—, que es lo que se tarda en hacer las dos cosas.
+     */
+    WINDOWS_AND_CABINETS: 55,
     INSIDE_CABINETS: 30,
     INTERIOR_WINDOWS: 5,
     LAUNDRY: 15,

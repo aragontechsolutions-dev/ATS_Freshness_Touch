@@ -5,9 +5,10 @@ import type {
   QuoteResponse,
   QuoteTotals,
 } from '@freshness/types';
+import { sizeBandFor } from '@freshness/types';
 import { defaultPricingConfig, type PricingConfig } from './config';
 import { calculateDeposit } from './deposit';
-import { percentOfCents, roundCents } from './money';
+import { percentOfCents } from './money';
 import { calculateTravel } from './travel';
 import { resolveZone } from './zones';
 
@@ -43,6 +44,15 @@ const MANUAL_REVIEW_REASONS = {
   farZone: 'quote.review.farZone',
   outOfState: 'quote.review.outOfState',
   largeProperty: 'quote.review.largeProperty',
+  /**
+   * La casa es mas grande que el ultimo tramo de la tabla de precios.
+   *
+   * NO SE EXTRAPOLA. La tabla acaba donde acaba, y nada dice que la
+   * progresion continue; a ese tamano, un precio inventado se equivoca por
+   * cientos de dolares. Se recoge la solicitud y el precio se da tras ver la
+   * casa, igual que en las zonas lejanas.
+   */
+  beyondSizeTable: 'quote.review.beyondSizeTable',
   /**
    * El servicio existe, pero no en esa cadencia.
    *
@@ -82,12 +92,26 @@ export function calculateQuote(request: QuoteRequest, context: QuoteContext): Qu
    * La tarifa de ESTA cadencia. `null` significa que el servicio no se
    * ofrece asi, que no es lo mismo que no tener precio automatico.
    */
-  const rate = service.byFrequency[request.frequency];
+  /*
+   * La COLUMNA de la tabla que lee esta cadencia. `null` significa que el
+   * servicio no se ofrece asi, que no es lo mismo que no tener precio
+   * automatico.
+   */
+  const columna = service.byFrequency[request.frequency];
+
+  /*
+   * EL TRAMO DE ESTA CASA. `null` = se sale de la tabla por arriba, y
+   * entonces no hay precio automatico. Una casa mas pequena que el primer
+   * tramo SI entra: paga el primero, que es el minimo.
+   */
+  const banda = sizeBandFor(config.sizeBands, request.squareFeet);
 
   if (!service.instantQuote) {
     manualReviewReasons.push(MANUAL_REVIEW_REASONS.commercial);
-  } else if (rate === null) {
+  } else if (columna === null) {
     manualReviewReasons.push(MANUAL_REVIEW_REASONS.frequencyUnavailable);
+  } else if (banda === null) {
+    manualReviewReasons.push(MANUAL_REVIEW_REASONS.beyondSizeTable);
   }
   if (!zone.serviceable) {
     manualReviewReasons.push(MANUAL_REVIEW_REASONS.outOfRange);
@@ -108,22 +132,22 @@ export function calculateQuote(request: QuoteRequest, context: QuoteContext): Qu
    * todo Georgia sin que el cotizador suelte una cifra para un traslado de
    * ocho horas que nadie ha calculado.
    */
-  const quotable = service.instantQuote && rate !== null && zone.serviceable && zone.instantQuote;
+  const quotable =
+    service.instantQuote &&
+    columna !== null &&
+    banda !== null &&
+    zone.serviceable &&
+    zone.instantQuote;
 
   // --- 1. Servicio ----------------------------------------------------------
   let serviceCents = 0;
-  if (quotable && rate !== null) {
+  if (quotable && columna !== null && banda !== null) {
     /*
-     * EL MAYOR DE LOS DOS, no un umbral por tamano. Con un umbral —«hasta
-     * 809 pies lo plano, por encima por pie»— aparece un escalon hacia
-     * abajo: a 810 pies saldrian 243 $ y a 809, 250 $. Siete dolares mas
-     * barata la casa mas grande, y nadie sabria explicarlo por telefono.
+     * UNA CELDA DE LA TABLA. Ni formula ni interpolacion: el tramo de la
+     * casa y la columna de la cadencia dan el precio que el cliente escribio
+     * en su hoja, exactamente ese.
      */
-    const porTamano =
-      rate.centsPerSquareFoot === null
-        ? 0
-        : roundCents(rate.centsPerSquareFoot * request.squareFeet);
-    const computed = Math.max(rate.flatCents, porTamano);
+    const computed = banda[columna];
 
     lines.push({
       code: `SERVICE_${request.service}`,
@@ -159,7 +183,24 @@ export function calculateQuote(request: QuoteRequest, context: QuoteContext): Qu
       if (!extra.offered) continue;
 
       const quantity = extra.unit === 'FLAT' ? 1 : Math.min(requested.quantity, extra.maxQuantity);
-      const amount = extra.unitAmountCents * quantity;
+
+      /*
+       * EL IMPORTE: PLANO, O EL DEL TRAMO DE LA CASA.
+       *
+       * Ventanas y gabinetes interiores crece con el tamano —de 30 a 85
+       * dolares—, porque hay mas ventanas que limpiar. El horno y la nevera
+       * no: limpiar un horno cuesta lo mismo en un apartamento que en una
+       * mansion.
+       *
+       * `banda` no puede ser null aqui: estamos dentro de `quotable`, que ya
+       * lo exige. La comprobacion esta igualmente porque el tipo no lo sabe,
+       * y caer a `unitAmountCents` seria cobrar cero por este extra.
+       */
+      const unitario =
+        extra.pricedBySize && banda !== null
+          ? banda.windowsAndCabinetsCents
+          : extra.unitAmountCents;
+      const amount = unitario * quantity;
 
       lines.push({
         code: `ADDON_${requested.code}`,
@@ -167,7 +208,7 @@ export function calculateQuote(request: QuoteRequest, context: QuoteContext): Qu
         labelKey: `quote.line.addOn.${requested.code}`,
         labelParams: { quantity },
         quantity,
-        unitAmountCents: extra.unitAmountCents,
+        unitAmountCents: unitario,
         amountCents: amount,
       });
       addOnsCents += amount;

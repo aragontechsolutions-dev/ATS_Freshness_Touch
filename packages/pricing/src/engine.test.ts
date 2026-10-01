@@ -9,7 +9,12 @@ const QUOTE_ID = '11111111-2222-4333-8444-555555555555';
 function buildRequest(overrides: Partial<QuoteRequest> = {}): QuoteRequest {
   return {
     service: 'STANDARD',
-    frequency: 'ONE_TIME',
+    /*
+     * MENSUAL Y NO PUNTUAL: desde la etapa 3.4 la estandar no se ofrece de
+     * una sola vez —la tabla del cliente solo le pone precio recurrente— y
+     * quien quiere una limpieza suelta contrata la profunda.
+     */
+    frequency: 'MONTHLY',
     // Sin habitaciones ni banos, que es lo que manda el cotizador: el
     // precio no los mira y por eso dejaron de preguntarse.
     squareFeet: 1800,
@@ -45,7 +50,7 @@ describe('calculateQuote - que datos entran y cuales no', () => {
     const quote = calculateQuote(buildRequest(), buildContext(10));
     const linea = quote.lines.find((item) => item.kind === 'SERVICE_BASE');
 
-    expect(linea?.labelParams).toEqual({ squareFeet: 1800, frequency: 'ONE_TIME' });
+    expect(linea?.labelParams).toEqual({ squareFeet: 1800, frequency: 'MONTHLY' });
   });
 
   it('el presupuesto devuelto tampoco los lleva', () => {
@@ -70,66 +75,118 @@ describe('calculateQuote - que datos entran y cuales no', () => {
 });
 
 describe('calculateQuote - servicio base', () => {
-  it('la estandar es plana: 185 dolares, mire el tamano que mire', () => {
+  it('el precio sale de la tabla y crece con la casa', () => {
     /*
-     * ES EL PRECIO QUE SE DICE POR TELEFONO SIN PREGUNTAR NADA, y por eso
-     * no mira habitaciones ni pies cuadrados. Dos casas muy distintas
-     * pagan lo mismo, y es deliberado.
+     * ES EL CAMBIO DE LA ETAPA 3.4. Antes la estandar era plana —185 $
+     * mirara el tamano que mirara— y ahora cada tramo tiene su precio.
      */
     const pequena = calculateQuote(buildRequest({ squareFeet: 600 }), buildContext(10));
     const grande = calculateQuote(buildRequest({ squareFeet: 3000 }), buildContext(10));
 
-    expect(pequena.totals.serviceCents).toBe(18500);
-    expect(grande.totals.serviceCents).toBe(18500);
+    // 600 pies caen en el primer tramo, el de 900: 160 $ mensuales.
+    expect(pequena.totals.serviceCents).toBe(16_000);
+    // 3.000 caen en el tramo de 3.100: 200 $.
+    expect(grande.totals.serviceCents).toBe(20_000);
     expect(pequena.totals.taxCents).toBe(0);
   });
 
-  it('el deposito son 35 de los 185, y los otros 150 se cobran al terminar', () => {
+  it('una casa en un hueco de la tabla SUBE al siguiente tramo', () => {
     /*
-     * EL EJEMPLO DEL NEGOCIO, TAL CUAL. A la empresa le llegan 185: 35
-     * retenidos al reservar y 150 al terminar. El deposito no es un cargo
-     * extra, y esta prueba existe para que nadie lo convierta en uno.
+     * LA REGLA QUE RELLENA LOS HUECOS DE LA HOJA DEL CLIENTE. Entre 900 y
+     * 1.200 no hay nada escrito, y una casa de 1.000 pies tiene que pagar
+     * algo: paga la fila de 1.200. Subir nunca cobra de menos, que es el
+     * lado correcto del error cuando hay que elegir uno.
+     */
+    const enElHueco = calculateQuote(buildRequest({ squareFeet: 1000 }), buildContext(10));
+    const enElTope = calculateQuote(buildRequest({ squareFeet: 1200 }), buildContext(10));
+
+    expect(enElHueco.totals.serviceCents).toBe(enElTope.totals.serviceCents);
+    expect(enElHueco.totals.serviceCents).toBe(15_000);
+  });
+
+  it('justo en el tope paga ese tramo, y un pie mas paga el siguiente', () => {
+    // El borde es lo unico que puede quedar mal en una tabla de tramos.
+    const enElTope = calculateQuote(buildRequest({ squareFeet: 1200 }), buildContext(10));
+    const unPieMas = calculateQuote(buildRequest({ squareFeet: 1201 }), buildContext(10));
+
+    expect(enElTope.totals.serviceCents).toBe(15_000);
+    expect(unPieMas.totals.serviceCents).toBe(16_000);
+  });
+
+  it('el deposito son 35 del total, y el resto se cobra al terminar', () => {
+    /*
+     * El deposito NO es un cargo extra, y esta prueba existe para que nadie
+     * lo convierta en uno. La casa de 1.800 pies paga 180 $ mensuales: 35
+     * retenidos al reservar y 145 al terminar.
      */
     const quote = calculateQuote(buildRequest(), buildContext(10));
 
-    expect(quote.totals.totalCents).toBe(18500);
+    expect(quote.totals.totalCents).toBe(18_000);
     expect(quote.deposit.amountCents).toBe(3500);
-    expect(quote.balanceDueAtServiceCents).toBe(15000);
+    expect(quote.balanceDueAtServiceCents).toBe(14_500);
   });
 
-  it('la profunda cobra el mayor entre el plano y los pies cuadrados', () => {
-    // 700 pies * 30 centavos = 21 000 < 25 000 -> manda el plano.
-    const pequena = calculateQuote(
-      buildRequest({ service: 'DEEP', squareFeet: 700 }),
+  it('la profunda y las dos de mudanza cobran lo mismo', () => {
+    // Es el mismo trabajo con distinto nombre segun por que se pida, y en
+    // la hoja del cliente comparten una sola columna.
+    const profunda = calculateQuote(
+      buildRequest({ service: 'DEEP', frequency: 'ONE_TIME', squareFeet: 2000 }),
       buildContext(5),
     );
-    expect(pequena.totals.serviceCents).toBe(25000);
+    const mudanza = calculateQuote(
+      buildRequest({ service: 'MOVE_IN_OUT', frequency: 'ONE_TIME', squareFeet: 2000 }),
+      buildContext(5),
+    );
 
-    // 2 000 pies * 30 = 60 000 > 25 000 -> manda el tamano.
-    const grande = calculateQuote(
-      buildRequest({ service: 'DEEP', squareFeet: 2000 }),
-      buildContext(5),
-    );
-    expect(grande.totals.serviceCents).toBe(60000);
+    expect(profunda.totals.serviceCents).toBe(32_000);
+    expect(mudanza.totals.serviceCents).toBe(32_000);
   });
 
-  it('NO HAY ESCALON al pasar del importe plano al precio por pie', () => {
+  it('por encima del ultimo tramo NO se inventa un precio', () => {
     /*
-     * ES EL MOTIVO DE USAR EL MAYOR Y NO UN UMBRAL. Con «hasta 809 pies lo
-     * plano, por encima por pie» aparecia un salto hacia abajo: a 810 pies
-     * saldrian 243 $ y a 809, 250 $. La casa mas grande, mas barata, y
-     * nadie sabria explicarlo por telefono.
+     * La tabla acaba en 6.900 pies. Nada dice que la progresion continue, y
+     * a ese tamano un precio extrapolado se equivoca por cientos de
+     * dolares. Se recoge la solicitud y se va a ver la casa.
      */
-    let anterior = 0;
-    for (const pies of [600, 800, 809, 810, 833, 834, 900, 1500]) {
-      const actual = calculateQuote(
-        buildRequest({ service: 'DEEP', squareFeet: pies }),
-        buildContext(5),
-      ).totals.serviceCents;
+    const enorme = calculateQuote(
+      buildRequest({ service: 'DEEP', frequency: 'ONE_TIME', squareFeet: 9000 }),
+      buildContext(5),
+    );
 
-      expect(actual).toBeGreaterThanOrEqual(anterior);
-      anterior = actual;
-    }
+    expect(enorme.manualReview.required).toBe(true);
+    expect(enorme.totals.serviceCents).toBe(0);
+    expect(enorme.manualReview.reasonKeys).toContain('quote.review.beyondSizeTable');
+  });
+
+  it('justo en el ultimo tramo SI hay precio', () => {
+    const limite = calculateQuote(
+      buildRequest({ service: 'DEEP', frequency: 'ONE_TIME', squareFeet: 6900 }),
+      buildContext(5),
+    );
+
+    /*
+     * SI pide revision, pero por SER GRANDE —umbral de 6.000 pies—, no por
+     * salirse de la tabla. La diferencia importa: una pide una mirada, la
+     * otra significa que no hay precio.
+     */
+    expect(limite.totals.serviceCents).toBe(60_000);
+    expect(limite.manualReview.reasonKeys).not.toContain('quote.review.beyondSizeTable');
+    expect(limite.manualReview.reasonKeys).toContain('quote.review.largeProperty');
+  });
+
+  it('la estandar NO se ofrece de una sola vez', () => {
+    /*
+     * La tabla del cliente solo le pone precio recurrente. No es «cara de
+     * una vez», es que no se vende asi: quien quiere una limpieza suelta
+     * contrata la profunda, que es practica habitual del sector.
+     */
+    const puntual = calculateQuote(
+      buildRequest({ service: 'STANDARD', frequency: 'ONE_TIME' }),
+      buildContext(10),
+    );
+
+    expect(puntual.manualReview.required).toBe(true);
+    expect(puntual.manualReview.reasonKeys).toContain('quote.review.frequencyUnavailable');
   });
 
   it('la suma de las lineas siempre cuadra con el total', () => {
@@ -163,15 +220,54 @@ describe('calculateQuote - extras', () => {
     expect(quote.totals.addOnsCents).toBe(5000);
   });
 
-  it('limita los extras por unidad a su cantidad maxima', () => {
+  it('un extra retirado del catalogo NO se cobra, aunque lo pida la peticion', () => {
+    /*
+     * `INTERIOR_WINDOWS` se apago en la etapa 3.4 —ahora va junto con los
+     * gabinetes en un solo extra—. Su codigo sigue existiendo para releer
+     * presupuestos antiguos, y sin esta guardia alguien podria pedir por la
+     * API algo que el sitio ya no ofrece.
+     */
     const quote = calculateQuote(
-      buildRequest({ addOns: [{ code: 'INTERIOR_WINDOWS', quantity: 999 }] }),
+      buildRequest({ addOns: [{ code: 'INTERIOR_WINDOWS', quantity: 10 }] }),
       buildContext(10),
     );
 
-    const line = quote.lines.find((item) => item.code === 'ADDON_INTERIOR_WINDOWS');
-    expect(line?.quantity).toBe(defaultPricingConfig.addOns.INTERIOR_WINDOWS.maxQuantity);
-    expect(line?.amountCents).toBe(40 * 600);
+    expect(quote.lines.find((item) => item.code === 'ADDON_INTERIOR_WINDOWS')).toBeUndefined();
+    expect(quote.totals.addOnsCents).toBe(0);
+  });
+
+  it('ventanas y gabinetes cuesta segun el tamano de la casa', () => {
+    /*
+     * ES EL UNICO EXTRA QUE MIRA EL TAMANO. En la hoja del cliente va de 30
+     * a 85 dolares, porque una casa grande tiene mas ventanas. El horno y
+     * la nevera son planos: limpiar un horno cuesta lo mismo en cualquier
+     * sitio.
+     */
+    const pequena = calculateQuote(
+      buildRequest({ squareFeet: 900, addOns: [{ code: 'WINDOWS_AND_CABINETS', quantity: 1 }] }),
+      buildContext(10),
+    );
+    const grande = calculateQuote(
+      buildRequest({ squareFeet: 6900, addOns: [{ code: 'WINDOWS_AND_CABINETS', quantity: 1 }] }),
+      buildContext(10),
+    );
+
+    expect(pequena.totals.addOnsCents).toBe(3000);
+    expect(grande.totals.addOnsCents).toBe(8500);
+  });
+
+  it('el horno cuesta lo mismo en cualquier casa', () => {
+    const pequena = calculateQuote(
+      buildRequest({ squareFeet: 900, addOns: [{ code: 'INSIDE_OVEN', quantity: 1 }] }),
+      buildContext(10),
+    );
+    const grande = calculateQuote(
+      buildRequest({ squareFeet: 6900, addOns: [{ code: 'INSIDE_OVEN', quantity: 1 }] }),
+      buildContext(10),
+    );
+
+    expect(pequena.totals.addOnsCents).toBe(5000);
+    expect(grande.totals.addOnsCents).toBe(5000);
   });
 });
 
@@ -183,12 +279,8 @@ describe('calculateQuote - tarifa por cadencia', () => {
    * raras.
    */
   it('cada cadencia tiene su precio, y no hay linea de descuento', () => {
-    const precios = {
-      ONE_TIME: 18500,
-      MONTHLY: 15000,
-      BIWEEKLY: 13500,
-      WEEKLY: 12000,
-    } as const;
+    // La casa de 1.800 pies, en la fila de 1.800 de la hoja del cliente.
+    const precios = { MONTHLY: 18_000, BIWEEKLY: 16_000, WEEKLY: 14_000 } as const;
 
     for (const [cadencia, esperado] of Object.entries(precios)) {
       const quote = calculateQuote(
@@ -202,15 +294,21 @@ describe('calculateQuote - tarifa por cadencia', () => {
     }
   });
 
-  it('a mas compromiso, nunca mas caro', () => {
-    const orden = ['ONE_TIME', 'MONTHLY', 'BIWEEKLY', 'WEEKLY'] as const;
-    let tope = Number.POSITIVE_INFINITY;
+  it('a mas compromiso, nunca mas caro, EN TODOS LOS TRAMOS', () => {
+    /*
+     * La promesa comercial de la empresa, comprobada en la tabla entera y no
+     * en una casa de ejemplo: un solo tramo con la semanal mas cara que la
+     * mensual perderia dinero en cada reserva recurrente de ese tamano, y no
+     * lo delataria ninguna pantalla.
+     */
+    for (const banda of defaultPricingConfig.sizeBands) {
+      const pies = banda.maxSquareFeet;
+      const precioDe = (frequency: 'MONTHLY' | 'BIWEEKLY' | 'WEEKLY'): number =>
+        calculateQuote(buildRequest({ frequency, squareFeet: pies }), buildContext(10)).totals
+          .serviceCents;
 
-    for (const cadencia of orden) {
-      const actual = calculateQuote(buildRequest({ frequency: cadencia }), buildContext(10)).totals
-        .serviceCents;
-      expect(actual).toBeLessThanOrEqual(tope);
-      tope = actual;
+      expect(precioDe('WEEKLY'), `tramo ${pies}`).toBeLessThanOrEqual(precioDe('BIWEEKLY'));
+      expect(precioDe('BIWEEKLY'), `tramo ${pies}`).toBeLessThanOrEqual(precioDe('MONTHLY'));
     }
   });
 
@@ -251,7 +349,8 @@ describe('calculateQuote - traslado y deposito', () => {
     expect(quote.travel.billableMiles).toBe(20);
     expect(quote.travel.centsPerMile).toBe(76);
     expect(quote.totals.surchargesCents).toBe(1520);
-    expect(quote.totals.totalCents).toBe(18500 + 1520);
+    // 180 $ la mensual de 1.800 pies, mas el traslado.
+    expect(quote.totals.totalCents).toBe(18_000 + 1520);
   });
 
   it('el deposito son 35 dolares, este donde este la casa', () => {
@@ -266,18 +365,23 @@ describe('calculateQuote - traslado y deposito', () => {
   });
 
   it('el deposito nunca supera el total del trabajo', () => {
+    /*
+     * Una tabla con un solo tramo y un precio por debajo del deposito. No
+     * es un caso real de hoy, pero es el que comprueba la regla: la
+     * retencion es un adelanto del total y nunca puede pasarse de el.
+     */
     const config = {
       ...defaultPricingConfig,
-      services: {
-        ...defaultPricingConfig.services,
-        STANDARD: {
-          instantQuote: true,
-          byFrequency: {
-            ...defaultPricingConfig.services.STANDARD.byFrequency,
-            ONE_TIME: { flatCents: 2000, centsPerSquareFoot: null },
-          },
+      sizeBands: [
+        {
+          maxSquareFeet: 20_000,
+          deepCents: 2000,
+          standardMonthlyCents: 2000,
+          standardBiweeklyCents: 2000,
+          standardWeeklyCents: 2000,
+          windowsAndCabinetsCents: 0,
         },
-      },
+      ],
     };
 
     const quote = calculateQuote(buildRequest(), buildContext(5, { config }));
@@ -353,12 +457,26 @@ describe('calculateQuote - revision manual', () => {
     expect(quote.totals.totalCents).toBe(0);
   });
 
-  it('marca propiedades muy grandes para revision, pero igual las cotiza', () => {
-    const quote = calculateQuote(buildRequest({ squareFeet: 9000 }), buildContext(10));
+  it('una casa grande pero dentro de la tabla se cotiza, marcada para revision', () => {
+    /*
+     * El umbral de revision —6.000 pies— y el final de la tabla —6.900— son
+     * dos cosas distintas, y en medio queda una franja donde SI hay precio y
+     * ADEMAS se pide una mirada. Es el caso que confunde los dos conceptos
+     * si alguien los junta.
+     */
+    const quote = calculateQuote(buildRequest({ squareFeet: 6500 }), buildContext(10));
 
     expect(quote.manualReview.required).toBe(true);
     expect(quote.manualReview.reasonKeys).toContain('quote.review.largeProperty');
+    expect(quote.manualReview.reasonKeys).not.toContain('quote.review.beyondSizeTable');
     expect(quote.totals.totalCents).toBeGreaterThan(0);
+  });
+
+  it('pasado el final de la tabla NO hay cifra, solo solicitud', () => {
+    const quote = calculateQuote(buildRequest({ squareFeet: 9000 }), buildContext(10));
+
+    expect(quote.manualReview.reasonKeys).toContain('quote.review.beyondSizeTable');
+    expect(quote.totals.totalCents).toBe(0);
   });
 
   it('marca destinos fuera de Georgia', () => {

@@ -13,11 +13,18 @@ import { QuoteTaxSchema } from './quote';
  * a partir de la configuracion del servidor: los precios NO se duplican en
  * el front. Si Freshness Touch cambia una tarifa, cambia en un solo sitio.
  */
-/** La tarifa de un servicio en una cadencia: manda el mayor de los dos. */
+/**
+ * Lo que cuesta un servicio en una cadencia, COMO «DESDE».
+ *
+ * Desde la etapa 3.4 el precio depende del tamano de la casa, asi que no hay
+ * una cifra unica que ensenar antes de preguntarlo: lo que se publica es el
+ * precio del tramo mas pequeno, que es el minimo al que se puede contratar.
+ *
+ * Sirve para comparar cadencias de un vistazo —«semanal desde 120 $,
+ * quincenal desde 135 $»—; la cifra exacta la da el presupuesto.
+ */
 export const CatalogRateSchema = z.strictObject({
-  flatCents: z.int().nonnegative(),
-  /** `null` cuando ese servicio no mira el tamano de la casa. */
-  centsPerSquareFoot: z.number().nonnegative().nullable(),
+  fromCents: z.int().nonnegative(),
 });
 export type CatalogRate = z.infer<typeof CatalogRateSchema>;
 

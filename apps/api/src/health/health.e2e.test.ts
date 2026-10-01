@@ -98,6 +98,7 @@ describe('limites de peticiones (aplicacion real)', () => {
   it('el cotizador SI se sigue limitando: la proteccion no se perdio al eximir la salud', async () => {
     const body = {
       service: 'STANDARD',
+      frequency: 'MONTHLY' as const,
       bedrooms: 3,
       bathrooms: 2,
       squareFeet: 1800,

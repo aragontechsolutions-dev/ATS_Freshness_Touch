@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { PricingSizeBandsSchema } from './pricing-size-bands';
 import { ServiceTypeSchema } from './enums';
 
 /**
@@ -87,12 +88,7 @@ void _todosClasificados;
  * ilegible un presupuesto del mes pasado. Simplemente no se tarifan ni se
  * ofrecen.
  */
-export const OFFERED_ADD_ON_CODES = [
-  'INSIDE_OVEN',
-  'INSIDE_FRIDGE',
-  'INSIDE_CABINETS',
-  'INTERIOR_WINDOWS',
-] as const;
+export const OFFERED_ADD_ON_CODES = ['INSIDE_OVEN', 'INSIDE_FRIDGE'] as const;
 
 export const OfferedAddOnCodeSchema = z.enum(OFFERED_ADD_ON_CODES);
 export type OfferedAddOnCode = z.infer<typeof OfferedAddOnCodeSchema>;
@@ -110,7 +106,6 @@ export type OfferedAddOnCode = z.infer<typeof OfferedAddOnCodeSchema>;
  * esta etapa viene a evitar.
  */
 const MAX_TARIFA_CENTS = 1_000_000; // 10 000 $: ninguna limpieza domestica se acerca
-const MAX_CENTS_POR_PIE = 100; // 1 $ el pie cuadrado
 const MAX_EXTRA_CENTS = 100_000; // 1 000 $ un extra
 const MAX_CANTIDAD_EXTRA = 100;
 /** El mismo tope que el area de servicio: Georgia de punta a punta. */
@@ -122,95 +117,23 @@ const MAX_CENTS_POR_MILLA = 500;
 /*  Las piezas                                                                */
 /* -------------------------------------------------------------------------- */
 
-/**
- * LA TARIFA DE UN SERVICIO EN UNA CADENCIA. Manda el mayor de los dos:
+/*
+ * EL PRECIO DE UN SERVICIO YA NO VIVE AQUI: ESTA EN LA TABLA POR TRAMOS.
  *
- *   precio = max(flatCents, centsPerSquareFoot * pies cuadrados)
+ * Hasta la etapa 3.4 cada servicio tenia, por cadencia, un importe plano y
+ * unos centavos por pie cuadrado, y el precio era el mayor de los dos. Era
+ * una formula, y la formula NO describe lo que cobra esta empresa: sus
+ * precios suben a saltos irregulares y hay tramos donde se quedan quietos
+ * mientras la casa crece. Ninguna recta pasa por esos puntos.
  *
- * POR QUE EL MAYOR Y NO UN UMBRAL POR TAMANO. Con un umbral —«hasta 809
- * pies lo plano, por encima por pie»— aparece un escalon hacia abajo: a 810
- * pies saldrian 243 $ y a 809, 250 $. La casa mas grande, siete dolares mas
- * barata. Con el maximo no hay escalon y la regla dice lo mismo.
+ * Ahora el precio sale de `sizeBands`, una fila por tramo de tamano, que es
+ * la misma forma que tiene la hoja de calculo del cliente. Ver
+ * `pricing-size-bands.ts`.
  *
- * `centsPerSquareFoot` ADMITE DECIMALES y el importe plano no. No es un
- * descuido: el plano se cobra tal cual y medio centavo no existe; este se
- * multiplica por los pies antes de redondear, y la diferencia entre 30 y 31
- * centavos en una casa de 2 000 pies son veinte dolares.
+ * QUE CADENCIAS SE OFRECEN SIGUE SIENDO DECISION DE PRODUCTO y vive en el
+ * codigo, no aqui: que la profunda no se contrate cada semana no es una
+ * tarifa que alguien deba poder cambiar desde una pantalla.
  */
-export const FrequencyRateSchema = z.strictObject({
-  flatCents: z.number().int().min(1).max(MAX_TARIFA_CENTS),
-  /** `null` cuando ese servicio no mira el tamano de la casa. */
-  centsPerSquareFoot: z.number().min(0).max(MAX_CENTS_POR_PIE).nullable(),
-});
-export type FrequencyRate = z.infer<typeof FrequencyRateSchema>;
-
-/**
- * Lo que cuesta un servicio en cada cadencia.
- *
- * `null` significa QUE NO SE OFRECE ASI, y no es lo mismo que un precio
- * alto: una limpieza profunda no se contrata cada semana porque la casa ya
- * esta profunda. El cotizador responde distinto a cada cosa —«elige otra
- * frecuencia» frente a «te llamamos»—, asi que la diferencia tiene que
- * existir en el contrato.
- */
-export const ServiceRatesSchema = z
-  .strictObject({
-    ONE_TIME: FrequencyRateSchema.nullable(),
-    WEEKLY: FrequencyRateSchema.nullable(),
-    BIWEEKLY: FrequencyRateSchema.nullable(),
-    MONTHLY: FrequencyRateSchema.nullable(),
-  })
-  .refine((tarifas) => tarifas.ONE_TIME !== null, {
-    /*
-     * SIEMPRE TIENE QUE PODERSE CONTRATAR UNA VEZ. Sin la puntual, un
-     * servicio marcado con precio automatico solo se podria contratar
-     * comprometiendose de antemano, y el cotizador daria «elige otra
-     * frecuencia» a quien solo quiere una limpieza.
-     */
-    message: 'admin.rates.errOneTimeRequired',
-    path: ['ONE_TIME'],
-  })
-  .refine((tarifas) => enOrden(tarifas, (t) => t.flatCents), {
-    /*
-     * A MAS COMPROMISO, NUNCA MAS CARO. Cada numero por separado es valido y
-     * el conjunto no significa nada: quien se compromete a una limpieza
-     * semanal pagaria mas que quien viene una vez. Se pierde dinero en cada
-     * reserva recurrente y no lo delata ninguna pantalla.
-     */
-    message: 'admin.rates.errFrequencyOrder',
-    path: ['WEEKLY'],
-  })
-  .refine((tarifas) => enOrden(tarifas, (t) => t.centsPerSquareFoot ?? 0), {
-    message: 'admin.rates.errFrequencyOrder',
-    path: ['WEEKLY'],
-  });
-export type ServiceRates = z.infer<typeof ServiceRatesSchema>;
-
-/**
- * Que las cadencias ofrecidas no suban de precio al hacerse mas frecuentes.
- *
- * Se comparan SOLO LAS OFRECIDAS: un hueco en medio —profunda puntual y
- * semanal, sin mensual— es raro pero no es incoherente, y rechazarlo seria
- * inventarse una regla que el negocio no pidio.
- */
-function enOrden(
-  tarifas: Record<string, FrequencyRate | null>,
-  valor: (tarifa: FrequencyRate) => number,
-): boolean {
-  // De menos compromiso a mas: cada una tiene que ser <= que la anterior.
-  const orden = ['ONE_TIME', 'MONTHLY', 'BIWEEKLY', 'WEEKLY'] as const;
-  let tope = Number.POSITIVE_INFINITY;
-
-  for (const cadencia of orden) {
-    const tarifa = tarifas[cadencia];
-    if (!tarifa) continue;
-    const actual = valor(tarifa);
-    if (actual > tope) return false;
-    tope = actual;
-  }
-
-  return true;
-}
 
 /** El precio de un extra. El tipo de unidad no es editable: es producto. */
 export const EditableAddOnRateSchema = z.strictObject({
@@ -251,7 +174,11 @@ export type EditableTravelRule = z.infer<typeof EditableTravelRuleSchema>;
  * un cambio suelto.
  */
 export const PricingRatesSchema = z.strictObject({
-  services: z.record(EditableServiceTypeSchema, ServiceRatesSchema),
+  /**
+   * LA TABLA DE PRECIOS POR TAMANO. Es el corazon de lo editable: una fila
+   * por tramo de pies cuadrados, igual que la hoja del cliente.
+   */
+  sizeBands: PricingSizeBandsSchema,
   addOns: z.record(OfferedAddOnCodeSchema, EditableAddOnRateSchema),
   /**
    * Lo que se retiene al reservar, en centavos. Se descuenta del total: NO

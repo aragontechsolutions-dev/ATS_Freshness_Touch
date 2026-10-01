@@ -23,6 +23,17 @@ export type Frequency = z.infer<typeof FrequencySchema>;
 export const AddOnCodeSchema = z.enum([
   'INSIDE_FRIDGE',
   'INSIDE_OVEN',
+  /**
+   * Ventanas y gabinetes interiores, JUNTOS Y EN UNO SOLO.
+   *
+   * La tabla de precios del cliente los trae en una sola columna, con un
+   * precio que crece con el tamano de la casa. Los dos codigos de abajo
+   * —`INSIDE_CABINETS` e `INTERIOR_WINDOWS`— son los de antes, cuando iban
+   * por separado: se apagan, no se borran. Estan escritos dentro del JSON de
+   * cotizaciones y reservas que ya existen, y quitarlos del enumerado haria
+   * ilegible un presupuesto del mes pasado.
+   */
+  'WINDOWS_AND_CABINETS',
   'INSIDE_CABINETS',
   'INTERIOR_WINDOWS',
   'LAUNDRY',

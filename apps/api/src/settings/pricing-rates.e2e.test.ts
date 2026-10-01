@@ -83,7 +83,7 @@ async function guardar(rates: unknown, token?: string) {
 }
 
 /** Una cotizacion normal, para ver el precio que sale de verdad. */
-async function cotizar(servicio = 'STANDARD', frecuencia = 'ONE_TIME') {
+async function cotizar(servicio = 'STANDARD', frecuencia = 'MONTHLY') {
   return request(app.getHttpServer())
     .post('/api/v1/quotes/estimate')
     .send({
@@ -148,11 +148,15 @@ describe('quien puede tocar los precios', () => {
 
     expect(respuesta.status).toBe(200);
     expect(AdminPricingRatesSchema.safeParse(respuesta.body).success).toBe(true);
-    expect(respuesta.body.rates.services.STANDARD.ONE_TIME.flatCents).toBe(
-      defaultPricingConfig.services.STANDARD.byFrequency.ONE_TIME?.flatCents,
+    expect(respuesta.body.rates.sizeBands).toHaveLength(defaultPricingConfig.sizeBands.length);
+    expect(respuesta.body.rates.sizeBands[0].standardMonthlyCents).toBe(
+      defaultPricingConfig.sizeBands[0]?.standardMonthlyCents,
     );
-    // La profunda solo se contrata puntual: ver `config.ts`.
-    expect(respuesta.body.rates.services.DEEP.WEEKLY).toBeNull();
+    /*
+     * Y NO lleva `services`: desde la etapa 3.4 que cadencias se ofrecen es
+     * decision de producto y vive en el codigo, no en lo editable.
+     */
+    expect(respuesta.body.rates.services).toBeUndefined();
   });
 
   /*
@@ -209,10 +213,16 @@ describe('el cambio llega al cotizador', () => {
 
     await guardar(
       conCambio((r) => {
-        // 50 $ mas en TODAS las cadencias: el contrato exige que el precio
-        // no suba al aumentar la frecuencia, asi que se mueven a la vez.
-        for (const tarifa of Object.values(r.services.STANDARD)) {
-          if (tarifa) tarifa.flatCents += 5000;
+        /*
+         * 50 $ mas en TODOS los tramos y TODAS las cadencias: el contrato
+         * exige que el precio no suba al comprometerse a mas limpiezas, asi
+         * que se mueven a la vez.
+         */
+        for (const banda of r.sizeBands) {
+          banda.deepCents += 5000;
+          banda.standardMonthlyCents += 5000;
+          banda.standardBiweeklyCents += 5000;
+          banda.standardWeeklyCents += 5000;
         }
         return r;
       }),
@@ -231,8 +241,8 @@ describe('el cambio llega al cotizador', () => {
   it('bajar la tarifa semanal se ve en el catalogo publico', async () => {
     await guardar(
       conCambio((r) => {
-        const semanal = r.services.STANDARD.WEEKLY;
-        if (semanal) semanal.flatCents = 9900;
+        // El primer tramo es el que publica el «desde» del catalogo.
+        for (const banda of r.sizeBands) banda.standardWeeklyCents = 9900;
         return r;
       }),
     );
@@ -240,9 +250,9 @@ describe('el cambio llega al cotizador', () => {
     const catalogo = await request(app.getHttpServer()).get('/api/v1/pricing/catalog');
     const estandar = catalogo.body.services.find(
       (servicio: { code: string }) => servicio.code === 'STANDARD',
-    ) as { rates: Record<string, { flatCents: number } | null>; fromCents: number };
+    ) as { rates: Record<string, { fromCents: number } | null>; fromCents: number };
 
-    expect(estandar.rates.WEEKLY?.flatCents).toBe(9900);
+    expect(estandar.rates.WEEKLY?.fromCents).toBe(9900);
     // Y el «desde» de la pagina de servicios lo sigue: se calcula, no se fija.
     expect(estandar.fromCents).toBe(9900);
   });
@@ -310,15 +320,13 @@ describe('el historial', () => {
 
     const primera = await guardar(
       conCambio((r) => {
-        const puntual = r.services.DEEP.ONE_TIME;
-        if (puntual) puntual.flatCents = 10_000;
+        for (const banda of r.sizeBands) banda.deepCents = 10_000;
         return r;
       }),
     );
     const segunda = await guardar(
       conCambio((r) => {
-        const puntual = r.services.DEEP.ONE_TIME;
-        if (puntual) puntual.flatCents = 11_000;
+        for (const banda of r.sizeBands) banda.deepCents = 11_000;
         return r;
       }),
     );
@@ -338,22 +346,20 @@ describe('el historial', () => {
      */
     const vieja = await guardar(
       conCambio((r) => {
-        const puntual = r.services.DEEP.ONE_TIME;
-        if (puntual) puntual.flatCents = 10_000;
+        for (const banda of r.sizeBands) banda.deepCents = 10_000;
         return r;
       }),
     );
     await guardar(
       conCambio((r) => {
-        const puntual = r.services.DEEP.ONE_TIME;
-        if (puntual) puntual.flatCents = 11_000;
+        for (const banda of r.sizeBands) banda.deepCents = 11_000;
         return r;
       }),
     );
 
     const config = await app.get(PricingConfigService).atVersion(vieja.body.version as string);
 
-    expect(config?.services.DEEP.byFrequency.ONE_TIME?.flatCents).toBe(10_000);
+    expect(config?.sizeBands[0]?.deepCents).toBe(10_000);
     expect(config?.version).toBe(vieja.body.version);
   });
 
@@ -379,8 +385,7 @@ describe('lo que el contrato no deja pasar', () => {
   it('rechaza un importe con un cero de mas', async () => {
     const respuesta = await guardar(
       conCambio((r) => {
-        const puntual = r.services.STANDARD.ONE_TIME;
-        if (puntual) puntual.flatCents = 99_999_999;
+        for (const banda of r.sizeBands) banda.deepCents = 99_999_999;
         return r;
       }),
     );
@@ -395,8 +400,7 @@ describe('lo que el contrato no deja pasar', () => {
   it('rechaza que el precio suba al aumentar la frecuencia', async () => {
     const respuesta = await guardar(
       conCambio((r) => {
-        const semanal = r.services.STANDARD.WEEKLY;
-        if (semanal) semanal.flatCents = 99_000;
+        for (const banda of r.sizeBands) banda.standardWeeklyCents = 99_000;
         return r;
       }),
     );
@@ -404,34 +408,35 @@ describe('lo que el contrato no deja pasar', () => {
     expect(respuesta.status).toBe(400);
   });
 
-  it('rechaza dejar un servicio sin tarifa puntual', async () => {
+  it('rechaza una tabla desordenada', async () => {
     /*
-     * Sin la puntual, un servicio con precio automatico solo se podria
-     * contratar comprometiendose de antemano, y el cotizador responderia
-     * «elige otra frecuencia» a quien solo quiere una limpieza.
+     * Con los tramos fuera de orden, cual gana depende de como este
+     * guardada la lista: la misma casa cotizaria distinto segun el orden.
      */
     const respuesta = await guardar(
-      conCambio((r) => {
-        r.services.STANDARD.ONE_TIME = null;
-        return r;
-      }),
+      conCambio((r) => ({ ...r, sizeBands: [...r.sizeBands].reverse() })),
     );
 
     expect(respuesta.status).toBe(400);
   });
 
-  it('rechaza precio para el servicio comercial', async () => {
+  it('rechaza una tabla vacia', async () => {
+    // Sin una sola fila no hay precio para ninguna casa.
+    const respuesta = await guardar(conCambio((r) => ({ ...r, sizeBands: [] })));
+
+    expect(respuesta.status).toBe(400);
+  });
+
+  it('rechaza campos que ya no son editables, como los servicios', async () => {
+    /*
+     * Desde la etapa 3.4 los precios estan en la tabla y `services` solo
+     * dice que cadencias se ofrecen, que es producto. El contrato es
+     * estricto: un campo de mas se RECHAZA en vez de ignorarse, para que
+     * nadie crea que lo guardo.
+     */
     const respuesta = await guardar({
       ...PARTIDA,
-      services: {
-        ...PARTIDA.services,
-        COMMERCIAL: {
-          ONE_TIME: { flatCents: 5000, centsPerSquareFoot: null },
-          MONTHLY: null,
-          BIWEEKLY: null,
-          WEEKLY: null,
-        },
-      },
+      services: { STANDARD: { ONE_TIME: { flatCents: 5000 } } },
     });
 
     expect(respuesta.status).toBe(400);
@@ -455,8 +460,7 @@ describe('lo que el contrato no deja pasar', () => {
 
     await guardar(
       conCambio((r) => {
-        const puntual = r.services.STANDARD.ONE_TIME;
-        if (puntual) puntual.flatCents = 99_999_999;
+        for (const banda of r.sizeBands) banda.deepCents = 99_999_999;
         return r;
       }),
     );
@@ -470,8 +474,7 @@ describe('la auditoria', () => {
   it('registra QUE cambio, no un volcado de la tabla entera', async () => {
     await guardar(
       conCambio((r) => {
-        const puntual = r.services.DEEP.ONE_TIME;
-        if (puntual) puntual.flatCents = 12_345;
+        for (const banda of r.sizeBands) banda.deepCents = 12_345;
         return r;
       }),
     );
@@ -483,13 +486,17 @@ describe('la auditoria', () => {
     expect(filas.rows).toHaveLength(1);
 
     const metadata = String(filas.rows[0]?.metadata);
-    expect(metadata).toContain('DEEP.ONE_TIME.importe');
+    /*
+     * Los tramos se nombran por su TOPE, no por su posicion: insertar una
+     * fila en medio no debe decir que cambiaron todas las de abajo.
+     */
+    expect(metadata).toContain('tramo.900.profunda');
     expect(metadata).toContain('12345');
     /*
-     * Y NO los cuarenta numeros que no se movieron. Un volcado en cada fila
-     * no se lee, y la pregunta real es siempre «que subio y cuanto».
+     * Y NO las columnas que no se movieron. Un volcado en cada fila no se
+     * lee, y la pregunta real es siempre «que subio y cuanto».
      */
-    expect(metadata).not.toContain('STANDARD');
+    expect(metadata).not.toContain('mensual');
   });
 
   it('tiene accion propia, distinta de la de los ajustes', async () => {

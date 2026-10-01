@@ -3,14 +3,13 @@ import {
   EDITABLE_SERVICE_TYPES,
   EditableAddOnRateSchema,
   EditableTravelRuleSchema,
-  FrequencyRateSchema,
   OFFERED_ADD_ON_CODES,
   PricingRatesSchema,
   QUOTE_ONLY_SERVICE_TYPES,
-  ServiceRatesSchema,
   nextPricingVersion,
   type PricingRates,
 } from './pricing-rates';
+import { PricingSizeBandsSchema, sizeBandFor } from './pricing-size-bands';
 
 /**
  * EL CONTRATO DE LAS TARIFAS
@@ -21,37 +20,38 @@ import {
  * se interpone entre un dedo y una factura absurda son estas reglas.
  */
 
-/** La estandar real: plana, y mas barata cuanto mas se repite. */
-const ESTANDAR = {
-  ONE_TIME: { flatCents: 18_500, centsPerSquareFoot: null },
-  MONTHLY: { flatCents: 15_000, centsPerSquareFoot: null },
-  BIWEEKLY: { flatCents: 13_500, centsPerSquareFoot: null },
-  WEEKLY: { flatCents: 12_000, centsPerSquareFoot: null },
-};
-
-/** La profunda real: solo puntual, y mirando los pies cuadrados. */
-const POR_TAMANO = {
-  ONE_TIME: { flatCents: 25_000, centsPerSquareFoot: 30 },
-  MONTHLY: null,
-  BIWEEKLY: null,
-  WEEKLY: null,
-};
+/** Dos tramos reales de la hoja del cliente. */
+const BANDAS = [
+  {
+    maxSquareFeet: 900,
+    deepCents: 26_000,
+    standardMonthlyCents: 16_000,
+    standardBiweeklyCents: 13_500,
+    standardWeeklyCents: 12_000,
+    windowsAndCabinetsCents: 3000,
+  },
+  {
+    maxSquareFeet: 1200,
+    deepCents: 27_000,
+    standardMonthlyCents: 15_000,
+    standardBiweeklyCents: 14_000,
+    standardWeeklyCents: 13_000,
+    windowsAndCabinetsCents: 3000,
+  },
+];
 
 const RATES: PricingRates = {
-  services: {
-    STANDARD: ESTANDAR,
-    DEEP: POR_TAMANO,
-    MOVE_IN_OUT: POR_TAMANO,
-  },
+  sizeBands: BANDAS,
   addOns: {
     INSIDE_OVEN: { unitAmountCents: 5000, maxQuantity: 1 },
     INSIDE_FRIDGE: { unitAmountCents: 5000, maxQuantity: 1 },
-    INSIDE_CABINETS: { unitAmountCents: 2500, maxQuantity: 1 },
-    INTERIOR_WINDOWS: { unitAmountCents: 600, maxQuantity: 40 },
   },
   depositCents: 3500,
   travel: { freeRadiusMiles: 35, roundTrip: true, centsPerMile: null },
 };
+
+/** Un tramo con un cambio encima, para probar una regla cada vez. */
+const tramo = (cambios: Partial<(typeof BANDAS)[number]> = {}) => ({ ...BANDAS[0], ...cambios });
 
 describe('la tabla de partida vale', () => {
   it('las tarifas de ejemplo pasan el contrato', () => {
@@ -69,15 +69,18 @@ describe('la tabla de partida vale', () => {
     }
   });
 
-  it('hacen falta TODOS los servicios editables', () => {
-    const incompleta = { ...RATES, services: { STANDARD: ESTANDAR } };
-
+  it('hace falta la tabla de tramos entera', () => {
     /*
-     * Si faltara uno, el motor se quedaria con la tarifa del codigo para ese
-     * servicio sin decir nada: medio sistema con los precios nuevos y medio
-     * con los viejos, que es el peor de los dos mundos.
+     * Sin ella el motor se quedaria con la del codigo sin decir nada: medio
+     * sistema con los precios nuevos y medio con los viejos, que es el peor
+     * de los dos mundos.
+     *
+     * Desde la etapa 3.4 los servicios ya no llevan importes —la tabla los
+     * tiene todos—, asi que lo que no puede faltar es la tabla.
      */
-    expect(PricingRatesSchema.safeParse(incompleta).success).toBe(false);
+    const { sizeBands: _descartada, ...sinTabla } = RATES;
+
+    expect(PricingRatesSchema.safeParse(sinTabla).success).toBe(false);
   });
 
   it('hacen falta TODOS los extras que se ofrecen', () => {
@@ -123,39 +126,38 @@ describe('el cero de mas', () => {
      * 1850000 donde iban 18500. Sin tope, la siguiente cotizacion sale a
      * 18 500 $ y se descubre con la factura delante.
      */
-    expect(
-      FrequencyRateSchema.safeParse({ flatCents: 99_999_999, centsPerSquareFoot: null }).success,
-    ).toBe(false);
-  });
-
-  it('rechaza un precio negativo', () => {
-    expect(
-      FrequencyRateSchema.safeParse({ flatCents: -100, centsPerSquareFoot: null }).success,
-    ).toBe(false);
-  });
-
-  it('el importe plano no puede ser cero', () => {
-    /*
-     * Es el suelo del precio: con cero, una casa pequena de un servicio sin
-     * precio por pie saldria gratis.
-     */
-    expect(FrequencyRateSchema.safeParse({ flatCents: 0, centsPerSquareFoot: null }).success).toBe(
+    expect(PricingSizeBandsSchema.safeParse([tramo({ deepCents: 99_999_999 })]).success).toBe(
       false,
     );
   });
 
-  it('acepta decimales solo en el precio por pie cuadrado', () => {
+  it('rechaza un precio negativo', () => {
+    expect(PricingSizeBandsSchema.safeParse([tramo({ deepCents: -100 })]).success).toBe(false);
+  });
+
+  it('rechaza centavos partidos', () => {
+    // Medio centavo no existe, y un decimal aqui viene de una division que
+    // alguien hizo mal, no de un precio que alguien quiso poner.
+    expect(PricingSizeBandsSchema.safeParse([tramo({ deepCents: 26_000.5 })]).success).toBe(false);
+  });
+
+  it('un tramo SI puede costar cero: se regala, no se retira', () => {
     /*
-     * El plano se cobra tal cual y medio centavo no existe. Este se
-     * multiplica por los pies antes de redondear, y la diferencia entre 30 y
-     * 31 centavos en una casa de 2 000 pies son veinte dolares.
+     * Distinto del importe plano del modelo anterior, que tenia un suelo de
+     * un centavo. Aqui un cero es una decision legitima —una promocion, un
+     * extra incluido— y no deja nada roto: la casa paga cero por esa
+     * columna y el resto del presupuesto sigue cuadrando.
      */
-    expect(
-      FrequencyRateSchema.safeParse({ flatCents: 25_000, centsPerSquareFoot: 30.5 }).success,
-    ).toBe(true);
-    expect(
-      FrequencyRateSchema.safeParse({ flatCents: 18_500.5, centsPerSquareFoot: null }).success,
-    ).toBe(false);
+    expect(PricingSizeBandsSchema.safeParse([tramo({ windowsAndCabinetsCents: 0 })]).success).toBe(
+      true,
+    );
+  });
+
+  it('rechaza un tramo de un tamano imposible', () => {
+    expect(PricingSizeBandsSchema.safeParse([tramo({ maxSquareFeet: 0 })]).success).toBe(false);
+    expect(PricingSizeBandsSchema.safeParse([tramo({ maxSquareFeet: 999_999 })]).success).toBe(
+      false,
+    );
   });
 
   it('el deposito no puede ser cero', () => {
@@ -165,74 +167,94 @@ describe('el cero de mas', () => {
 });
 
 describe('lo que no significa nada aunque cada numero valga', () => {
-  it('siempre tiene que poderse contratar una vez', () => {
+  it('los tramos tienen que ir en orden', () => {
     /*
-     * Sin la puntual, un servicio con precio automatico solo se podria
-     * contratar comprometiendose de antemano, y el cotizador respondería
-     * «elige otra frecuencia» a quien solo quiere una limpieza.
+     * Con la tabla desordenada, cual tramo gana depende de como este
+     * guardada: la misma casa cotizaria distinto segun el orden de la
+     * lista. Es la clase de fallo que nadie encuentra.
      */
-    const sinPuntual = { ...ESTANDAR, ONE_TIME: null };
+    const alReves = [tramo({ maxSquareFeet: 1200 }), tramo({ maxSquareFeet: 900 })];
 
-    expect(ServiceRatesSchema.safeParse(sinPuntual).success).toBe(false);
+    expect(PricingSizeBandsSchema.safeParse(alReves).success).toBe(false);
   });
 
-  it('el precio no puede SUBIR al aumentar la frecuencia', () => {
-    /*
-     * 120 $ la puntual y 185 $ la semanal: los dos numeros son validos.
-     * Juntos significan que quien se compromete a una limpieza semanal paga
-     * mas que quien viene una vez. Se pierde la venta recurrente entera y no
-     * lo delata nada.
-     */
-    const alReves = {
-      ONE_TIME: { flatCents: 12_000, centsPerSquareFoot: null },
-      MONTHLY: { flatCents: 13_500, centsPerSquareFoot: null },
-      BIWEEKLY: { flatCents: 15_000, centsPerSquareFoot: null },
-      WEEKLY: { flatCents: 18_500, centsPerSquareFoot: null },
-    };
+  it('dos tramos no pueden tener el mismo tope', () => {
+    const repetido = [tramo({ maxSquareFeet: 900 }), tramo({ maxSquareFeet: 900 })];
 
-    expect(ServiceRatesSchema.safeParse(alReves).success).toBe(false);
+    expect(PricingSizeBandsSchema.safeParse(repetido).success).toBe(false);
   });
 
-  it('el precio por pie cuadrado se vigila igual que el plano', () => {
-    const alReves = {
-      ONE_TIME: { flatCents: 25_000, centsPerSquareFoot: 14 },
-      MONTHLY: { flatCents: 15_000, centsPerSquareFoot: 18 },
-      BIWEEKLY: null,
-      WEEKLY: null,
-    };
+  it('la tabla no puede estar vacia', () => {
+    // Sin una sola fila no hay precio para ninguna casa, y el cotizador
+    // mandaria a revision manual absolutamente todo.
+    expect(PricingSizeBandsSchema.safeParse([]).success).toBe(false);
+  });
 
-    expect(ServiceRatesSchema.safeParse(alReves).success).toBe(false);
+  it('el precio no puede SUBIR al comprometerse a mas limpiezas', () => {
+    /*
+     * Cada numero por separado es valido y el conjunto no significa nada:
+     * quien se compromete a una limpieza semanal pagaria mas que quien
+     * viene una vez al mes. Se pierde dinero en cada reserva recurrente y no
+     * lo delata ninguna pantalla.
+     */
+    expect(PricingSizeBandsSchema.safeParse([tramo({ standardWeeklyCents: 99_000 })]).success).toBe(
+      false,
+    );
+    expect(
+      PricingSizeBandsSchema.safeParse([tramo({ standardBiweeklyCents: 99_000 })]).success,
+    ).toBe(false);
   });
 
   it('precios iguales en todas las cadencias SI valen', () => {
-    // No es raro: un servicio que no premia el compromiso.
-    const iguales = {
-      ONE_TIME: { flatCents: 15_000, centsPerSquareFoot: null },
-      MONTHLY: { flatCents: 15_000, centsPerSquareFoot: null },
-      BIWEEKLY: { flatCents: 15_000, centsPerSquareFoot: null },
-      WEEKLY: { flatCents: 15_000, centsPerSquareFoot: null },
-    };
+    // No subir no es lo mismo que bajar: una empresa puede decidir que la
+    // recurrencia no abarata, y eso es coherente aunque sea poco comun.
+    const plano = tramo({
+      standardMonthlyCents: 15_000,
+      standardBiweeklyCents: 15_000,
+      standardWeeklyCents: 15_000,
+    });
 
-    expect(ServiceRatesSchema.safeParse(iguales).success).toBe(true);
+    expect(PricingSizeBandsSchema.safeParse([plano]).success).toBe(true);
   });
 
-  it('un hueco en medio vale: se comparan solo las cadencias ofrecidas', () => {
+  it('UN TRAMO MAS GRANDE SI PUEDE SER MAS BARATO, y es deliberado', () => {
     /*
-     * Puntual y semanal sin mensual es raro, pero no es incoherente.
-     * Rechazarlo seria inventarse una regla que el negocio no pidio.
+     * LA REGLA QUE NO EXISTE, Y POR QUE.
+     *
+     * En la hoja del cliente, la estandar mensual de 900 pies cuesta 160 $ y
+     * la de 1.200 cuesta 150: la casa mas grande, diez dolares mas barata.
+     * Parece una errata suya, pero no es nuestra para corregirla.
+     *
+     * Una invariante de «el precio nunca baja al crecer la casa» rechazaria
+     * SUS PROPIOS PRECIOS y le impediria guardarlos desde el panel. Esta
+     * prueba deja por escrito que la ausencia de esa regla esta pensada.
      */
-    const conHueco = {
-      ONE_TIME: { flatCents: 18_500, centsPerSquareFoot: null },
-      MONTHLY: null,
-      BIWEEKLY: null,
-      WEEKLY: { flatCents: 12_000, centsPerSquareFoot: null },
-    };
+    expect(PricingSizeBandsSchema.safeParse(BANDAS).success).toBe(true);
+  });
+});
 
-    expect(ServiceRatesSchema.safeParse(conHueco).success).toBe(true);
+describe('a que tramo va cada casa', () => {
+  it('justo en el tope, ese tramo', () => {
+    expect(sizeBandFor(BANDAS, 900)?.maxSquareFeet).toBe(900);
+    expect(sizeBandFor(BANDAS, 1200)?.maxSquareFeet).toBe(1200);
   });
 
-  it('solo puntual vale: es el caso de la profunda', () => {
-    expect(ServiceRatesSchema.safeParse(POR_TAMANO).success).toBe(true);
+  it('un pie mas, el siguiente', () => {
+    expect(sizeBandFor(BANDAS, 901)?.maxSquareFeet).toBe(1200);
+  });
+
+  it('en un hueco de la tabla, sube', () => {
+    // Entre 900 y 1.200 no hay nada escrito: una casa de 1.000 paga 1.200.
+    expect(sizeBandFor(BANDAS, 1000)?.maxSquareFeet).toBe(1200);
+  });
+
+  it('mas pequena que el primer tramo, paga el primero', () => {
+    expect(sizeBandFor(BANDAS, 100)?.maxSquareFeet).toBe(900);
+  });
+
+  it('mas grande que el ultimo, NO hay tramo', () => {
+    // `null` no es un error: significa «esta casa no se tarifa sola».
+    expect(sizeBandFor(BANDAS, 1201)).toBeNull();
   });
 });
 

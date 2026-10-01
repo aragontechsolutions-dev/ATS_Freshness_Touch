@@ -216,6 +216,10 @@ del cliente (que en la Etapa 1 no se pide a propósito).
   casa** —las coordenadas del empleado se descartan en el servidor y no
   existen en ninguna tabla— y **nunca bloquea el fichaje**; sin ubicación se
   ficha igual, anotando por qué.
+- ✅ **Precios por tamaño de casa** (`docs/26-tabla-de-precios.md`): el motor
+  cotiza con la tabla que mandó el cliente, una fila por tramo de pies
+  cuadrados. La post-obra, el cambio de Airbnb y el comercial se retiran del
+  sitio, y la estándar pasa a venderse solo como plan recurrente.
 - ⬜ Detalle del trabajo, listas de verificación, fotos antes y después.
   Requiere decidir dónde se almacenan las fotos.
 - ⬜ Funcionamiento sin conexión con cola de sincronización (zonas rurales de

@@ -1,10 +1,8 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  EDITABLE_SERVICE_TYPES,
   OFFERED_ADD_ON_CODES,
   PricingRatesSchema,
-  type Frequency,
   type Locale,
   type OfferedAddOnCode,
   type PricingRates,
@@ -12,7 +10,7 @@ import {
 import { ApiClientError, fetchPricingRates, savePricingRates } from '../lib/api';
 import { useToast } from './ToastProvider';
 import { SkeletonFormulario } from './Skeletons';
-import { AlertIcon, SpinnerIcon } from './Icons';
+import { AlertIcon, CloseIcon, SpinnerIcon } from './Icons';
 import { formatTimestamp } from '../lib/format';
 
 interface PricingRatesFormProps {
@@ -20,25 +18,32 @@ interface PricingRatesFormProps {
   onSessionLost: (reason?: 'expired' | 'noAccess') => void;
 }
 
-type ServicioEditable = (typeof EDITABLE_SERVICE_TYPES)[number];
+/**
+ * Las columnas de la tabla, en el orden en que se leen. Es el mismo que el de
+ * la hoja de calculo del cliente, a proposito: quien mantiene los precios
+ * compara las dos pantallas lado a lado.
+ */
+const COLUMNAS = [
+  { campo: 'deep', etiqueta: 'admin.rates.bands.deep' },
+  { campo: 'monthly', etiqueta: 'admin.rates.bands.monthly' },
+  { campo: 'biweekly', etiqueta: 'admin.rates.bands.biweekly' },
+  { campo: 'weekly', etiqueta: 'admin.rates.bands.weekly' },
+  { campo: 'windows', etiqueta: 'admin.rates.bands.windows' },
+] as const;
 
-/** Las cadencias, de menos compromiso a mas. Es el orden en que se leen. */
-const CADENCIAS: readonly Frequency[] = ['ONE_TIME', 'MONTHLY', 'BIWEEKLY', 'WEEKLY'];
+type ColumnaTramo = (typeof COLUMNAS)[number]['campo'];
 
 /**
- * Lo que hay escrito en los campos. Todo cadenas: vienen de inputs, y un
- * campo a medio escribir («12.») no es un numero todavia.
+ * Una fila de la tabla, tal y como esta escrita en los campos.
+ *
+ * TODO CADENAS: vienen de inputs, y un campo a medio escribir («12.») no es
+ * un numero todavia.
  */
-interface CamposTarifa {
-  /** Si ese servicio se ofrece en esa cadencia. */
-  offered: boolean;
-  flat: string;
-  /** En centavos, no en dolares: ver la cabecera del componente. */
-  sqft: string;
-}
+type FilaTramo = { maxSquareFeet: string } & Record<ColumnaTramo, string>;
 
 interface Borrador {
-  services: Record<ServicioEditable, Record<Frequency, CamposTarifa>>;
+  /** La tabla de precios por tamano. Una fila por tramo. */
+  bands: FilaTramo[];
   addOns: Record<OfferedAddOnCode, { amount: string; max: string }>;
   deposit: string;
   travel: { freeMiles: string; centsPerMile: string; roundTrip: boolean };
@@ -46,8 +51,12 @@ interface Borrador {
 
 /** El nombre de cada campo, para poder decir CUAL revisar. */
 const ETIQUETA_CAMPO: Record<string, string> = {
-  flatCents: 'admin.rates.flat',
-  centsPerSquareFoot: 'admin.rates.perSquareFoot',
+  maxSquareFeet: 'admin.rates.bands.upTo',
+  deepCents: 'admin.rates.bands.deep',
+  standardMonthlyCents: 'admin.rates.bands.monthly',
+  standardBiweeklyCents: 'admin.rates.bands.biweekly',
+  standardWeeklyCents: 'admin.rates.bands.weekly',
+  windowsAndCabinetsCents: 'admin.rates.bands.windows',
   unitAmountCents: 'admin.rates.amount',
   maxQuantity: 'admin.rates.maxQuantity',
   depositCents: 'admin.rates.deposit',
@@ -114,19 +123,14 @@ export function PricingRatesForm({ locale, onSessionLost }: PricingRatesFormProp
   const perdioSesion = onSessionLost;
 
   const asentar = useCallback((rates: PricingRates) => {
-    const services = {} as Borrador['services'];
-    for (const tipo of EDITABLE_SERVICE_TYPES) {
-      const porCadencia = {} as Record<Frequency, CamposTarifa>;
-      for (const cadencia of CADENCIAS) {
-        const tarifa = rates.services[tipo]?.[cadencia] ?? null;
-        porCadencia[cadencia] = {
-          offered: tarifa !== null,
-          flat: tarifa === null ? '' : dolares(tarifa.flatCents),
-          sqft: tarifa?.centsPerSquareFoot === null ? '' : String(tarifa?.centsPerSquareFoot ?? ''),
-        };
-      }
-      services[tipo] = porCadencia;
-    }
+    const bands: FilaTramo[] = rates.sizeBands.map((banda) => ({
+      maxSquareFeet: String(banda.maxSquareFeet),
+      deep: dolares(banda.deepCents),
+      monthly: dolares(banda.standardMonthlyCents),
+      biweekly: dolares(banda.standardBiweeklyCents),
+      weekly: dolares(banda.standardWeeklyCents),
+      windows: dolares(banda.windowsAndCabinetsCents),
+    }));
 
     const addOns = {} as Borrador['addOns'];
     for (const codigo of OFFERED_ADD_ON_CODES) {
@@ -137,7 +141,7 @@ export function PricingRatesForm({ locale, onSessionLost }: PricingRatesFormProp
     }
 
     setBorrador({
-      services,
+      bands,
       addOns,
       deposit: dolares(rates.depositCents),
       travel: {
@@ -206,26 +210,14 @@ export function PricingRatesForm({ locale, onSessionLost }: PricingRatesFormProp
   const aContrato = (): PricingRates | null => {
     if (!borrador) return null;
 
-    const services = {} as PricingRates['services'];
-    for (const tipo of EDITABLE_SERVICE_TYPES) {
-      const porCadencia = {} as PricingRates['services'][ServicioEditable];
-      for (const cadencia of CADENCIAS) {
-        const campos = borrador.services[tipo][cadencia];
-        porCadencia[cadencia] = !campos.offered
-          ? null
-          : {
-              flatCents: aCentavos(campos.flat),
-              /*
-               * Vacio significa «este servicio no mira el tamano», que es
-               * `null` y no cero: con cero el maximo lo ganaria siempre el
-               * importe plano y daria igual, pero el dia que alguien mire la
-               * tabla vería un precio por pie que no existe.
-               */
-              centsPerSquareFoot: campos.sqft.trim() === '' ? null : Number.parseFloat(campos.sqft),
-            };
-      }
-      services[tipo] = porCadencia;
-    }
+    const sizeBands = borrador.bands.map((fila) => ({
+      maxSquareFeet: entero(fila.maxSquareFeet),
+      deepCents: aCentavos(fila.deep),
+      standardMonthlyCents: aCentavos(fila.monthly),
+      standardBiweeklyCents: aCentavos(fila.biweekly),
+      standardWeeklyCents: aCentavos(fila.weekly),
+      windowsAndCabinetsCents: aCentavos(fila.windows),
+    }));
 
     const addOns = {} as PricingRates['addOns'];
     for (const codigo of OFFERED_ADD_ON_CODES) {
@@ -236,7 +228,7 @@ export function PricingRatesForm({ locale, onSessionLost }: PricingRatesFormProp
     }
 
     const candidato: PricingRates = {
-      services,
+      sizeBands,
       addOns,
       depositCents: aCentavos(borrador.deposit),
       travel: {
@@ -308,25 +300,52 @@ export function PricingRatesForm({ locale, onSessionLost }: PricingRatesFormProp
 
   if (!borrador) return null;
 
-  const cambiarTarifa = (
-    tipo: ServicioEditable,
-    cadencia: Frequency,
-    cambio: Partial<CamposTarifa>,
-  ): void => {
+  const cambiarTramo = (indice: number, cambio: Partial<FilaTramo>): void => {
     setBorrador((actual) =>
       actual === null
         ? actual
         : {
             ...actual,
-            services: {
-              ...actual.services,
-              [tipo]: {
-                ...actual.services[tipo],
-                [cadencia]: { ...actual.services[tipo][cadencia], ...cambio },
-              },
-            },
+            bands: actual.bands.map((fila, i) => (i === indice ? { ...fila, ...cambio } : fila)),
           },
     );
+  };
+
+  const quitarTramo = (indice: number): void => {
+    setBorrador((actual) =>
+      actual === null ? actual : { ...actual, bands: actual.bands.filter((_, i) => i !== indice) },
+    );
+  };
+
+  /**
+   * Un tramo nuevo al final, copiando los precios del ultimo.
+   *
+   * COPIAR Y NO DEJAR EN BLANCO: una tabla de precios crece por el final y
+   * cada tramo se parece al anterior. Partir de ceros obliga a teclear seis
+   * numeros donde normalmente se cambian dos, y un cero olvidado es una
+   * limpieza gratis que nadie ve.
+   *
+   * El tope si sube, porque dos tramos con el mismo tope no se pueden
+   * guardar: el contrato lo rechaza, y mejor que salga ya distinto.
+   */
+  const anadirTramo = (): void => {
+    setBorrador((actual) => {
+      if (actual === null) return actual;
+
+      const ultima = actual.bands.at(-1);
+      const nueva: FilaTramo = ultima
+        ? { ...ultima, maxSquareFeet: String((entero(ultima.maxSquareFeet) || 0) + 100) }
+        : {
+            maxSquareFeet: '1000',
+            deep: '0.00',
+            monthly: '0.00',
+            biweekly: '0.00',
+            weekly: '0.00',
+            windows: '0.00',
+          };
+
+      return { ...actual, bands: [...actual.bands, nueva] };
+    });
   };
 
   return (
@@ -351,101 +370,109 @@ export function PricingRatesForm({ locale, onSessionLost }: PricingRatesFormProp
       <section className="ft-card space-y-4 p-4">
         <div>
           <h3 className="font-semibold text-slate-900 dark:text-white">
-            {t('admin.rates.services')}
+            {t('admin.rates.bands.title')}
           </h3>
           <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
-            {t('admin.rates.servicesHelp')}
+            {t('admin.rates.bands.help')}
           </p>
         </div>
 
-        <div className="space-y-4">
-          {EDITABLE_SERVICE_TYPES.map((tipo) => (
-            <fieldset
-              key={tipo}
-              className="rounded-lg border border-slate-200 p-3 dark:border-night-600"
-            >
-              <legend className="px-1 text-sm font-semibold text-brand-800 dark:text-brand-300">
-                {t(`services.${tipo}.name`)}
-              </legend>
+        {/*
+          UNA TABLA, CON LA MISMA FORMA QUE LA HOJA DEL CLIENTE.
+          Quien mantiene los precios tiene su hoja de calculo abierta al lado:
+          si aqui las columnas estuvieran en otro orden o con otros nombres,
+          copiar veintiseis filas seria una invitacion a equivocarse de celda.
 
-              <div className="space-y-2">
-                {CADENCIAS.map((cadencia) => {
-                  const campos = borrador.services[tipo][cadencia];
-                  return (
-                    <div
-                      key={cadencia}
-                      className="flex flex-wrap items-end gap-3 border-t border-slate-100 pt-2
-                                 first:border-0 first:pt-0 dark:border-night-700"
-                    >
-                      <label className="flex w-40 items-center gap-2 pb-2 text-sm text-slate-800 dark:text-slate-200">
+          EL DESBORDE HORIZONTAL ES DELIBERADO. Son seis columnas de numeros y
+          no caben en un movil; apilarlas en tarjetas haria imposible
+          comparar una fila con la de arriba, que es justo como se revisa una
+          tabla de precios.
+        */}
+        <div className="-mx-4 overflow-x-auto px-4">
+          <table className="w-full min-w-[46rem] border-collapse text-sm">
+            <thead>
+              <tr className="border-b border-slate-200 dark:border-night-600">
+                <th scope="col" className="ft-label py-2 pr-3 text-left">
+                  {t('admin.rates.bands.upTo')}
+                </th>
+                {COLUMNAS.map((columna) => (
+                  <th key={columna.campo} scope="col" className="ft-label px-2 py-2 text-right">
+                    {t(columna.etiqueta)}
+                  </th>
+                ))}
+                <th scope="col" className="w-10 py-2">
+                  <span className="sr-only">{t('admin.rates.bands.remove')}</span>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {borrador.bands.map((fila, indice) => (
+                <tr
+                  // El indice como clave, y aqui si es correcto: las filas no
+                  // tienen identidad propia —son posiciones de una tabla
+                  // ordenada— y lo que las define, el tope, es justo lo que
+                  // se esta editando.
+                  key={indice}
+                  className="border-b border-slate-100 last:border-0 dark:border-night-700"
+                >
+                  <td className="py-1.5 pr-3">
+                    <label>
+                      <span className="sr-only">{t('admin.rates.bands.upTo')}</span>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        className="ft-input w-24"
+                        value={fila.maxSquareFeet}
+                        onChange={(evento) =>
+                          cambiarTramo(indice, { maxSquareFeet: evento.target.value })
+                        }
+                      />
+                    </label>
+                  </td>
+
+                  {COLUMNAS.map((columna) => (
+                    <td key={columna.campo} className="px-2 py-1.5">
+                      <label className="relative block">
+                        <span className="sr-only">{t(columna.etiqueta)}</span>
+                        <span
+                          aria-hidden="true"
+                          className="pointer-events-none absolute top-1/2 left-2 -translate-y-1/2
+                                     text-sm text-slate-500 dark:text-slate-400"
+                        >
+                          $
+                        </span>
                         <input
-                          type="checkbox"
-                          className="h-4 w-4"
-                          checked={campos.offered}
+                          type="text"
+                          inputMode="decimal"
+                          className="ft-input w-24 pl-6 text-right"
+                          value={fila[columna.campo]}
                           onChange={(evento) =>
-                            cambiarTarifa(tipo, cadencia, { offered: evento.target.checked })
+                            cambiarTramo(indice, { [columna.campo]: evento.target.value })
                           }
                         />
-                        {t(`frequency.${cadencia}`)}
                       </label>
+                    </td>
+                  ))}
 
-                      {campos.offered ? (
-                        <>
-                          <label className="w-32">
-                            <span className="ft-label">{t('admin.rates.flat')}</span>
-                            <div className="relative">
-                              <span
-                                aria-hidden="true"
-                                className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-sm text-slate-500 dark:text-slate-400"
-                              >
-                                $
-                              </span>
-                              <input
-                                type="text"
-                                inputMode="decimal"
-                                className="ft-input w-full pl-7"
-                                value={campos.flat}
-                                onChange={(evento) =>
-                                  cambiarTarifa(tipo, cadencia, { flat: evento.target.value })
-                                }
-                              />
-                            </div>
-                          </label>
-
-                          <label className="w-32">
-                            <span className="ft-label">{t('admin.rates.perSquareFoot')}</span>
-                            <div className="relative">
-                              <span
-                                aria-hidden="true"
-                                className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-sm text-slate-500 dark:text-slate-400"
-                              >
-                                ¢
-                              </span>
-                              <input
-                                type="text"
-                                inputMode="decimal"
-                                className="ft-input w-full pl-7"
-                                placeholder={t('admin.rates.noSize')}
-                                value={campos.sqft}
-                                onChange={(evento) =>
-                                  cambiarTarifa(tipo, cadencia, { sqft: evento.target.value })
-                                }
-                              />
-                            </div>
-                          </label>
-                        </>
-                      ) : (
-                        <p className="pb-2 text-sm text-slate-500 dark:text-slate-400">
-                          {t('admin.rates.notOffered')}
-                        </p>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </fieldset>
-          ))}
+                  <td className="py-1.5 text-right">
+                    <button
+                      type="button"
+                      className="ft-btn-icon"
+                      onClick={() => quitarTramo(indice)}
+                      aria-label={`${t('admin.rates.bands.remove')} ${fila.maxSquareFeet}`}
+                    >
+                      <CloseIcon className="h-4 w-4" />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
+
+        <button type="button" className="ft-btn-ghost" onClick={anadirTramo}>
+          {t('admin.rates.bands.add')}
+        </button>
       </section>
 
       {/* --- Extras ------------------------------------------------------ */}

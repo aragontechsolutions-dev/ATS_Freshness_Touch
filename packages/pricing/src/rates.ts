@@ -1,7 +1,6 @@
 import {
   EDITABLE_SERVICE_TYPES,
   OFFERED_ADD_ON_CODES,
-  type Frequency,
   type OfferedAddOnCode,
   type PricingRates,
   type ServiceType,
@@ -26,21 +25,8 @@ import type { PricingConfig } from './config';
  *     extra es plano o por unidad— sigue teniendo un unico origen.
  */
 
-const FRECUENCIAS: readonly Frequency[] = ['ONE_TIME', 'WEEKLY', 'BIWEEKLY', 'MONTHLY'];
-
 /** Las tarifas de partida, sacadas de la configuracion del codigo. */
 export function defaultPricingRates(config: PricingConfig): PricingRates {
-  const services = {} as PricingRates['services'];
-  for (const tipo of EDITABLE_SERVICE_TYPES) {
-    const porCadencia = config.services[tipo].byFrequency;
-    services[tipo] = {
-      ONE_TIME: porCadencia.ONE_TIME,
-      WEEKLY: porCadencia.WEEKLY,
-      BIWEEKLY: porCadencia.BIWEEKLY,
-      MONTHLY: porCadencia.MONTHLY,
-    };
-  }
-
   const addOns = {} as PricingRates['addOns'];
   for (const codigo of OFFERED_ADD_ON_CODES) {
     addOns[codigo] = {
@@ -50,7 +36,13 @@ export function defaultPricingRates(config: PricingConfig): PricingRates {
   }
 
   return {
-    services,
+    /*
+     * Copia, no la misma lista. La configuracion del codigo la comparte todo
+     * el proceso: devolver la referencia dejaria que quien guarde tarifas
+     * desde el panel modificara de paso los precios de partida, y hasta los
+     * de las pruebas.
+     */
+    sizeBands: config.sizeBands.map((banda) => ({ ...banda })),
     addOns,
     depositCents: config.deposit.amountCents,
     travel: { ...config.travel },
@@ -75,30 +67,6 @@ export function defaultPricingRates(config: PricingConfig): PricingRates {
  *     presupuestos anteriores.
  */
 export function applyPricingRates(config: PricingConfig, rates: PricingRates): PricingConfig {
-  const services = { ...config.services };
-  for (const tipo of EDITABLE_SERVICE_TYPES) {
-    const guardadas = rates.services[tipo];
-    if (!guardadas) continue;
-
-    const byFrequency = {} as PricingConfig['services'][ServiceType]['byFrequency'];
-    for (const cadencia of FRECUENCIAS) {
-      const tarifa = guardadas[cadencia];
-      byFrequency[cadencia] =
-        tarifa === null
-          ? null
-          : {
-              flatCents: tarifa.flatCents,
-              centsPerSquareFoot: tarifa.centsPerSquareFoot,
-            };
-    }
-
-    services[tipo] = {
-      // Regla de negocio, no tarifa.
-      instantQuote: config.services[tipo].instantQuote,
-      byFrequency,
-    };
-  }
-
   const addOns = { ...config.addOns };
   for (const codigo of OFFERED_ADD_ON_CODES) {
     const editable = rates.addOns[codigo];
@@ -106,6 +74,12 @@ export function applyPricingRates(config: PricingConfig, rates: PricingRates): P
     addOns[codigo] = {
       unit: config.addOns[codigo].unit,
       offered: config.addOns[codigo].offered,
+      /*
+       * Tambien del codigo: si un extra cobra por tamano es producto, no
+       * tarifa. Editable desde el panel, el precio del horno podria pasar a
+       * leerse de la columna de ventanas sin que nadie lo pidiera.
+       */
+      pricedBySize: config.addOns[codigo].pricedBySize,
       unitAmountCents: editable.unitAmountCents,
       maxQuantity: editable.maxQuantity,
     };
@@ -113,7 +87,18 @@ export function applyPricingRates(config: PricingConfig, rates: PricingRates): P
 
   return {
     ...config,
-    services,
+    /*
+     * LA TABLA GUARDADA MANDA ENTERA. No se mezcla con la del codigo tramo a
+     * tramo: una tabla a medias —unos tramos de una version y otros de
+     * otra— no es la tabla de nadie, y produciria un precio que no esta
+     * escrito en ningun sitio.
+     */
+    sizeBands: rates.sizeBands.map((banda) => ({ ...banda })),
+    /*
+     * `services` NO se toca: desde la etapa 3.4 ya no lleva importes, solo
+     * dice que columna de la tabla lee cada cadencia. Eso es producto y vive
+     * en el codigo.
+     */
     addOns,
     deposit: { amountCents: rates.depositCents },
     travel: { ...rates.travel },
