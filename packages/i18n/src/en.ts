@@ -93,6 +93,7 @@ export const en = {
     title: 'Add-ons',
     INSIDE_FRIDGE: 'Inside the refrigerator',
     INSIDE_OVEN: 'Inside the oven',
+    WINDOWS_AND_CABINETS: 'Interior windows and cabinets',
     INSIDE_CABINETS: 'Inside kitchen cabinets',
     INTERIOR_WINDOWS: 'Interior windows',
     LAUNDRY: 'Laundry loads',
@@ -406,6 +407,18 @@ export const en = {
         'Anything already booked does not change: each booking stores the prices it was calculated with. This only affects quotes from now on.',
 
       services: 'Price per service and frequency',
+      bands: {
+        title: 'Price table by home size',
+        help: 'One row per size bracket, in the same order as the pricing sheet. A home pays the first row whose size reaches it, so a 1,000 sq ft home pays the 1,200 row. A home larger than the last row gets no automatic price: we go and look at it.',
+        upTo: 'Up to (sq ft)',
+        deep: 'Deep / Move',
+        monthly: 'Monthly',
+        biweekly: 'Biweekly',
+        weekly: 'Weekly',
+        windows: 'Windows + cabinets',
+        add: 'Add a bracket',
+        remove: 'Remove bracket',
+      },
       servicesHelp:
         'In each frequency the higher of the two wins: the flat amount or what the square footage gives. Unchecking a frequency means the service is not offered that way.',
       flat: 'Amount',
@@ -433,6 +446,7 @@ export const en = {
         'That amount is beyond anything reasonable. Check "{{field}}": is there an extra zero?',
       errOneTimeRequired:
         'A service has to be bookable as a one-off: leave the "One time" frequency checked.',
+      errBandOrder: 'Size brackets must go from smallest to largest, with no repeats.',
       errFrequencyOrder:
         'The price cannot go up as the frequency goes up: someone coming weekly would pay more than someone coming once.',
       currentVersion: 'Version {{version}} · {{count}} saved in total',
@@ -1082,6 +1096,7 @@ export const en = {
       addOn: {
         INSIDE_FRIDGE: 'Inside the refrigerator',
         INSIDE_OVEN: 'Inside the oven',
+        WINDOWS_AND_CABINETS: 'Interior windows and cabinets',
         INSIDE_CABINETS: 'Inside kitchen cabinets',
         INTERIOR_WINDOWS: 'Interior windows (x{{quantity}})',
         LAUNDRY: 'Laundry ({{quantity}} loads)',
@@ -1139,6 +1154,8 @@ export const en = {
         'We do reach that far, but at that distance we price the job in person: travel changes the numbers a lot and we would rather give you a real figure. Leave us your details and we will call you.',
       outOfState: 'We currently operate in the State of Georgia only.',
       largeProperty: 'Large properties are quoted individually to keep the estimate accurate.',
+      beyondSizeTable:
+        'Your home is larger than our price list covers. We will come out, look at it and send you a price.',
 
       /**
        * El servicio existe, pero no en esa cadencia. Distinto de «no damos

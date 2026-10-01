@@ -95,6 +95,7 @@ export const es: TranslationResources = {
     title: 'Extras',
     INSIDE_FRIDGE: 'Interior del refrigerador',
     INSIDE_OVEN: 'Interior del horno',
+    WINDOWS_AND_CABINETS: 'Ventanas y gabinetes interiores',
     INSIDE_CABINETS: 'Interior de gabinetes de cocina',
     INTERIOR_WINDOWS: 'Ventanas por dentro',
     LAUNDRY: 'Cargas de lavandería',
@@ -410,6 +411,18 @@ export const es: TranslationResources = {
         'Lo que ya está reservado no cambia: cada reserva guarda los precios con los que se calculó. Esto afecta solo a las cotizaciones a partir de ahora.',
 
       services: 'Precio por servicio y frecuencia',
+      bands: {
+        title: 'Tabla de precios por tamaño de casa',
+        help: 'Una fila por tramo de tamaño, en el mismo orden que la hoja de precios. Una casa paga la primera fila cuyo tamaño la alcanza, así que una de 1.000 pies paga la de 1.200. Una casa más grande que la última fila no recibe precio automático: vamos a verla.',
+        upTo: 'Hasta (pies²)',
+        deep: 'Profunda / Mudanza',
+        monthly: 'Mensual',
+        biweekly: 'Quincenal',
+        weekly: 'Semanal',
+        windows: 'Ventanas + gabinetes',
+        add: 'Añadir un tramo',
+        remove: 'Quitar el tramo',
+      },
       servicesHelp:
         'En cada frecuencia manda el importe más alto de los dos: el plano o el que sale por pies cuadrados. Desmarcar una frecuencia significa que ese servicio no se ofrece así.',
       flat: 'Importe',
@@ -436,6 +449,7 @@ export const es: TranslationResources = {
       outOfRange: 'Ese importe está fuera de lo razonable. Revisa «{{field}}»: ¿sobra un cero?',
       errOneTimeRequired:
         'Un servicio tiene que poder contratarse una sola vez: deja marcada la frecuencia «Una vez».',
+      errBandOrder: 'Los tramos deben ir de menor a mayor y sin repetirse.',
       errFrequencyOrder:
         'El precio no puede subir al aumentar la frecuencia: quien viene cada semana pagaría más que quien viene una vez.',
       currentVersion: 'Versión {{version}} · {{count}} guardadas en total',
@@ -1077,6 +1091,7 @@ export const es: TranslationResources = {
       addOn: {
         INSIDE_FRIDGE: 'Interior del refrigerador',
         INSIDE_OVEN: 'Interior del horno',
+        WINDOWS_AND_CABINETS: 'Ventanas y gabinetes interiores',
         INSIDE_CABINETS: 'Interior de gabinetes de cocina',
         INTERIOR_WINDOWS: 'Ventanas por dentro (x{{quantity}})',
         LAUNDRY: 'Lavandería ({{quantity}} cargas)',
@@ -1136,6 +1151,8 @@ export const es: TranslationResources = {
       outOfState: 'Por ahora operamos únicamente en el estado de Georgia.',
       largeProperty:
         'Las propiedades grandes se cotizan de forma individual para que el estimado sea preciso.',
+      beyondSizeTable:
+        'Tu casa es más grande de lo que cubre nuestra lista de precios. Vamos a verla y te enviamos un precio.',
 
       /**
        * El servicio existe, pero no en esa cadencia. Distinto de «no damos

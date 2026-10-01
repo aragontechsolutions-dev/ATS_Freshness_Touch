@@ -205,7 +205,8 @@ describe('mover la sede llega al cotizador', () => {
       .post('/api/v1/quotes/estimate')
       .send({
         service: 'STANDARD',
-        frequency: 'ONE_TIME',
+        // Mensual: la estandar ya no se ofrece de una sola vez (etapa 3.4).
+        frequency: 'MONTHLY',
         squareFeet: 1200,
         destination: { postalCode: '30303' },
       });

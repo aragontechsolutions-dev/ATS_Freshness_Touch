@@ -55,11 +55,21 @@ function proximoDiaLaborable(offsetDias = 3): string {
 
 const TRABAJO = {
   service: 'STANDARD' as const,
+  frequency: 'MONTHLY' as const,
   bedrooms: 2,
   bathrooms: 1,
   squareFeet: 1200,
   addOns: [],
 };
+
+/**
+ * Lo mismo, SIN la cadencia: la consulta de disponibilidad no la acepta.
+ *
+ * Su contrato es estricto a proposito —un campo de mas se rechaza en vez de
+ * ignorarse—, y la agenda no depende de cada cuanto se repite una limpieza:
+ * depende de cuanto dura, y eso sale del servicio y del tamano.
+ */
+const { frequency: _cadencia, ...TRABAJO_SIN_CADENCIA } = TRABAJO;
 
 const DIRECCION = {
   line1: '500 Peachtree St NE',
@@ -72,7 +82,7 @@ const DIRECCION = {
 async function reservar(email: string, dia: string): Promise<request.Response> {
   const disponibilidad = await request(app.getHttpServer())
     .get('/api/v1/availability')
-    .query({ date: dia, ...TRABAJO, addOns: [] })
+    .query({ date: dia, ...TRABAJO_SIN_CADENCIA, addOns: [] })
     .expect(200);
 
   const franja = disponibilidad.body.slots.find(

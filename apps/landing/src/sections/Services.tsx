@@ -5,14 +5,18 @@ import { formatCentsCompact } from '../lib/format';
 import { Reveal } from '../components/Reveal';
 import { ICONO_POR_SERVICIO } from '../components/ServiceIcons';
 
-const SERVICE_ORDER: ServiceType[] = [
-  'STANDARD',
-  'DEEP',
-  'MOVE_IN_OUT',
-  'AIRBNB_TURNOVER',
-  'POST_CONSTRUCTION',
-  'COMMERCIAL',
-];
+/**
+ * EL ORDEN EN QUE SE ENSENAN, no que servicios hay.
+ *
+ * Que se ofrece lo decide el catalogo, que ya trae solo los que estan
+ * encendidos (ver `offered` en la configuracion de precios). Esta lista
+ * ordena, y lo que no este en el catalogo no se pinta aunque aparezca aqui.
+ *
+ * Desde la etapa 3.4 el cambio de Airbnb, la post-obra y el comercial no se
+ * ofrecen: se quitan de aqui tambien, para que la lista no prometa un orden
+ * de cosas que no existen.
+ */
+const SERVICE_ORDER: ServiceType[] = ['STANDARD', 'DEEP', 'MOVE_IN_OUT'];
 
 export function Services() {
   const { t, i18n } = useTranslation();
@@ -33,7 +37,11 @@ export function Services() {
         </p>
 
         <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {SERVICE_ORDER.map((code, indice) => {
+          {SERVICE_ORDER.filter(
+            // Mientras el catalogo no ha llegado se pintan las tres, que es
+            // lo que evita que la seccion aparezca vacia y luego salte.
+            (code) => !catalog || catalog.services.some((service) => service.code === code),
+          ).map((code, indice) => {
             const entry = catalog?.services.find((service) => service.code === code);
             const Icono = ICONO_POR_SERVICIO[code];
 

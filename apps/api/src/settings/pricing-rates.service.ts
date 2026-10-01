@@ -1,6 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
 import {
-  EDITABLE_SERVICE_TYPES,
   OFFERED_ADD_ON_CODES,
   PricingRatesSchema,
   nextPricingVersion,
@@ -36,8 +35,6 @@ const VERSION_SEMILLA = defaultPricingConfig.version;
 const CACHE_TTL_MS = 30_000;
 
 /** Las cadencias, en el orden en que se leen. */
-const CADENCIAS = ['ONE_TIME', 'MONTHLY', 'BIWEEKLY', 'WEEKLY'] as const;
-
 /**
  * LAS TARIFAS VIGENTES, Y TODAS LAS QUE LO FUERON
  * -----------------------------------------------
@@ -295,35 +292,47 @@ function diferencias(antes: PricingRates, despues: PricingRates): Record<string,
     if (a !== b) cambios[clave] = `${etiqueta(a)} → ${etiqueta(b)}`;
   };
 
-  for (const tipo of EDITABLE_SERVICE_TYPES) {
-    const a = antes.services[tipo];
-    const b = despues.services[tipo];
-    if (!a || !b) continue;
+  /*
+   * LOS TRAMOS SE COMPARAN POR SU TOPE, NO POR SU POSICION.
+   *
+   * Si se compararan por indice, insertar un tramo en medio diria que
+   * cambiaron TODOS los de abajo: veinte lineas de ruido donde el cambio
+   * real fue uno. Con el tope como clave, un tramo nuevo se lee como lo que
+   * es —uno nuevo— y los demas quedan en silencio.
+   */
+  const porTope = (
+    bandas: PricingRates['sizeBands'],
+  ): Map<number, PricingRates['sizeBands'][number]> =>
+    new Map(bandas.map((banda) => [banda.maxSquareFeet, banda]));
 
-    for (const cadencia of CADENCIAS) {
-      const antesTarifa = a[cadencia];
-      const despuesTarifa = b[cadencia];
+  const bandasAntes = porTope(antes.sizeBands);
+  const bandasDespues = porTope(despues.sizeBands);
 
-      /*
-       * Dejar de ofrecer una cadencia —o empezar a ofrecerla— es el cambio
-       * mas grande que se puede hacer aqui y no es un numero, asi que se
-       * dice con palabras en vez de con una flecha entre cifras.
-       */
-      if (antesTarifa === null || despuesTarifa === null) {
-        if (antesTarifa !== despuesTarifa) {
-          cambios[`${tipo}.${cadencia}`] =
-            antesTarifa === null ? 'no se ofrecía → se ofrece' : 'se ofrecía → ya no';
-        }
-        continue;
-      }
+  const COLUMNAS = [
+    ['profunda', 'deepCents'],
+    ['mensual', 'standardMonthlyCents'],
+    ['quincenal', 'standardBiweeklyCents'],
+    ['semanal', 'standardWeeklyCents'],
+    ['ventanas', 'windowsAndCabinetsCents'],
+  ] as const;
 
-      anotar(`${tipo}.${cadencia}.importe`, antesTarifa.flatCents, despuesTarifa.flatCents);
-      anotar(
-        `${tipo}.${cadencia}.pieCuadrado`,
-        antesTarifa.centsPerSquareFoot,
-        despuesTarifa.centsPerSquareFoot,
-      );
+  for (const [tope, banda] of bandasDespues) {
+    const previa = bandasAntes.get(tope);
+
+    if (!previa) {
+      // Un tramo nuevo. Decirlo con palabras, no con cinco flechas desde la
+      // nada: quien lee una auditoria quiere el hecho, no el detalle.
+      cambios[`tramo.${tope}`] = 'tramo nuevo';
+      continue;
     }
+
+    for (const [nombre, campo] of COLUMNAS) {
+      anotar(`tramo.${tope}.${nombre}`, previa[campo], banda[campo]);
+    }
+  }
+
+  for (const tope of bandasAntes.keys()) {
+    if (!bandasDespues.has(tope)) cambios[`tramo.${tope}`] = 'tramo retirado';
   }
 
   for (const codigo of OFFERED_ADD_ON_CODES) {

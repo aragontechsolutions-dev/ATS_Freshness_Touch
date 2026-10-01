@@ -56,15 +56,17 @@ describe('QuotesService', () => {
     const quote = await service.estimate(request, new Date('2026-09-20T12:00:00Z'));
 
     /*
-     * 13500 la estandar quincenal + 5000 el horno = 18500. El traslado no
-     * suma: 12 millas caen dentro de las 35 incluidas.
+     * 16000 la estandar quincenal de una casa de 1.800 pies —la fila de
+     * 1.800 de la tabla— mas 5000 el horno. El traslado no suma: 12 millas
+     * caen dentro de las 35 incluidas.
      */
-    expect(quote.totals.totalCents).toBe(18_500);
+    expect(quote.totals.totalCents).toBe(21_000);
     expect(quote.distance.zone).toBe('A');
     expect(quote.travel.amountCents).toBe(0);
     // La garantia es fija y sale del total, no se suma a el.
     expect(quote.deposit.amountCents).toBe(3500);
-    expect(quote.balanceDueAtServiceCents).toBe(15_000);
+    // 21000 el total menos los 3500 de la garantia.
+    expect(quote.balanceDueAtServiceCents).toBe(17_500);
   });
 
   it('genera un identificador distinto por presupuesto', async () => {
@@ -98,7 +100,7 @@ describe('QuotesService', () => {
     expect(quote.travel.billableMiles).toBe(30);
     expect(quote.travel.amountCents).toBe(2280);
     expect(quote.totals.surchargesCents).toBe(2280);
-    expect(quote.totals.totalCents).toBe(18_500 + 2280);
+    expect(quote.totals.totalCents).toBe(21_000 + 2280);
     // La garantia no crece con el viaje: sigue siendo la misma cifra fija.
     expect(quote.deposit.amountCents).toBe(3500);
   });
@@ -108,7 +110,12 @@ describe('QuotesService', () => {
     const catalog = await service.getCatalog(new Date('2026-09-20T12:00:00Z'));
 
     expect(catalog.baseOfOperations.city).toBe('Atlanta');
-    expect(catalog.services).toHaveLength(6);
+    /*
+     * TRES, no seis: desde la etapa 3.4 la post-obra, el cambio de Airbnb y
+     * el comercial no se ofrecen, y el catalogo no publica lo que no se
+     * puede contratar.
+     */
+    expect(catalog.services).toHaveLength(3);
     expect(catalog.addOns.length).toBeGreaterThan(0);
     expect(catalog.tax.exempt).toBe(true);
     expect(catalog.deposit.amountCents).toBe(3500);

@@ -20,6 +20,7 @@ export * from './assignments';
 export * from './staff';
 export * from './my-jobs';
 export * from './panel-password';
+export * from './pricing-size-bands';
 export * from './pricing-rates';
 export * from './audit';
 export * from './errors';

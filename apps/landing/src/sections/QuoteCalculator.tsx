@@ -169,14 +169,15 @@ export function QuoteCalculator() {
    * El importe plano del servicio elegido en esa cadencia, o `null` si no se
    * ofrece asi.
    *
-   * Es EL IMPORTE PLANO y no el precio final: el final depende de los pies
-   * cuadrados y aqui todavia no se han escrito. Ensenarlo como referencia
-   * junto al boton es lo que permite comparar cadencias de un vistazo; la
-   * cifra exacta la da el presupuesto de abajo.
+   * Es UN «DESDE» y no el precio final: desde la etapa 3.4 el precio sale de
+   * una tabla por tramos de tamano, asi que lo que se puede ensenar antes de
+   * saber los pies cuadrados es el precio del tramo mas pequeno. Sirve para
+   * comparar cadencias de un vistazo; la cifra exacta la da el presupuesto
+   * de abajo.
    */
-  const tarifaPlanaDe = (frecuencia: Frequency): number | null => {
+  const desdeDe = (frecuencia: Frequency): number | null => {
     const servicio = catalog?.services.find((item) => item.code === form.service);
-    return servicio?.rates[frecuencia]?.flatCents ?? null;
+    return servicio?.rates[frecuencia]?.fromCents ?? null;
   };
   const showResult = quote !== null;
 
@@ -248,7 +249,7 @@ export function QuoteCalculator() {
               <div className="flex flex-wrap gap-2">
                 {(catalog?.frequencies ?? []).map((frequency) => {
                   const selected = form.frequency === frequency.code;
-                  const tarifa = tarifaPlanaDe(frequency.code);
+                  const tarifa = desdeDe(frequency.code);
                   /*
                    * Una limpieza profunda no se contrata cada semana: la casa
                    * ya está profunda. El botón se apaga en vez de dejar

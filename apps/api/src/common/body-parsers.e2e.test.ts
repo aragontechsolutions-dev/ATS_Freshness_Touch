@@ -25,6 +25,7 @@ describe('lectura del cuerpo de las peticiones', () => {
   const cuerpoDe = (bytes: number): string =>
     JSON.stringify({
       service: 'STANDARD',
+      frequency: 'MONTHLY' as const,
       bedrooms: 2,
       bathrooms: 1,
       squareFeet: 1200,

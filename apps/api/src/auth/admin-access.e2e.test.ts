@@ -324,9 +324,13 @@ describe('el sitio publico sigue abierto', () => {
 async function primeraFranjaLibre(): Promise<{ startsAt: string } | null> {
   for (let dias = 2; dias <= 10; dias += 1) {
     const dia = new Date(Date.now() + dias * 86_400_000).toISOString().slice(0, 10);
-    const respuesta = await request(app.getHttpServer())
-      .get('/api/v1/availability')
-      .query({ date: dia, service: 'STANDARD', bedrooms: 2, bathrooms: 1, squareFeet: 1200 });
+    const respuesta = await request(app.getHttpServer()).get('/api/v1/availability').query({
+      date: dia,
+      service: 'STANDARD',
+      bedrooms: 2,
+      bathrooms: 1,
+      squareFeet: 1200,
+    });
 
     const libre = respuesta.body.slots?.find((s: { available: boolean }) => s.available);
     if (libre) return libre;
@@ -359,6 +363,7 @@ describe('listado y detalle de reservas', () => {
       .post('/api/v1/bookings')
       .send({
         service: 'STANDARD',
+        frequency: 'MONTHLY' as const,
         bedrooms: 2,
         bathrooms: 1,
         squareFeet: 1200,
@@ -523,9 +528,13 @@ describe('acciones sobre la reserva', () => {
     coordinacion = await provider.issue(DISPATCHER_AUTH_ID, 'beto@example.com');
 
     const dia = new Date(Date.now() + 9 * 86_400_000).toISOString().slice(0, 10);
-    const disponibilidad = await request(app.getHttpServer())
-      .get('/api/v1/availability')
-      .query({ date: dia, service: 'STANDARD', bedrooms: 2, bathrooms: 1, squareFeet: 1100 });
+    const disponibilidad = await request(app.getHttpServer()).get('/api/v1/availability').query({
+      date: dia,
+      service: 'STANDARD',
+      bedrooms: 2,
+      bathrooms: 1,
+      squareFeet: 1100,
+    });
 
     const franja = disponibilidad.body.slots?.find((s: { available: boolean }) => s.available);
     if (!franja) throw new Error('el dia elegido no tiene franjas libres');
@@ -534,6 +543,7 @@ describe('acciones sobre la reserva', () => {
       .post('/api/v1/bookings')
       .send({
         service: 'STANDARD',
+        frequency: 'MONTHLY' as const,
         bedrooms: 2,
         bathrooms: 1,
         squareFeet: 1100,

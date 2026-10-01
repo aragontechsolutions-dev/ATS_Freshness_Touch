@@ -28,39 +28,55 @@ export function buildCatalog(
   now: Date,
   config: PricingConfig = defaultPricingConfig,
 ): CatalogResponse {
-  const services: CatalogService[] = (Object.keys(config.services) as ServiceType[]).map((code) => {
-    const rates = Object.fromEntries(
-      FRECUENCIAS.map((frecuencia) => {
-        const tarifa = config.services[code].byFrequency[frecuencia];
-        return [
-          frecuencia,
-          tarifa === null
-            ? null
-            : {
-                flatCents: tarifa.flatCents,
-                centsPerSquareFoot: tarifa.centsPerSquareFoot,
-              },
-        ];
-      }),
-    ) as CatalogService['rates'];
+  /*
+   * EL PRECIO DEL TRAMO MAS PEQUENO es lo que se publica como «desde». Es el
+   * minimo real al que se puede contratar, y sale de la tabla en vez de
+   * escribirse a mano: el dia que cambien los precios, el sitio dice la
+   * verdad sin que nadie se acuerde de tocarlo.
+   */
+  const primerTramo = config.sizeBands[0] ?? null;
 
-    /*
-     * El «desde X» de la pagina de servicios: el importe plano mas bajo
-     * al que se puede contratar. Es el precio de la cadencia mas
-     * frecuente, pero se calcula y no se asume: el dia que alguien ponga
-     * la mensual mas barata que la semanal, el sitio dira la verdad.
-     */
-    const planos = FRECUENCIAS.map((f) => config.services[code].byFrequency[f])
-      .filter((tarifa): tarifa is NonNullable<typeof tarifa> => tarifa !== null)
-      .map((tarifa) => tarifa.flatCents);
+  /*
+   * SOLO LOS SERVICIOS QUE SE OFRECEN HOY. Los retirados siguen en la
+   * configuracion para poder releer reservas antiguas, pero el sitio no
+   * tiene por que ensenarlos: desde la etapa 3.4 la post-obra, el cambio de
+   * Airbnb y el comercial no se ofrecen.
+   *
+   * FILTRAR AQUI Y NO EN CADA PANTALLA es lo que hace que no se escape por
+   * ningun lado: la lista de servicios, el cotizador y el formulario de
+   * reserva leen todos de aqui.
+   */
+  const services: CatalogService[] = (Object.keys(config.services) as ServiceType[])
+    .filter((code) => config.services[code].offered)
+    .map((code) => {
+      const rates = Object.fromEntries(
+        FRECUENCIAS.map((frecuencia) => {
+          const columna = config.services[code].byFrequency[frecuencia];
+          return [
+            frecuencia,
+            columna === null || primerTramo === null ? null : { fromCents: primerTramo[columna] },
+          ];
+        }),
+      ) as CatalogService['rates'];
 
-    return {
-      code,
-      instantQuote: config.services[code].instantQuote,
-      rates,
-      fromCents: planos.length > 0 ? Math.min(...planos) : null,
-    };
-  });
+      /*
+       * El «desde X» de la pagina de servicios: el mas bajo de los de arriba.
+       * Se calcula y no se asume que sea el de la cadencia mas frecuente: el
+       * dia que alguien ponga la mensual mas barata que la semanal —que ya
+       * pasa en el tramo de 900 pies de la tabla actual—, el sitio dira la
+       * verdad.
+       */
+      const minimos = FRECUENCIAS.map((f) => config.services[code].byFrequency[f])
+        .filter((columna): columna is NonNullable<typeof columna> => columna !== null)
+        .map((columna) => primerTramo?.[columna] ?? 0);
+
+      return {
+        code,
+        instantQuote: config.services[code].instantQuote,
+        rates,
+        fromCents: minimos.length > 0 ? Math.min(...minimos) : null,
+      };
+    });
 
   /*
    * SOLO LOS EXTRAS QUE SE OFRECEN. Los retirados siguen en la
@@ -71,8 +87,15 @@ export function buildCatalog(
     .filter((code) => config.addOns[code].offered)
     .map((code) => ({
       code,
+      /*
+       * El de ventanas y gabinetes publica el precio del tramo mas pequeno:
+       * su `unitAmountCents` es cero porque el importe sale de la tabla, y
+       * ensenar un cero en el sitio diria que es gratis.
+       */
+      unitAmountCents: config.addOns[code].pricedBySize
+        ? (primerTramo?.windowsAndCabinetsCents ?? 0)
+        : config.addOns[code].unitAmountCents,
       unit: config.addOns[code].unit,
-      unitAmountCents: config.addOns[code].unitAmountCents,
       maxQuantity: config.addOns[code].maxQuantity,
     }));
 
