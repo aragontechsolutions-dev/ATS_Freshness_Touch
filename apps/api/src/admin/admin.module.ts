@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { JOB_CHECKLIST_CATALOG } from '@freshness/types';
 import { ConfigService } from '@nestjs/config';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { PaymentsModule } from '../payments/payments.module';
@@ -12,6 +13,7 @@ import {
   StaffListController,
 } from './bookings-admin.controller';
 import { BookingsAdminService } from './bookings-admin.service';
+import { JOB_CHECKLIST_CATALOG_TOKEN } from './job-checklist.helper';
 import { MyJobsController } from './my-jobs.controller';
 import { PasswordRecoveryController } from './password-recovery.controller';
 import { PasswordRecoveryService } from './password-recovery.service';
@@ -62,6 +64,23 @@ import type { Env } from '../common/config/env';
     StaffAdminService,
     MyJobsService,
     PasswordRecoveryService,
+    {
+      /*
+       * EL CATALOGO DE TAREAS DE LA LISTA DE VERIFICACION.
+       *
+       * Entra por la puerta de delante y no importado a pelo dentro de los
+       * servicios, igual que el proveedor de pagos o el de geocodificacion.
+       * El motivo esta en `job-checklist.helper.ts`: el catalogo de verdad
+       * esta vacio mientras las plantillas del cliente esten pendientes de
+       * transcribir, y sin este token el camino de ESCRITURA —marcar una
+       * tarea— no se podria probar de punta a punta en absoluto.
+       *
+       * En produccion es siempre el catalogo real. Lo unico que lo sustituye
+       * son las pruebas, con tres tareas de mentira y el mismo codigo debajo.
+       */
+      provide: JOB_CHECKLIST_CATALOG_TOKEN,
+      useValue: JOB_CHECKLIST_CATALOG,
+    },
     {
       /*
        * La capacidad de invitar se DERIVA de la configuracion en vez de

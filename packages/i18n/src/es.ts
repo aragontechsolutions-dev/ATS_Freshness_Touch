@@ -145,6 +145,27 @@ export const es: TranslationResources = {
     },
   },
 
+  /* ------------------ La lista de verificacion de un trabajo ------------------ */
+  checklist: {
+    title: 'Qué hacer en la casa',
+    pending_one: 'Te queda {{count}} tarea',
+    pending_other: 'Te quedan {{count}} tareas',
+    notTicked_one: '{{count}} tarea sin marcar',
+    notTicked_other: '{{count}} tareas sin marcar',
+    allDone: 'Toda la lista está hecha',
+    doneBy: '{{name}}, {{time}}',
+    retired: 'Ya no forma parte de este servicio',
+
+    rooms: {
+      COMMON_AREAS: 'Salón y habitaciones',
+      BATHROOM: 'Baños',
+      KITCHEN: 'Cocina',
+    },
+
+    /* Pendientes de transcribir: ver el comentario en `en.ts`. */
+    items: {},
+  },
+
   frequency: {
     /** Para la cadencia que un servicio concreto no ofrece. */
     notOffered: 'Este servicio no se contrata con esta frecuencia',
@@ -945,6 +966,10 @@ export const es: TranslationResources = {
     errorAssignCancelled: 'No se puede asignar equipo a una reserva cancelada.',
     errorInvalidTransition:
       'Ese cambio no es posible desde el estado actual. Puede que alguien acabe de cambiarlo.',
+    errorChecklistClosed:
+      'Este trabajo está cerrado y su lista ya no se puede cambiar. Habla con coordinación.',
+    errorChecklistUnknownItem:
+      'Esa tarea ya no está en la lista de este trabajo. Actualiza la pantalla.',
     errorPaymentNotCapturable: 'Esta reserva no tiene una retención sobre la que se pueda actuar.',
     errorHoldExpired: 'La retención en la tarjeta ha caducado y ya no se puede cobrar.',
     errorCaptureTooLarge: 'No se puede cobrar más de lo que se retuvo.',

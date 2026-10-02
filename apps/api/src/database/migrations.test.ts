@@ -60,6 +60,7 @@ describe('migraciones', () => {
       'addresses',
       'audit_logs',
       'booking_assignments',
+      'booking_checklist_items',
       'booking_clock_ins',
       'bookings',
       'business_settings',
@@ -167,6 +168,60 @@ describe('reglas de integridad', () => {
     expect(columna.rows[0]?.is_nullable).toBe('NO');
     // Sin valor por defecto: cada insercion tiene que decirlo explicitamente.
     expect(columna.rows[0]?.column_default).toBeNull();
+  });
+
+  it('impide marcar dos veces la misma tarea de un trabajo', async () => {
+    /*
+     * ES LA GUARDIA CONTRA EL DOBLE TOQUE, y en esta pantalla el doble toque
+     * no es un caso raro: se usa de pie, con una mano y a veces con guantes.
+     *
+     * Sin esta unicidad, dos toques seguidos dejarian dos filas y la lista
+     * diria que la tarea se hizo dos veces, con dos autores distintos si van
+     * dos personas a la casa. Es ademas lo que hace que marcar sea
+     * idempotente: el servidor puede escribir sin mirar antes si ya estaba.
+     */
+    const indices = await db.query<{ indexdef: string }>(
+      `SELECT indexdef FROM pg_indexes
+       WHERE tablename = 'booking_checklist_items' AND indexdef LIKE '%UNIQUE%'`,
+    );
+
+    /*
+     * Se busca el que lleva las dos columnas: la clave primaria tambien es un
+     * indice unico, y coger la primera fila sin mirar devolvia esa.
+     */
+    const porTarea = indices.rows.find(
+      (fila) => fila.indexdef.includes('bookingId') && fila.indexdef.includes('itemCode'),
+    );
+    expect(porTarea, 'falta la unicidad de (bookingId, itemCode)').toBeDefined();
+  });
+
+  it('una tarea marcada no se borra al dar de baja a quien la marco', async () => {
+    /*
+     * RESTRICT y no CASCADE, igual que en los fichajes: que se marco y quien
+     * lo marco es el registro de un trabajo hecho. Que desaparezca porque se
+     * da de baja a esa persona en el sistema es justo lo que no debe pasar,
+     * porque es cuando mas falta hace poder mirarlo.
+     */
+    const rule = await db.query<{ delete_rule: string }>(
+      `SELECT rc.delete_rule
+       FROM information_schema.referential_constraints rc
+       JOIN information_schema.table_constraints tc ON tc.constraint_name = rc.constraint_name
+       WHERE tc.table_name = 'booking_checklist_items'
+         AND rc.constraint_name LIKE '%doneByStaffId%'`,
+    );
+    expect(rule.rows[0]?.delete_rule).toBe('RESTRICT');
+  });
+
+  it('pero si se borra con el trabajo al que pertenece', async () => {
+    // CASCADE: sin la reserva, una lista de tareas marcadas no es nada.
+    const rule = await db.query<{ delete_rule: string }>(
+      `SELECT rc.delete_rule
+       FROM information_schema.referential_constraints rc
+       JOIN information_schema.table_constraints tc ON tc.constraint_name = rc.constraint_name
+       WHERE tc.table_name = 'booking_checklist_items'
+         AND rc.constraint_name LIKE '%bookingId%'`,
+    );
+    expect(rule.rows[0]?.delete_rule).toBe('CASCADE');
   });
 
   it('no permite borrar un cliente que conserva historial de reservas', async () => {

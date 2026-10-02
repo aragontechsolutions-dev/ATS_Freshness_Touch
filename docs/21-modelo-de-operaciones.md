@@ -171,11 +171,17 @@ deliberado: casi todas las quejas de una limpieza salen de algo que el
 cliente daba por incluido. Decirlo antes cuesta una sección y evita la
 discusión entera, que siempre acaba costando más.
 
-> **Pendiente de contenido.** Las listas de tareas por estancia —áreas
-> comunes (11 tareas), baños (7) y cocina (7) de las plantillas de trabajo—
-> todavía no están en el sitio. Cuando se transcriban, van como claves nuevas
-> dentro de `scope` y se pintan en esta misma sección: no hace falta tocar
-> el motor ni el catálogo.
+> **Pendiente de contenido, y ahora bloquea dos cosas.** Las listas de tareas
+> por estancia —áreas comunes (11 tareas), baños (7) y cocina (7) de las
+> plantillas de trabajo— **siguen sin transcribir**. Desde la Etapa 3.5
+> bloquean también la lista de verificación que el equipo marca en la casa
+> (`docs/27-listas-de-verificacion.md`), cuya maquinaria ya está terminada y
+> esperando el contenido.
+>
+> Cuando lleguen las capturas, el mismo texto sirve para las dos cosas: se
+> escribe una vez en `checklist.items.<CÓDIGO>` y se pinta tanto aquí como en
+> la pantalla de limpieza. No hace falta tocar el motor ni el catálogo de
+> precios.
 
 ---
 
@@ -316,4 +322,6 @@ Lo que se revisó al cerrar la etapa:
   puntual, así que los 0,18 / 0,16 / 0,14 $ por pie que se mencionaron no
   tienen dónde aplicarse hoy. El contrato los admite: el día que la profunda
   se ofrezca mensual, el campo ya está.
-- **Las listas de tareas por estancia**, según la sección 4.
+- **Las listas de tareas por estancia**, según la sección 4. Desde la Etapa
+  3.5 son además lo único que le falta a la lista de verificación del equipo
+  (`docs/27-listas-de-verificacion.md`).

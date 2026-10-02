@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { BookingStatusSchema } from './booking';
 import { ClockInLocationSchema, ClockInRecordSchema } from './clock-in';
+import { JobChecklistEntrySchema } from './job-checklist';
 import { ServiceTypeSchema } from './enums';
 
 /**
@@ -92,6 +93,24 @@ export const MyJobSchema = z.strictObject({
    * nadie— y sirve para lo de siempre: saber si hay que esperar en la puerta.
    */
   clockIns: z.array(ClockInRecordSchema),
+
+  /**
+   * LA LISTA DE VERIFICACION DE ESTA CASA.
+   *
+   * Que hay que hacer en cada estancia, y que esta ya marcado. Es lo que
+   * convierte esta pantalla de «donde voy» en «que hago», que es lo que de
+   * verdad cambia el dia a dia de quien limpia.
+   *
+   * VIENE CALCULADA DEL SERVIDOR Y NO SE DEDUCE AQUI. El movil no sabe que
+   * tareas pide cada servicio, y si lo supiera habria dos catalogos que
+   * mantener de acuerdo. Llega la lista que toca, ya en orden, con el estado
+   * de cada tarea.
+   *
+   * Puede venir VACIA, y es un estado legitimo: mientras las tareas de las
+   * plantillas del cliente esten pendientes de transcribir, el catalogo esta
+   * vacio y la seccion no se pinta. Ver `job-checklist.ts`.
+   */
+  checklist: z.array(JobChecklistEntrySchema),
 });
 export type MyJob = z.infer<typeof MyJobSchema>;
 

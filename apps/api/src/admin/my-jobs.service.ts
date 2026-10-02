@@ -1,11 +1,14 @@
-import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { DateTime } from 'luxon';
 import {
   API_ERROR_CODES,
   allowedTransitions,
+  canEditChecklist,
   clockInDistanceMeters,
   staffFullName,
   type AuthenticatedStaff,
+  type ChecklistItem,
+  type ChecklistProgress,
   type ClockInKind,
   type ClockInLocationState,
   type ClockInRecord,
@@ -15,6 +18,11 @@ import {
 } from '@freshness/types';
 import { AuditService } from '../audit/audit.service';
 import { PrismaService } from '../database/prisma.service';
+import {
+  JOB_CHECKLIST_CATALOG_TOKEN,
+  esTareaDelTrabajo,
+  montarChecklist,
+} from './job-checklist.helper';
 import type { Prisma } from '../generated/prisma/client';
 
 /**
@@ -72,6 +80,18 @@ const JOB_SELECT = {
     },
     orderBy: { occurredAt: 'asc' as const },
   },
+  /*
+   * LAS TAREAS YA MARCADAS. Solo las marcadas: la lista completa sale del
+   * catalogo del codigo, y esta tabla guarda unicamente lo que se hizo.
+   *
+   * Con el nombre de pila de quien la marco, sin apellido, igual que el
+   * resto de esta pantalla: en una casa con dos personas sirve para no hacer
+   * dos veces lo mismo, que es el problema que esta lista resuelve.
+   */
+  checklistItems: {
+    select: { itemCode: true, doneAt: true, doneBy: { select: { firstName: true } } },
+    orderBy: { doneAt: 'asc' as const },
+  },
 };
 
 /**
@@ -116,6 +136,8 @@ export class MyJobsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    @Inject(JOB_CHECKLIST_CATALOG_TOKEN)
+    private readonly catalogo: readonly ChecklistItem[],
   ) {}
 
   /**
@@ -144,7 +166,7 @@ export class MyJobsService {
       take: 60,
     });
 
-    return { jobs: trabajos.map((trabajo) => toMyJob(trabajo, staff.staffId)) };
+    return { jobs: trabajos.map((trabajo) => toMyJob(trabajo, staff.staffId, this.catalogo)) };
   }
 
   /**
@@ -297,7 +319,113 @@ export class MyJobsService {
         `(${fichaje.locationState}` +
         `${fichaje.distanceMeters === null ? '' : `, a ${fichaje.distanceMeters} m`})`,
     );
-    return toMyJob(actualizado, staff.staffId);
+    return toMyJob(actualizado, staff.staffId, this.catalogo);
+  }
+
+  /**
+   * Marca o desmarca una tarea de la lista de verificacion.
+   *
+   * ======================================================================
+   * LAS TRES COMPROBACIONES, Y LAS TRES IMPORTAN
+   * ======================================================================
+   *   1. QUE EL TRABAJO SEA SUYO. Igual que al cambiar de estado: sin esto,
+   *      con el identificador de otra reserva se podrian ir marcando tareas
+   *      de trabajos ajenos. Responde 404 y no 403, por el mismo motivo que
+   *      alli: un 403 enseñaria que esa reserva existe.
+   *   2. QUE EL CODIGO SEA DE UNA TAREA QUE ESTE TRABAJO PIDE. Es una
+   *      comprobacion de SEGURIDAD, no de forma: sin ella, cualquiera con
+   *      sesion podria escribir una fila por cada cadena que se le ocurriera
+   *      y usar la lista como un almacen de texto libre colgado de una
+   *      reserva.
+   *   3. QUE EL TRABAJO NO ESTE CERRADO. Una lista que se puede seguir
+   *      tocando despues de cobrar no vale como registro de lo que se hizo.
+   *
+   * ======================================================================
+   * NO HAY ENTRADA DE AUDITORIA POR CADA TOQUE, Y ES DELIBERADO
+   * ======================================================================
+   * Una lista son veinticinco tareas, y un trabajo de dos personas con sus
+   * correcciones pasa de las cincuenta escrituras. Auditarlas enterraria
+   * bajo miles de lineas al mes lo que coordinacion de verdad busca en la
+   * auditoria: quien cambio un precio, quien cancelo una reserva, quien
+   * entro al panel.
+   *
+   * Y NO SE PIERDE NADA: la propia fila ES el registro. Lleva quien la marco
+   * y a que hora, que es exactamente lo que una entrada de auditoria
+   * guardaria. La auditoria de este proyecto guarda que cambio, no un
+   * volcado de todo lo que pasa.
+   */
+  async markChecklistItem(
+    bookingId: string,
+    cambio: ChecklistProgress,
+    staff: AuthenticatedStaff,
+  ): Promise<MyJob> {
+    const asignacion = await this.prisma.db.bookingAssignment.findUnique({
+      where: { bookingId_staffId: { bookingId, staffId: staff.staffId } },
+      select: { booking: { select: { status: true, service: true } } },
+    });
+
+    if (!asignacion) {
+      throw new NotFoundException({
+        code: API_ERROR_CODES.NOT_FOUND,
+        messageKey: 'admin.errorBookingNotFound',
+      });
+    }
+
+    /*
+     * UN TRABAJO CERRADO NO SE TOCA.
+     *
+     * `COMPLETED` SI entra, y no es una contradiccion: lo normal es acabar de
+     * marcar la ultima tarea justo despues de pulsar «he terminado», y
+     * negarlo ahi convertiria el ultimo toque de cada trabajo en un fallo. Lo
+     * que no se puede tocar es una reserva cancelada o ya cobrada y cerrada
+     * por coordinacion.
+     */
+    if (!canEditChecklist(asignacion.booking.status)) {
+      throw new BadRequestException({
+        code: API_ERROR_CODES.INVALID_TRANSITION,
+        messageKey: 'admin.errorChecklistClosed',
+      });
+    }
+
+    if (!esTareaDelTrabajo(asignacion.booking.service, cambio.itemCode, this.catalogo)) {
+      throw new BadRequestException({
+        code: API_ERROR_CODES.VALIDATION_ERROR,
+        messageKey: 'admin.errorChecklistUnknownItem',
+      });
+    }
+
+    if (cambio.done) {
+      /*
+       * IDEMPOTENTE, Y HACE FALTA QUE LO SEA. Esta pantalla se usa de pie, a
+       * veces con guantes y con una conexion mala en la puerta de una casa:
+       * el doble toque y el reintento son la norma.
+       *
+       * `upsert` con el `update` VACIO a proposito: si ya estaba marcada, se
+       * deja como estaba. Volver a escribir la hora y el autor convertiria el
+       * segundo toque de otra persona en «lo hizo ella», borrando a quien de
+       * verdad lo hizo.
+       */
+      await this.prisma.db.bookingChecklistItem.upsert({
+        where: { bookingId_itemCode: { bookingId, itemCode: cambio.itemCode } },
+        create: { bookingId, itemCode: cambio.itemCode, doneByStaffId: staff.staffId },
+        update: {},
+      });
+    } else {
+      /*
+       * Desmarcar borra la fila. `deleteMany` y no `delete` porque `delete`
+       * lanza si no hay nada que borrar, y desmarcar algo que no estaba
+       * marcado no es un error: es el resultado que se pedia.
+       */
+      await this.prisma.db.bookingChecklistItem.deleteMany({
+        where: { bookingId, itemCode: cambio.itemCode },
+      });
+    }
+
+    const trabajo = await this.prisma.db.booking.findUniqueOrThrow({
+      where: { id: bookingId },
+      select: JOB_SELECT,
+    });
+    return toMyJob(trabajo, staff.staffId, this.catalogo);
   }
 
   /**
@@ -392,7 +520,7 @@ function comienzoDelDia(now: Date): Date {
  * Aqui es donde el apellido del cliente se queda fuera y donde los demas del
  * equipo se reducen a un nombre.
  */
-function toMyJob(trabajo: FilaTrabajo, staffId: string): MyJob {
+function toMyJob(trabajo: FilaTrabajo, staffId: string, catalogo: readonly ChecklistItem[]): MyJob {
   const mia = trabajo.assignments.find((a) => a.staffId === staffId);
 
   return {
@@ -422,6 +550,12 @@ function toMyJob(trabajo: FilaTrabajo, staffId: string): MyJob {
       .filter((a) => a.staffId !== staffId)
       .map((a) => ({ name: staffFullName(a.staff), isLead: a.isLead })),
     iAmLead: mia?.isLead ?? false,
+    /*
+     * La lista se monta en el servidor, no en el movil: el movil no sabe que
+     * tareas pide cada servicio, y si lo supiera habria dos catalogos que
+     * mantener de acuerdo.
+     */
+    checklist: montarChecklist(trabajo.service, trabajo.checklistItems, catalogo),
     clockIns: trabajo.clockIns.map((f): ClockInRecord => ({
       staffId: f.staffId,
       staffFirstName: f.staff.firstName,

@@ -1,8 +1,10 @@
 import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Req } from '@nestjs/common';
 import { SkipThrottle } from '@nestjs/throttler';
 import {
+  ChecklistProgressSchema,
   MyJobProgressSchema,
   type AuthenticatedStaff,
+  type ChecklistProgress,
   type MyJob,
   type MyJobProgress,
   type MyJobs,
@@ -56,5 +58,42 @@ export class MyJobsController {
     @Req() request: Request,
   ): Promise<MyJob> {
     return this.jobs.progress(bookingId, body, staff, request.ip ?? null);
+  }
+
+  /**
+   * Marcar o desmarcar una tarea de la lista de verificacion.
+   *
+   * ======================================================================
+   * UN ENDPOINT APARTE, Y NO UN CAMPO MAS EN `progress`
+   * ======================================================================
+   * Son dos hechos distintos y van por caminos distintos a proposito:
+   * `progress` cambia el estado del trabajo y ficha, con su transaccion y su
+   * entrada de auditoria; esto marca una casilla.
+   *
+   * Juntarlos obligaria a mandar el estado del trabajo en cada toque de la
+   * lista, y entonces un toque mal puesto podria cerrar un trabajo. Son
+   * veinticinco toques por casa: es demasiada superficie para colgarla del
+   * mismo camino que cierra un trabajo y mueve el dinero.
+   *
+   * DEVUELVE EL TRABAJO ENTERO, no solo la tarea. Asi la pantalla se pinta
+   * con lo que de verdad hay en la base despues del toque, incluido lo que
+   * una companera haya marcado mientras tanto, en vez de con lo que el movil
+   * cree que acaba de pasar.
+   */
+  @Patch(':bookingId/checklist')
+  @Roles('ADMIN', 'DISPATCHER', 'CLEANER')
+  markChecklistItem(
+    @Param('bookingId', new ParseUUIDPipe({ version: '4' })) bookingId: string,
+    @Body(new ZodValidationPipe<ChecklistProgress>(ChecklistProgressSchema))
+    body: ChecklistProgress,
+    @CurrentStaff() staff: AuthenticatedStaff,
+  ): Promise<MyJob> {
+    /*
+     * NO SE PASA LA IP, al contrario que `progress`: aqui no se escribe
+     * auditoria. El motivo esta en el servicio —una lista son veinticinco
+     * toques, y auditarlos enterraria lo que coordinacion de verdad busca—, y
+     * la propia fila ya lleva quien la marco y cuando.
+     */
+    return this.jobs.markChecklistItem(bookingId, body, staff);
   }
 }

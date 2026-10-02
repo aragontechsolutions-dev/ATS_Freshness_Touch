@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { ClockInRecordSchema } from './clock-in';
 import { BookingStatusSchema } from './booking';
+import { JobChecklistEntrySchema } from './job-checklist';
 import { FrequencySchema, ServiceTypeSchema, ServiceZoneSchema } from './enums';
 import { QuoteLineSchema } from './quote';
 import { PaymentStatusSchema } from './payment';
@@ -169,6 +170,20 @@ export const AdminBookingDetailSchema = AdminBookingListItemSchema.extend({
    * en zonas rurales, una alarma automatica avisaria de cosas que no son.
    */
   clockIns: z.array(ClockInRecordSchema),
+
+  /**
+   * LA LISTA DE VERIFICACION, EN SOLO LECTURA.
+   *
+   * Que se marco, quien lo marco y cuando. Es lo que coordinacion mira
+   * cuando un cliente llama diciendo que algo se quedo sin hacer, y es la
+   * MISMA lista que ve el equipo en su pantalla: la monta el mismo codigo.
+   *
+   * NO SE PUEDE MARCAR DESDE EL PANEL, y no es un endpoint que falte: lo que
+   * ocurre en la casa lo marca quien esta alli. Si coordinacion pudiera
+   * marcar desde la oficina, la lista dejaria de ser el registro de lo que se
+   * hizo y pasaria a ser el de lo que alguien cree que se hizo.
+   */
+  checklist: z.array(JobChecklistEntrySchema),
 });
 export type AdminBookingDetail = z.infer<typeof AdminBookingDetailSchema>;
 
