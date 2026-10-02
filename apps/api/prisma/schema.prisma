@@ -407,10 +407,11 @@ model Booking {
   cancelledBy        CancelledBy?
   cancellationReason String?
 
-  payments      Payment[]
-  assignments   BookingAssignment[]
-  notifications Notification[]
-  clockIns      BookingClockIn[]
+  payments       Payment[]
+  assignments    BookingAssignment[]
+  notifications  Notification[]
+  clockIns       BookingClockIn[]
+  checklistItems BookingChecklistItem[]
 
   createdAt DateTime @default(now()) @db.Timestamptz(3)
   updatedAt DateTime @updatedAt @db.Timestamptz(3)
@@ -608,8 +609,11 @@ model Staff {
 
   assignments BookingAssignment[]
   clockIns    BookingClockIn[]
-  createdAt   DateTime            @default(now()) @db.Timestamptz(3)
-  updatedAt   DateTime            @updatedAt @db.Timestamptz(3)
+
+  /// Las tareas que ha marcado como hechas.
+  checklistItems BookingChecklistItem[]
+  createdAt      DateTime               @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime               @updatedAt @db.Timestamptz(3)
 
   @@index([isActive])
   @@map("staff")
@@ -732,10 +736,10 @@ model AuditLog {
   id String @id @default(uuid()) @db.Uuid
 
   actorType ActorType
-  actorId   String?   @db.Uuid
+  actorId   String?      @db.Uuid
   /// Desde donde. Ver el enumerado AuditSurface.
   surface   AuditSurface
-  action    String    @db.VarChar(80)
+  action    String       @db.VarChar(80)
 
   entityType String  @db.VarChar(40)
   entityId   String?
@@ -837,4 +841,50 @@ model BookingClockIn {
   /// historial dentro, es una migracion que bloquea escrituras.
   @@index([staffId, occurredAt])
   @@map("booking_clock_ins")
+}
+
+/// LA LISTA DE VERIFICACION DE UN TRABAJO: UNA FILA POR TAREA MARCADA.
+///
+/// Esta tabla NO guarda la lista de tareas de cada reserva, solo las que se
+/// han marcado. La lista que se pinta sale del catalogo del codigo
+/// (`packages/types/src/job-checklist.ts`).
+///
+/// El precio de esa decision es una regla, y esta escrita en el contrato: un
+/// codigo de tarea no se borra ni se reutiliza nunca. Es la misma que ya
+/// siguen los servicios retirados y las zonas D y E: su codigo esta escrito
+/// en reservas que ya existen, y borrarlo dejaria el historico ilegible. El
+/// porque completo esta en la migracion 20261001160000.
+model BookingChecklistItem {
+  id String @id @default(uuid(4)) @db.Uuid
+
+  bookingId String  @db.Uuid
+  booking   Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  /// El codigo de la tarea en el catalogo. Texto y no un enumerado de
+  /// Postgres: las tareas cambian al ritmo en que cambia como limpia la
+  /// empresa, y con un enumerado cada cambio seria una migracion. El
+  /// servidor comprueba el codigo contra el catalogo antes de escribir.
+  itemCode String @db.VarChar(64)
+
+  /// RESTRICT y no CASCADE, igual que en los fichajes: que se marco y quien
+  /// lo marco es el registro de un trabajo hecho, y no debe borrarse porque
+  /// se de de baja a esa persona.
+  doneByStaffId String @db.Uuid
+  doneBy        Staff  @relation(fields: [doneByStaffId], references: [id], onDelete: Restrict)
+
+  /// Segun el reloj del SERVIDOR, no del movil.
+  doneAt DateTime @default(now()) @db.Timestamptz(3)
+
+  /// UNA TAREA SOLO PUEDE ESTAR MARCADA UNA VEZ EN UN TRABAJO.
+  ///
+  /// Es la guardia contra el doble toque, que aqui no es un caso raro: la
+  /// pantalla se usa de pie, con una mano y a veces con guantes. Y es lo que
+  /// hace que marcar sea idempotente, que es justo lo que hace falta con una
+  /// conexion mala en la puerta de una casa.
+  ///
+  /// Resuelve ademas la consulta real —«las tareas de este trabajo»—, asi
+  /// que no se añade un segundo indice sobre `bookingId`: seria un duplicado
+  /// que solo cuesta escrituras.
+  @@unique([bookingId, itemCode])
+  @@map("booking_checklist_items")
 }

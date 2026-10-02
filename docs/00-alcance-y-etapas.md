@@ -220,8 +220,14 @@ del cliente (que en la Etapa 1 no se pide a propósito).
   cotiza con la tabla que mandó el cliente, una fila por tramo de pies
   cuadrados. La post-obra, el cambio de Airbnb y el comercial se retiran del
   sitio, y la estándar pasa a venderse solo como plan recurrente.
-- ⬜ Detalle del trabajo, listas de verificación, fotos antes y después.
-  Requiere decidir dónde se almacenan las fotos.
+- 🔄 **Listas de verificación por estancia**
+  (`docs/27-listas-de-verificacion.md`): qué hay que hacer en cada parte de la
+  casa, marcado a medida que se hace, visible para el equipo y para
+  coordinación. **La maquinaria está terminada; el contenido no**: las tareas
+  de las plantillas del cliente —áreas comunes (11), baños (7) y cocina (7)—
+  siguen pendientes de transcribir desde la Etapa 2, y mientras tanto la
+  sección no se pinta.
+- ⬜ Fotos antes y después. Requiere decidir dónde se almacenan.
 - ⬜ Funcionamiento sin conexión con cola de sincronización (zonas rurales de
   Georgia).
 - ⬜ Avisos por SMS: confirmación, recordatorio, "vamos en camino", solicitud

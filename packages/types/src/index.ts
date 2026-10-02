@@ -18,6 +18,7 @@ export * from './company-location';
 export * from './notifications';
 export * from './assignments';
 export * from './staff';
+export * from './job-checklist';
 export * from './my-jobs';
 export * from './panel-password';
 export * from './pricing-size-bands';

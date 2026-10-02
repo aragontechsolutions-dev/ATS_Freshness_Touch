@@ -28,6 +28,7 @@ import {
   type AdminServiceArea,
   type AuditPage,
   type AuditQueryInput,
+  type ChecklistProgress,
   type MyJob,
   type MyJobProgress,
   type MyJobs,
@@ -435,6 +436,25 @@ export function markMyJobProgress(bookingId: string, body: MyJobProgress): Promi
     (payload) => {
       const parsed = MyJobSchema.safeParse(payload);
       if (!parsed.success) throw contractError('avance del trabajo', parsed.error.issues);
+      return parsed.data;
+    },
+    { method: 'PATCH', body },
+  );
+}
+
+/**
+ * Marca o desmarca una tarea de la lista de verificacion.
+ *
+ * DEVUELVE EL TRABAJO ENTERO, no solo la tarea, y la pantalla se repinta con
+ * eso: asi se ve tambien lo que una companera haya marcado mientras tanto, en
+ * vez de quedarse con lo que este movil cree que acaba de pasar.
+ */
+export function markChecklistItem(bookingId: string, body: ChecklistProgress): Promise<MyJob> {
+  return request(
+    `/admin/my-jobs/${bookingId}/checklist`,
+    (payload) => {
+      const parsed = MyJobSchema.safeParse(payload);
+      if (!parsed.success) throw contractError('lista de verificacion', parsed.error.issues);
       return parsed.data;
     },
     { method: 'PATCH', body },

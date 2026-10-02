@@ -4,7 +4,9 @@ import {
   AUDIT_ACTIONS,
   AuditEntityTypeSchema,
   AuditSurfaceSchema,
+  CHECKLIST_ROOMS,
   FrequencySchema,
+  JOB_CHECKLIST_CATALOG,
   ServiceTypeSchema,
 } from '@freshness/types';
 import { en } from './en';
@@ -60,6 +62,46 @@ describe('recursos de traduccion', () => {
     for (const code of FrequencySchema.options) {
       expect(en.frequency[code], code).toBeTruthy();
       expect(en.quote.line.discount[code], code).toBeTruthy();
+    }
+  });
+
+  /*
+   * EL CATALOGO DE TAREAS Y SUS TEXTOS TIENEN QUE IR JUNTOS.
+   *
+   * Es el mismo guardia que el de la auditoria, y existe por un fallo real de
+   * la etapa anterior: una clave de i18n que no existe NO ES UN ERROR DE
+   * TYPESCRIPT, es una cadena. En la pantalla del fichaje salio literalmente
+   * «admin.clockIns.no_house» delante de quien coordina, con los tipos bien,
+   * el lint limpio y las pruebas en verde.
+   *
+   * Aqui el riesgo es el mismo y peor: la lista de tareas se pinta entera, y
+   * una tarea sin texto saldria como «checklist.items.KITCHEN_SINK» en la
+   * puerta de una casa.
+   */
+  it('cada tarea del catalogo tiene texto en los dos idiomas', () => {
+    const buscar = (recurso: unknown, ruta: string): unknown =>
+      ruta
+        .split('.')
+        .reduce<unknown>(
+          (acc, key) =>
+            acc && typeof acc === 'object' ? (acc as Record<string, unknown>)[key] : undefined,
+          recurso,
+        );
+
+    for (const [locale, resource] of Object.entries({ en, es })) {
+      for (const tarea of JOB_CHECKLIST_CATALOG) {
+        expect(
+          buscar(resource, `checklist.items.${tarea.code}`),
+          `${locale}: falta checklist.items.${tarea.code}`,
+        ).toBeTypeOf('string');
+      }
+    }
+  });
+
+  it('y cada estancia de la casa tambien', () => {
+    for (const estancia of CHECKLIST_ROOMS) {
+      expect(en.checklist.rooms[estancia], estancia).toBeTruthy();
+      expect(es.checklist.rooms[estancia], estancia).toBeTruthy();
     }
   });
 

@@ -57,6 +57,17 @@ export function CalendarIcon({ className }: IconProps) {
   );
 }
 
+/** La lista de verificacion de un trabajo. */
+export function ClipboardCheckIcon({ className }: IconProps) {
+  return (
+    <Trazo className={className}>
+      <path d="M9 4h6v3H9z" />
+      <path d="M15 5.5h2.5A1.5 1.5 0 0 1 19 7v12a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 5 19V7a1.5 1.5 0 0 1 1.5-1.5H9" />
+      <path d="M9 13.5l2 2 4-4" />
+    </Trazo>
+  );
+}
+
 /** Mis trabajos. */
 export function BriefcaseIcon({ className }: IconProps) {
   return (

@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { DateTime } from 'luxon';
 import {
   staffFullName,
@@ -8,12 +8,14 @@ import {
   type AdminBookingListItem,
   type AdminBookingQuery,
   type AuthenticatedStaff,
+  type ChecklistItem,
   type ClockInRecord,
 } from '@freshness/types';
 import { PrismaService } from '../database/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import type { Prisma } from '../generated/prisma/client';
 import { defaultSchedulingConfig } from '../scheduling/scheduling.config';
+import { JOB_CHECKLIST_CATALOG_TOKEN, montarChecklist } from './job-checklist.helper';
 
 /** Lo que el listado necesita de cada reserva, y nada mas. */
 const LIST_SELECT = {
@@ -50,6 +52,8 @@ export class BookingsAdminService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    @Inject(JOB_CHECKLIST_CATALOG_TOKEN)
+    private readonly catalogo: readonly ChecklistItem[],
   ) {}
 
   /**
@@ -154,6 +158,15 @@ export class BookingsAdminService {
             staff: { select: { firstName: true } },
           },
           orderBy: { occurredAt: 'asc' },
+        },
+        /*
+         * LAS TAREAS YA MARCADAS. Solo las marcadas: la lista completa sale
+         * del catalogo del codigo, y se monta con el mismo helper que usa la
+         * pantalla de limpieza para que las dos vean lo mismo.
+         */
+        checklistItems: {
+          select: { itemCode: true, doneAt: true, doneBy: { select: { firstName: true } } },
+          orderBy: { doneAt: 'asc' },
         },
         payments: {
           where: { kind: 'DEPOSIT_HOLD' },
@@ -271,6 +284,12 @@ export class BookingsAdminService {
       cancelledAt: booking.cancelledAt?.toISOString() ?? null,
       cancelledBy: booking.cancelledBy,
       cancellationReason: booking.cancellationReason,
+      /*
+       * LA MISMA LISTA QUE VE EL EQUIPO, montada por el mismo codigo. Si cada
+       * pantalla la montara por su cuenta, coordinacion y limpieza podrian
+       * estar viendo listas distintas del mismo trabajo.
+       */
+      checklist: montarChecklist(booking.service, booking.checklistItems, this.catalogo),
       clockIns: booking.clockIns.map((f): ClockInRecord => ({
         staffId: f.staffId,
         staffFirstName: f.staff.firstName,

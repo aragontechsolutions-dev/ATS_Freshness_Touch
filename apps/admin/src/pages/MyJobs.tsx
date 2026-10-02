@@ -1,16 +1,18 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { CLOCK_IN_STATE_TEXT_KEY } from '@freshness/types';
+import { CLOCK_IN_STATE_TEXT_KEY, canEditChecklist } from '@freshness/types';
 import type { ClockInKind, Locale, MyJob } from '@freshness/types';
 import {
   ApiClientError,
   fetchMyJobs,
   isSessionError,
+  markChecklistItem,
   markMyJobProgress,
   sessionLostReason,
 } from '../lib/api';
 import { formatPhone } from '@freshness/types';
 import { useToast } from '../components/ToastProvider';
+import { JobChecklist } from '../components/JobChecklist';
 import { SkeletonMisTrabajos } from '../components/Skeletons';
 import {
   AlertIcon,
@@ -64,6 +66,15 @@ export function MyJobs({ locale, onSessionLost }: MyJobsProps) {
   /** Solo el fallo de la CARGA inicial: sin lista no hay pantalla que mirar. */
   const [errorKey, setErrorKey] = useState<string | null>(null);
   const [ocupado, setOcupado] = useState<string | null>(null);
+  /**
+   * La tarea que se esta guardando, como `bookingId:codigo`.
+   *
+   * ES UNA SOLA Y NO UN CONJUNTO a proposito: se marca una tarea a la vez,
+   * y guardar la clave entera —y no solo el codigo— evita que al marcar
+   * «fregar el suelo» en un trabajo se vea el reloj girando en la misma
+   * tarea de otro trabajo de la lista.
+   */
+  const [tareaOcupada, setTareaOcupada] = useState<string | null>(null);
   const toast = useToast();
 
   useEffect(() => {
@@ -138,6 +149,46 @@ export function MyJobs({ locale, onSessionLost }: MyJobsProps) {
     }
   };
 
+  /**
+   * Marca o desmarca una tarea.
+   *
+   * ======================================================================
+   * SIN AVISO AL ACERTAR, Y SI AL FALLAR
+   * ======================================================================
+   * Es lo contrario que al fichar, y la diferencia esta razonada: fichar
+   * ocurre una vez y hay que quedarse tranquilo de que quedo registrado.
+   * Marcar tareas ocurre veinticinco veces en una casa, y veinticinco avisos
+   * seguidos tapan la pantalla justo cuando se esta trabajando. La casilla
+   * marcandose YA ES la confirmacion.
+   *
+   * Lo que si avisa es el fallo, porque una casilla que vuelve sola a su
+   * sitio sin explicacion se lee como que la pantalla va mal.
+   */
+  const marcarTarea = async (job: MyJob, code: string, done: boolean): Promise<void> => {
+    setTareaOcupada(`${job.bookingId}:${code}`);
+
+    try {
+      /*
+       * SE REPINTA CON LO QUE DEVUELVE EL SERVIDOR, no con lo que este movil
+       * cree. Asi aparece tambien lo que una companera haya marcado mientras
+       * tanto, que es justo para lo que sirve la lista cuando van dos a una
+       * casa: no hacer dos veces lo mismo.
+       */
+      const actualizado = await markChecklistItem(job.bookingId, { itemCode: code, done });
+      setJobs((actual) =>
+        (actual ?? []).map((j) => (j.bookingId === actualizado.bookingId ? actualizado : j)),
+      );
+    } catch (error) {
+      if (isSessionError(error)) {
+        onSessionLost(sessionLostReason(error));
+        return;
+      }
+      toast.error(error instanceof ApiClientError ? error.messageKey : 'admin.errorGeneric');
+    } finally {
+      setTareaOcupada(null);
+    }
+  };
+
   if (errorKey) {
     return (
       <div className="ft-card flex items-start gap-3 p-5" role="alert">
@@ -186,6 +237,8 @@ export function MyJobs({ locale, onSessionLost }: MyJobsProps) {
               locale={locale}
               ocupado={ocupado === job.bookingId}
               onMarcar={marcar}
+              tareaOcupada={tareaOcupada}
+              onMarcarTarea={marcarTarea}
             />
           ))}
         </>
@@ -203,6 +256,8 @@ export function MyJobs({ locale, onSessionLost }: MyJobsProps) {
               locale={locale}
               ocupado={ocupado === job.bookingId}
               onMarcar={marcar}
+              tareaOcupada={tareaOcupada}
+              onMarcarTarea={marcarTarea}
             />
           ))}
         </>
@@ -218,11 +273,15 @@ function Tarjeta({
   locale,
   ocupado,
   onMarcar,
+  tareaOcupada,
+  onMarcarTarea,
 }: {
   job: MyJob;
   locale: Locale;
   ocupado: boolean;
   onMarcar: (job: MyJob, status: 'IN_PROGRESS' | 'COMPLETED') => Promise<void>;
+  tareaOcupada: string | null;
+  onMarcarTarea: (job: MyJob, code: string, done: boolean) => Promise<void>;
 }) {
   const { t } = useTranslation();
 
@@ -323,6 +382,34 @@ function Tarjeta({
             )}
           </div>
         </div>
+      )}
+
+      {/*
+        LA LISTA VA JUSTO ENCIMA DE LOS BOTONES, y no al principio de la
+        tarjeta: la direccion y el telefono son lo que se necesita ANTES de
+        llegar, y las tareas despues de entrar. Puesta arriba, empujaria hacia
+        abajo lo primero que hay que mirar conduciendo.
+
+        No se pinta cuando el trabajo esta cancelado o ya cerrado por
+        coordinacion, porque ahi no se puede marcar: el componente leeria
+        bien, pero cada toque devolveria un error y nadie entenderia por que.
+      */}
+      {canEditChecklist(job.status) && (
+        <JobChecklist
+          entries={job.checklist}
+          locale={locale}
+          onToggle={(code, done) => void onMarcarTarea(job, code, done)}
+          /*
+           * Se le pasa SOLO el codigo si la tarea ocupada es de ESTE trabajo.
+           * Sin esta comprobacion, marcar una tarea en un trabajo pondria el
+           * reloj girando en la misma tarea de todos los demas.
+           */
+          guardando={
+            tareaOcupada?.startsWith(`${job.bookingId}:`) === true
+              ? tareaOcupada.slice(job.bookingId.length + 1)
+              : null
+          }
+        />
       )}
 
       <Acciones job={job} ocupado={ocupado} onMarcar={onMarcar} />

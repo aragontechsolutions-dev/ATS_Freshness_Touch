@@ -144,6 +144,54 @@ export const en = {
     },
   },
 
+  /* ------------------ La lista de verificacion de un trabajo ------------------ */
+  /*
+   * LA LISTA QUE EL EQUIPO MARCA EN LA CASA.
+   *
+   * Esta FUERA de `admin` a proposito, aunque hoy solo se use ahi: las mismas
+   * tareas son las que el sitio publico promete en la seccion «que incluye
+   * una limpieza» (`scope`). El dia que se pinten en los dos sitios, los dos
+   * leeran el mismo texto, y no habra forma de que el sitio prometa una cosa
+   * y el equipo lleve otra.
+   */
+  checklist: {
+    title: 'What to do in the house',
+    /** «Te quedan 3». Avisa, no bloquea: el trabajo se puede terminar igual. */
+    pending_one: '{{count}} task left',
+    pending_other: '{{count}} tasks left',
+    /* Lo mismo contado para coordinacion, que lee un trabajo ya cerrado. */
+    notTicked_one: '{{count}} task not ticked',
+    notTicked_other: '{{count}} tasks not ticked',
+    allDone: 'Everything on the list is done',
+    /** Quien y cuando marco una tarea. */
+    doneBy: '{{name}}, {{time}}',
+    /** Una tarea que se marco cuando se pedia y que ya no se pide. */
+    retired: 'No longer part of this service',
+
+    rooms: {
+      COMMON_AREAS: 'Living areas and bedrooms',
+      BATHROOM: 'Bathrooms',
+      KITCHEN: 'Kitchen',
+    },
+
+    /*
+     * ======================================================================
+     * LAS TAREAS, PENDIENTES DE CONTENIDO
+     * ======================================================================
+     * Las de las plantillas de trabajo del cliente —areas comunes (11),
+     * baños (7) y cocina (7)— estan pendientes de transcribir desde la Etapa
+     * 2 (`docs/21-modelo-de-operaciones.md` §4).
+     *
+     * No se rellena con tareas inventadas: una lista de limpieza plausible
+     * pero que no es la de esta empresa es peor que ninguna, porque alguien
+     * la daria por buena y quedaria registrado que se hizo un trabajo que
+     * nadie pidio.
+     *
+     * Una clave por codigo del catalogo, con el mismo nombre exacto.
+     */
+    items: {},
+  },
+
   frequency: {
     /** Para la cadencia que un servicio concreto no ofrece. */
     notOffered: 'We do not offer this service on this schedule',
@@ -948,6 +996,14 @@ export const en = {
     errorAssignCancelled: 'You cannot assign a team to a cancelled booking.',
     errorInvalidTransition:
       'That change is not possible from the current status. Someone may have just updated it.',
+    /*
+     * Los dos de la lista de verificacion. Dicen QUE HACER, no solo que algo
+     * fallo: quien los lee esta de pie en una casa y no puede investigar.
+     */
+    errorChecklistClosed:
+      'This job is closed, so its list cannot be changed any more. Talk to dispatch.',
+    errorChecklistUnknownItem:
+      'That task is no longer on the list for this job. Refresh the screen.',
     errorPaymentNotCapturable: 'There is no hold on this booking that can be charged or released.',
     errorHoldExpired: 'The card hold has expired and can no longer be charged.',
     errorCaptureTooLarge: 'You cannot charge more than the amount held.',

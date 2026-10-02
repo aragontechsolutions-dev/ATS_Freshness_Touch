@@ -30,20 +30,28 @@ Vive en `apps/api/prisma/schema.prisma`.
 
 ## Tablas
 
-| Tabla                 | Para qué                                               |
-| --------------------- | ------------------------------------------------------ |
-| `customers`           | Clientes, con o sin cuenta                             |
-| `notifications`       | Cada aviso enviado, con su resultado                   |
-| `addresses`           | Direcciones de servicio, con la distancia ya calculada |
-| `quotes`              | Cotizaciones emitidas (antes no se guardaba ninguna)   |
-| `bookings`            | Citas y trabajos, con el precio pactado congelado      |
-| `recurring_series`    | Series recurrentes como objeto propio                  |
-| `payments`            | Reflejo local de cada movimiento de dinero             |
-| `webhook_events`      | Eventos del proveedor de pago (idempotencia)           |
-| `staff`               | Personal, lo mínimo para asignar trabajos              |
-| `booking_assignments` | Qué persona atiende qué trabajo                        |
-| `business_settings`   | Configuración editable desde el panel (ver más abajo)  |
-| `audit_logs`          | Quién hizo qué                                         |
+| Tabla                     | Para qué                                                                      |
+| ------------------------- | ----------------------------------------------------------------------------- |
+| `customers`               | Clientes, con o sin cuenta                                                    |
+| `notifications`           | Cada aviso enviado, con su resultado                                          |
+| `addresses`               | Direcciones de servicio, con la distancia ya calculada                        |
+| `quotes`                  | Cotizaciones emitidas (antes no se guardaba ninguna)                          |
+| `bookings`                | Citas y trabajos, con el precio pactado congelado                             |
+| `recurring_series`        | Series recurrentes como objeto propio                                         |
+| `payments`                | Reflejo local de cada movimiento de dinero                                    |
+| `webhook_events`          | Eventos del proveedor de pago (idempotencia)                                  |
+| `staff`                   | Personal, lo mínimo para asignar trabajos                                     |
+| `booking_assignments`     | Qué persona atiende qué trabajo                                               |
+| `booking_clock_ins`       | Entrada y salida de cada persona, **solo la distancia a la casa** (`docs/25`) |
+| `booking_checklist_items` | Las tareas **marcadas** de cada trabajo: qué, quién y cuándo (`docs/27`)      |
+| `pricing_tables`          | Versiones de tarifas, de solo añadir (`docs/20`)                              |
+| `business_settings`       | Configuración editable desde el panel (ver más abajo)                         |
+| `audit_logs`              | Quién hizo qué                                                                |
+
+> `booking_checklist_items` guarda **lo marcado, no la lista**: la lista de
+> tareas vive en el código, no copiada sobre cada reserva. El porqué completo
+> —y la regla que lo hace seguro, que un código de tarea no se reutiliza
+> nunca— está en `docs/27-listas-de-verificacion.md` §1.
 
 ### Por qué `business_settings` guarda una sola fila
 

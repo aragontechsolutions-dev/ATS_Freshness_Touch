@@ -6,9 +6,10 @@ import { Test } from '@nestjs/testing';
 import type { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { MyJobsSchema } from '@freshness/types';
+import { ALL_SERVICES, MyJobsSchema, type ChecklistItem } from '@freshness/types';
 import { AppModule } from '../app.module';
 import { AUTH_PROVIDER } from '../auth/auth.types';
+import { JOB_CHECKLIST_CATALOG_TOKEN } from './job-checklist.helper';
 import type { LocalAuthProvider } from '../auth/providers/local-auth.provider';
 
 vi.hoisted(() => {
@@ -122,6 +123,49 @@ async function fichajes(bookingId: string): Promise<FilaFichaje[]> {
   return filas.rows;
 }
 
+/* ------------------------- La lista de verificacion ------------------------- */
+
+/** Tres tareas de mentira: ver el comentario en `beforeAll`. */
+const CATALOGO_DE_PRUEBA: readonly ChecklistItem[] = [
+  { code: 'COCINA_FREGADERO', room: 'KITCHEN', appliesTo: ALL_SERVICES },
+  { code: 'SALON_POLVO', room: 'COMMON_AREAS', appliesTo: ALL_SERVICES },
+  { code: 'BANO_ESPEJO', room: 'BATHROOM', appliesTo: ['DEEP'] },
+  { code: 'TAREA_RETIRADA', room: 'KITCHEN', appliesTo: ALL_SERVICES, retired: true },
+];
+
+async function marcarTarea(
+  bookingId: string,
+  itemCode: string,
+  done: boolean,
+  token?: string,
+): Promise<request.Response> {
+  return request(app.getHttpServer())
+    .patch(`${RUTA}/${bookingId}/checklist`)
+    .set('authorization', `Bearer ${token ?? (await comoCleo())}`)
+    .send({ itemCode, done });
+}
+
+interface FilaTarea {
+  itemCode: string;
+  doneByStaffId: string;
+}
+
+async function tareasMarcadas(bookingId: string): Promise<FilaTarea[]> {
+  const filas = await db.query<FilaTarea>(
+    `SELECT "itemCode", "doneByStaffId" FROM booking_checklist_items
+      WHERE "bookingId" = '${bookingId}' ORDER BY "doneAt"`,
+  );
+  return filas.rows;
+}
+
+/** La lista tal como la devuelve la API para un trabajo. */
+async function listaDe(bookingId: string, token?: string) {
+  const respuesta = await misTrabajos(token);
+  const job = respuesta.body.jobs.find((j: { bookingId: string }) => j.bookingId === bookingId) as
+    { checklist: { code: string; done: boolean; retired: boolean }[] } | undefined;
+  return job?.checklist ?? [];
+}
+
 /** Una reserva dentro de la ventana que mira la pantalla. */
 async function sembrarReserva(id: string, referencia: string, horas: number, status = 'CONFIRMED') {
   const inicio = new Date(Date.now() + horas * 3_600_000);
@@ -172,7 +216,21 @@ beforeAll(async () => {
 
   process.env.DATABASE_URL = `postgresql://postgres:postgres@127.0.0.1:${PUERTO}/postgres`;
 
-  const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
+  /*
+   * EL CATALOGO DE TAREAS, SUSTITUIDO POR TRES DE MENTIRA.
+   *
+   * El de verdad esta vacio mientras las plantillas del cliente esten
+   * pendientes de transcribir, y con el vacio el camino de ESCRITURA no se
+   * podria probar en absoluto: toda peticion seria rechazada por «esa tarea
+   * no existe» y lo unico verificado seria el rechazo.
+   *
+   * Con estas tres se recorre EL MISMO codigo que produccion: la unica
+   * diferencia es el contenido de una lista de datos.
+   */
+  const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
+    .overrideProvider(JOB_CHECKLIST_CATALOG_TOKEN)
+    .useValue(CATALOGO_DE_PRUEBA)
+    .compile();
   app = moduleRef.createNestApplication();
   app.setGlobalPrefix('api/v1', { exclude: ['health', 'health/ready'] });
   await app.init();
@@ -189,6 +247,7 @@ afterAll(async () => {
 beforeEach(async () => {
   await db.exec(
     'DELETE FROM audit_logs; DELETE FROM booking_clock_ins; ' +
+      'DELETE FROM booking_checklist_items; ' +
       'DELETE FROM booking_assignments; DELETE FROM bookings;',
   );
   await geocodificarLaCasa();
@@ -630,5 +689,241 @@ describe('el cliente no puede mentir sobre su ubicacion', () => {
     });
 
     expect(respuesta.status).toBe(400);
+  });
+});
+
+/* ======================================================================== */
+/*  LA LISTA DE VERIFICACION                                                */
+/* ======================================================================== */
+
+describe('la lista que llega con el trabajo', () => {
+  it('trae las tareas del servicio, en orden de recorrido de la casa', async () => {
+    /*
+     * La reserva de estas pruebas es STANDARD, asi que `BANO_ESPEJO` —solo de
+     * la profunda— no entra, y la retirada tampoco. Lo que queda sale primero
+     * el salon y despues la cocina, que es el orden del recorrido y no el del
+     * catalogo.
+     */
+    const lista = await listaDe(DE_CLEO);
+
+    expect(lista.map((t) => t.code)).toEqual(['SALON_POLVO', 'COCINA_FREGADERO']);
+    expect(lista.every((t) => !t.done)).toBe(true);
+  });
+
+  it('un trabajo recien confirmado la trae entera sin marcar', async () => {
+    expect((await listaDe(DE_CLEO)).filter((t) => t.done)).toEqual([]);
+  });
+});
+
+describe('marcar una tarea', () => {
+  it('escribe una fila con quien la marco', async () => {
+    const respuesta = await marcarTarea(DE_CLEO, 'SALON_POLVO', true);
+
+    expect(respuesta.status).toBe(200);
+    expect(await tareasMarcadas(DE_CLEO)).toEqual([
+      { itemCode: 'SALON_POLVO', doneByStaffId: CLEO },
+    ]);
+  });
+
+  it('devuelve el trabajo entero con la tarea ya marcada', async () => {
+    /*
+     * Devuelve el trabajo y no solo la tarea para que la pantalla se repinte
+     * con lo que de verdad hay en la base —incluido lo que una companera haya
+     * marcado mientras tanto— en vez de con lo que el movil cree.
+     */
+    const respuesta = await marcarTarea(DE_CLEO, 'SALON_POLVO', true);
+    const lista = respuesta.body.checklist as { code: string; done: boolean }[];
+
+    expect(lista.find((t) => t.code === 'SALON_POLVO')?.done).toBe(true);
+    expect(lista.find((t) => t.code === 'COCINA_FREGADERO')?.done).toBe(false);
+  });
+
+  it('ES IDEMPOTENTE: dos toques no dejan dos filas', async () => {
+    /*
+     * EL CASO REAL, NO UN CASO LIMITE. Esta pantalla se usa de pie, a veces
+     * con guantes y con una conexion mala en la puerta de una casa: el doble
+     * toque y el reintento son la norma. Sin la unicidad en la base, la lista
+     * diria que la tarea se hizo dos veces.
+     */
+    await marcarTarea(DE_CLEO, 'SALON_POLVO', true);
+    const segunda = await marcarTarea(DE_CLEO, 'SALON_POLVO', true);
+
+    expect(segunda.status).toBe(200);
+    expect(await tareasMarcadas(DE_CLEO)).toHaveLength(1);
+  });
+
+  it('y el segundo toque de OTRA persona no le roba la autoria', async () => {
+    /*
+     * `upsert` con el `update` vacio. Si volviera a escribir el autor, el
+     * segundo toque de Dario convertiria «lo hizo Cleo» en «lo hizo Dario»,
+     * borrando a quien de verdad lo hizo.
+     */
+    await marcarTarea(DE_CLEO, 'SALON_POLVO', true);
+    await marcarTarea(DE_CLEO, 'SALON_POLVO', true, await comoDario());
+
+    expect(await tareasMarcadas(DE_CLEO)).toEqual([
+      { itemCode: 'SALON_POLVO', doneByStaffId: CLEO },
+    ]);
+  });
+
+  it('desmarcar borra la fila', async () => {
+    /*
+     * Se puede desmarcar a proposito: los toques equivocados con guantes son
+     * la norma, y una lista que no se puede corregir deja de usarse en cuanto
+     * alguien marca sin querer «horno limpiado».
+     */
+    await marcarTarea(DE_CLEO, 'SALON_POLVO', true);
+    const respuesta = await marcarTarea(DE_CLEO, 'SALON_POLVO', false);
+
+    expect(respuesta.status).toBe(200);
+    expect(await tareasMarcadas(DE_CLEO)).toEqual([]);
+  });
+
+  it('desmarcar lo que no estaba marcado NO es un error', async () => {
+    // Es el resultado que se pedia: la tarea queda sin marcar.
+    const respuesta = await marcarTarea(DE_CLEO, 'SALON_POLVO', false);
+
+    expect(respuesta.status).toBe(200);
+    expect(await tareasMarcadas(DE_CLEO)).toEqual([]);
+  });
+
+  it('cada companera ve lo que marco la otra', async () => {
+    /*
+     * ES PARA LO QUE SIRVE LA LISTA cuando van dos a una casa: no hacer dos
+     * veces lo mismo. Dario esta asignado al trabajo de Cleo.
+     */
+    await marcarTarea(DE_CLEO, 'SALON_POLVO', true);
+
+    const lista = await listaDe(DE_CLEO, await comoDario());
+    expect(lista.find((t) => t.code === 'SALON_POLVO')?.done).toBe(true);
+  });
+});
+
+describe('quien puede marcar, y en que', () => {
+  it('UN TRABAJO AJENO RESPONDE 404 Y NO ESCRIBE NADA', async () => {
+    /*
+     * LA PRUEBA QUE SOSTIENE ESTE ENDPOINT. Sin el filtro por asignacion, con
+     * el identificador de otra reserva se podrian ir marcando tareas de
+     * trabajos ajenos —o llenando su lista de ruido—.
+     *
+     * 404 y no 403 por el mismo motivo que en el resto de la pantalla: un 403
+     * enseñaria que esa reserva existe, y probando identificadores se podria
+     * ir dibujando la agenda de la empresa.
+     */
+    const respuesta = await marcarTarea(DE_DARIO, 'SALON_POLVO', true);
+
+    expect(respuesta.status).toBe(404);
+    expect(await tareasMarcadas(DE_DARIO)).toEqual([]);
+  });
+
+  it('sin sesion no se llega', async () => {
+    const respuesta = await request(app.getHttpServer())
+      .patch(`${RUTA}/${DE_CLEO}/checklist`)
+      .send({ itemCode: 'SALON_POLVO', done: true });
+
+    expect(respuesta.status).toBe(401);
+    expect(await tareasMarcadas(DE_CLEO)).toEqual([]);
+  });
+
+  it('un trabajo CANCELADO no admite marcar', async () => {
+    // A esa casa no fue nadie. Un registro de tareas hechas ahi contradiria
+    // al estado.
+    const respuesta = await marcarTarea(CANCELADA, 'SALON_POLVO', true);
+
+    expect(respuesta.status).toBe(400);
+    expect(await tareasMarcadas(CANCELADA)).toEqual([]);
+  });
+
+  it('pero un trabajo TERMINADO si, que es el ultimo toque de cada casa', async () => {
+    /*
+     * Lo normal es acabar de marcar la ultima tarea justo despues de pulsar
+     * «he terminado». Negarlo convertiria el ultimo toque de cada trabajo en
+     * un fallo delante de alguien que acaba de hacer bien su trabajo.
+     */
+    await db.exec(`UPDATE bookings SET status = 'COMPLETED' WHERE id = '${DE_CLEO}'`);
+
+    const respuesta = await marcarTarea(DE_CLEO, 'SALON_POLVO', true);
+    expect(respuesta.status).toBe(200);
+  });
+});
+
+describe('que codigos se aceptan', () => {
+  it('RECHAZA UN CODIGO INVENTADO, y no escribe nada', async () => {
+    /*
+     * ES UNA COMPROBACION DE SEGURIDAD, NO DE FORMA. Sin ella, cualquiera con
+     * sesion podria escribir una fila por cada cadena que se le ocurriera y
+     * usar la lista de tareas como un almacen de texto libre colgado de una
+     * reserva ajena a su proposito.
+     */
+    const respuesta = await marcarTarea(DE_CLEO, 'ME_LO_INVENTO', true);
+
+    expect(respuesta.status).toBe(400);
+    expect(await tareasMarcadas(DE_CLEO)).toEqual([]);
+  });
+
+  it('rechaza una tarea de OTRO servicio', async () => {
+    // `BANO_ESPEJO` es solo de la profunda, y esta reserva es estandar.
+    const respuesta = await marcarTarea(DE_CLEO, 'BANO_ESPEJO', true);
+
+    expect(respuesta.status).toBe(400);
+  });
+
+  it('rechaza una tarea RETIRADA: no se hace hoy lo que la empresa ya no hace', async () => {
+    const respuesta = await marcarTarea(DE_CLEO, 'TAREA_RETIRADA', true);
+
+    expect(respuesta.status).toBe(400);
+  });
+
+  it('rechaza un codigo desmesurado', async () => {
+    // Sin el tope del contrato, cada toque podria escribir un megabyte.
+    const respuesta = await marcarTarea(DE_CLEO, 'A'.repeat(200), true);
+
+    expect(respuesta.status).toBe(400);
+  });
+
+  it('rechaza un cuerpo con campos de mas', async () => {
+    /*
+     * El caso realista no es malicia: es un cliente que manda tambien
+     * `doneAt` o `doneBy`. Los dos los pone el servidor —la hora porque el
+     * reloj de un movil se cambia a mano, el autor porque sale de la sesion—.
+     */
+    const respuesta = await request(app.getHttpServer())
+      .patch(`${RUTA}/${DE_CLEO}/checklist`)
+      .set('authorization', `Bearer ${await comoCleo()}`)
+      .send({ itemCode: 'SALON_POLVO', done: true, doneByStaffId: DARIO });
+
+    expect(respuesta.status).toBe(400);
+    expect(await tareasMarcadas(DE_CLEO)).toEqual([]);
+  });
+});
+
+describe('una tarea marcada que ya no esta en la lista de hoy', () => {
+  it('SIGUE LEYENDOSE, marcada como retirada', async () => {
+    /*
+     * ES LA CONSECUENCIA DE NO GUARDAR UNA COPIA DE LA LISTA, y la parte que
+     * hay que probar: la lista sale del catalogo, asi que una tarea retirada
+     * desapareceria del catalogo vigente.
+     *
+     * Si se dejara fuera, un trabajo de hace tres meses parecerian dos tareas
+     * cuando se hicieron tres, y la lista estaria mintiendo justo cuando se
+     * consulta por un motivo.
+     */
+    await db.exec(
+      `INSERT INTO booking_checklist_items (id, "bookingId", "itemCode", "doneByStaffId", "doneAt")
+       VALUES ('f1111111-1111-4111-8111-111111111111', '${DE_CLEO}', 'TAREA_RETIRADA',
+               '${CLEO}', now())`,
+    );
+
+    const lista = await listaDe(DE_CLEO);
+    const retirada = lista.find((t) => t.code === 'TAREA_RETIRADA');
+
+    expect(retirada).toBeDefined();
+    expect(retirada?.done).toBe(true);
+    expect(retirada?.retired).toBe(true);
+  });
+
+  it('y no se puede volver a marcar ni desmarcar', async () => {
+    // Se ve, pero no se toca: es trabajo que la empresa ya no hace.
+    expect((await marcarTarea(DE_CLEO, 'TAREA_RETIRADA', false)).status).toBe(400);
   });
 });

@@ -527,17 +527,35 @@ describe('acciones sobre la reserva', () => {
     admin = await provider.issue(ADMIN_AUTH_ID, 'ada@example.com');
     coordinacion = await provider.issue(DISPATCHER_AUTH_ID, 'beto@example.com');
 
-    const dia = new Date(Date.now() + 9 * 86_400_000).toISOString().slice(0, 10);
-    const disponibilidad = await request(app.getHttpServer()).get('/api/v1/availability').query({
-      date: dia,
-      service: 'STANDARD',
-      bedrooms: 2,
-      bathrooms: 1,
-      squareFeet: 1100,
-    });
+    /*
+     * EL PRIMER DIA CON HUECO A PARTIR DE DENTRO DE NUEVE, no el noveno a
+     * secas.
+     *
+     * ESTO ERA UN FALLO REAL Y DEPENDIENTE DE LA FECHA. La version anterior
+     * cogia «hoy + 9 dias» y daba por hecho que ese dia abria. Los domingos
+     * la empresa cierra (`DEFAULT_BUSINESS_SETTINGS.hours` no tiene el dia
+     * 0), asi que la prueba fallaba con «el dia elegido no tiene franjas
+     * libres» TODOS LOS VIERNES, cuando hoy + 9 cae en domingo. Nada en el
+     * codigo de produccion estaba mal: era la prueba.
+     *
+     * Se recorren unos cuantos dias para cubrir tambien un futuro festivo
+     * seguido de domingo.
+     */
+    let franja: { startsAt: string } | undefined;
+    for (let salto = 9; salto < 16 && !franja; salto += 1) {
+      const dia = new Date(Date.now() + salto * 86_400_000).toISOString().slice(0, 10);
+      const disponibilidad = await request(app.getHttpServer()).get('/api/v1/availability').query({
+        date: dia,
+        service: 'STANDARD',
+        bedrooms: 2,
+        bathrooms: 1,
+        squareFeet: 1100,
+      });
 
-    const franja = disponibilidad.body.slots?.find((s: { available: boolean }) => s.available);
-    if (!franja) throw new Error('el dia elegido no tiene franjas libres');
+      franja = disponibilidad.body.slots?.find((s: { available: boolean }) => s.available);
+    }
+
+    if (!franja) throw new Error('ningun dia de la proxima semana tiene franjas libres');
 
     const creada = await request(app.getHttpServer())
       .post('/api/v1/bookings')

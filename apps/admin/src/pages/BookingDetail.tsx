@@ -6,6 +6,7 @@ import { BookingActions } from '../components/BookingActions';
 import { StatusChip } from '../components/StatusChip';
 import { TeamSection } from '../components/TeamSection';
 import { ClockInsSection } from '../components/ClockInsSection';
+import { JobChecklist } from '../components/JobChecklist';
 import { SkeletonDetalleReserva } from '../components/Skeletons';
 import {
   AlertIcon,
@@ -186,6 +187,24 @@ export function BookingDetailPage({
         trabajo aun por hacer.
       */}
       <ClockInsSection booking={booking} locale={locale} />
+
+      {/*
+        LA LISTA DE VERIFICACION, DETRAS DE LOS FICHAJES.
+        El orden es el de la conversacion que se tiene cuando algo se discute:
+        primero «¿fue alguien y cuando?» y despues «¿que hizo?».
+
+        EN SOLO LECTURA: no se le pasa `onToggle`. Lo que ocurre en la casa lo
+        marca quien esta alli; si coordinacion pudiera marcar desde la
+        oficina, la lista dejaria de ser el registro de lo que se hizo.
+
+        Tampoco se pinta si no hay lista, que hoy es el caso normal: las
+        tareas de las plantillas del cliente estan pendientes de transcribir.
+      */}
+      {booking.checklist.length > 0 && (
+        <section className="ft-card p-5">
+          <JobChecklist entries={booking.checklist} locale={locale} />
+        </section>
+      )}
 
       {/* -------------------------------- Precio ------------------------------- */}
       <section className="ft-card p-5">
