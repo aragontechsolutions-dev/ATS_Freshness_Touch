@@ -225,11 +225,62 @@ export class MyJobsService {
       });
     }
 
-    if (!allowedTransitions(asignacion.booking.status).includes(cambio.status)) {
-      throw new BadRequestException({
-        code: API_ERROR_CODES.INVALID_TRANSITION,
-        messageKey: 'admin.errorInvalidTransition',
+    /*
+     * ======================================================================
+     * FICHAR ES DE CADA PERSONA. EL ESTADO ES DEL TRABAJO.
+     * ======================================================================
+     * ESTO ERA UN FALLO REAL Y LLEGO A PRODUCCION, asi que conviene contarlo
+     * entero.
+     *
+     * La primera version exigia una transicion de estado valida para poder
+     * fichar. Como un trabajo pasa a EN CURSO cuando ficha LA PRIMERA
+     * persona del equipo, la segunda se encontraba el trabajo ya en curso,
+     * `IN_PROGRESS -> IN_PROGRESS` no es una transicion valida, y SU LLEGADA
+     * NO SE PODIA REGISTRAR NUNCA. Lo mismo al salir, una vez que la primera
+     * marcaba terminado.
+     *
+     * No era un caso raro: pasa siempre que van dos personas a una casa, y
+     * tambien cuando coordinacion mueve el estado desde el panel. Y a partir
+     * de la Etapa 3.6 dejo de ser solo un hueco en el registro de horas: sin
+     * fichaje de llegada propio tampoco se puede avisar de que la casa no es
+     * la contratada, asi que la responsable se quedaba sin poder hacer su
+     * trabajo.
+     *
+     * Ahora hay dos caminos, y el fichaje se registra en los dos:
+     *
+     *   1. CAMBIA EL ESTADO. Es la primera persona: el trabajo pasa a EN
+     *      CURSO o a TERMINADO, con su hora y su entrada de auditoria.
+     *   2. NO CAMBIA EL ESTADO. El trabajo ya esta donde esta y esta persona
+     *      ficha lo suyo. No se vuelve a tocar `startedAt` —esa es la hora a
+     *      la que empezo el trabajo, no la de cada cual— ni se escribe
+     *      auditoria: no ha cambiado nada que auditar, y la fila del fichaje
+     *      ya lleva quien, cuando y a que distancia.
+     */
+    const estadoActual = asignacion.booking.status;
+    const cambiaEstado = allowedTransitions(estadoActual).includes(cambio.status);
+
+    if (!cambiaEstado) {
+      /*
+       * Solo vale como «yo tambien» si el trabajo YA ESTA en el estado que se
+       * pide y esta persona no ha fichado todavia ese momento. Cualquier otra
+       * cosa —terminar una cancelada, empezar una ya terminada— sigue siendo
+       * una transicion invalida.
+       */
+      const yaFichado = await this.prisma.db.bookingClockIn.findFirst({
+        where: {
+          bookingId,
+          staffId: staff.staffId,
+          kind: cambio.status === 'IN_PROGRESS' ? 'ARRIVAL' : 'DEPARTURE',
+        },
+        select: { id: true },
       });
+
+      if (estadoActual !== cambio.status || yaFichado) {
+        throw new BadRequestException({
+          code: API_ERROR_CODES.INVALID_TRANSITION,
+          messageKey: 'admin.errorInvalidTransition',
+        });
+      }
     }
 
     /*
@@ -250,15 +301,22 @@ export class MyJobsService {
     const fichaje = await this.medirDistancia(bookingId, cambio);
 
     const actualizado = await this.prisma.db.$transaction(async (tx) => {
-      const trabajo = await tx.booking.update({
-        where: { id: bookingId },
-        data: {
-          status: cambio.status,
-          ...(cambio.status === 'IN_PROGRESS' ? { startedAt: new Date() } : {}),
-          ...(cambio.status === 'COMPLETED' ? { completedAt: new Date() } : {}),
-        },
-        select: JOB_SELECT,
-      });
+      /*
+       * Si esta persona solo ficha lo suyo, la reserva NO SE TOCA: se lee tal
+       * como esta. Volver a escribir `startedAt` moveria la hora a la que
+       * empezo el trabajo cada vez que llega alguien del equipo.
+       */
+      const trabajo = cambiaEstado
+        ? await tx.booking.update({
+            where: { id: bookingId },
+            data: {
+              status: cambio.status,
+              ...(cambio.status === 'IN_PROGRESS' ? { startedAt: new Date() } : {}),
+              ...(cambio.status === 'COMPLETED' ? { completedAt: new Date() } : {}),
+            },
+            select: JOB_SELECT,
+          })
+        : await tx.booking.findUniqueOrThrow({ where: { id: bookingId }, select: JOB_SELECT });
 
       /*
        * EL FICHAJE, DENTRO DE LA MISMA TRANSACCION QUE EL CAMBIO DE ESTADO.
@@ -280,56 +338,65 @@ export class MyJobsService {
         },
       });
 
-      await this.audit.record(
-        {
-          staff,
-          surface: 'PANEL',
-          /*
-           * MISMA ACCION QUE CUANDO LO MARCA COORDINACION desde el panel.
-           * Antes esto ponia `booking.status_changed` y el panel ponia
-           * `booking.status.<estado>`: dos nombres para el mismo hecho, asi
-           * que filtrar «ensename todas las que se completaron» se dejaba
-           * fuera justo las que marco el equipo de limpieza, que son la
-           * mayoria. Quien lo hizo y desde donde se distingue por el actor y
-           * por `source`, no por el nombre de la accion.
-           */
-          action: `booking.status.${cambio.status.toLowerCase()}`,
-          entityType: 'booking',
-          entityId: bookingId,
-          /*
-           * Se deja constancia de que lo marco limpieza desde su propia
-           * pantalla y no coordinacion desde el panel. Ante un "esto se
-           * cerro sin hacerse", saber quien lo marco y desde donde es la
-           * primera pregunta.
-           */
-          metadata: {
-            reference: trabajo.reference,
-            from: asignacion.booking.status,
-            to: cambio.status,
-            source: 'my-jobs',
+      /*
+       * AUDITORIA SOLO CUANDO CAMBIA EL ESTADO. Un «de EN CURSO a EN CURSO»
+       * no es un cambio: ensuciaria el registro y, peor, romperia los filtros
+       * que coordinacion usa de verdad —«ensename todo lo que se completo»—
+       * con lineas que no completaron nada. Quien ficho y cuando ya esta en
+       * la fila del fichaje.
+       */
+      if (cambiaEstado) {
+        await this.audit.record(
+          {
+            staff,
+            surface: 'PANEL',
             /*
-             * LA DISTANCIA SI, LAS COORDENADAS NUNCA.
-             *
-             * Ante un «esto se cerro sin hacerse», que la auditoria diga «lo
-             * marco a 30 kilometros de la casa» es exactamente el dato que
-             * resuelve la conversacion, y no revela donde estaba esa persona:
-             * un radio de 30 km alrededor de una casa conocida son miles de
-             * kilometros cuadrados.
-             *
-             * La regla de este proyecto es que la auditoria no lleva nunca
-             * datos de tarjeta, contrasenas ni codigos de puerta. Una
-             * distancia no es ninguna de las tres, pero un par de
-             * coordenadas si seria de la misma familia: un dato que permite
-             * situar a una persona. Por eso aqui va el numero de metros y no
-             * el punto.
+             * MISMA ACCION QUE CUANDO LO MARCA COORDINACION desde el panel.
+             * Antes esto ponia `booking.status_changed` y el panel ponia
+             * `booking.status.<estado>`: dos nombres para el mismo hecho, asi
+             * que filtrar «ensename todas las que se completaron» se dejaba
+             * fuera justo las que marco el equipo de limpieza, que son la
+             * mayoria. Quien lo hizo y desde donde se distingue por el actor y
+             * por `source`, no por el nombre de la accion.
              */
-            locationState: fichaje.locationState,
-            distanceMeters: fichaje.distanceMeters,
+            action: `booking.status.${cambio.status.toLowerCase()}`,
+            entityType: 'booking',
+            entityId: bookingId,
+            /*
+             * Se deja constancia de que lo marco limpieza desde su propia
+             * pantalla y no coordinacion desde el panel. Ante un "esto se
+             * cerro sin hacerse", saber quien lo marco y desde donde es la
+             * primera pregunta.
+             */
+            metadata: {
+              reference: trabajo.reference,
+              from: asignacion.booking.status,
+              to: cambio.status,
+              source: 'my-jobs',
+              /*
+               * LA DISTANCIA SI, LAS COORDENADAS NUNCA.
+               *
+               * Ante un «esto se cerro sin hacerse», que la auditoria diga «lo
+               * marco a 30 kilometros de la casa» es exactamente el dato que
+               * resuelve la conversacion, y no revela donde estaba esa persona:
+               * un radio de 30 km alrededor de una casa conocida son miles de
+               * kilometros cuadrados.
+               *
+               * La regla de este proyecto es que la auditoria no lleva nunca
+               * datos de tarjeta, contrasenas ni codigos de puerta. Una
+               * distancia no es ninguna de las tres, pero un par de
+               * coordenadas si seria de la misma familia: un dato que permite
+               * situar a una persona. Por eso aqui va el numero de metros y no
+               * el punto.
+               */
+              locationState: fichaje.locationState,
+              distanceMeters: fichaje.distanceMeters,
+            },
+            ipAddress,
           },
-          ipAddress,
-        },
-        tx,
-      );
+          tx,
+        );
+      }
 
       return trabajo;
     });
@@ -597,6 +664,7 @@ function toMyJob(trabajo: FilaTrabajo, staffId: string, catalogo: readonly Check
      * mas, y es el mismo dato que mira el servidor al aceptar un ajuste.
      */
     iHaveArrived: trabajo.clockIns.some((f) => f.staffId === staffId && f.kind === 'ARRIVAL'),
+    iHaveLeft: trabajo.clockIns.some((f) => f.staffId === staffId && f.kind === 'DEPARTURE'),
     /*
      * La lista se monta en el servidor, no en el movil: el movil no sabe que
      * tareas pide cada servicio, y si lo supiera habria dos catalogos que

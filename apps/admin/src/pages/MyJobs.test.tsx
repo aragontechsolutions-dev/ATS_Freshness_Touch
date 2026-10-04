@@ -69,7 +69,7 @@ function tarea(code: string, done: boolean): JobChecklistEntry {
   };
 }
 
-function trabajo(checklist: JobChecklistEntry[]): MyJob {
+function trabajo(checklist: JobChecklistEntry[], cambios: Partial<MyJob> = {}): MyJob {
   const dentroDeUnRato = new Date(Date.now() + 3 * 3_600_000);
 
   return {
@@ -97,9 +97,11 @@ function trabajo(checklist: JobChecklistEntry[]): MyJob {
     teammates: [],
     iAmLead: true,
     iHaveArrived: true,
+    iHaveLeft: false,
     clockIns: [],
     adjustments: [],
     checklist,
+    ...cambios,
   };
 }
 
@@ -119,8 +121,8 @@ afterEach(() => {
 });
 
 /** Monta la pantalla con la lista indicada y espera a la carga. */
-async function montar(checklist: JobChecklistEntry[]): Promise<void> {
-  fetchMyJobs.mockResolvedValue({ jobs: [trabajo(checklist)] });
+async function montar(checklist: JobChecklistEntry[], cambios: Partial<MyJob> = {}): Promise<void> {
+  fetchMyJobs.mockResolvedValue({ jobs: [trabajo(checklist, cambios)] });
 
   const { MyJobs } = await import('./MyJobs');
   await act(async () => {
@@ -269,5 +271,92 @@ describe('cuando la API falla', () => {
     });
 
     expect(casilla('Dust all surfaces').checked).toBe(true);
+  });
+});
+
+/**
+ * EL BOTON SE DECIDE POR PERSONA, NO POR EL ESTADO DEL TRABAJO
+ * ===========================================================
+ * ESTE BLOQUE EXISTE POR UN FALLO QUE LLEGO A PRODUCCION, y que se vio en una
+ * captura de pantalla: el aviso decia «Marca primero He llegado» justo debajo
+ * de un boton que ponia «He terminado».
+ *
+ * La causa: `Acciones` miraba solo `job.status`. Un trabajo pasa a EN CURSO
+ * cuando ficha LA PRIMERA persona del equipo —o cuando coordinacion mueve el
+ * estado desde el panel—, asi que a la siguiente se le ofrecia terminar un
+ * trabajo al que no habia podido fichar que llegaba. Y sin fichaje de llegada
+ * propio tampoco podia avisar de que la casa no era la contratada.
+ */
+
+/** El texto del boton principal de la tarjeta, si hay alguno. */
+function botonPrincipal(): string | null {
+  const botones = [...contenedor.querySelectorAll('button')];
+  const principal = botones.find((b) => b.className.includes('ft-btn-primary'));
+  return principal?.textContent?.trim() ?? null;
+}
+
+describe('que boton se ofrece', () => {
+  it('EL CASO DE LA CAPTURA: trabajo EN CURSO y yo sin fichar → «He llegado»', async () => {
+    /*
+     * Antes salia «He terminado» y no habia forma de fichar la llegada: un
+     * callejon sin salida en la puerta de una casa.
+     */
+    await montar([], { status: 'IN_PROGRESS', iHaveArrived: false, iHaveLeft: false });
+
+    expect(botonPrincipal()).toContain('I have arrived');
+  });
+
+  it('trabajo CONFIRMADO y yo sin fichar → «He llegado»', async () => {
+    await montar([], { status: 'CONFIRMED', iHaveArrived: false, iHaveLeft: false });
+
+    expect(botonPrincipal()).toContain('I have arrived');
+  });
+
+  it('ya fiche mi llegada → «He terminado»', async () => {
+    await montar([], { status: 'IN_PROGRESS', iHaveArrived: true, iHaveLeft: false });
+
+    expect(botonPrincipal()).toContain('I have finished');
+  });
+
+  it('el trabajo lo cerro otra pero yo no me he ido → «He terminado»', async () => {
+    // Su salida tambien cuenta: las horas son de cada cual.
+    await montar([], { status: 'COMPLETED', iHaveArrived: true, iHaveLeft: false });
+
+    expect(botonPrincipal()).toContain('I have finished');
+  });
+
+  it('ya fiche mi salida → ningun boton, solo «Terminado»', async () => {
+    await montar([], { status: 'COMPLETED', iHaveArrived: true, iHaveLeft: true });
+
+    expect(botonPrincipal()).toBeNull();
+    expect(contenedor.textContent).toContain('Finished');
+  });
+
+  it('en una CANCELADA no se ficha nada', async () => {
+    // A esa casa no va nadie.
+    await montar([], { status: 'CANCELLED', iHaveArrived: false, iHaveLeft: false });
+
+    expect(botonPrincipal()).toBeNull();
+  });
+});
+
+describe('el aviso de corregir y el boton no se contradicen', () => {
+  it('SI DICE «marca primero He llegado», EL BOTON DICE «He llegado»', async () => {
+    /*
+     * LA PRUEBA QUE HABRIA CAZADO EL FALLO. No comprueba un boton ni un texto
+     * por separado: comprueba que los dos CUENTAN LA MISMA HISTORIA, que es
+     * lo que estaba roto.
+     */
+    await montar([], {
+      status: 'IN_PROGRESS',
+      iAmLead: true,
+      iHaveArrived: false,
+      iHaveLeft: false,
+    });
+
+    const texto = contenedor.textContent ?? '';
+    if (texto.includes('Tap "I have arrived" first')) {
+      expect(botonPrincipal(), 'el aviso manda a un boton que no esta').toContain('I have arrived');
+    }
   });
 });

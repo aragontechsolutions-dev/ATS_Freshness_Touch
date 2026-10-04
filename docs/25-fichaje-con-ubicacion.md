@@ -14,6 +14,49 @@ Marcar la llegada y la salida ya existía desde la Etapa 2.11. Lo que no había
 era forma de saber desde dónde se marcaba: el botón se podía pulsar desde el
 sofá de casa, y el sistema lo registraba igual de contento.
 
+## 1 bis. Fichar es de cada persona, no del trabajo
+
+**Esto fue un fallo real y llegó a producción.** Se vio en una captura: el
+aviso decía «marca primero _He llegado_» justo debajo de un botón que ponía
+**«He terminado»**.
+
+La causa estaba repartida en dos sitios que cometían el mismo error —decidir
+por el **estado de la reserva** algo que es **de cada persona**:
+
+- **El servidor** exigía una transición de estado válida para poder fichar.
+- **La pantalla** elegía el botón mirando solo `job.status`.
+
+Un trabajo pasa a EN CURSO cuando ficha **la primera** persona del equipo. La
+segunda se encontraba `IN_PROGRESS → IN_PROGRESS`, que no es una transición, y
+**su llegada no se podía registrar nunca**. Lo mismo al salir, una vez que la
+primera marcaba terminado. Pasa también cuando coordinación mueve el estado
+desde el panel.
+
+No era un caso raro: **ocurre siempre que van dos personas a una casa**. Y
+desde la Etapa 3.6 dejó de ser solo un hueco en el registro de horas: sin
+fichaje de llegada propio tampoco se puede avisar de que la casa no es la
+contratada (`docs/28-ajustes-de-campo.md`), así que la responsable se quedaba
+sin poder hacer su trabajo.
+
+**Ahora hay dos caminos y el fichaje se registra en los dos:**
+
+|                         | Qué pasa                                                                                                                                                                                                                                              |
+| ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Cambia el estado**    | Es la primera persona: el trabajo pasa a EN CURSO o TERMINADO, con su hora y su entrada de auditoría                                                                                                                                                  |
+| **No cambia el estado** | Esta persona ficha lo suyo. No se vuelve a tocar `startedAt` —esa es la hora a la que empezó el trabajo, no la de cada cual— ni se escribe auditoría: no ha cambiado nada que auditar, y la fila del fichaje ya lleva quién, cuándo y a qué distancia |
+
+Lo que **sigue siendo imposible**: fichar dos veces lo mismo, fichar en una
+cancelada, y cualquier transición que no esté en la tabla.
+
+El contrato gana `iHaveArrived` e `iHaveLeft`, calculados en el servidor, para
+que la pantalla decida con **la misma regla** que la API.
+
+> **La prueba que lo fija no comprueba un botón ni un texto por separado:
+> comprueba que los dos cuentan la misma historia.** Si el aviso dice «marca
+> primero He llegado», el botón tiene que decir «He llegado». Eso era
+> exactamente lo que estaba roto, y ninguna prueba de las dos piezas por
+> separado lo habría visto.
+
 ## 2. La decisión que sostiene todo: solo se guarda la distancia
 
 **Las coordenadas de quien ficha no se guardan en ninguna parte.** Llegan al

@@ -110,6 +110,17 @@ export const MyJobSchema = z.strictObject({
   iHaveArrived: z.boolean(),
 
   /**
+   * Y si ya ha fichado su salida.
+   *
+   * VA CON `iHaveArrived` PORQUE EL BOTON SE DECIDE POR PERSONA, no por el
+   * estado del trabajo. Decidirlo por el estado fue un fallo real: la segunda
+   * persona de un equipo se encontraba el trabajo ya EN CURSO, y el unico
+   * boton que se le ofrecia era «he terminado» —sin haber podido fichar su
+   * llegada nunca—.
+   */
+  iHaveLeft: z.boolean(),
+
+  /**
    * LOS FICHAJES DE ESTE TRABAJO, INCLUIDOS LOS DE LOS COMPANEROS.
    *
    * Que una empleada vea su propio fichaje fue una decision explicita: no hay
