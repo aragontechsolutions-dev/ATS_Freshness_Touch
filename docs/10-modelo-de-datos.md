@@ -44,7 +44,7 @@ Vive en `apps/api/prisma/schema.prisma`.
 | `booking_assignments`       | Qué persona atiende qué trabajo                                               |
 | `booking_clock_ins`         | Entrada y salida de cada persona, **solo la distancia a la casa** (`docs/25`) |
 | `booking_checklist_items`   | Las tareas **marcadas** de cada trabajo: qué, quién y cuándo (`docs/27`)      |
-| `booking_field_adjustments` | Lo que el equipo encontró en la casa, y si se cobró (`docs/28`)               |
+| `booking_field_adjustments` | Lo que el equipo encontró en la casa, si se cobró, y si el importe lo tecleó una persona (`docs/28`) |
 | `pricing_tables`            | Versiones de tarifas, de solo añadir (`docs/20`)                              |
 | `business_settings`         | Configuración editable desde el panel (ver más abajo)                         |
 | `audit_logs`                | Quién hizo qué                                                                |

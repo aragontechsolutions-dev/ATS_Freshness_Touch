@@ -31,7 +31,12 @@ interface FieldAdjustmentsSectionProps {
   booking: AdminBookingDetail;
   role: StaffRole;
   locale: Locale;
-  onResolver: (adjustmentId: string, approve: boolean, note?: string) => Promise<void>;
+  onResolver: (
+    adjustmentId: string,
+    approve: boolean,
+    note?: string,
+    newTotalCents?: number,
+  ) => Promise<void>;
 }
 
 export function FieldAdjustmentsSection({
@@ -57,6 +62,8 @@ export function FieldAdjustmentsSection({
           <Ajuste
             key={ajuste.id}
             ajuste={ajuste}
+            /* El total de HOY: es contra lo que se compara el que se teclea. */
+            totalActual={booking.totalCents}
             role={role}
             locale={locale}
             onResolver={onResolver}
@@ -71,19 +78,28 @@ export function FieldAdjustmentsSection({
 
 function Ajuste({
   ajuste,
+  totalActual,
   role,
   locale,
   onResolver,
 }: {
   ajuste: FieldAdjustment;
+  totalActual: number;
   role: StaffRole;
   locale: Locale;
-  onResolver: (adjustmentId: string, approve: boolean, note?: string) => Promise<void>;
+  onResolver: (
+    adjustmentId: string,
+    approve: boolean,
+    note?: string,
+    newTotalCents?: number,
+  ) => Promise<void>;
 }) {
   const { t } = useTranslation();
   const [rechazando, setRechazando] = useState(false);
   const [motivo, setMotivo] = useState('');
   const [ocupado, setOcupado] = useState(false);
+  /** El total nuevo, en dólares tal como se teclea. */
+  const [importe, setImporte] = useState('');
 
   const abierta = ajuste.state === 'PROPOSED';
   /**
@@ -97,10 +113,34 @@ function Ajuste({
    */
   const puedeDecidir = role === 'ADMIN' || role === 'DISPATCHER';
 
+  /*
+   * SIN PRECIO AUTOMATICO, EL IMPORTE LO PONE UNA PERSONA.
+   *
+   * Pasa siempre fuera de las 35 millas del area metropolitana, o sea en casi
+   * toda Georgia: esos trabajos se atienden sin cotizacion automatica por
+   * diseno. Sin este campo, un ajuste alli no se puede resolver nunca.
+   */
+  const aMano = ajuste.newTotalCents === null;
+  /*
+   * SOLO ADMINISTRACION TECLEA IMPORTES. La linea es la misma que separa
+   * mover una cita de cobrar una tarjeta: el numero que calcula el motor lo
+   * aprueba quien lleva la agenda; un numero que sale de la cabeza de una
+   * persona lo pone quien responde del dinero. El servidor lo comprueba
+   * tambien; esto solo evita ofrecer un campo que acabaria en un 403.
+   */
+  const puedeTeclear = role === 'ADMIN';
+  const centavos = Math.round(Number(importe.replace(',', '.')) * 100);
+  const importeValido = Number.isFinite(centavos) && centavos >= 0 && importe.trim() !== '';
+
   const resolver = async (approve: boolean): Promise<void> => {
     setOcupado(true);
     try {
-      await onResolver(ajuste.id, approve, approve ? undefined : motivo.trim());
+      await onResolver(
+        ajuste.id,
+        approve,
+        approve ? undefined : motivo.trim(),
+        approve && aMano ? centavos : undefined,
+      );
       setRechazando(false);
       setMotivo('');
     } finally {
@@ -146,7 +186,7 @@ function Ajuste({
         {ajuste.note}
       </p>
 
-      <Importe ajuste={ajuste} locale={locale} />
+      <Importe ajuste={ajuste} locale={locale} puedeTeclear={abierta && puedeTeclear} />
 
       {ajuste.resolutionNote !== null && (
         <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
@@ -160,31 +200,71 @@ function Ajuste({
       {abierta && puedeDecidir && (
         <div className="mt-4">
           {!rechazando ? (
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                className="ft-btn-primary"
-                /*
-                 * Sin precio automatico no se puede aprobar: el importe lo
-                 * tendria que poner alguien a mano, y eso todavia no existe.
-                 * Se deshabilita en vez de esconderlo para que se vea que la
-                 * opcion existe y por que no se puede usar.
-                 */
-                disabled={ocupado || ajuste.newTotalCents === null}
-                onClick={() => void resolver(true)}
-              >
-                {ocupado ? <SpinnerIcon className="h-4 w-4" /> : <CheckIcon className="h-4 w-4" />}
-                {t('admin.adjustments.approve')}
-              </button>
-              <button
-                type="button"
-                className="ft-btn-ghost"
-                disabled={ocupado}
-                onClick={() => setRechazando(true)}
-              >
-                <CloseIcon className="h-4 w-4" />
-                {t('admin.adjustments.reject')}
-              </button>
+            <div className="space-y-3">
+              {aMano && puedeTeclear && (
+                <div>
+                  <label className="ft-label" htmlFor={`importe-${ajuste.id}`}>
+                    {t('admin.adjustments.manualTotal')}
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg font-semibold text-slate-500">$</span>
+                    <input
+                      id={`importe-${ajuste.id}`}
+                      type="text"
+                      inputMode="decimal"
+                      className="ft-input w-40"
+                      value={importe}
+                      placeholder="0.00"
+                      onChange={(e) => setImporte(e.target.value.replace(/[^0-9.,]/g, ''))}
+                    />
+                  </div>
+                  {/*
+                    EL TOTAL ACTUAL, AL LADO. Teclear «345» sin saber que
+                    ahora pone 250 es teclear a ciegas: lo que se decide es
+                    la diferencia, no la cifra.
+                  */}
+                  <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                    {t('admin.adjustments.currentTotal', {
+                      value: formatCents(totalActual, locale),
+                    })}
+                  </p>
+                </div>
+              )}
+
+              {aMano && !puedeTeclear && (
+                <p className="text-sm text-slate-600 dark:text-slate-400">
+                  {t('admin.adjustments.manualNeedsAdmin')}
+                </p>
+              )}
+
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  className="ft-btn-primary"
+                  /*
+                   * Con precio automatico se aprueba tal cual. Sin el, hace
+                   * falta que administracion teclee un importe valido.
+                   */
+                  disabled={ocupado || (aMano && (!puedeTeclear || !importeValido))}
+                  onClick={() => void resolver(true)}
+                >
+                  {ocupado ? (
+                    <SpinnerIcon className="h-4 w-4" />
+                  ) : (
+                    <CheckIcon className="h-4 w-4" />
+                  )}
+                  {t('admin.adjustments.approve')}
+                </button>
+                <button
+                  type="button"
+                  className="ft-btn-ghost"
+                  disabled={ocupado}
+                  onClick={() => setRechazando(true)}
+                >
+                  <CloseIcon className="h-4 w-4" />
+                  {t('admin.adjustments.reject')}
+                </button>
+              </div>
             </div>
           ) : (
             <div className="space-y-2">
@@ -272,14 +352,42 @@ function Estado({ state }: { state: FieldAdjustment['state'] }) {
  * de la tabla no tiene precio automático, y el importe lo tiene que calcular
  * una persona. Enseñar «0 $» ahí diría «no cambia nada», que es lo contrario.
  */
-function Importe({ ajuste, locale }: { ajuste: FieldAdjustment; locale: Locale }) {
+function Importe({
+  ajuste,
+  locale,
+  puedeTeclear,
+}: {
+  ajuste: FieldAdjustment;
+  locale: Locale;
+  /** Si quien mira va a ver debajo el campo del importe. */
+  puedeTeclear: boolean;
+}) {
   const { t } = useTranslation();
 
   if (ajuste.differenceCents === null || ajuste.newTotalCents === null) {
     return (
       <p className="mt-3 flex items-start gap-2 text-sm font-medium text-amber-700 dark:text-amber-400">
         <AlertIcon className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-        {t('admin.adjustments.noAutoPrice')}
+        {/*
+          SE DICE EL MOTIVO DE VERDAD.
+          La primera version decia «este tamaño no tiene precio automático»
+          para los siete motivos del motor, y casi nunca es el tamaño: el más
+          frecuente es la ZONA, porque fuera de las 35 millas Georgia entera
+          se atiende sin precio automático por diseño. Decir el motivo
+          equivocado hace buscar el problema donde no está.
+        */}
+        {/*
+          SOLO SE MANDA A TECLEAR A QUIEN PUEDE TECLEAR.
+          Decirle a coordinación «escribe abajo el total» cuando el campo no
+          le sale es la misma contradicción que ya costó un fallo en
+          producción: un aviso que manda a algo que no está.
+        */}
+        {ajuste.noPriceReason !== null
+          ? t('admin.adjustments.noAutoPriceBecause', {
+              reason: motivoInterno(ajuste.noPriceReason, t),
+            })
+          : t('admin.adjustments.noAutoPrice')}
+        {puedeTeclear && ` ${t('admin.adjustments.typeBelow')}`}
       </p>
     );
   }
@@ -315,4 +423,27 @@ function extrasCambiados(ajuste: FieldAdjustment): { code: string; de: number; a
   return [...codigos]
     .map((code) => ({ code, de: contratados.get(code) ?? 0, a: encontrados.get(code) ?? 0 }))
     .filter((fila) => fila.de !== fila.a);
+}
+
+/**
+ * El motivo, dicho PARA DENTRO.
+ *
+ * ========================================================================
+ * NO SE REUSA EL TEXTO DEL CLIENTE, Y ESO SE VIO EN EL NAVEGADOR
+ * ========================================================================
+ * La clave que llega es la del motor (`quote.review.farZone`), y esos textos
+ * estan escritos para el SITIO PUBLICO: «llegamos hasta ahi, pero a esa
+ * distancia el precio lo damos en persona... dejanos tus datos y te
+ * llamamos». Puesto en el panel sonaba absurdo —quien lo lee es quien
+ * decide, no el cliente— y ademas ocupaba cuatro lineas donde hacen falta
+ * seis palabras.
+ *
+ * Se busca por el ultimo trozo de la clave. Si falta, se cae al texto del
+ * cliente: feo, pero nunca deja a quien decide sin saber por que.
+ */
+function motivoInterno(clave: string, t: (k: string) => string): string {
+  const corto = clave.split('.').pop() ?? '';
+  const interno = t(`admin.adjustments.reason.${corto}`);
+
+  return interno === `admin.adjustments.reason.${corto}` ? t(clave) : interno;
 }

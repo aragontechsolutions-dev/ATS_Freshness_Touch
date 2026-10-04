@@ -232,6 +232,10 @@ del cliente (que en la Etapa 1 no se pide a propósito).
   1.300, una nevera que son tres— y coordinación decide si se cobra la
   diferencia. **La reserva no se toca hasta que alguien aprueba**, y se
   re-tarifica con la tabla que tenía la reserva, no con la vigente.
+  Y cuando el motor **no puede** dar precio —que es el caso de casi toda
+  Georgia fuera de las 35 millas del área metropolitana— el total lo teclea
+  **administración**, no coordinación, y la fila queda marcada como importe
+  puesto a mano.
 - ⬜ Fotos antes y después. Requiere decidir dónde se almacenan.
 - ⬜ Funcionamiento sin conexión con cola de sincronización (zonas rurales de
   Georgia).

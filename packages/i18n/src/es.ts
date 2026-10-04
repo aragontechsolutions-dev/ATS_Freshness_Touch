@@ -962,6 +962,22 @@ export const es: TranslationResources = {
       bedrooms: 'Habitaciones',
       bathrooms: 'Baños',
       newTotal: 'Total nuevo:',
+      reason: {
+        farZone: 'la casa está fuera del radio con precio',
+        outOfServiceArea: 'el código postal está fuera del área de servicio',
+        outOfState: 'la casa está fuera de Georgia',
+        beyondSizeTable: 'la casa es más grande de lo que cubre la tabla',
+        largeProperty: 'es una propiedad grande',
+        frequencyUnavailable: 'este servicio no se vende con esa frecuencia',
+        commercialWalkthrough: 'los trabajos comerciales se cotizan tras una visita',
+        ratesUnavailable: 'ya no se guarda la tabla de tarifas que usó esta reserva',
+      },
+      noAutoPriceBecause: 'Sin precio automático: {{reason}}.',
+      typeBelow: 'Escribe abajo el total nuevo.',
+      manualTotal: 'Total nuevo de este trabajo',
+      currentTotal: 'Ahora pone {{value}}',
+      manualNeedsAdmin:
+        'El importe de este lo tiene que poner administración: el sistema no puede calcularlo.',
       noAutoPrice: 'Este tamaño no tiene precio automático. Calcula el importe nuevo a mano.',
       approve: 'Cobrar la diferencia',
       reject: 'No cobrarlo',
@@ -1033,8 +1049,11 @@ export const es: TranslationResources = {
     errorAdjustmentResolved: 'Alguien ya decidió sobre esta corrección. Actualiza la página.',
     errorAdjustmentRejectNeedsNote:
       'Di por qué lo rechazas: el equipo necesita saber si midió mal o si lo asumimos nosotros.',
-    errorAdjustmentNoAutoPrice:
-      'Este tamaño no tiene precio automático, así que el importe nuevo hay que calcularlo a mano.',
+    errorAdjustmentManualNeedsAdmin:
+      'Solo administración puede poner el importe a mano. Coordinación puede aprobar un precio que calculó el sistema, no teclear uno.',
+    errorAdjustmentNeedsAmount: 'Escribe el total nuevo antes de cobrarlo.',
+    errorAdjustmentPriceIsAutomatic:
+      'El sistema ya calculó este precio, así que no se teclea a mano.',
     errorAdjustmentStale:
       'El precio sale distinto ahora que cuando se avisó. Pide al equipo que lo vuelva a enviar para que alguien mire la cifra nueva.',
     errorChecklistClosed:
@@ -1169,6 +1188,7 @@ export const es: TranslationResources = {
   },
   quote: {
     line: {
+      fieldAdjustment: 'Corrección hecha en la casa',
       /*
        * LA LINEA DICE LO QUE ENTRA EN EL PRECIO, Y NADA MAS. Antes nombraba
        * habitaciones y banos; ninguno de los dos mueve la cifra, y leerlos
@@ -1233,6 +1253,7 @@ export const es: TranslationResources = {
         'La distancia se estima desde tu código postal y se confirma cuando tengamos la dirección completa.',
     },
     review: {
+      ratesUnavailable: 'Ya no se guarda la tabla de tarifas con la que se cotizó esta reserva',
       commercialWalkthrough:
         'Los trabajos comerciales se cotizan tras una visita gratuita para ajustar el alcance a tus instalaciones.',
       outOfServiceArea:

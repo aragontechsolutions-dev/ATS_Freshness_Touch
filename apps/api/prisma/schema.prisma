@@ -943,6 +943,21 @@ model BookingFieldAdjustment {
   differenceCents Int?
   newTotalCents   Int?
 
+  /// POR QUE no hay precio automatico, cuando no lo hay.
+  ///
+  /// El motor se niega por siete razones distintas y casi nunca es el tamano:
+  /// la mas frecuente es la ZONA, porque fuera de las 35 millas Georgia
+  /// entera se atiende sin precio automatico por diseno. Juntarlas todas en
+  /// un mensaje hacia buscar el problema donde no estaba.
+  noPriceReasonKey String?
+
+  /// Si el total lo TECLEO una persona en vez de calcularlo el motor.
+  ///
+  /// Se marca porque un total calculado y uno tecleado valen lo mismo en la
+  /// factura y no valen lo mismo al revisar las cuentas de un mes. Hay un
+  /// CHECK en la migracion que solo lo admite en una propuesta aplicada.
+  manualPrice Boolean @default(false)
+
   /// La version de tarifas con la que se calculo: la de la RESERVA, no la
   /// vigente. Aprobar un ajuste no puede colar los precios de hoy en un
   /// trabajo contratado el mes pasado.

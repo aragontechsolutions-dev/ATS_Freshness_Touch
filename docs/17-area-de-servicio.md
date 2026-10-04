@@ -32,6 +32,18 @@ Esa distinción se eligió sobre las alternativas —recargos escalonados hasta
 el final, o un recargo máximo plano— porque es la única que no promete una
 cifra que nadie ha calculado.
 
+> **Esta decisión alcanza más lejos de lo que parece, y hay que tenerlo
+> presente al construir cualquier cosa que toque precios.** La zona A son 35
+> millas desde la base; **el resto del estado es zona C**, o sea que un pueblo
+> como Gainesville —a unas 50 millas— se atiende **sin precio automático**. No
+> es un caso raro: es casi toda Georgia fuera del área metropolitana.
+>
+> Consecuencia práctica: **cualquier función que dé por hecho que el motor
+> puede dar una cifra se rompe para la mayoría de los trabajos del estado.**
+> Pasó con los ajustes de campo de la Etapa 3.6, que no se podían aprobar en
+> esas casas; se arregló dejando que administración teclee el total
+> (`docs/28-ajustes-de-campo.md` §6.3).
+
 ---
 
 ## 2. Lo que el motor ya sabía hacer
