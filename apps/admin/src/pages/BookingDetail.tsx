@@ -1,11 +1,18 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { AdminBookingDetail, AuthenticatedStaff, Locale } from '@freshness/types';
-import { ApiClientError, fetchBookingDetail, isSessionError, sessionLostReason } from '../lib/api';
+import {
+  ApiClientError,
+  fetchBookingDetail,
+  isSessionError,
+  resolveFieldAdjustment,
+  sessionLostReason,
+} from '../lib/api';
 import { BookingActions } from '../components/BookingActions';
 import { StatusChip } from '../components/StatusChip';
 import { TeamSection } from '../components/TeamSection';
 import { ClockInsSection } from '../components/ClockInsSection';
+import { FieldAdjustmentsSection } from '../components/FieldAdjustmentsSection';
 import { JobChecklist } from '../components/JobChecklist';
 import { SkeletonDetalleReserva } from '../components/Skeletons';
 import {
@@ -17,6 +24,7 @@ import {
   UserIcon,
 } from '../components/Icons';
 import { formatCents, formatDateTime } from '../lib/format';
+import { useToast } from '../components/ToastProvider';
 
 interface BookingDetailProps {
   bookingId: string;
@@ -35,6 +43,7 @@ export function BookingDetailPage({
 }: BookingDetailProps) {
   const { t } = useTranslation();
   const [booking, setBooking] = useState<AdminBookingDetail | null>(null);
+  const toast = useToast();
   const [errorKey, setErrorKey] = useState<string | null>(null);
 
   useEffect(() => {
@@ -186,6 +195,30 @@ export function BookingDetailPage({
         No se pinta si nadie ha fichado todavia, que es el caso normal de un
         trabajo aun por hacer.
       */}
+      {/*
+        LO QUE ENCONTRO EL EQUIPO, JUSTO DESPUES DE LOS FICHAJES.
+        El orden es el de la conversacion: primero «¿fue alguien y cuando?» y
+        despues «¿y la casa era la que dijo el cliente?». Va ANTES del precio
+        a proposito: aprobar aqui cambia las cifras de mas abajo.
+      */}
+      <FieldAdjustmentsSection
+        booking={booking}
+        role={staff.role}
+        locale={locale}
+        onResolver={async (adjustmentId, approve, note) => {
+          try {
+            setBooking(
+              await resolveFieldAdjustment(booking.bookingId, adjustmentId, { approve, note }),
+            );
+            toast.success(
+              approve ? 'admin.toast.adjustmentApplied' : 'admin.toast.adjustmentRejected',
+            );
+          } catch (error) {
+            toast.error(error instanceof ApiClientError ? error.messageKey : 'admin.errorGeneric');
+          }
+        }}
+      />
+
       <ClockInsSection booking={booking} locale={locale} />
 
       {/*

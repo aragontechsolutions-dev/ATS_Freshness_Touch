@@ -227,6 +227,11 @@ del cliente (que en la Etapa 1 no se pide a propósito).
   de las plantillas del cliente —áreas comunes (11), baños (7) y cocina (7)—
   siguen pendientes de transcribir desde la Etapa 2, y mientras tanto la
   sección no se pinta.
+- ✅ **Ajustes de campo** (`docs/28-ajustes-de-campo.md`): el responsable avisa
+  desde su móvil de que el trabajo no es el contratado —900 pies que son
+  1.300, una nevera que son tres— y coordinación decide si se cobra la
+  diferencia. **La reserva no se toca hasta que alguien aprueba**, y se
+  re-tarifica con la tabla que tenía la reserva, no con la vigente.
 - ⬜ Fotos antes y después. Requiere decidir dónde se almacenan.
 - ⬜ Funcionamiento sin conexión con cola de sincronización (zonas rurales de
   Georgia).

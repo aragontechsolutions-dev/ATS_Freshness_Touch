@@ -1,17 +1,25 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { CLOCK_IN_STATE_TEXT_KEY, canEditChecklist } from '@freshness/types';
-import type { ClockInKind, Locale, MyJob } from '@freshness/types';
+import type {
+  ClockInKind,
+  FieldAdjustmentInput,
+  JobChecklistEntry,
+  Locale,
+  MyJob,
+} from '@freshness/types';
 import {
   ApiClientError,
   fetchMyJobs,
   isSessionError,
   markChecklistItem,
   markMyJobProgress,
+  proposeFieldAdjustment,
   sessionLostReason,
 } from '../lib/api';
 import { formatPhone } from '@freshness/types';
 import { useToast } from '../components/ToastProvider';
+import { FieldAdjustmentForm } from '../components/FieldAdjustmentForm';
 import { JobChecklist } from '../components/JobChecklist';
 import { SkeletonMisTrabajos } from '../components/Skeletons';
 import {
@@ -36,6 +44,14 @@ import { ubicacionParaFichar } from '../lib/geolocalizacion';
 
 interface MyJobsProps {
   locale: Locale;
+  /**
+   * El nombre de pila de quien mira.
+   *
+   * Hace falta para poder escribir «Cleo, 10:42» DEBAJO DE LA TAREA EN EL
+   * MISMO INSTANTE en que se marca, sin esperar a que el servidor lo diga.
+   * Sin el, la linea aparece un segundo despues y da un salto en pantalla.
+   */
+  staffFirstName: string;
   onSessionLost: (reason?: 'expired' | 'noAccess') => void;
 }
 
@@ -59,7 +75,7 @@ interface MyJobsProps {
  *   - Las instrucciones de acceso van destacadas y con su aviso: es el unico
  *     dato de esta pantalla que no debe leerse en alto.
  */
-export function MyJobs({ locale, onSessionLost }: MyJobsProps) {
+export function MyJobs({ locale, staffFirstName, onSessionLost }: MyJobsProps) {
   const { t } = useTranslation();
 
   const [jobs, setJobs] = useState<MyJob[] | null>(null);
@@ -67,14 +83,29 @@ export function MyJobs({ locale, onSessionLost }: MyJobsProps) {
   const [errorKey, setErrorKey] = useState<string | null>(null);
   const [ocupado, setOcupado] = useState<string | null>(null);
   /**
-   * La tarea que se esta guardando, como `bookingId:codigo`.
+   * EL NUMERO DE ORDEN DE LA ULTIMA PETICION ENVIADA POR CADA TRABAJO.
    *
-   * ES UNA SOLA Y NO UN CONJUNTO a proposito: se marca una tarea a la vez,
-   * y guardar la clave entera —y no solo el codigo— evita que al marcar
-   * «fregar el suelo» en un trabajo se vea el reloj girando en la misma
-   * tarea de otro trabajo de la lista.
+   * ======================================================================
+   * EXISTE POR UN FALLO DE DATOS, NO POR ESTETICA
+   * ======================================================================
+   * Cada respuesta de marcar trae el trabajo ENTERO tal como estaba el
+   * servidor al atenderla. Marcando dos tareas seguidas —que es como se
+   * usa esto— hay dos peticiones en vuelo, y LA RED NO GARANTIZA EL ORDEN
+   * DE LLEGADA: si la respuesta de la primera llega la ultima, trae una
+   * foto SIN la segunda marca, y repintar con ella DESMARCA EN PANTALLA
+   * algo que en la base de datos esta marcado.
+   *
+   * Con esto, solo se adopta la foto del servidor cuando la respuesta viene
+   * de la ULTIMA peticion enviada. Las demas se descartan: son viejas por
+   * construccion.
+   *
+   * Va en una referencia y no en el estado a proposito: cambiarlo no tiene
+   * que repintar nada, y leerlo dentro de la promesa tiene que dar el valor
+   * de AHORA, no el del render en el que se lanzo.
    */
-  const [tareaOcupada, setTareaOcupada] = useState<string | null>(null);
+  const ultimaPeticion = useRef(new Map<string, number>());
+  /** El trabajo cuyo ajuste se esta enviando, si hay alguno. */
+  const [ajustando, setAjustando] = useState<string | null>(null);
   const toast = useToast();
 
   useEffect(() => {
@@ -153,28 +184,56 @@ export function MyJobs({ locale, onSessionLost }: MyJobsProps) {
    * Marca o desmarca una tarea.
    *
    * ======================================================================
+   * SE PINTA PRIMERO Y SE PREGUNTA DESPUES
+   * ======================================================================
+   * La casilla se mueve EN EL ACTO, antes de que el servidor conteste. No
+   * es un adorno: en una casa con mala cobertura pasan dos segundos entre
+   * el toque y el movimiento, y esa espera no se lee como «esta
+   * guardando», se lee como «no me ha cogido el toque». Se vuelve a pulsar,
+   * y asi es como una lista de veinticinco tareas acaba marcada a medias.
+   *
+   * Si el servidor dice que no, la casilla vuelve a su sitio EXACTAMENTE
+   * como estaba —con su hora y su autor anteriores— y se avisa. Una casilla
+   * que vuelve sola sin explicacion se lee como una pantalla rota.
+   *
+   * ======================================================================
    * SIN AVISO AL ACERTAR, Y SI AL FALLAR
    * ======================================================================
    * Es lo contrario que al fichar, y la diferencia esta razonada: fichar
    * ocurre una vez y hay que quedarse tranquilo de que quedo registrado.
-   * Marcar tareas ocurre veinticinco veces en una casa, y veinticinco avisos
-   * seguidos tapan la pantalla justo cuando se esta trabajando. La casilla
-   * marcandose YA ES la confirmacion.
-   *
-   * Lo que si avisa es el fallo, porque una casilla que vuelve sola a su
-   * sitio sin explicacion se lee como que la pantalla va mal.
+   * Marcar tareas ocurre veinticinco veces en una casa, y veinticinco
+   * avisos seguidos tapan la pantalla justo cuando se esta trabajando. La
+   * casilla marcandose YA ES la confirmacion.
    */
   const marcarTarea = async (job: MyJob, code: string, done: boolean): Promise<void> => {
-    setTareaOcupada(`${job.bookingId}:${code}`);
+    const anterior = job.checklist.find((entrada) => entrada.code === code);
+    if (!anterior) return;
+
+    // Lo que se pinta ya mismo, sin preguntar a nadie.
+    parcharTarea(setJobs, job.bookingId, {
+      ...anterior,
+      done,
+      doneAt: done ? new Date().toISOString() : null,
+      doneByFirstName: done ? staffFirstName : null,
+    });
+
+    const turno = (ultimaPeticion.current.get(job.bookingId) ?? 0) + 1;
+    ultimaPeticion.current.set(job.bookingId, turno);
 
     try {
-      /*
-       * SE REPINTA CON LO QUE DEVUELVE EL SERVIDOR, no con lo que este movil
-       * cree. Asi aparece tambien lo que una companera haya marcado mientras
-       * tanto, que es justo para lo que sirve la lista cuando van dos a una
-       * casa: no hacer dos veces lo mismo.
-       */
       const actualizado = await markChecklistItem(job.bookingId, { itemCode: code, done });
+
+      /*
+       * SOLO MANDA LA RESPUESTA DE LA ULTIMA PETICION ENVIADA.
+       *
+       * Si mientras tanto se marco otra tarea, esta foto del servidor es
+       * vieja por construccion y adoptarla desmarcaria la otra. Lo que esta
+       * pintado en local ya es correcto para las marcas propias; lo unico
+       * que aporta la foto es lo que haya marcado una companera, y eso
+       * llega igual con la respuesta de la ultima.
+       */
+      if (ultimaPeticion.current.get(job.bookingId) !== turno) return;
+
       setJobs((actual) =>
         (actual ?? []).map((j) => (j.bookingId === actualizado.bookingId ? actualizado : j)),
       );
@@ -183,9 +242,38 @@ export function MyJobs({ locale, onSessionLost }: MyJobsProps) {
         onSessionLost(sessionLostReason(error));
         return;
       }
+
+      // Se deshace SOLO esta tarea, dejandola como estaba. No se repinta el
+      // trabajo entero: eso borraria lo que se haya marcado mientras tanto.
+      parcharTarea(setJobs, job.bookingId, anterior);
+      toast.error(error instanceof ApiClientError ? error.messageKey : 'admin.errorGeneric');
+    }
+  };
+
+  /**
+   * El responsable avisa de que el trabajo no es el contratado.
+   *
+   * AQUI SI HAY AVISO AL ACERTAR, al reves que al marcar una tarea: esto
+   * ocurre una vez por casa y pone en marcha una conversacion con el cliente.
+   * Quien lo manda tiene que quedarse tranquilo de que llego.
+   */
+  const ajustar = async (job: MyJob, cambios: FieldAdjustmentInput): Promise<void> => {
+    setAjustando(job.bookingId);
+
+    try {
+      const actualizado = await proposeFieldAdjustment(job.bookingId, cambios);
+      setJobs((actual) =>
+        (actual ?? []).map((j) => (j.bookingId === actualizado.bookingId ? actualizado : j)),
+      );
+      toast.success('admin.toast.adjustmentSent');
+    } catch (error) {
+      if (isSessionError(error)) {
+        onSessionLost(sessionLostReason(error));
+        return;
+      }
       toast.error(error instanceof ApiClientError ? error.messageKey : 'admin.errorGeneric');
     } finally {
-      setTareaOcupada(null);
+      setAjustando(null);
     }
   };
 
@@ -237,8 +325,9 @@ export function MyJobs({ locale, onSessionLost }: MyJobsProps) {
               locale={locale}
               ocupado={ocupado === job.bookingId}
               onMarcar={marcar}
-              tareaOcupada={tareaOcupada}
               onMarcarTarea={marcarTarea}
+              ajustando={ajustando === job.bookingId}
+              onAjustar={ajustar}
             />
           ))}
         </>
@@ -256,8 +345,9 @@ export function MyJobs({ locale, onSessionLost }: MyJobsProps) {
               locale={locale}
               ocupado={ocupado === job.bookingId}
               onMarcar={marcar}
-              tareaOcupada={tareaOcupada}
               onMarcarTarea={marcarTarea}
+              ajustando={ajustando === job.bookingId}
+              onAjustar={ajustar}
             />
           ))}
         </>
@@ -273,15 +363,17 @@ function Tarjeta({
   locale,
   ocupado,
   onMarcar,
-  tareaOcupada,
   onMarcarTarea,
+  ajustando,
+  onAjustar,
 }: {
   job: MyJob;
   locale: Locale;
   ocupado: boolean;
   onMarcar: (job: MyJob, status: 'IN_PROGRESS' | 'COMPLETED') => Promise<void>;
-  tareaOcupada: string | null;
   onMarcarTarea: (job: MyJob, code: string, done: boolean) => Promise<void>;
+  ajustando: boolean;
+  onAjustar: (job: MyJob, cambios: FieldAdjustmentInput) => Promise<void>;
 }) {
   const { t } = useTranslation();
 
@@ -399,18 +491,19 @@ function Tarjeta({
           entries={job.checklist}
           locale={locale}
           onToggle={(code, done) => void onMarcarTarea(job, code, done)}
-          /*
-           * Se le pasa SOLO el codigo si la tarea ocupada es de ESTE trabajo.
-           * Sin esta comprobacion, marcar una tarea en un trabajo pondria el
-           * reloj girando en la misma tarea de todos los demas.
-           */
-          guardando={
-            tareaOcupada?.startsWith(`${job.bookingId}:`) === true
-              ? tareaOcupada.slice(job.bookingId.length + 1)
-              : null
-          }
         />
       )}
+
+      {/*
+        CORREGIR LO CONTRATADO VA DESPUES DE LA LISTA Y ANTES DE LOS BOTONES.
+        Es lo que se hace al mirar la casa, no al llegar ni al irse, y empieza
+        cerrado: el caso normal es que la reserva sea correcta.
+      */}
+      <FieldAdjustmentForm
+        job={job}
+        enviando={ajustando}
+        onEnviar={(cambios) => onAjustar(job, cambios)}
+      />
 
       <Acciones job={job} ocupado={ocupado} onMarcar={onMarcar} />
     </section>
@@ -522,4 +615,28 @@ function textoDeFichaje(
    * que el fallo es NUESTRO, para que nadie crea que su movil va mal.
    */
   return t(`admin.myJobs.clockIn.${CLOCK_IN_STATE_TEXT_KEY[mio.locationState]}`);
+}
+
+/**
+ * Cambia UNA tarea de UN trabajo, dejando todo lo demas como estaba.
+ *
+ * Esta aparte porque se usa en los dos sentidos —al pintar el toque y al
+ * deshacerlo si falla— y porque la precision importa: repintar el trabajo
+ * entero borraria lo que una companera haya marcado mientras tanto.
+ */
+function parcharTarea(
+  setJobs: React.Dispatch<React.SetStateAction<MyJob[] | null>>,
+  bookingId: string,
+  entrada: JobChecklistEntry,
+): void {
+  setJobs((actual) =>
+    (actual ?? []).map((job) =>
+      job.bookingId === bookingId
+        ? {
+            ...job,
+            checklist: job.checklist.map((t) => (t.code === entrada.code ? entrada : t)),
+          }
+        : job,
+    ),
+  );
 }

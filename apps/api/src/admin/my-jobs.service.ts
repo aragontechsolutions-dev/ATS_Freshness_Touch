@@ -6,6 +6,7 @@ import {
   canEditChecklist,
   clockInDistanceMeters,
   staffFullName,
+  toMyJobAdjustment,
   type AuthenticatedStaff,
   type ChecklistItem,
   type ChecklistProgress,
@@ -18,6 +19,7 @@ import {
 } from '@freshness/types';
 import { AuditService } from '../audit/audit.service';
 import { PrismaService } from '../database/prisma.service';
+import { AJUSTE_SELECT, ExtrasGuardadosSchema, ajusteAContrato } from './field-adjustment.helper';
 import {
   JOB_CHECKLIST_CATALOG_TOKEN,
   esTareaDelTrabajo,
@@ -42,6 +44,8 @@ const JOB_SELECT = {
   timezone: true,
   bedrooms: true,
   bathrooms: true,
+  squareFeet: true,
+  addOns: true,
   customerNotes: true,
   customer: { select: { firstName: true, phone: true } },
   address: {
@@ -91,6 +95,22 @@ const JOB_SELECT = {
   checklistItems: {
     select: { itemCode: true, doneAt: true, doneBy: { select: { firstName: true } } },
     orderBy: { doneAt: 'asc' as const },
+  },
+  /*
+   * LOS AJUSTES DE CAMPO, EN LA MISMA CONSULTA.
+   *
+   * No se piden al servicio de ajustes uno a uno: eso serian tantas
+   * consultas como trabajos tenga la persona en pantalla, y esta lista se
+   * carga entera al abrir la aplicacion en la calle.
+   *
+   * Los importes se leen y se tiran en `toMyJob`: el contrato de esta
+   * pantalla no tiene donde ponerlos. Se traen porque el mapeador es
+   * compartido con el panel, que si los ensena.
+   */
+  fieldAdjustments: {
+    select: AJUSTE_SELECT,
+    orderBy: { proposedAt: 'desc' as const },
+    take: 10,
   },
 };
 
@@ -421,6 +441,22 @@ export class MyJobsService {
       });
     }
 
+    return this.getOne(bookingId, staff);
+  }
+
+  /**
+   * UN trabajo, tal como lo ve quien pregunta.
+   *
+   * Lo usan los endpoints que CAMBIAN algo de un trabajo —marcar una tarea,
+   * proponer un ajuste— para devolver el estado de despues. Asi la pantalla
+   * se pinta con lo que decidio el servidor en vez de suponer que hizo lo
+   * que le pidieron.
+   *
+   * NO COMPRUEBA LA ASIGNACION, y es deliberado: lo llaman metodos que ya la
+   * comprobaron. Es privado del servidor; no hay ningun endpoint que lo
+   * exponga directamente.
+   */
+  async getOne(bookingId: string, staff: AuthenticatedStaff): Promise<MyJob> {
     const trabajo = await this.prisma.db.booking.findUniqueOrThrow({
       where: { id: bookingId },
       select: JOB_SELECT,
@@ -536,6 +572,12 @@ function toMyJob(trabajo: FilaTrabajo, staffId: string, catalogo: readonly Check
     ),
     bedrooms: trabajo.bedrooms,
     bathrooms: trabajo.bathrooms,
+    squareFeet: trabajo.squareFeet,
+    /*
+     * El JSON de la base es opaco: se relee con el contrato antes de
+     * mandarlo. Una lista ilegible es «sin extras», no una pantalla rota.
+     */
+    addOns: ExtrasGuardadosSchema.parse(trabajo.addOns),
     customerFirstName: trabajo.customer.firstName,
     customerPhone: trabajo.customer.phone,
     addressLine1: trabajo.address.line1,
@@ -551,11 +593,22 @@ function toMyJob(trabajo: FilaTrabajo, staffId: string, catalogo: readonly Check
       .map((a) => ({ name: staffFullName(a.staff), isLead: a.isLead })),
     iAmLead: mia?.isLead ?? false,
     /*
+     * Se saca de los fichajes que YA vienen en la consulta: ni una consulta
+     * mas, y es el mismo dato que mira el servidor al aceptar un ajuste.
+     */
+    iHaveArrived: trabajo.clockIns.some((f) => f.staffId === staffId && f.kind === 'ARRIVAL'),
+    /*
      * La lista se monta en el servidor, no en el movil: el movil no sabe que
      * tareas pide cada servicio, y si lo supiera habria dos catalogos que
      * mantener de acuerdo.
      */
     checklist: montarChecklist(trabajo.service, trabajo.checklistItems, catalogo),
+    /*
+     * AQUI MUEREN LOS IMPORTES DEL AJUSTE. `toMyJobAdjustment` quita la
+     * diferencia y el total nuevo: quien limpia reporta lo que ve, y lo que
+     * cuesta lo dice coordinacion. Ver `field-adjustment.ts`.
+     */
+    adjustments: trabajo.fieldAdjustments.map((fila) => toMyJobAdjustment(ajusteAContrato(fila))),
     clockIns: trabajo.clockIns.map((f): ClockInRecord => ({
       staffId: f.staffId,
       staffFirstName: f.staff.firstName,

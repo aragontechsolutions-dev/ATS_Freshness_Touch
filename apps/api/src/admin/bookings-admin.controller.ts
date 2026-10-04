@@ -21,6 +21,7 @@ import {
   AdminCaptureDepositSchema,
   AdminReleaseDepositSchema,
   AdminStatusChangeSchema,
+  FieldAdjustmentDecisionSchema,
   type AdminAssignmentsUpdate,
   type AdminBookingDetail,
   type AdminBookingList,
@@ -30,6 +31,7 @@ import {
   type AdminStaffList,
   type AdminStatusChange,
   type AuthenticatedStaff,
+  type FieldAdjustmentDecision,
 } from '@freshness/types';
 import type { Request } from 'express';
 import { ADMIN_ROUTE, CurrentStaff, Roles } from '../auth/auth.decorators';
@@ -38,6 +40,7 @@ import { SKIP_QUOTE_THROTTLER } from '../common/throttling';
 import { AssignmentsService } from './assignments.service';
 import { BookingActionsService } from './booking-actions.service';
 import { BookingsAdminService } from './bookings-admin.service';
+import { FieldAdjustmentsService } from './field-adjustments.service';
 
 /**
  * Agenda y reservas del panel.
@@ -113,7 +116,42 @@ export class BookingActionsController {
   constructor(
     private readonly actions: BookingActionsService,
     private readonly bookings: BookingsAdminService,
+    private readonly adjustments: FieldAdjustmentsService,
   ) {}
+
+  /**
+   * Aprueba o rechaza un ajuste de campo.
+   *
+   * ======================================================================
+   * APROBAR ES LO UNICO DEL SISTEMA QUE MUEVE UN PRECIO YA PACTADO
+   * ======================================================================
+   * Hasta esta etapa, `serviceCents`, `totalCents` y `lines` estaban
+   * congelados desde que se reservaba. Aqui es donde se descongelan, y por
+   * eso va en el controlador de ACCIONES y no en el de lectura: los permisos
+   * se leen de un vistazo.
+   *
+   * ADMIN Y COORDINACION, y no solo ADMIN. No es lo mismo que cobrar: aqui
+   * no se toca la tarjeta de nadie, se corrige lo que dice la ficha para que
+   * refleje el trabajo que de verdad se hizo. Quien lleva la agenda es quien
+   * habla con el cliente cuando la casa no era la que dijo, y hacerle pasar
+   * por administracion para cada metro cuadrado dejaria el ajuste sin usar.
+   */
+  @Post('adjustment/:adjustmentId')
+  @HttpCode(HttpStatus.OK)
+  @Roles('ADMIN', 'DISPATCHER')
+  async resolveAdjustment(
+    @Param('bookingId', new ParseUUIDPipe({ version: '4' })) bookingId: string,
+    @Param('adjustmentId', new ParseUUIDPipe({ version: '4' })) adjustmentId: string,
+    @Body(new ZodValidationPipe<FieldAdjustmentDecision>(FieldAdjustmentDecisionSchema))
+    decision: FieldAdjustmentDecision,
+    @CurrentStaff() staff: AuthenticatedStaff,
+    @Req() request: Request,
+  ): Promise<AdminBookingDetail> {
+    await this.adjustments.resolve(bookingId, adjustmentId, decision, staff, request.ip ?? null);
+    // La reserva ya re-tarificada, como el resto de acciones: el panel pinta
+    // lo que decidio el servidor en vez de suponer que hizo lo pedido.
+    return this.bookings.detail(bookingId);
+  }
 
   /** Cambia el estado de la reserva. Coordinacion tambien puede. */
   @Patch('status')

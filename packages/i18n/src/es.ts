@@ -235,6 +235,9 @@ export const es: TranslationResources = {
       depositReleased: 'Retención liberada.',
       teamSaved: 'Equipo guardado.',
       staffSaved: 'Ficha guardada.',
+      adjustmentApplied: 'Cobrado. La reserva ya dice lo que encontró el equipo.',
+      adjustmentRejected: 'Rechazado. El equipo puede ver por qué.',
+      adjustmentSent: 'Avisado. Coordinación lo mira y te dice algo.',
       jobStarted: 'Llegada registrada.',
       jobFinished: 'Trabajo marcado como terminado.',
     },
@@ -799,6 +802,11 @@ export const es: TranslationResources = {
         booking: {
           created: 'Reserva realizada',
           team_changed: 'Cambió el equipo',
+          adjustment: {
+            proposed: 'Avisó de que el trabajo no es el contratado',
+            applied: 'Aprobó la corrección hecha en la casa',
+            rejected: 'Rechazó la corrección hecha en la casa',
+          },
           viewed: 'Abrió la ficha de una reserva',
           status: {
             pending_payment: 'Marcó como pendiente de pago',
@@ -909,6 +917,33 @@ export const es: TranslationResources = {
         'Marca «He llegado» al entrar en la casa. Queda la hora, y es lo que respalda tu trabajo si alguien pregunta.',
       noActions: 'Coordinación se encarga del resto.',
 
+      adjustment: {
+        open: 'Esto no es lo que dice la reserva',
+        title: '¿Qué te has encontrado?',
+        intro: 'Cambia solo lo que sea distinto. Del precio se encarga coordinación.',
+        squareFeet: 'Pies cuadrados',
+        bedrooms: 'Habitaciones',
+        bathrooms: 'Baños',
+        addOns: 'Extras que pidió el cliente',
+        asBooked: 'Igual que lo contratado',
+        wasBooked: 'Se contrató {{value}}',
+        fewer: 'Uno menos',
+        more: 'Uno más',
+        note: '¿Qué pasa?',
+        notePlaceholder: 'La casa es mucho más grande de lo que decía, y hay tres neveras.',
+        noteWhy: 'Esto lo lee quien va a llamar al cliente. Cuenta lo que has visto.',
+        cancel: 'Cancelar',
+        send: 'Avisar a coordinación',
+        needsArrival: 'Marca primero «He llegado» si la casa no es la contratada.',
+        reportedSize: 'Avisaste de que {{from}} pies son en realidad {{to}}',
+        state: {
+          PROPOSED: 'Avisado a coordinación',
+          APPLIED: 'Coordinación lo aceptó',
+          REJECTED: 'Coordinación lo rechazó',
+          SUPERSEDED: 'Sustituido por un aviso posterior',
+        },
+      },
+
       clockIn: {
         distanceFeet: 'Registrado a {{value}} pies de la casa. Tu ubicación no se guarda.',
         distanceMiles: 'Registrado a {{value}} millas de la casa. Tu ubicación no se guarda.',
@@ -916,6 +951,28 @@ export const es: TranslationResources = {
         unavailable: 'Registrado sin ubicación: tu teléfono no pudo captar el GPS.',
         noHouse: 'Registrado sin distancia: todavía no tenemos esta casa en el mapa.',
         far: 'Lejos de la casa',
+      },
+    },
+
+    /* ------------------------ Ajustes de campo ------------------------ */
+    adjustments: {
+      title: 'Lo que encontró el equipo',
+      reportedBy: '{{name}} avisó el {{when}}',
+      squareFeet: 'Pies cuadrados',
+      bedrooms: 'Habitaciones',
+      bathrooms: 'Baños',
+      newTotal: 'Total nuevo:',
+      noAutoPrice: 'Este tamaño no tiene precio automático. Calcula el importe nuevo a mano.',
+      approve: 'Cobrar la diferencia',
+      reject: 'No cobrarlo',
+      rejectReason: '¿Por qué no? Esto lo lee el equipo.',
+      confirmReject: 'Rechazar',
+      resolvedNote: '{{name}}: {{note}}',
+      state: {
+        PROPOSED: 'Esperándote',
+        APPLIED: 'Cobrado',
+        REJECTED: 'No cobrado',
+        SUPERSEDED: 'Sustituido por un aviso posterior',
       },
     },
 
@@ -966,6 +1023,20 @@ export const es: TranslationResources = {
     errorAssignCancelled: 'No se puede asignar equipo a una reserva cancelada.',
     errorInvalidTransition:
       'Ese cambio no es posible desde el estado actual. Puede que alguien acabe de cambiarlo.',
+    errorAdjustmentNotLead:
+      'Solo la responsable del equipo puede avisar de que el trabajo no es el contratado. Pídeselo a ella.',
+    errorAdjustmentNoArrival:
+      'Marca primero «He llegado». Solo registramos correcciones de una casa en la que alguien está.',
+    errorAdjustmentEmpty: 'No hay nada distinto de lo contratado, así que no hay nada que enviar.',
+    errorAdjustmentClosed: 'Este trabajo está cerrado y ya no se puede corregir.',
+    errorAdjustmentNotFound: 'No encontramos esa corrección.',
+    errorAdjustmentResolved: 'Alguien ya decidió sobre esta corrección. Actualiza la página.',
+    errorAdjustmentRejectNeedsNote:
+      'Di por qué lo rechazas: el equipo necesita saber si midió mal o si lo asumimos nosotros.',
+    errorAdjustmentNoAutoPrice:
+      'Este tamaño no tiene precio automático, así que el importe nuevo hay que calcularlo a mano.',
+    errorAdjustmentStale:
+      'El precio sale distinto ahora que cuando se avisó. Pide al equipo que lo vuelva a enviar para que alguien mire la cifra nueva.',
     errorChecklistClosed:
       'Este trabajo está cerrado y su lista ya no se puede cambiar. Habla con coordinación.',
     errorChecklistUnknownItem:

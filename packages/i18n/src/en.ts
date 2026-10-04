@@ -258,6 +258,9 @@ export const en = {
       depositReleased: 'Hold released.',
       teamSaved: 'Team saved.',
       staffSaved: 'Staff record saved.',
+      adjustmentApplied: 'Charged. The booking now says what the team found.',
+      adjustmentRejected: 'Turned down. The team can see why.',
+      adjustmentSent: 'Sent. Dispatch will look at it and get back to you.',
       jobStarted: 'Arrival recorded.',
       jobFinished: 'Job marked as finished.',
     },
@@ -821,6 +824,11 @@ export const en = {
         booking: {
           created: 'Booking placed',
           team_changed: 'Team changed',
+          adjustment: {
+            proposed: 'Reported the job is not what was booked',
+            applied: 'Approved the on-site correction',
+            rejected: 'Turned down the on-site correction',
+          },
           viewed: 'Booking record opened',
           status: {
             pending_payment: 'Marked as awaiting payment',
@@ -933,6 +941,41 @@ export const en = {
        * `noHouse` dice que el fallo es NUESTRO para que nadie crea que su
        * movil va mal.
        */
+      /*
+       * ======================================================================
+       * CORREGIR LO CONTRATADO
+       * ======================================================================
+       * Lo lee el responsable, de pie en una casa que no se parece a lo que
+       * pone la reserva. Ni una cifra de dinero: reporta lo que ve, y lo que
+       * cuesta lo dice coordinacion.
+       */
+      adjustment: {
+        open: 'This is not what was booked',
+        title: 'What did you find?',
+        intro: 'Change only what is different. Dispatch decides what happens with the price.',
+        squareFeet: 'Square feet',
+        bedrooms: 'Bedrooms',
+        bathrooms: 'Bathrooms',
+        addOns: 'Extras the customer asked for',
+        asBooked: 'Same as booked',
+        wasBooked: 'Booked as {{value}}',
+        fewer: 'One fewer',
+        more: 'One more',
+        note: 'What is going on?',
+        notePlaceholder: 'The house is much bigger than it said, and there are three fridges.',
+        noteWhy: 'Whoever calls the customer will read this. Say what you saw.',
+        cancel: 'Cancel',
+        send: 'Send to dispatch',
+        needsArrival: 'Tap "I have arrived" first if the house is not what was booked.',
+        reportedSize: 'You reported {{from}} sq ft is really {{to}}',
+        state: {
+          PROPOSED: 'Sent to dispatch',
+          APPLIED: 'Dispatch accepted it',
+          REJECTED: 'Dispatch turned it down',
+          SUPERSEDED: 'Replaced by a later report',
+        },
+      },
+
       clockIn: {
         distanceFeet: 'Recorded {{value}} ft from the house. Your location is not saved.',
         distanceMiles: 'Recorded {{value}} mi from the house. Your location is not saved.',
@@ -940,6 +983,33 @@ export const en = {
         unavailable: 'Recorded without location: your phone could not get a GPS fix.',
         noHouse: 'Recorded without distance: we do not have this house on the map yet.',
         far: 'Far from the house',
+      },
+    },
+
+    /* ------------------------ Ajustes de campo ------------------------ */
+    /*
+     * Lo que coordinacion ve cuando el equipo avisa de que la casa no es la
+     * contratada. AQUI SI van los importes: es quien decide si se cobra la
+     * diferencia y quien habla con el cliente.
+     */
+    adjustments: {
+      title: 'What the team found',
+      reportedBy: '{{name}} reported this on {{when}}',
+      squareFeet: 'Square feet',
+      bedrooms: 'Bedrooms',
+      bathrooms: 'Bathrooms',
+      newTotal: 'New total:',
+      noAutoPrice: 'This size has no automatic price. Work the new amount out by hand.',
+      approve: 'Charge the difference',
+      reject: 'Do not charge it',
+      rejectReason: 'Why not? The team will read this.',
+      confirmReject: 'Turn it down',
+      resolvedNote: '{{name}}: {{note}}',
+      state: {
+        PROPOSED: 'Waiting on you',
+        APPLIED: 'Charged',
+        REJECTED: 'Not charged',
+        SUPERSEDED: 'Replaced by a later report',
       },
     },
 
@@ -1000,6 +1070,25 @@ export const en = {
      * Los dos de la lista de verificacion. Dicen QUE HACER, no solo que algo
      * fallo: quien los lee esta de pie en una casa y no puede investigar.
      */
+    /*
+     * LOS AJUSTES DE CAMPO. Los lee gente muy distinta: los tres primeros,
+     * alguien de pie en la puerta de una casa; los tres ultimos,
+     * coordinacion delante de un ordenador. Todos dicen QUE HACER.
+     */
+    errorAdjustmentNotLead:
+      'Only the team lead can report that the job is not what was booked. Ask them to do it.',
+    errorAdjustmentNoArrival:
+      'Tap "I have arrived" first. We only record corrections for a house someone is actually at.',
+    errorAdjustmentEmpty: 'Nothing is different from what was booked, so there is nothing to send.',
+    errorAdjustmentClosed: 'This job is closed, so it can no longer be corrected.',
+    errorAdjustmentNotFound: 'We could not find that correction.',
+    errorAdjustmentResolved: 'Someone already decided on this correction. Refresh the page.',
+    errorAdjustmentRejectNeedsNote:
+      'Say why you are turning it down: the team needs to know whether they measured wrong or we are absorbing it.',
+    errorAdjustmentNoAutoPrice:
+      'This size has no automatic price, so the new amount has to be worked out by hand.',
+    errorAdjustmentStale:
+      'The price works out differently now than when this was reported. Ask the team to send it again so someone can look at the new figure.',
     errorChecklistClosed:
       'This job is closed, so its list cannot be changed any more. Talk to dispatch.',
     errorChecklistUnknownItem:

@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { ClockInRecordSchema } from './clock-in';
 import { BookingStatusSchema } from './booking';
+import { FieldAdjustmentSchema } from './field-adjustment';
 import { JobChecklistEntrySchema } from './job-checklist';
 import { FrequencySchema, ServiceTypeSchema, ServiceZoneSchema } from './enums';
 import { QuoteLineSchema } from './quote';
@@ -184,6 +185,15 @@ export const AdminBookingDetailSchema = AdminBookingListItemSchema.extend({
    * hizo y pasaria a ser el de lo que alguien cree que se hizo.
    */
   checklist: z.array(JobChecklistEntrySchema),
+
+  /**
+   * LOS AJUSTES DE CAMPO, CON SUS IMPORTES.
+   *
+   * Aquí sí van las cifras, al contrario que en la pantalla de limpieza: es
+   * coordinación quien decide si se cobra la diferencia y quien habla con el
+   * cliente. El más reciente va primero.
+   */
+  adjustments: z.array(FieldAdjustmentSchema),
 });
 export type AdminBookingDetail = z.infer<typeof AdminBookingDetailSchema>;
 

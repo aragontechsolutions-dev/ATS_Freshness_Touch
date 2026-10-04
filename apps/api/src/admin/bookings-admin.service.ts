@@ -15,6 +15,7 @@ import { PrismaService } from '../database/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import type { Prisma } from '../generated/prisma/client';
 import { defaultSchedulingConfig } from '../scheduling/scheduling.config';
+import { FieldAdjustmentsService } from './field-adjustments.service';
 import { JOB_CHECKLIST_CATALOG_TOKEN, montarChecklist } from './job-checklist.helper';
 
 /** Lo que el listado necesita de cada reserva, y nada mas. */
@@ -54,6 +55,7 @@ export class BookingsAdminService {
     private readonly audit: AuditService,
     @Inject(JOB_CHECKLIST_CATALOG_TOKEN)
     private readonly catalogo: readonly ChecklistItem[],
+    private readonly adjustments: FieldAdjustmentsService,
   ) {}
 
   /**
@@ -199,6 +201,16 @@ export class BookingsAdminService {
     }
 
     const pago = booking.payments[0] ?? null;
+    /*
+     * Los ajustes se leen APARTE y no dentro de la consulta del trabajo.
+     *
+     * Es el mismo servicio que usa la pantalla del responsable para
+     * montarlos, y por eso: si cada lado los montara por su cuenta, el equipo
+     * y coordinacion podrian estar viendo propuestas distintas del mismo
+     * trabajo, que es la clase de discrepancia que convierte «yo avise» en
+     * una discusion sin arbitro.
+     */
+    const ajustes = await this.adjustments.listFor(bookingId);
     const duracion = Math.round(
       (booking.scheduledEnd.getTime() - booking.scheduledStart.getTime()) / 60_000,
     );
@@ -290,6 +302,7 @@ export class BookingsAdminService {
        * estar viendo listas distintas del mismo trabajo.
        */
       checklist: montarChecklist(booking.service, booking.checklistItems, this.catalogo),
+      adjustments: ajustes,
       clockIns: booking.clockIns.map((f): ClockInRecord => ({
         staffId: f.staffId,
         staffFirstName: f.staff.firstName,

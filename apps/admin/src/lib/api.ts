@@ -29,6 +29,8 @@ import {
   type AuditPage,
   type AuditQueryInput,
   type ChecklistProgress,
+  type FieldAdjustmentDecision,
+  type FieldAdjustmentInput,
   type MyJob,
   type MyJobProgress,
   type MyJobs,
@@ -455,6 +457,50 @@ export function markChecklistItem(bookingId: string, body: ChecklistProgress): P
     (payload) => {
       const parsed = MyJobSchema.safeParse(payload);
       if (!parsed.success) throw contractError('lista de verificacion', parsed.error.issues);
+      return parsed.data;
+    },
+    { method: 'PATCH', body },
+  );
+}
+
+/**
+ * El responsable avisa de que el trabajo no es el contratado.
+ *
+ * DEVUELVE EL TRABAJO, no el ajuste, y eso no es casualidad: el ajuste lleva
+ * los importes y este movil no los puede ver. Ver `field-adjustment.ts`.
+ */
+/**
+ * Coordinación aprueba o rechaza un ajuste de campo.
+ *
+ * APROBAR RE-TARIFICA LA RESERVA, asi que devuelve el detalle entero ya
+ * actualizado: la pantalla pinta lo que decidio el servidor en vez de suponer
+ * que hizo lo que le pidieron.
+ */
+export function resolveFieldAdjustment(
+  bookingId: string,
+  adjustmentId: string,
+  body: FieldAdjustmentDecision,
+): Promise<AdminBookingDetail> {
+  return request(
+    `/admin/bookings/${bookingId}/adjustment/${adjustmentId}`,
+    (payload) => {
+      const parsed = AdminBookingDetailSchema.safeParse(payload);
+      if (!parsed.success) throw contractError('ajuste resuelto', parsed.error.issues);
+      return parsed.data;
+    },
+    { method: 'POST', body },
+  );
+}
+
+export function proposeFieldAdjustment(
+  bookingId: string,
+  body: FieldAdjustmentInput,
+): Promise<MyJob> {
+  return request(
+    `/admin/my-jobs/${bookingId}/adjustment`,
+    (payload) => {
+      const parsed = MyJobSchema.safeParse(payload);
+      if (!parsed.success) throw contractError('ajuste de campo', parsed.error.issues);
       return parsed.data;
     },
     { method: 'PATCH', body },

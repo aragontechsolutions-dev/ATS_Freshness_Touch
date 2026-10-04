@@ -188,9 +188,15 @@ respuestas de la API la traen ya montada.
   sin marcar», y el área pulsable es toda la línea. Medido en el navegador:
   **entre 48 y 60 px de alto**, por encima de los 44 px que es el mínimo que
   se acierta de pie.
-- **Solo se bloquea la casilla que se está guardando**, no la lista entera:
-  bloquear todo en cada toque haría imposible marcar cinco tareas seguidas,
-  que es como se usa.
+- **La casilla se mueve en el acto, antes de que el servidor conteste**, y si
+  el servidor dice que no vuelve a su sitio exactamente como estaba. No es un
+  adorno: en una casa con mala cobertura pasan dos segundos entre el toque y
+  el movimiento, y esa espera no se lee como «está guardando», se lee como
+  «no me ha cogido el toque». Se vuelve a pulsar, y así es como una lista de
+  veinticinco tareas acaba marcada a medias.
+- **Sin reloj de espera y sin deshabilitar la casilla.** El movimiento ya es
+  la confirmación, y deshabilitarla mientras se guarda impediría corregir un
+  toque equivocado justo en el segundo en que uno se da cuenta.
 - **Sin aviso al acertar, y sí al fallar.** Es lo contrario que al fichar
   (`docs/25` §6), y la diferencia está razonada: fichar ocurre una vez y hay
   que quedarse tranquilo de que quedó registrado; marcar tareas ocurre
@@ -211,6 +217,40 @@ respuestas de la API la traen ya montada.
   cerrado. No es lo mismo ni se actúa igual.
 
 ---
+
+### 6.2 La carrera que desmarcaba tareas ya marcadas
+
+**Esto fue un fallo real, de datos, y estuvo en `main`.** Merece contarse
+entero porque la clase de fallo se repite.
+
+Cada respuesta de marcar trae **el trabajo entero** tal como estaba el
+servidor al atenderla —así es como aparece lo que haya marcado una
+compañera—. Marcando dos tareas seguidas, que es exactamente como se usa,
+hay dos peticiones en vuelo a la vez. Y **la red no garantiza el orden de
+llegada**: si la respuesta de la primera llega la última, trae una foto
+**sin** la segunda marca, y repintar con ella **desmarca en pantalla algo que
+en la base de datos está marcado**.
+
+La base nunca estuvo mal. Lo que mentía era la pantalla, que es peor: quien
+limpia ve la tarea sin marcar, la vuelve a marcar, y acaba desconfiando de la
+lista.
+
+**No se ve probando.** Hace falta que dos respuestas se crucen, y en un
+portátil con fibra no se cruzan nunca. Se encontró releyendo el código, y la
+prueba que lo fija (`MyJobs.test.tsx`) resuelve las dos promesas al revés a
+propósito.
+
+La corrección es una regla de una línea: **solo se adopta la foto del
+servidor cuando la respuesta viene de la última petición enviada.** Las demás
+se descartan, porque son viejas por construcción. Lo que está pintado en
+local ya es correcto para las marcas propias.
+
+> **Y una advertencia sobre las pruebas de esto.** La primera versión del
+> archivo de pruebas ponía `input.checked` a mano antes de lanzar el evento.
+> React lleva su propio rastreador del valor de cada campo y **suprime el
+> evento de cambio cuando el valor que encuentra ya coincide**: el manejador
+> no llegaba a ejecutarse nunca y **las seis pruebas pasaban sin probar
+> nada**. Se pulsa con `input.click()`, como lo haría un dedo.
 
 ## 7. Seguridad
 
@@ -282,11 +322,16 @@ recorre **el mismo código** que producción.
 ## 10. Lo que quedó sin resolver
 
 - **Las tareas, que es todo el contenido.** Ver el aviso del principio.
-- **No se sabe si la lista cambia según el servicio.** El catálogo lo admite
-  —cada tarea declara `appliesTo`— pero las plantillas del cliente no dicen si
-  una profunda pide más tareas que una estándar. **Se decidirá al
-  transcribirlas**; mientras tanto, lo honesto es que el campo exista y nadie
-  haya supuesto nada.
+- **La lista es la del servicio que el cliente contrató en la web.** Quedó
+  decidido en la Etapa 3.6. Tiene una consecuencia que conviene tener escrita:
+  como la lista sale del servicio de la reserva y no de una copia congelada,
+  **cambiar el servicio cambiaría la lista bajo los pies del equipo a media
+  limpieza**. Por eso el ajuste de campo no deja cambiarlo
+  (`docs/28-ajustes-de-campo.md` §3).
+- **Sigue sin saberse si la lista cambia dentro de cada servicio.** El
+  catálogo lo admite —cada tarea declara `appliesTo`— pero las plantillas del
+  cliente no dicen si una profunda pide más tareas que una estándar. Se
+  decidirá al transcribirlas.
 - **No hay foto de lo hecho.** Es la siguiente capacidad de la Etapa 3 y
   depende de decidir dónde se almacenan las fotos.
 - **No funciona sin conexión.** Cada toque es una petición: en un sótano sin

@@ -1,6 +1,8 @@
 import { z } from 'zod';
 import { BookingStatusSchema } from './booking';
 import { ClockInLocationSchema, ClockInRecordSchema } from './clock-in';
+import { MyJobAdjustmentSchema } from './field-adjustment';
+import { QuoteAddOnInputSchema } from './quote';
 import { JobChecklistEntrySchema } from './job-checklist';
 import { ServiceTypeSchema } from './enums';
 
@@ -44,6 +46,20 @@ export const MyJobSchema = z.strictObject({
   bathrooms: z.int(),
 
   /**
+   * LO CONTRATADO, para poder corregirlo al llegar.
+   *
+   * Los pies cuadrados y los extras no estaban en esta pantalla hasta la
+   * Etapa 3.6 porque no hacian falta para limpiar. Ahora si: son justo lo
+   * que el responsable compara con la casa que tiene delante.
+   *
+   * NO SON IMPORTES. Un extra aqui es «el cliente pidio limpiar la nevera»,
+   * no lo que cuesta: `QuoteAddOnInput` lleva codigo y cantidad, y ninguna
+   * cifra de dinero.
+   */
+  squareFeet: z.int(),
+  addOns: z.array(QuoteAddOnInputSchema),
+
+  /**
    * Nombre de pila del cliente. Sin apellido: para saludar en la puerta
    * sobra, y un apellido mas una direccion identifica a una persona.
    */
@@ -80,6 +96,20 @@ export const MyJobSchema = z.strictObject({
   iAmLead: z.boolean(),
 
   /**
+   * SI QUIEN MIRA HA FICHADO YA SU LLEGADA A ESTA CASA.
+   *
+   * Lo calcula el SERVIDOR y no se deduce del estado del trabajo, que es lo
+   * que parecia obvio y habria estado mal: un trabajo pasa a EN CURSO cuando
+   * ficha la PRIMERA persona del equipo, asi que mirar el estado diria que
+   * ha llegado alguien que todavia esta en el coche.
+   *
+   * Lo usa la pantalla para decidir si ofrece corregir lo contratado, que el
+   * servidor solo acepta con un fichaje de llegada propio detras. Con dos
+   * reglas distintas, la pantalla ofreceria un boton que la API rechaza.
+   */
+  iHaveArrived: z.boolean(),
+
+  /**
    * LOS FICHAJES DE ESTE TRABAJO, INCLUIDOS LOS DE LOS COMPANEROS.
    *
    * Que una empleada vea su propio fichaje fue una decision explicita: no hay
@@ -111,6 +141,19 @@ export const MyJobSchema = z.strictObject({
    * vacio y la seccion no se pinta. Ver `job-checklist.ts`.
    */
   checklist: z.array(JobChecklistEntrySchema),
+
+  /**
+   * LOS AJUSTES DE CAMPO DE ESTE TRABAJO, SIN IMPORTES.
+   *
+   * Lo que el responsable reportó y en qué quedó. Van sin una sola cifra de
+   * dinero, por la misma regla que el resto de esta pantalla: reporta lo que
+   * ve, y lo que cuesta lo dice coordinación. Ver `field-adjustment.ts`.
+   *
+   * Los ve todo el equipo y no solo quien propuso: a la casa fueron todos, y
+   * enterarse de que coordinación rechazó la corrección es tan útil para
+   * quien limpia al lado como para quien la escribió.
+   */
+  adjustments: z.array(MyJobAdjustmentSchema),
 });
 export type MyJob = z.infer<typeof MyJobSchema>;
 
