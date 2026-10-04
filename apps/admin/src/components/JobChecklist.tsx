@@ -8,7 +8,7 @@ import {
   type Locale,
 } from '@freshness/types';
 import { formatTimestamp } from '../lib/format';
-import { ClipboardCheckIcon, SpinnerIcon } from './Icons';
+import { ClipboardCheckIcon } from './Icons';
 
 /**
  * LA LISTA DE VERIFICACION DE UN TRABAJO
@@ -47,11 +47,9 @@ interface JobChecklistProps {
    * ve el panel.
    */
   onToggle?: (code: string, done: boolean) => void;
-  /** El codigo que se esta guardando ahora mismo, si hay alguno. */
-  guardando?: string | null;
 }
 
-export function JobChecklist({ entries, locale, onToggle, guardando }: JobChecklistProps) {
+export function JobChecklist({ entries, locale, onToggle }: JobChecklistProps) {
   const { t } = useTranslation();
 
   /*
@@ -108,13 +106,7 @@ export function JobChecklist({ entries, locale, onToggle, guardando }: JobCheckl
             {entries
               .filter((entrada) => entrada.room === estancia)
               .map((entrada) => (
-                <Tarea
-                  key={entrada.code}
-                  entrada={entrada}
-                  locale={locale}
-                  onToggle={onToggle}
-                  guardandoEsta={guardando === entrada.code}
-                />
+                <Tarea key={entrada.code} entrada={entrada} locale={locale} onToggle={onToggle} />
               ))}
           </ul>
         </div>
@@ -129,12 +121,10 @@ function Tarea({
   entrada,
   locale,
   onToggle,
-  guardandoEsta,
 }: {
   entrada: JobChecklistEntry;
   locale: Locale;
   onToggle?: (code: string, done: boolean) => void;
-  guardandoEsta: boolean;
 }) {
   const { t } = useTranslation();
 
@@ -207,23 +197,21 @@ function Tarea({
         `py-3` y no `py-2`: 44 px de alto es el minimo que se acierta de pie.
       */}
       <label className="flex cursor-pointer items-start gap-3 py-3 text-sm">
-        <span className="relative flex h-6 w-6 shrink-0 items-center justify-center">
-          <input
-            type="checkbox"
-            className="h-6 w-6 rounded border-slate-400 text-brand-700 focus:ring-2 focus:ring-brand-500 dark:border-slate-500"
-            checked={entrada.done}
-            /*
-             * Se deshabilita SOLO la que se esta guardando, no la lista
-             * entera: bloquear todo en cada toque haria que marcar cinco
-             * tareas seguidas —que es como se usa— fuera imposible.
-             */
-            disabled={guardandoEsta}
-            onChange={(e) => onToggle(entrada.code, e.target.checked)}
-          />
-          {guardandoEsta && (
-            <SpinnerIcon className="pointer-events-none absolute h-4 w-4 text-brand-700 dark:text-sun-300" />
-          )}
-        </span>
+        {/*
+          SIN RELOJ DE ESPERA Y SIN DESHABILITAR, y las dos cosas a proposito.
+
+          La casilla se mueve en el acto (ver `marcarTarea`), asi que el
+          movimiento YA ES la confirmacion y un reloj al lado solo diria que
+          algo va lento. Y deshabilitarla mientras se guarda impediria
+          corregir un toque equivocado justo en el segundo en que uno se da
+          cuenta de que lo ha dado.
+        */}
+        <input
+          type="checkbox"
+          className="h-6 w-6 shrink-0 rounded border-slate-400 text-brand-700 focus:ring-2 focus:ring-brand-500 dark:border-slate-500"
+          checked={entrada.done}
+          onChange={(e) => onToggle(entrada.code, e.target.checked)}
+        />
         <span className="min-w-0">{detalle}</span>
       </label>
     </li>

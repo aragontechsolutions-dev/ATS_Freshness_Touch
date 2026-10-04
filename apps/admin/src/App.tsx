@@ -351,7 +351,11 @@ export default function App() {
 
       <main className="mx-auto max-w-5xl px-4 py-6">
         {actual === 'myJobs' ? (
-          <MyJobs locale={locale} onSessionLost={alPerderSesion} />
+          <MyJobs
+            locale={locale}
+            staffFirstName={state.staff.firstName}
+            onSessionLost={alPerderSesion}
+          />
         ) : actual === 'settings' && puedeConfigurar ? (
           <SettingsPage staff={state.staff} locale={locale} onSessionLost={alPerderSesion} />
         ) : openBookingId ? (
