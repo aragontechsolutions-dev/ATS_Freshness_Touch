@@ -6,7 +6,6 @@ import {
   MyJobProgressSchema,
   type AuthenticatedStaff,
   type ChecklistProgress,
-  type FieldAdjustment,
   type FieldAdjustmentInput,
   type MyJob,
   type MyJobProgress,
@@ -123,18 +122,31 @@ export class MyJobsController {
    */
   @Patch(':bookingId/adjustment')
   @Roles('ADMIN', 'DISPATCHER', 'CLEANER')
-  proposeAdjustment(
+  async proposeAdjustment(
     @Param('bookingId', new ParseUUIDPipe({ version: '4' })) bookingId: string,
     @Body(new ZodValidationPipe<FieldAdjustmentInput>(FieldAdjustmentInputSchema))
     body: FieldAdjustmentInput,
     @CurrentStaff() staff: AuthenticatedStaff,
     @Req() request: Request,
-  ): Promise<FieldAdjustment> {
+  ): Promise<MyJob> {
     /*
      * AQUI SI SE PASA LA IP, al contrario que al marcar una tarea: esto
      * mueve dinero, aunque sea en diferido, y la auditoria de las cosas que
      * mueven dinero lleva desde donde se hicieron.
      */
-    return this.adjustments.propose(bookingId, body, staff, request.ip ?? null);
+    await this.adjustments.propose(bookingId, body, staff, request.ip ?? null);
+
+    /*
+     * DEVUELVE EL TRABAJO, NO EL AJUSTE, Y ESA ES LA DIFERENCIA QUE IMPORTA.
+     *
+     * `propose` devuelve un `FieldAdjustment`, que LLEVA LOS IMPORTES: la
+     * diferencia y el total nuevo. Devolverlo aqui mandaria esas cifras al
+     * movil de quien acaba de reportar la casa, que es exactamente lo que
+     * `MyJob` lleva prohibido desde la Etapa 2.
+     *
+     * El trabajo entero trae el ajuste ya recortado —sin una sola cifra de
+     * dinero— y ademas deja la pantalla pintada con el estado de despues.
+     */
+    return this.jobs.getOne(bookingId, staff);
   }
 }

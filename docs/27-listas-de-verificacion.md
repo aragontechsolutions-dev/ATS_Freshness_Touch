@@ -322,11 +322,16 @@ recorre **el mismo código** que producción.
 ## 10. Lo que quedó sin resolver
 
 - **Las tareas, que es todo el contenido.** Ver el aviso del principio.
-- **No se sabe si la lista cambia según el servicio.** El catálogo lo admite
-  —cada tarea declara `appliesTo`— pero las plantillas del cliente no dicen si
-  una profunda pide más tareas que una estándar. **Se decidirá al
-  transcribirlas**; mientras tanto, lo honesto es que el campo exista y nadie
-  haya supuesto nada.
+- **La lista es la del servicio que el cliente contrató en la web.** Quedó
+  decidido en la Etapa 3.6. Tiene una consecuencia que conviene tener escrita:
+  como la lista sale del servicio de la reserva y no de una copia congelada,
+  **cambiar el servicio cambiaría la lista bajo los pies del equipo a media
+  limpieza**. Por eso el ajuste de campo no deja cambiarlo
+  (`docs/28-ajustes-de-campo.md` §3).
+- **Sigue sin saberse si la lista cambia dentro de cada servicio.** El
+  catálogo lo admite —cada tarea declara `appliesTo`— pero las plantillas del
+  cliente no dicen si una profunda pide más tareas que una estándar. Se
+  decidirá al transcribirlas.
 - **No hay foto de lo hecho.** Es la siguiente capacidad de la Etapa 3 y
   depende de decidir dónde se almacenan las fotos.
 - **No funciona sin conexión.** Cada toque es una petición: en un sótano sin

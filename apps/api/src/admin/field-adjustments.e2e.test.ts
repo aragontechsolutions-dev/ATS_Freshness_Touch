@@ -217,9 +217,11 @@ describe('quien puede proponer un ajuste', () => {
     const respuesta = await proponer({ squareFeet: 1300, note: 'La casa es mucho mas grande' });
 
     expect(respuesta.status).toBe(200);
-    expect(respuesta.body.state).toBe('PROPOSED');
-    expect(respuesta.body.booked.squareFeet).toBe(900);
-    expect(respuesta.body.found.squareFeet).toBe(1300);
+    // Devuelve EL TRABAJO, no el ajuste: ver la prueba de los importes.
+    const ajuste = respuesta.body.adjustments[0];
+    expect(ajuste.state).toBe('PROPOSED');
+    expect(ajuste.booked.squareFeet).toBe(900);
+    expect(ajuste.found.squareFeet).toBe(1300);
   });
 
   it('QUIEN NO ES RESPONSABLE RECIBE 403, no 404', async () => {
@@ -297,11 +299,17 @@ describe('proponer NO cambia la reserva', () => {
 
   it('pero deja calculada la diferencia para quien decide', async () => {
     await cleoFicha();
+    await proponer({ squareFeet: 1300, note: 'Es mas grande' });
 
-    const respuesta = await proponer({ squareFeet: 1300, note: 'Es mas grande' });
+    // Guardada en la base, lista para el panel. Al movil NO viaja: eso lo
+    // comprueba la prueba de los importes, mas abajo.
+    const fila = await db.query<{ differenceCents: number; newTotalCents: number }>(
+      `SELECT "differenceCents", "newTotalCents" FROM booking_field_adjustments
+        WHERE "bookingId" = '${TRABAJO}'`,
+    );
 
-    expect(respuesta.body.differenceCents).toBeGreaterThan(0);
-    expect(respuesta.body.newTotalCents).toBeGreaterThan(25000);
+    expect(fila.rows[0]?.differenceCents).toBeGreaterThan(0);
+    expect(fila.rows[0]?.newTotalCents).toBeGreaterThan(25000);
   });
 
   it('una segunda propuesta sustituye a la primera, sin borrarla', async () => {
@@ -335,7 +343,8 @@ describe('aprobar y rechazar', () => {
   async function propuestaAbierta(cambios: Record<string, unknown> = {}): Promise<string> {
     await cleoFicha();
     const respuesta = await proponer({ squareFeet: 1300, note: 'Es mas grande', ...cambios });
-    return respuesta.body.id as string;
+    // La respuesta es el TRABAJO; el identificador del ajuste sale de dentro.
+    return respuesta.body.adjustments[0].id as string;
   }
 
   it('APROBAR RE-TARIFICA LA RESERVA', async () => {
@@ -431,16 +440,29 @@ describe('lo que ve cada quien', () => {
      * antes de que nadie lo haya aprobado.
      */
     await cleoFicha();
-    await proponer({ squareFeet: 1300, note: 'Es mas grande' });
+
+    /*
+     * SE MIRAN LAS DOS PUERTAS, y la primera version de esta prueba solo
+     * miraba una: la respuesta de PROPONER tambien va al movil, y estaba
+     * devolviendo el ajuste con sus importes dentro. La fuga vivio en `main`
+     * hasta que se escribio la pantalla y hubo que mirar que devolvia.
+     */
+    const alProponer = await proponer({ squareFeet: 1300, note: 'Es mas grande' });
 
     const mis = await request(app.getHttpServer())
       .get(MIS_TRABAJOS)
       .set('authorization', `Bearer ${await comoCleo()}`);
 
-    const texto = JSON.stringify(mis.body);
-    expect(texto).toContain('1300');
-    for (const prohibido of ['differenceCents', 'newTotalCents', 'totalCents', 'depositCents']) {
-      expect(texto, `la pantalla de limpieza trae ${prohibido}`).not.toContain(prohibido);
+    for (const [donde, cuerpo] of [
+      ['la respuesta de proponer', alProponer.body],
+      ['la lista de mis trabajos', mis.body],
+    ] as const) {
+      const texto = JSON.stringify(cuerpo);
+      expect(texto, `${donde} no trae el ajuste`).toContain('1300');
+
+      for (const prohibido of ['differenceCents', 'newTotalCents', 'totalCents', 'depositCents']) {
+        expect(texto, `${donde} trae ${prohibido}`).not.toContain(prohibido);
+      }
     }
   });
 
@@ -463,7 +485,10 @@ describe('lo que ve cada quien', () => {
     // Un rechazo mudo ensena a no volver a reportar nada.
     await cleoFicha();
     const propuesta = await proponer({ squareFeet: 1300, note: 'Es mas grande' });
-    await resolver(propuesta.body.id as string, { approve: false, note: 'Ya lo sabiamos' });
+    await resolver(propuesta.body.adjustments[0].id as string, {
+      approve: false,
+      note: 'Ya lo sabiamos',
+    });
 
     const mis = await request(app.getHttpServer())
       .get(MIS_TRABAJOS)
@@ -477,7 +502,7 @@ describe('la auditoria', () => {
   it('deja las tres acciones, con las cifras y sin datos del cliente', async () => {
     await cleoFicha();
     const propuesta = await proponer({ squareFeet: 1300, note: 'Es mas grande' });
-    await resolver(propuesta.body.id as string, { approve: true });
+    await resolver(propuesta.body.adjustments[0].id as string, { approve: true });
 
     const filas = await db.query<{ action: string; metadata: unknown }>(
       `SELECT action, metadata FROM audit_logs

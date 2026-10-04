@@ -1,17 +1,25 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { CLOCK_IN_STATE_TEXT_KEY, canEditChecklist } from '@freshness/types';
-import type { ClockInKind, JobChecklistEntry, Locale, MyJob } from '@freshness/types';
+import type {
+  ClockInKind,
+  FieldAdjustmentInput,
+  JobChecklistEntry,
+  Locale,
+  MyJob,
+} from '@freshness/types';
 import {
   ApiClientError,
   fetchMyJobs,
   isSessionError,
   markChecklistItem,
   markMyJobProgress,
+  proposeFieldAdjustment,
   sessionLostReason,
 } from '../lib/api';
 import { formatPhone } from '@freshness/types';
 import { useToast } from '../components/ToastProvider';
+import { FieldAdjustmentForm } from '../components/FieldAdjustmentForm';
 import { JobChecklist } from '../components/JobChecklist';
 import { SkeletonMisTrabajos } from '../components/Skeletons';
 import {
@@ -96,6 +104,8 @@ export function MyJobs({ locale, staffFirstName, onSessionLost }: MyJobsProps) {
    * de AHORA, no el del render en el que se lanzo.
    */
   const ultimaPeticion = useRef(new Map<string, number>());
+  /** El trabajo cuyo ajuste se esta enviando, si hay alguno. */
+  const [ajustando, setAjustando] = useState<string | null>(null);
   const toast = useToast();
 
   useEffect(() => {
@@ -240,6 +250,33 @@ export function MyJobs({ locale, staffFirstName, onSessionLost }: MyJobsProps) {
     }
   };
 
+  /**
+   * El responsable avisa de que el trabajo no es el contratado.
+   *
+   * AQUI SI HAY AVISO AL ACERTAR, al reves que al marcar una tarea: esto
+   * ocurre una vez por casa y pone en marcha una conversacion con el cliente.
+   * Quien lo manda tiene que quedarse tranquilo de que llego.
+   */
+  const ajustar = async (job: MyJob, cambios: FieldAdjustmentInput): Promise<void> => {
+    setAjustando(job.bookingId);
+
+    try {
+      const actualizado = await proposeFieldAdjustment(job.bookingId, cambios);
+      setJobs((actual) =>
+        (actual ?? []).map((j) => (j.bookingId === actualizado.bookingId ? actualizado : j)),
+      );
+      toast.success('admin.toast.adjustmentSent');
+    } catch (error) {
+      if (isSessionError(error)) {
+        onSessionLost(sessionLostReason(error));
+        return;
+      }
+      toast.error(error instanceof ApiClientError ? error.messageKey : 'admin.errorGeneric');
+    } finally {
+      setAjustando(null);
+    }
+  };
+
   if (errorKey) {
     return (
       <div className="ft-card flex items-start gap-3 p-5" role="alert">
@@ -289,6 +326,8 @@ export function MyJobs({ locale, staffFirstName, onSessionLost }: MyJobsProps) {
               ocupado={ocupado === job.bookingId}
               onMarcar={marcar}
               onMarcarTarea={marcarTarea}
+              ajustando={ajustando === job.bookingId}
+              onAjustar={ajustar}
             />
           ))}
         </>
@@ -307,6 +346,8 @@ export function MyJobs({ locale, staffFirstName, onSessionLost }: MyJobsProps) {
               ocupado={ocupado === job.bookingId}
               onMarcar={marcar}
               onMarcarTarea={marcarTarea}
+              ajustando={ajustando === job.bookingId}
+              onAjustar={ajustar}
             />
           ))}
         </>
@@ -323,12 +364,16 @@ function Tarjeta({
   ocupado,
   onMarcar,
   onMarcarTarea,
+  ajustando,
+  onAjustar,
 }: {
   job: MyJob;
   locale: Locale;
   ocupado: boolean;
   onMarcar: (job: MyJob, status: 'IN_PROGRESS' | 'COMPLETED') => Promise<void>;
   onMarcarTarea: (job: MyJob, code: string, done: boolean) => Promise<void>;
+  ajustando: boolean;
+  onAjustar: (job: MyJob, cambios: FieldAdjustmentInput) => Promise<void>;
 }) {
   const { t } = useTranslation();
 
@@ -448,6 +493,17 @@ function Tarjeta({
           onToggle={(code, done) => void onMarcarTarea(job, code, done)}
         />
       )}
+
+      {/*
+        CORREGIR LO CONTRATADO VA DESPUES DE LA LISTA Y ANTES DE LOS BOTONES.
+        Es lo que se hace al mirar la casa, no al llegar ni al irse, y empieza
+        cerrado: el caso normal es que la reserva sea correcta.
+      */}
+      <FieldAdjustmentForm
+        job={job}
+        enviando={ajustando}
+        onEnviar={(cambios) => onAjustar(job, cambios)}
+      />
 
       <Acciones job={job} ocupado={ocupado} onMarcar={onMarcar} />
     </section>

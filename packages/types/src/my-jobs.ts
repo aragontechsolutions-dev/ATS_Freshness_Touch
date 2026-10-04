@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { BookingStatusSchema } from './booking';
 import { ClockInLocationSchema, ClockInRecordSchema } from './clock-in';
 import { MyJobAdjustmentSchema } from './field-adjustment';
+import { QuoteAddOnInputSchema } from './quote';
 import { JobChecklistEntrySchema } from './job-checklist';
 import { ServiceTypeSchema } from './enums';
 
@@ -45,6 +46,20 @@ export const MyJobSchema = z.strictObject({
   bathrooms: z.int(),
 
   /**
+   * LO CONTRATADO, para poder corregirlo al llegar.
+   *
+   * Los pies cuadrados y los extras no estaban en esta pantalla hasta la
+   * Etapa 3.6 porque no hacian falta para limpiar. Ahora si: son justo lo
+   * que el responsable compara con la casa que tiene delante.
+   *
+   * NO SON IMPORTES. Un extra aqui es «el cliente pidio limpiar la nevera»,
+   * no lo que cuesta: `QuoteAddOnInput` lleva codigo y cantidad, y ninguna
+   * cifra de dinero.
+   */
+  squareFeet: z.int(),
+  addOns: z.array(QuoteAddOnInputSchema),
+
+  /**
    * Nombre de pila del cliente. Sin apellido: para saludar en la puerta
    * sobra, y un apellido mas una direccion identifica a una persona.
    */
@@ -79,6 +94,20 @@ export const MyJobSchema = z.strictObject({
   teammates: z.array(z.strictObject({ name: z.string(), isLead: z.boolean() })),
   /** Si quien mira es la responsable de este trabajo. */
   iAmLead: z.boolean(),
+
+  /**
+   * SI QUIEN MIRA HA FICHADO YA SU LLEGADA A ESTA CASA.
+   *
+   * Lo calcula el SERVIDOR y no se deduce del estado del trabajo, que es lo
+   * que parecia obvio y habria estado mal: un trabajo pasa a EN CURSO cuando
+   * ficha la PRIMERA persona del equipo, asi que mirar el estado diria que
+   * ha llegado alguien que todavia esta en el coche.
+   *
+   * Lo usa la pantalla para decidir si ofrece corregir lo contratado, que el
+   * servidor solo acepta con un fichaje de llegada propio detras. Con dos
+   * reglas distintas, la pantalla ofreceria un boton que la API rechaza.
+   */
+  iHaveArrived: z.boolean(),
 
   /**
    * LOS FICHAJES DE ESTE TRABAJO, INCLUIDOS LOS DE LOS COMPANEROS.

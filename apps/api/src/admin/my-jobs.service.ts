@@ -19,7 +19,7 @@ import {
 } from '@freshness/types';
 import { AuditService } from '../audit/audit.service';
 import { PrismaService } from '../database/prisma.service';
-import { AJUSTE_SELECT, ajusteAContrato } from './field-adjustment.helper';
+import { AJUSTE_SELECT, ExtrasGuardadosSchema, ajusteAContrato } from './field-adjustment.helper';
 import {
   JOB_CHECKLIST_CATALOG_TOKEN,
   esTareaDelTrabajo,
@@ -44,6 +44,8 @@ const JOB_SELECT = {
   timezone: true,
   bedrooms: true,
   bathrooms: true,
+  squareFeet: true,
+  addOns: true,
   customerNotes: true,
   customer: { select: { firstName: true, phone: true } },
   address: {
@@ -439,6 +441,22 @@ export class MyJobsService {
       });
     }
 
+    return this.getOne(bookingId, staff);
+  }
+
+  /**
+   * UN trabajo, tal como lo ve quien pregunta.
+   *
+   * Lo usan los endpoints que CAMBIAN algo de un trabajo —marcar una tarea,
+   * proponer un ajuste— para devolver el estado de despues. Asi la pantalla
+   * se pinta con lo que decidio el servidor en vez de suponer que hizo lo
+   * que le pidieron.
+   *
+   * NO COMPRUEBA LA ASIGNACION, y es deliberado: lo llaman metodos que ya la
+   * comprobaron. Es privado del servidor; no hay ningun endpoint que lo
+   * exponga directamente.
+   */
+  async getOne(bookingId: string, staff: AuthenticatedStaff): Promise<MyJob> {
     const trabajo = await this.prisma.db.booking.findUniqueOrThrow({
       where: { id: bookingId },
       select: JOB_SELECT,
@@ -554,6 +572,12 @@ function toMyJob(trabajo: FilaTrabajo, staffId: string, catalogo: readonly Check
     ),
     bedrooms: trabajo.bedrooms,
     bathrooms: trabajo.bathrooms,
+    squareFeet: trabajo.squareFeet,
+    /*
+     * El JSON de la base es opaco: se relee con el contrato antes de
+     * mandarlo. Una lista ilegible es «sin extras», no una pantalla rota.
+     */
+    addOns: ExtrasGuardadosSchema.parse(trabajo.addOns),
     customerFirstName: trabajo.customer.firstName,
     customerPhone: trabajo.customer.phone,
     addressLine1: trabajo.address.line1,
@@ -568,6 +592,11 @@ function toMyJob(trabajo: FilaTrabajo, staffId: string, catalogo: readonly Check
       .filter((a) => a.staffId !== staffId)
       .map((a) => ({ name: staffFullName(a.staff), isLead: a.isLead })),
     iAmLead: mia?.isLead ?? false,
+    /*
+     * Se saca de los fichajes que YA vienen en la consulta: ni una consulta
+     * mas, y es el mismo dato que mira el servidor al aceptar un ajuste.
+     */
+    iHaveArrived: trabajo.clockIns.some((f) => f.staffId === staffId && f.kind === 'ARRIVAL'),
     /*
      * La lista se monta en el servidor, no en el movil: el movil no sabe que
      * tareas pide cada servicio, y si lo supiera habria dos catalogos que
