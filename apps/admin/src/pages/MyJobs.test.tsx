@@ -95,6 +95,7 @@ function trabajo(checklist: JobChecklistEntry[]): MyJob {
     teammates: [],
     iAmLead: true,
     clockIns: [],
+    adjustments: [],
     checklist,
   };
 }

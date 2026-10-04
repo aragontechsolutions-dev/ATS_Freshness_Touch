@@ -6,6 +6,7 @@ import {
   canEditChecklist,
   clockInDistanceMeters,
   staffFullName,
+  toMyJobAdjustment,
   type AuthenticatedStaff,
   type ChecklistItem,
   type ChecklistProgress,
@@ -18,6 +19,7 @@ import {
 } from '@freshness/types';
 import { AuditService } from '../audit/audit.service';
 import { PrismaService } from '../database/prisma.service';
+import { AJUSTE_SELECT, ajusteAContrato } from './field-adjustment.helper';
 import {
   JOB_CHECKLIST_CATALOG_TOKEN,
   esTareaDelTrabajo,
@@ -91,6 +93,22 @@ const JOB_SELECT = {
   checklistItems: {
     select: { itemCode: true, doneAt: true, doneBy: { select: { firstName: true } } },
     orderBy: { doneAt: 'asc' as const },
+  },
+  /*
+   * LOS AJUSTES DE CAMPO, EN LA MISMA CONSULTA.
+   *
+   * No se piden al servicio de ajustes uno a uno: eso serian tantas
+   * consultas como trabajos tenga la persona en pantalla, y esta lista se
+   * carga entera al abrir la aplicacion en la calle.
+   *
+   * Los importes se leen y se tiran en `toMyJob`: el contrato de esta
+   * pantalla no tiene donde ponerlos. Se traen porque el mapeador es
+   * compartido con el panel, que si los ensena.
+   */
+  fieldAdjustments: {
+    select: AJUSTE_SELECT,
+    orderBy: { proposedAt: 'desc' as const },
+    take: 10,
   },
 };
 
@@ -556,6 +574,12 @@ function toMyJob(trabajo: FilaTrabajo, staffId: string, catalogo: readonly Check
      * mantener de acuerdo.
      */
     checklist: montarChecklist(trabajo.service, trabajo.checklistItems, catalogo),
+    /*
+     * AQUI MUEREN LOS IMPORTES DEL AJUSTE. `toMyJobAdjustment` quita la
+     * diferencia y el total nuevo: quien limpia reporta lo que ve, y lo que
+     * cuesta lo dice coordinacion. Ver `field-adjustment.ts`.
+     */
+    adjustments: trabajo.fieldAdjustments.map((fila) => toMyJobAdjustment(ajusteAContrato(fila))),
     clockIns: trabajo.clockIns.map((f): ClockInRecord => ({
       staffId: f.staffId,
       staffFirstName: f.staff.firstName,

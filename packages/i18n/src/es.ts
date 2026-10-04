@@ -799,6 +799,11 @@ export const es: TranslationResources = {
         booking: {
           created: 'Reserva realizada',
           team_changed: 'Cambió el equipo',
+          adjustment: {
+            proposed: 'Avisó de que el trabajo no es el contratado',
+            applied: 'Aprobó la corrección hecha en la casa',
+            rejected: 'Rechazó la corrección hecha en la casa',
+          },
           viewed: 'Abrió la ficha de una reserva',
           status: {
             pending_payment: 'Marcó como pendiente de pago',
@@ -966,6 +971,20 @@ export const es: TranslationResources = {
     errorAssignCancelled: 'No se puede asignar equipo a una reserva cancelada.',
     errorInvalidTransition:
       'Ese cambio no es posible desde el estado actual. Puede que alguien acabe de cambiarlo.',
+    errorAdjustmentNotLead:
+      'Solo la responsable del equipo puede avisar de que el trabajo no es el contratado. Pídeselo a ella.',
+    errorAdjustmentNoArrival:
+      'Marca primero «He llegado». Solo registramos correcciones de una casa en la que alguien está.',
+    errorAdjustmentEmpty: 'No hay nada distinto de lo contratado, así que no hay nada que enviar.',
+    errorAdjustmentClosed: 'Este trabajo está cerrado y ya no se puede corregir.',
+    errorAdjustmentNotFound: 'No encontramos esa corrección.',
+    errorAdjustmentResolved: 'Alguien ya decidió sobre esta corrección. Actualiza la página.',
+    errorAdjustmentRejectNeedsNote:
+      'Di por qué lo rechazas: el equipo necesita saber si midió mal o si lo asumimos nosotros.',
+    errorAdjustmentNoAutoPrice:
+      'Este tamaño no tiene precio automático, así que el importe nuevo hay que calcularlo a mano.',
+    errorAdjustmentStale:
+      'El precio sale distinto ahora que cuando se avisó. Pide al equipo que lo vuelva a enviar para que alguien mire la cifra nueva.',
     errorChecklistClosed:
       'Este trabajo está cerrado y su lista ya no se puede cambiar. Habla con coordinación.',
     errorChecklistUnknownItem:

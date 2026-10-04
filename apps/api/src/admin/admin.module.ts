@@ -13,6 +13,7 @@ import {
   StaffListController,
 } from './bookings-admin.controller';
 import { BookingsAdminService } from './bookings-admin.service';
+import { FieldAdjustmentsService } from './field-adjustments.service';
 import { JOB_CHECKLIST_CATALOG_TOKEN } from './job-checklist.helper';
 import { MyJobsController } from './my-jobs.controller';
 import { PasswordRecoveryController } from './password-recovery.controller';
@@ -63,6 +64,7 @@ import type { Env } from '../common/config/env';
     AssignmentsService,
     StaffAdminService,
     MyJobsService,
+    FieldAdjustmentsService,
     PasswordRecoveryService,
     {
       /*

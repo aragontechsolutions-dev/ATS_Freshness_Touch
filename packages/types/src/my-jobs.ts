@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { BookingStatusSchema } from './booking';
 import { ClockInLocationSchema, ClockInRecordSchema } from './clock-in';
+import { MyJobAdjustmentSchema } from './field-adjustment';
 import { JobChecklistEntrySchema } from './job-checklist';
 import { ServiceTypeSchema } from './enums';
 
@@ -111,6 +112,19 @@ export const MyJobSchema = z.strictObject({
    * vacio y la seccion no se pinta. Ver `job-checklist.ts`.
    */
   checklist: z.array(JobChecklistEntrySchema),
+
+  /**
+   * LOS AJUSTES DE CAMPO DE ESTE TRABAJO, SIN IMPORTES.
+   *
+   * Lo que el responsable reportó y en qué quedó. Van sin una sola cifra de
+   * dinero, por la misma regla que el resto de esta pantalla: reporta lo que
+   * ve, y lo que cuesta lo dice coordinación. Ver `field-adjustment.ts`.
+   *
+   * Los ve todo el equipo y no solo quien propuso: a la casa fueron todos, y
+   * enterarse de que coordinación rechazó la corrección es tan útil para
+   * quien limpia al lado como para quien la escribió.
+   */
+  adjustments: z.array(MyJobAdjustmentSchema),
 });
 export type MyJob = z.infer<typeof MyJobSchema>;
 

@@ -2,9 +2,12 @@ import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Req } from '@nestjs
 import { SkipThrottle } from '@nestjs/throttler';
 import {
   ChecklistProgressSchema,
+  FieldAdjustmentInputSchema,
   MyJobProgressSchema,
   type AuthenticatedStaff,
   type ChecklistProgress,
+  type FieldAdjustment,
+  type FieldAdjustmentInput,
   type MyJob,
   type MyJobProgress,
   type MyJobs,
@@ -13,6 +16,7 @@ import type { Request } from 'express';
 import { ADMIN_ROUTE, CurrentStaff, Roles } from '../auth/auth.decorators';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
 import { SKIP_QUOTE_THROTTLER } from '../common/throttling';
+import { FieldAdjustmentsService } from './field-adjustments.service';
 import { MyJobsService } from './my-jobs.service';
 
 /**
@@ -33,7 +37,10 @@ import { MyJobsService } from './my-jobs.service';
 @SkipThrottle(SKIP_QUOTE_THROTTLER)
 @Controller(`${ADMIN_ROUTE}/my-jobs`)
 export class MyJobsController {
-  constructor(private readonly jobs: MyJobsService) {}
+  constructor(
+    private readonly jobs: MyJobsService,
+    private readonly adjustments: FieldAdjustmentsService,
+  ) {}
 
   @Get()
   @Roles('ADMIN', 'DISPATCHER', 'CLEANER')
@@ -95,5 +102,39 @@ export class MyJobsController {
      * la propia fila ya lleva quien la marco y cuando.
      */
     return this.jobs.markChecklistItem(bookingId, body, staff);
+  }
+
+  /**
+   * El responsable avisa de que el trabajo no es el contratado.
+   *
+   * ======================================================================
+   * ESTO NO CAMBIA LA RESERVA. PROPONE.
+   * ======================================================================
+   * Lo que entra es lo que el equipo ENCONTRO —1.300 pies donde ponia 900,
+   * tres neveras donde ponia una—, y queda como una propuesta colgada del
+   * trabajo con la diferencia ya calculada. La reserva, su precio y su
+   * deposito siguen intactos hasta que coordinacion aprueba desde el panel.
+   *
+   * ADMITE A LOS TRES ROLES, igual que el resto de esta pantalla, y eso NO
+   * lo abre: lo que decide no es el puesto sino ser el RESPONSABLE de ese
+   * trabajo, y eso se comprueba en el servidor contra la tabla de
+   * asignaciones. En una empresa pequena quien coordina tambien lidera
+   * equipos.
+   */
+  @Patch(':bookingId/adjustment')
+  @Roles('ADMIN', 'DISPATCHER', 'CLEANER')
+  proposeAdjustment(
+    @Param('bookingId', new ParseUUIDPipe({ version: '4' })) bookingId: string,
+    @Body(new ZodValidationPipe<FieldAdjustmentInput>(FieldAdjustmentInputSchema))
+    body: FieldAdjustmentInput,
+    @CurrentStaff() staff: AuthenticatedStaff,
+    @Req() request: Request,
+  ): Promise<FieldAdjustment> {
+    /*
+     * AQUI SI SE PASA LA IP, al contrario que al marcar una tarea: esto
+     * mueve dinero, aunque sea en diferido, y la auditoria de las cosas que
+     * mueven dinero lleva desde donde se hicieron.
+     */
+    return this.adjustments.propose(bookingId, body, staff, request.ip ?? null);
   }
 }

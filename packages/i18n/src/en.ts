@@ -821,6 +821,11 @@ export const en = {
         booking: {
           created: 'Booking placed',
           team_changed: 'Team changed',
+          adjustment: {
+            proposed: 'Reported the job is not what was booked',
+            applied: 'Approved the on-site correction',
+            rejected: 'Turned down the on-site correction',
+          },
           viewed: 'Booking record opened',
           status: {
             pending_payment: 'Marked as awaiting payment',
@@ -1000,6 +1005,25 @@ export const en = {
      * Los dos de la lista de verificacion. Dicen QUE HACER, no solo que algo
      * fallo: quien los lee esta de pie en una casa y no puede investigar.
      */
+    /*
+     * LOS AJUSTES DE CAMPO. Los lee gente muy distinta: los tres primeros,
+     * alguien de pie en la puerta de una casa; los tres ultimos,
+     * coordinacion delante de un ordenador. Todos dicen QUE HACER.
+     */
+    errorAdjustmentNotLead:
+      'Only the team lead can report that the job is not what was booked. Ask them to do it.',
+    errorAdjustmentNoArrival:
+      'Tap "I have arrived" first. We only record corrections for a house someone is actually at.',
+    errorAdjustmentEmpty: 'Nothing is different from what was booked, so there is nothing to send.',
+    errorAdjustmentClosed: 'This job is closed, so it can no longer be corrected.',
+    errorAdjustmentNotFound: 'We could not find that correction.',
+    errorAdjustmentResolved: 'Someone already decided on this correction. Refresh the page.',
+    errorAdjustmentRejectNeedsNote:
+      'Say why you are turning it down: the team needs to know whether they measured wrong or we are absorbing it.',
+    errorAdjustmentNoAutoPrice:
+      'This size has no automatic price, so the new amount has to be worked out by hand.',
+    errorAdjustmentStale:
+      'The price works out differently now than when this was reported. Ask the team to send it again so someone can look at the new figure.',
     errorChecklistClosed:
       'This job is closed, so its list cannot be changed any more. Talk to dispatch.',
     errorChecklistUnknownItem:

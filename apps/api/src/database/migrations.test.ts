@@ -62,6 +62,7 @@ describe('migraciones', () => {
       'booking_assignments',
       'booking_checklist_items',
       'booking_clock_ins',
+      'booking_field_adjustments',
       'bookings',
       'business_settings',
       'customers',

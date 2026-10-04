@@ -407,11 +407,12 @@ model Booking {
   cancelledBy        CancelledBy?
   cancellationReason String?
 
-  payments       Payment[]
-  assignments    BookingAssignment[]
-  notifications  Notification[]
-  clockIns       BookingClockIn[]
-  checklistItems BookingChecklistItem[]
+  payments         Payment[]
+  assignments      BookingAssignment[]
+  notifications    Notification[]
+  clockIns         BookingClockIn[]
+  checklistItems   BookingChecklistItem[]
+  fieldAdjustments BookingFieldAdjustment[]
 
   createdAt DateTime @default(now()) @db.Timestamptz(3)
   updatedAt DateTime @updatedAt @db.Timestamptz(3)
@@ -612,8 +613,12 @@ model Staff {
 
   /// Las tareas que ha marcado como hechas.
   checklistItems BookingChecklistItem[]
-  createdAt      DateTime               @default(now()) @db.Timestamptz(3)
-  updatedAt      DateTime               @updatedAt @db.Timestamptz(3)
+
+  /// Los ajustes de campo que ha propuesto y los que ha resuelto.
+  adjustmentsProposed BookingFieldAdjustment[] @relation("AjustePropuestoPor")
+  adjustmentsResolved BookingFieldAdjustment[] @relation("AjusteResueltoPor")
+  createdAt           DateTime                 @default(now()) @db.Timestamptz(3)
+  updatedAt           DateTime                 @updatedAt @db.Timestamptz(3)
 
   @@index([isActive])
   @@map("staff")
@@ -887,4 +892,78 @@ model BookingChecklistItem {
   /// que solo cuesta escrituras.
   @@unique([bookingId, itemCode])
   @@map("booking_checklist_items")
+}
+
+/// Los cuatro estados de una propuesta de ajuste.
+enum FieldAdjustmentState {
+  /// Esperando a que coordinacion decida.
+  PROPOSED
+  /// Aprobada: la reserva se re-tarifico con lo encontrado.
+  APPLIED
+  /// Rechazada, con su motivo.
+  REJECTED
+  /// Sustituida por una propuesta posterior del mismo trabajo.
+  SUPERSEDED
+}
+
+/// EL AJUSTE DE CAMPO: LO QUE EL EQUIPO ENCONTRO AL LLEGAR.
+///
+/// Esta tabla NO modifica la reserva. Guarda lo que el lider encontro, con la
+/// diferencia ya calculada, y la reserva sigue intacta hasta que coordinacion
+/// aprueba desde el panel. El porque completo esta en la migracion
+/// 20261004120000 y en `docs/28-ajustes-de-campo.md`.
+///
+/// Lo contratado se COPIA aqui y no se lee de `bookings` al pintarlo: si se
+/// aprueba, la reserva pasa a tener los valores nuevos y la propuesta diria
+/// «de 1.300 a 1.300». El salto —que es lo unico que se revisa— se habria
+/// perdido.
+model BookingFieldAdjustment {
+  id String @id @default(uuid(4)) @db.Uuid
+
+  bookingId String  @db.Uuid
+  booking   Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  state FieldAdjustmentState @default(PROPOSED)
+
+  bookedSquareFeet Int
+  bookedBedrooms   Int
+  bookedBathrooms  Int
+  bookedAddOns     Json @default("[]")
+
+  foundSquareFeet Int
+  foundBedrooms   Int
+  foundBathrooms  Int
+  foundAddOns     Json @default("[]")
+
+  /// Por que. Lo lee quien va a tener que llamar al cliente.
+  note String
+
+  /// La diferencia en centavos. NULL cuando no hay precio automatico: una
+  /// casa por encima del ultimo tramo de la tabla no se tarifa sola.
+  differenceCents Int?
+  newTotalCents   Int?
+
+  /// La version de tarifas con la que se calculo: la de la RESERVA, no la
+  /// vigente. Aprobar un ajuste no puede colar los precios de hoy en un
+  /// trabajo contratado el mes pasado.
+  pricingVersion String
+
+  /// RESTRICT, como los fichajes: es el registro de lo que alguien vio en una
+  /// casa, y no debe borrarse porque se de de baja a esa persona.
+  proposedByStaffId String   @db.Uuid
+  proposedBy        Staff    @relation("AjustePropuestoPor", fields: [proposedByStaffId], references: [id], onDelete: Restrict)
+  proposedAt        DateTime @default(now()) @db.Timestamptz(3)
+
+  resolvedByStaffId String?   @db.Uuid
+  resolvedBy        Staff?    @relation("AjusteResueltoPor", fields: [resolvedByStaffId], references: [id], onDelete: Restrict)
+  resolvedAt        DateTime? @db.Timestamptz(3)
+  resolutionNote    String?
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @default(now()) @updatedAt @db.Timestamptz(3)
+
+  /// La consulta real es «los ajustes de este trabajo, el mas reciente
+  /// primero». Ademas hay dos CHECK en la migracion que Prisma no ve.
+  @@index([bookingId, proposedAt(sort: Desc)])
+  @@map("booking_field_adjustments")
 }

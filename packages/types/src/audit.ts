@@ -86,6 +86,15 @@ const ACCIONES_FIJAS = [
   /** Un cliente reservo desde el sitio publico. */
   'booking.created',
   'booking.team_changed',
+  /**
+   * AJUSTES DE CAMPO. Son tres acciones y no una porque responden a
+   * preguntas distintas: quien dijo que la casa no era lo contratado, quien
+   * decidio cobrarlo, y quien decidio no cobrarlo. La tercera es la que mas
+   * se mira cuando las cuentas de un mes no salen.
+   */
+  'booking.adjustment.proposed',
+  'booking.adjustment.applied',
+  'booking.adjustment.rejected',
 
   /* --- Dinero ---------------------------------------------------------- */
   'payment.captured',
