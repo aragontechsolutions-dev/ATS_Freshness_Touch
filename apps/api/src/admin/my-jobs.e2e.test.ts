@@ -927,3 +927,122 @@ describe('una tarea marcada que ya no esta en la lista de hoy', () => {
     expect((await marcarTarea(DE_CLEO, 'TAREA_RETIRADA', false)).status).toBe(400);
   });
 });
+
+/* ======================================================================== */
+/*  FICHAR ES DE CADA PERSONA, NO DEL TRABAJO                               */
+/* ======================================================================== */
+
+describe('la segunda persona del equipo tambien ficha', () => {
+  /*
+   * ESTE BLOQUE EXISTE POR UN FALLO QUE LLEGO A PRODUCCION, y que se vio en
+   * una captura de pantalla: el aviso decia «marca primero He llegado» justo
+   * debajo de un boton que ponia «He terminado».
+   *
+   * La causa: se exigia una transicion de estado valida para poder fichar. Un
+   * trabajo pasa a EN CURSO cuando ficha LA PRIMERA persona, asi que la
+   * segunda se encontraba `IN_PROGRESS -> IN_PROGRESS`, que no es una
+   * transicion, y SU LLEGADA NO SE PODIA REGISTRAR NUNCA.
+   *
+   * No es un caso raro: pasa siempre que van dos a una casa, y tambien cuando
+   * coordinacion mueve el estado desde el panel.
+   */
+
+  it('CLEO FICHA SU LLEGADA AUNQUE DARIO YA HAYA PUESTO EL TRABAJO EN CURSO', async () => {
+    // Dario llega primero: el trabajo pasa a EN CURSO.
+    await marcar(DE_CLEO, 'IN_PROGRESS', await comoDario());
+
+    // Y ahora llega Cleo, con el trabajo ya en curso.
+    const respuesta = await marcar(DE_CLEO, 'IN_PROGRESS');
+
+    expect(respuesta.status).toBe(200);
+    expect((await fichajes(DE_CLEO)).filter((f) => f.kind === 'ARRIVAL')).toHaveLength(2);
+  });
+
+  it('y el segundo fichaje NO mueve la hora a la que empezo el trabajo', async () => {
+    /*
+     * `startedAt` es cuando empezo el TRABAJO, no cuando llego cada cual.
+     * Volver a escribirlo haria que la hora de inicio saltara hacia delante
+     * cada vez que aparece alguien del equipo.
+     */
+    await marcar(DE_CLEO, 'IN_PROGRESS', await comoDario());
+    const antes = await db.query<{ startedAt: Date }>(
+      `SELECT "startedAt" FROM bookings WHERE id = '${DE_CLEO}'`,
+    );
+
+    await marcar(DE_CLEO, 'IN_PROGRESS');
+
+    const despues = await db.query<{ startedAt: Date }>(
+      `SELECT "startedAt" FROM bookings WHERE id = '${DE_CLEO}'`,
+    );
+    expect(despues.rows[0]?.startedAt).toEqual(antes.rows[0]?.startedAt);
+  });
+
+  it('ni escribe una entrada de auditoria, porque no ha cambiado nada', async () => {
+    /*
+     * Un «de EN CURSO a EN CURSO» romperia los filtros que coordinacion usa
+     * de verdad —«ensename todo lo que se completo»— con lineas que no
+     * completaron nada. Quien ficho y cuando ya esta en la fila del fichaje.
+     */
+    await marcar(DE_CLEO, 'IN_PROGRESS', await comoDario());
+    await marcar(DE_CLEO, 'IN_PROGRESS');
+
+    const filas = await db.query<{ n: number }>(
+      `SELECT COUNT(*)::int AS n FROM audit_logs WHERE action = 'booking.status.in_progress'`,
+    );
+    expect(filas.rows[0]?.n).toBe(1);
+  });
+
+  it('lo mismo al salir: cada cual ficha la suya', async () => {
+    await marcar(DE_CLEO, 'IN_PROGRESS', await comoDario());
+    await marcar(DE_CLEO, 'IN_PROGRESS');
+    // Dario se va y da el trabajo por terminado.
+    await marcar(DE_CLEO, 'COMPLETED', await comoDario());
+
+    // Cleo se va despues, con el trabajo ya terminado.
+    const respuesta = await marcar(DE_CLEO, 'COMPLETED');
+
+    expect(respuesta.status).toBe(200);
+    expect((await fichajes(DE_CLEO)).filter((f) => f.kind === 'DEPARTURE')).toHaveLength(2);
+  });
+
+  it('pero NADIE ficha la misma cosa dos veces', async () => {
+    // Un doble toque no puede dejar dos llegadas de la misma persona.
+    await marcar(DE_CLEO, 'IN_PROGRESS');
+    const segunda = await marcar(DE_CLEO, 'IN_PROGRESS');
+
+    expect(segunda.status).toBe(400);
+    expect((await fichajes(DE_CLEO)).filter((f) => f.kind === 'ARRIVAL')).toHaveLength(1);
+  });
+
+  it('y las transiciones imposibles siguen siendo imposibles', async () => {
+    // De CONFIRMADA a TERMINADA sin pasar por el trabajo.
+    expect((await marcar(DE_CLEO, 'COMPLETED')).status).toBe(400);
+
+    // Y en una cancelada no se ficha nada, aunque este asignada.
+    expect((await marcar(CANCELADA, 'IN_PROGRESS')).status).toBe(400);
+    expect(await fichajes(CANCELADA)).toHaveLength(0);
+  });
+});
+
+describe('lo que la pantalla necesita para pintar el boton correcto', () => {
+  it('dice si YO he llegado y si YO me he ido, no lo que hizo el equipo', async () => {
+    /*
+     * Es el dato que faltaba. Sin el, la pantalla decidia por el estado del
+     * trabajo y le ofrecia «he terminado» a quien no habia llegado.
+     */
+    await marcar(DE_CLEO, 'IN_PROGRESS', await comoDario());
+
+    const deCleo = (await misTrabajos()).body.jobs.find(
+      (j: { bookingId: string }) => j.bookingId === DE_CLEO,
+    );
+    expect(deCleo.status).toBe('IN_PROGRESS');
+    expect(deCleo.iHaveArrived, 'Cleo no ha fichado y la pantalla cree que si').toBe(false);
+    expect(deCleo.iHaveLeft).toBe(false);
+
+    const deDario = (await misTrabajos(await comoDario())).body.jobs.find(
+      (j: { bookingId: string }) => j.bookingId === DE_CLEO,
+    );
+    expect(deDario.iHaveArrived).toBe(true);
+    expect(deDario.iHaveLeft).toBe(false);
+  });
+});

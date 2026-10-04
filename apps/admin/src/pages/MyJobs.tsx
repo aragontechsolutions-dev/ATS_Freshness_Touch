@@ -517,6 +517,26 @@ function Tarjeta({
  * la vez invita a pulsar «he terminado» nada mas llegar, que es como se
  * pierde la hora de entrada.
  */
+/**
+ * Los dos botones.
+ *
+ * ========================================================================
+ * SE DECIDE POR PERSONA, NO POR EL ESTADO DEL TRABAJO
+ * ========================================================================
+ * ESTO ERA UN FALLO REAL Y LLEGO A PRODUCCION. La primera version miraba
+ * solo `job.status`: si el trabajo ya estaba EN CURSO —porque fichó una
+ * compañera, o porque coordinación movió el estado desde el panel— la
+ * siguiente persona solo veía «he terminado», sin haber podido fichar su
+ * llegada nunca.
+ *
+ * Y desde la Etapa 3.6 eso dejó de ser solo un hueco en el registro de
+ * horas: la pantalla le decía «marca primero He llegado» justo debajo de un
+ * botón que ponía «He terminado». Un callejón sin salida en la puerta de una
+ * casa.
+ *
+ * Ahora manda el fichaje de cada cual, que es lo que de verdad describe
+ * dónde está esa persona.
+ */
 function Acciones({
   job,
   ocupado,
@@ -528,7 +548,14 @@ function Acciones({
 }) {
   const { t } = useTranslation();
 
-  if (job.status === 'CONFIRMED') {
+  /*
+   * Un trabajo cancelado o sin cobrar no se ficha, pase lo que pase: a esa
+   * casa no va nadie. `NO_SHOW` tampoco: el cliente no estaba.
+   */
+  const fichable = job.status === 'CONFIRMED' || job.status === 'IN_PROGRESS';
+  const puedoTerminar = job.status === 'IN_PROGRESS' || job.status === 'COMPLETED';
+
+  if (!job.iHaveArrived && fichable) {
     return (
       <div>
         <button
@@ -547,7 +574,7 @@ function Acciones({
     );
   }
 
-  if (job.status === 'IN_PROGRESS') {
+  if (job.iHaveArrived && !job.iHaveLeft && puedoTerminar) {
     return (
       <button
         type="button"
