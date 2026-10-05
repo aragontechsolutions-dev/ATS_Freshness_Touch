@@ -236,6 +236,12 @@ del cliente (que en la Etapa 1 no se pide a propósito).
   Georgia fuera de las 35 millas del área metropolitana— el total lo teclea
   **administración**, no coordinación, y la fila queda marcada como importe
   puesto a mano.
+- ✅ **La PWA se entera sola** (`docs/28-ajustes-de-campo.md` §13): la pantalla
+  del equipo se refresca cada 30 s mientras se está mirando —y **siempre** al
+  volver a la aplicación—, avisa cuando coordinación resuelve una corrección
+  (con el motivo, si la rechaza) y **cierra el asunto** cuando administración ya
+  puso el precio, dejando una salida pequeña por si aparece algo nuevo. En
+  segundo plano no pide nada: es la batería y los datos de quien trabaja.
 - ⬜ Fotos antes y después. Requiere decidir dónde se almacenan.
 - ⬜ Funcionamiento sin conexión con cola de sincronización (zonas rurales de
   Georgia).

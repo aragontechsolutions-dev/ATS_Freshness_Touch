@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type {
   FieldAdjustmentInput,
@@ -51,7 +51,49 @@ export function FieldAdjustmentForm({ job, enviando, onEnviar }: FieldAdjustment
   const [addOns, setAddOns] = useState<QuoteAddOnInput[]>(job.addOns);
   const [note, setNote] = useState('');
 
+  /**
+   * LO CONTRATADO CAMBIA BAJO LOS PIES DE ESTA PANTALLA.
+   *
+   * ========================================================================
+   * HACE FALTA DESDE QUE LA PWA SE REFRESCA SOLA
+   * ========================================================================
+   * Estos campos arrancan con lo que dice la reserva, y hasta la Etapa 3.8
+   * eso no se movia mientras la pantalla estaba abierta. Ahora si: cuando
+   * coordinacion aprueba una correccion, la reserva pasa a decir 1.300 pies
+   * donde decia 900, y el sondeo lo trae.
+   *
+   * Sin esto, el formulario se quedaria con el 900 de cuando se monto, y
+   * volver a abrirlo propondria «de 1.300 a 900» —deshacer la correccion que
+   * se acaba de aprobar— sin que nadie lo hubiera pedido.
+   *
+   * NO SE TOCA MIENTRAS ESTA ABIERTO: un refresco no puede borrar lo que
+   * alguien esta tecleando de pie en una cocina. Se sincroniza al cerrarse,
+   * que es cuando no hay nada que perder.
+   */
+  const contratado = [
+    job.squareFeet,
+    job.bedrooms,
+    job.bathrooms,
+    job.addOns.map((e) => `${e.code}:${e.quantity}`).join(','),
+  ].join('|');
+
+  useEffect(() => {
+    if (abierto) return;
+    setSquareFeet(String(job.squareFeet));
+    setBedrooms(String(job.bedrooms));
+    setBathrooms(String(job.bathrooms));
+    setAddOns(job.addOns);
+  }, [contratado, abierto]);
+
   const abierta = job.adjustments.find((a) => a.state === 'PROPOSED');
+  /**
+   * Si en este trabajo ya se aprobo una correccion.
+   *
+   * Que exista significa que la reserva YA dice lo que hay en la casa y que
+   * alguien ya decidio lo que cuesta: el asunto esta cerrado, y la pantalla
+   * tiene que parecerlo.
+   */
+  const aplicada = job.adjustments.find((a) => a.state === 'APPLIED');
   const ultima = job.adjustments[0];
 
   /*
@@ -124,14 +166,50 @@ export function FieldAdjustmentForm({ job, enviando, onEnviar }: FieldAdjustment
       {historial}
 
       {!abierto ? (
-        <button
-          type="button"
-          className="ft-btn-ghost w-full justify-center py-2.5 text-sm"
-          onClick={() => setAbierto(true)}
-        >
-          <AlertIcon className="h-4 w-4" />
-          {t('admin.myJobs.adjustment.open')}
-        </button>
+        /*
+         * ========================================================================
+         * CON UNA CORRECCION YA APROBADA, EL BOTON GRANDE DESAPARECE
+         * ========================================================================
+         * Dejar «Esto no es lo que pone la reserva» a tamaño completo despues de
+         * que administracion haya puesto el precio hace parecer que el asunto
+         * sigue sin resolver, y lo esta: la reserva ya dice lo que hay en la casa
+         * y alguien ya decidio lo que cuesta.
+         *
+         * PERO NO SE QUITA DEL TODO, y esa es la parte pensada. Corregir los pies
+         * cuadrados y descubrir DESPUES que hay tres neveras es un caso normal:
+         * se mide al entrar y la cocina se ve mas tarde. Sin salida alguna, al
+         * equipo solo le quedaria llamar por telefono, que es justo el camino que
+         * esta pantalla existe para evitar.
+         *
+         * Queda como un enlace pequeño: cuesta encontrarlo a proposito, no se
+         * pulsa por error, y esta ahi cuando de verdad hace falta.
+         */
+        aplicada ? (
+          <button
+            type="button"
+            /*
+             * DISCRETO NO ES LO MISMO QUE DIFICIL DE PULSAR.
+             *
+             * La primera version media 28 px de alto, y la regla de esta
+             * pantalla son 44: se usa de pie, con una mano y a veces con
+             * guantes. Lo que tiene que ser pequeño es la LETRA —para que no
+             * compita con el resto de la tarjeta—, no el blanco de dedo.
+             */
+            className="flex min-h-11 w-full items-center justify-center text-xs font-medium text-slate-500 underline underline-offset-2 dark:text-slate-400"
+            onClick={() => setAbierto(true)}
+          >
+            {t('admin.myJobs.adjustment.openAgain')}
+          </button>
+        ) : (
+          <button
+            type="button"
+            className="ft-btn-ghost w-full justify-center py-2.5 text-sm"
+            onClick={() => setAbierto(true)}
+          >
+            <AlertIcon className="h-4 w-4" />
+            {t('admin.myJobs.adjustment.open')}
+          </button>
+        )
       ) : (
         <div className="space-y-3">
           <div>

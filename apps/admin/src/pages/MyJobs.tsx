@@ -41,6 +41,20 @@ import {
   todayInTimezone,
 } from '../lib/format';
 import { ubicacionParaFichar } from '../lib/geolocalizacion';
+import { useRefrescoVisible } from '../lib/use-refresco';
+
+/**
+ * CADA CUANTO SE VUELVE A PREGUNTAR, con la pantalla delante.
+ *
+ * Treinta segundos sale de lo que esto tiene que resolver: que el equipo se
+ * entere de que coordinacion decidio sobre su correccion. Eso no ocurre en
+ * segundos —hay una persona mirandolo— asi que medio minuto de retraso no
+ * cambia nada, y bajarlo solo gastaria datos del movil de quien trabaja.
+ *
+ * Lo que de verdad hace que se note inmediato es el refresco AL VOLVER a la
+ * aplicacion (`use-refresco.ts`), no el reloj.
+ */
+const REFRESCO_MS = 30_000;
 
 interface MyJobsProps {
   locale: Locale;
@@ -108,12 +122,93 @@ export function MyJobs({ locale, staffFirstName, onSessionLost }: MyJobsProps) {
   const [ajustando, setAjustando] = useState<string | null>(null);
   const toast = useToast();
 
+  /**
+   * CUANTAS ACCIONES DE LA PERSONA HAY EN VUELO AHORA MISMO.
+   *
+   * ======================================================================
+   * EL SONDEO NO PUEDE PISAR LO QUE SE ESTA HACIENDO
+   * ======================================================================
+   * Esto es la version de fondo del fallo que ya costo un arreglo en la
+   * Etapa 3.5.h: una foto del servidor que llega tarde y DESMARCA en
+   * pantalla algo que en la base de datos esta marcado.
+   *
+   * Alli eran dos toques seguidos. Aqui es peor, porque el reloj dispara
+   * SOLO: se marca una tarea, el sondeo salta en ese mismo segundo, el
+   * servidor todavia no tiene la marca, y la casilla se vuelve atras sin
+   * que nadie haya tocado nada. En una casa con mala cobertura eso se lee
+   * como que la aplicacion pierde el trabajo hecho.
+   *
+   * Un contador y no un booleano: pueden solaparse dos acciones —marcar una
+   * tarea mientras se ficha— y con un booleano la primera en terminar
+   * abriria la puerta estando la otra todavia en vuelo.
+   */
+  const accionesEnVuelo = useRef(0);
+  /** Si ya hay un sondeo pedido, para que el reloj y el volver no se dupliquen. */
+  const refrescando = useRef(false);
+  /** Si la sesion ya se dio por perdida: entonces el reloj se calla para siempre. */
+  const sesionPerdida = useRef(false);
+  /**
+   * EL ESTADO EN QUE VIMOS POR ULTIMA VEZ CADA PROPUESTA.
+   *
+   * Sirve para avisar SOLO de lo que cambia. Sin esto habria que comparar
+   * contra lo pintado, y al abrir la aplicacion saldria un aviso por cada
+   * correccion que coordinacion resolvio la semana pasada.
+   */
+  const estadoDeAjustes = useRef(new Map<string, string>());
+
+  /** Apunta el estado de cada propuesta sin avisar de nada. */
+  const recordarAjustes = (lista: MyJob[]): void => {
+    for (const job of lista) {
+      for (const ajuste of job.adjustments) estadoDeAjustes.current.set(ajuste.id, ajuste.state);
+    }
+  };
+
+  /**
+   * Avisa de las propuestas que coordinacion acaba de resolver.
+   *
+   * ======================================================================
+   * EL RECHAZO ES EL QUE DE VERDAD HAY QUE LEER
+   * ======================================================================
+   * Que se apruebe se nota solo: el trabajo pasa a decir otra cosa. Que se
+   * rechace no se nota en nada, y un rechazo mudo enseña al equipo a no
+   * volver a reportar nada —y entonces se pierde el dato de verdad—. Por
+   * eso el motivo viaja en el aviso.
+   *
+   * SUPERSEDED no avisa: esa propuesta la sustituyo quien la escribio, al
+   * mandar una medicion nueva. Avisarle de su propio acto sobra.
+   *
+   * SIN UNA SOLA CIFRA DE DINERO, como toda esta pantalla: `MyJobAdjustment`
+   * no tiene donde ponerla.
+   */
+  const avisarDeResoluciones = (lista: MyJob[]): void => {
+    for (const job of lista) {
+      for (const ajuste of job.adjustments) {
+        const conocido = estadoDeAjustes.current.get(ajuste.id);
+        estadoDeAjustes.current.set(ajuste.id, ajuste.state);
+
+        // Solo interesa lo que estaba ESPERANDO y ya no lo esta.
+        if (conocido !== 'PROPOSED') continue;
+
+        if (ajuste.state === 'APPLIED') {
+          toast.success('admin.toast.adjustmentApproved');
+        } else if (ajuste.state === 'REJECTED') {
+          toast.info('admin.toast.adjustmentRejectedToTeam', {
+            detail: ajuste.resolutionNote ?? undefined,
+          });
+        }
+      }
+    }
+  };
+
   useEffect(() => {
     let vigente = true;
 
     fetchMyJobs()
       .then((respuesta) => {
-        if (vigente) setJobs(respuesta.jobs);
+        if (!vigente) return;
+        // La primera carga NO avisa: lo resuelto hace semanas no es noticia.
+        recordarAjustes(respuesta.jobs);
+        setJobs(respuesta.jobs);
       })
       .catch((error: unknown) => {
         if (!vigente) return;
@@ -129,8 +224,68 @@ export function MyJobs({ locale, staffFirstName, onSessionLost }: MyJobsProps) {
     };
   }, [onSessionLost]);
 
+  /**
+   * El sondeo de fondo.
+   *
+   * ======================================================================
+   * UN FALLO AQUI NO PUEDE ROMPER LA PANTALLA NI GRITAR
+   * ======================================================================
+   * Esto ocurre SOLO, sin que nadie lo pida. Dos consecuencias:
+   *
+   *   - No toca `errorKey`. Esa variable vacia la pantalla y la cambia por
+   *     un error, y perder la lista de trabajos porque un sondeo de fondo
+   *     no entro en un sotano seria absurdo: lo pintado sigue siendo
+   *     valido.
+   *   - No saca un aviso. Un rojo cada treinta segundos en una zona con
+   *     mala cobertura tapa la pantalla justo mientras se trabaja.
+   *
+   * La sesion caducada SI se atiende: ahi no hay nada que seguir pintando.
+   */
+  const refrescar = async (): Promise<void> => {
+    if (sesionPerdida.current || refrescando.current || accionesEnVuelo.current > 0) return;
+    refrescando.current = true;
+
+    try {
+      const respuesta = await fetchMyJobs();
+
+      /*
+       * Se vuelve a mirar DESPUES de la respuesta: una accion pudo empezar
+       * mientras esta peticion viajaba, y entonces esta foto ya es vieja.
+       */
+      if (accionesEnVuelo.current > 0) return;
+
+      avisarDeResoluciones(respuesta.jobs);
+      setJobs(respuesta.jobs);
+      /*
+       * Y LA PANTALLA SE CURA SOLA.
+       *
+       * Si la carga inicial fallo —un sotano, un ascensor, el tunel de la
+       * I-85— la pantalla se queda en un error del que no se sale sin cerrar
+       * y abrir la aplicacion. Como el sondeo sigue intentandolo, al volver
+       * la cobertura la lista aparece sin que nadie haga nada.
+       */
+      setErrorKey(null);
+    } catch (error) {
+      if (isSessionError(error)) {
+        /*
+         * Y SE PARA. Sin esto, un token caducado se seguiria mandando cada
+         * treinta segundos hasta que alguien cerrara la aplicacion: ruido en
+         * los registros del servidor, cuota del limitador gastada, y un
+         * aviso de sesion perdida por cada vuelta del reloj.
+         */
+        sesionPerdida.current = true;
+        onSessionLost(sessionLostReason(error));
+      }
+    } finally {
+      refrescando.current = false;
+    }
+  };
+
+  useRefrescoVisible(() => void refrescar(), REFRESCO_MS);
+
   const marcar = async (job: MyJob, status: 'IN_PROGRESS' | 'COMPLETED'): Promise<void> => {
     setOcupado(job.bookingId);
+    accionesEnVuelo.current += 1;
 
     try {
       /*
@@ -176,6 +331,7 @@ export function MyJobs({ locale, staffFirstName, onSessionLost }: MyJobsProps) {
       }
       toast.error(error instanceof ApiClientError ? error.messageKey : 'admin.errorGeneric');
     } finally {
+      accionesEnVuelo.current -= 1;
       setOcupado(null);
     }
   };
@@ -219,6 +375,7 @@ export function MyJobs({ locale, staffFirstName, onSessionLost }: MyJobsProps) {
 
     const turno = (ultimaPeticion.current.get(job.bookingId) ?? 0) + 1;
     ultimaPeticion.current.set(job.bookingId, turno);
+    accionesEnVuelo.current += 1;
 
     try {
       const actualizado = await markChecklistItem(job.bookingId, { itemCode: code, done });
@@ -247,6 +404,8 @@ export function MyJobs({ locale, staffFirstName, onSessionLost }: MyJobsProps) {
       // trabajo entero: eso borraria lo que se haya marcado mientras tanto.
       parcharTarea(setJobs, job.bookingId, anterior);
       toast.error(error instanceof ApiClientError ? error.messageKey : 'admin.errorGeneric');
+    } finally {
+      accionesEnVuelo.current -= 1;
     }
   };
 
@@ -259,12 +418,20 @@ export function MyJobs({ locale, staffFirstName, onSessionLost }: MyJobsProps) {
    */
   const ajustar = async (job: MyJob, cambios: FieldAdjustmentInput): Promise<void> => {
     setAjustando(job.bookingId);
+    accionesEnVuelo.current += 1;
 
     try {
       const actualizado = await proposeFieldAdjustment(job.bookingId, cambios);
       setJobs((actual) =>
         (actual ?? []).map((j) => (j.bookingId === actualizado.bookingId ? actualizado : j)),
       );
+      /*
+       * Se apunta la propuesta nueva como YA CONOCIDA. Sin esto, el primer
+       * sondeo la veria por primera vez en estado PROPOSED, que no dispara
+       * ningun aviso, pero si coordinacion la resolviera entre el envio y
+       * ese sondeo, el aviso de la resolucion se perderia.
+       */
+      recordarAjustes([actualizado]);
       toast.success('admin.toast.adjustmentSent');
     } catch (error) {
       if (isSessionError(error)) {
@@ -273,6 +440,7 @@ export function MyJobs({ locale, staffFirstName, onSessionLost }: MyJobsProps) {
       }
       toast.error(error instanceof ApiClientError ? error.messageKey : 'admin.errorGeneric');
     } finally {
+      accionesEnVuelo.current -= 1;
       setAjustando(null);
     }
   };
