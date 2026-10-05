@@ -1825,13 +1825,17 @@ Hasta la Etapa 3.6 **nada en el panel podía cambiar el precio de una reserva
 confirmada**. Los ajustes de campo lo cambiaron, así que la frontera hay que
 tenerla escrita (el detalle está en `docs/28-ajustes-de-campo.md`).
 
-| Acción                                                     | ADMIN | DISPATCHER | CLEANER |
-| ---------------------------------------------------------- | :---: | :--------: | :-----: |
-| Ver las propuestas de ajuste de una reserva                |  sí   |     sí     |   no    |
-| Aprobar un ajuste **con el importe que calculó el motor**  |  sí   |     sí     |   no    |
-| Rechazar un ajuste                                         |  sí   |     sí     |   no    |
-| **Teclear el importe** cuando el motor no puede calcularlo |  sí   |   **no**   |   no    |
-| Proponer un ajuste desde la PWA                            |  no   |     no     | el responsable del trabajo |
+| Acción                                                     | ADMIN | DISPATCHER |       CLEANER        |
+| ---------------------------------------------------------- | :---: | :--------: | :------------------: |
+| Ver las propuestas de ajuste de una reserva                |  sí   |     sí     |          no          |
+| Aprobar un ajuste **con el importe que calculó el motor**  |  sí   |     sí     |          no          |
+| Rechazar un ajuste                                         |  sí   |     sí     |          no          |
+| **Teclear el importe** cuando el motor no puede calcularlo |  sí   |   **no**   |          no          |
+| Proponer un ajuste desde la PWA                            |  no   |     no     | solo el responsable¹ |
+
+¹ **Proponer no es una acción del panel**, es de la PWA, y la única persona que
+puede hacerla es la que figura como responsable de **ese** trabajo y ha fichado
+**su propia** llegada. No es un permiso de rol: es un permiso de trabajo.
 
 **La línea es ésta: el número que calcula el motor lo aprueba quien lleva la
 agenda; un número que sale de la cabeza de una persona lo pone quien responde

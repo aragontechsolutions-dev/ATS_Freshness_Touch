@@ -170,10 +170,10 @@ del área metropolitana**.
 
 Así que ahora el importe se puede teclear. Con dos condiciones:
 
-|                                                      | Por qué                                                                                                                                                                                       |
-| ---------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Solo ADMIN.** Coordinación no ve ni el campo       | El número que calcula el motor lo aprueba quien lleva la agenda; un número que sale de la cabeza de una persona lo pone quien responde del dinero. Es la frontera que ya separa mover una cita de cobrar una tarjeta |
-| **Solo cuando el motor no puede.** Si puede, es un 400 | Dejar teclear un importe encima del calculado convertiría la tabla de precios en una sugerencia, y dos casas iguales costarían cosas distintas según quién aprobara el ajuste                  |
+|                                                        | Por qué                                                                                                                                                                                                              |
+| ------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Solo ADMIN.** Coordinación no ve ni el campo         | El número que calcula el motor lo aprueba quien lleva la agenda; un número que sale de la cabeza de una persona lo pone quien responde del dinero. Es la frontera que ya separa mover una cita de cobrar una tarjeta |
+| **Solo cuando el motor no puede.** Si puede, es un 400 | Dejar teclear un importe encima del calculado convertiría la tabla de precios en una sugerencia, y dos casas iguales costarían cosas distintas según quién aprobara el ajuste                                        |
 
 **La fila queda marcada (`manualPrice`), y la auditoría también.** Un total
 calculado y uno tecleado valen lo mismo en la factura y **no** valen lo mismo
@@ -246,13 +246,13 @@ mes, la primera pregunta es si lo puso el sistema o alguien.
 Las guardias críticas se validaron **rompiéndolas a propósito** y comprobando
 que las pruebas se ponen en rojo:
 
-| Guardia                                   | Al quitarla       |
-| ----------------------------------------- | ----------------- |
-| Solo el responsable propone                 | 1 prueba en rojo  |
-| Se re-tarifica con la tabla de la reserva   | 1 prueba en rojo  |
-| El móvil no recibe importes                 | 4 pruebas en rojo |
-| Solo ADMIN teclea un importe                | 1 prueba en rojo  |
-| No se teclea encima de un precio calculado  | 1 prueba en rojo  |
+| Guardia                                    | Al quitarla       |
+| ------------------------------------------ | ----------------- |
+| Solo el responsable propone                | 1 prueba en rojo  |
+| Se re-tarifica con la tabla de la reserva  | 1 prueba en rojo  |
+| El móvil no recibe importes                | 4 pruebas en rojo |
+| Solo ADMIN teclea un importe               | 1 prueba en rojo  |
+| No se teclea encima de un precio calculado | 1 prueba en rojo  |
 
 Además:
 
@@ -328,17 +328,17 @@ de teclear solo quien puede teclear.
 
 ## 11. Dónde está cada cosa
 
-| Qué                              | Dónde                                                          |
-| -------------------------------- | -------------------------------------------------------------- |
-| El contrato                      | `packages/types/src/field-adjustment.ts`                       |
-| La tabla                         | `apps/api/prisma/migrations/20261004120000_field_adjustments/` |
+| Qué                              | Dónde                                                                |
+| -------------------------------- | -------------------------------------------------------------------- |
+| El contrato                      | `packages/types/src/field-adjustment.ts`                             |
+| La tabla                         | `apps/api/prisma/migrations/20261004120000_field_adjustments/`       |
 | El motivo y el importe a mano    | `apps/api/prisma/migrations/20261005090000_adjustment_manual_price/` |
-| Proponer, aprobar y re-tarificar | `apps/api/src/admin/field-adjustments.service.ts`              |
-| Leer un ajuste, en un solo sitio | `apps/api/src/admin/field-adjustment.helper.ts`                |
-| Proponer                         | `PATCH /admin/my-jobs/:bookingId/adjustment`                   |
-| Resolver                         | `POST /admin/bookings/:bookingId/adjustment/:adjustmentId`     |
-| La pantalla del responsable      | `apps/admin/src/components/FieldAdjustmentForm.tsx`            |
-| La decisión en el panel          | `apps/admin/src/components/FieldAdjustmentsSection.tsx`        |
+| Proponer, aprobar y re-tarificar | `apps/api/src/admin/field-adjustments.service.ts`                    |
+| Leer un ajuste, en un solo sitio | `apps/api/src/admin/field-adjustment.helper.ts`                      |
+| Proponer                         | `PATCH /admin/my-jobs/:bookingId/adjustment`                         |
+| Resolver                         | `POST /admin/bookings/:bookingId/adjustment/:adjustmentId`           |
+| La pantalla del responsable      | `apps/admin/src/components/FieldAdjustmentForm.tsx`                  |
+| La decisión en el panel          | `apps/admin/src/components/FieldAdjustmentsSection.tsx`              |
 
 ---
 
