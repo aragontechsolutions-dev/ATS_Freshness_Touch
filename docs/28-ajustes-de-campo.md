@@ -357,6 +357,10 @@ de teclear solo quien puede teclear.
   la tabla —aunque esté fuera de zona, los pies cuadrados sí tienen fila— ni lo
   que cobró un trabajo parecido. Es lo primero que pediría quien use esta
   pantalla más de tres veces.
+- **El equipo sigue sin enterarse con la aplicacion cerrada.** El aviso de la
+  §13.4 llega dentro de la aplicacion; una notificacion del movil exigiria
+  permiso de notificaciones, claves VAPID y guardar suscripciones, que es una
+  etapa aparte.
 - **Un importe tecleado no se puede corregir.** Si se escribe 4.200 donde iban
   420, la propuesta ya está aplicada y resuelta, y una resuelta no se resuelve
   dos veces (§8). Hoy se arregla reportando un ajuste nuevo encima; sería mejor
@@ -364,3 +368,153 @@ de teclear solo quien puede teclear.
 
 > **Se cerró en esta etapa:** _«sin precio automático no se puede aplicar»_
 > dejaba sin salida a casi toda Georgia. Ahora lo teclea administración (§6.3).
+
+---
+
+## 13. La PWA se entera sola (Etapa 3.8)
+
+Hasta aquí, el equipo mandaba su corrección y **no se enteraba nunca de en qué
+quedó**, salvo cerrando y abriendo la aplicación. Eso rompe lo que §5 dice que
+es lo más importante de esa pantalla: que el motivo del rechazo llegue.
+
+### 13.1 «Tiempo real» aquí significa treinta segundos
+
+Se descartó el empuje real (WebSocket) y no por pereza: exigiría una pasarela
+de sockets en NestJS, autenticar por socket, reconectar al pasar de 4G a wifi y
+mantener una conexión abierta por cada móvil. **Y no compra nada**, porque al
+otro lado de esta decisión hay una persona mirando una propuesta: medio minuto
+de retraso no cambia ninguna decisión.
+
+Lo que de verdad hace que se note inmediato **no es el reloj, es el refresco al
+volver a la aplicación**. El caso real no es tenerla abierta media hora: es
+sacar el móvil del bolsillo.
+
+|                                | Qué                                       |
+| ------------------------------ | ----------------------------------------- |
+| **Con la pantalla a la vista** | Se pide cada 30 s                         |
+| **Al volver a la aplicación**  | Se pide **siempre**, sin esperar al reloj |
+| **En segundo plano**           | **No se pide nada**                       |
+
+Lo último no es un detalle: esto corre en el móvil de alguien que trabaja toda
+la jornada, y en zonas rurales de Georgia los datos no son gratis.
+
+### 13.2 El sondeo no puede pisar lo que se está haciendo
+
+**Es el riesgo principal de toda la etapa**, y es la versión de fondo del fallo
+que ya costó un arreglo en la Etapa 3.5.h: una foto del servidor que llega
+tarde y **desmarca en pantalla algo que en la base de datos está marcado**.
+
+Allí hacían falta dos toques seguidos. Aquí basta **uno**, porque el reloj
+dispara solo: se marca una tarea, el sondeo salta en ese mismo segundo, el
+servidor todavía no tiene la marca, y la casilla se vuelve atrás sin que nadie
+haya tocado nada. En una casa eso se lee como que la aplicación pierde el
+trabajo hecho.
+
+Se resuelve con **un contador de acciones en vuelo**, mirado dos veces: antes
+de pedir y **otra vez al recibir**, porque una acción pudo empezar mientras la
+petición viajaba. Es un contador y no un booleano porque dos acciones pueden
+solaparse —marcar una tarea mientras se ficha— y con un booleano la primera en
+terminar abriría la puerta estando la otra aún en vuelo.
+
+### 13.3 Un fallo de fondo no puede romper la pantalla ni gritar
+
+Esto ocurre solo, sin que nadie lo pida, así que **no toca el error de pantalla
+y no saca ningún aviso**. Perder la lista de trabajos porque un sondeo no entró
+en un sótano sería absurdo, y un rojo cada treinta segundos en una zona con
+mala cobertura tapa la pantalla justo mientras se trabaja.
+
+Al revés sí: **la pantalla se cura sola**. Si la carga inicial falló, antes
+había que cerrar y abrir la aplicación; ahora el propio sondeo la recupera en
+cuanto vuelve la cobertura.
+
+Y **con la sesión caducada el reloj se calla para siempre**. Sin eso, un token
+muerto se seguiría mandando cada treinta segundos: ruido en los registros,
+cuota del limitador gastada, y un aviso de sesión perdida por cada vuelta.
+
+### 13.4 El aviso: solo de lo que cambia, y el rechazo con su motivo
+
+Se guarda el estado en que se vio por última vez cada propuesta, y se avisa
+solo de las que **estaban esperando y ya no**. Sin eso, al abrir la aplicación
+saldría un aviso por cada corrección resuelta la semana pasada.
+
+- **Aprobada** → aviso verde. Aunque se nota solo (el trabajo pasa a decir otra
+  cosa), confirma que lo que mandó sirvió para algo.
+- **Rechazada** → aviso con **el motivo**. Es el importante: un rechazo mudo
+  enseña al equipo a no volver a reportar nada, y entonces se pierde el dato.
+- **Sustituida** → **no avisa**. La sustituyó quien la escribió.
+
+**Sin una sola cifra de dinero**, como todo lo que llega a esta pantalla.
+
+### 13.5 Con el precio ya puesto, el asunto se cierra
+
+Dejar «Esto no es lo que pone la reserva» a tamaño completo después de que
+administración haya puesto el precio **hace parecer que sigue sin resolverse**,
+y no es así: la reserva ya dice lo que hay en la casa y alguien ya decidió lo
+que cuesta.
+
+Pero **no desaparece del todo**, y esa es la parte pensada. Medir los pies
+cuadrados y descubrir **después** que hay tres neveras es un caso normal: se
+mide al entrar y la cocina se ve más tarde. Sin salida alguna, al equipo solo
+le quedaría llamar por teléfono, que es justo el camino que esta pantalla
+existe para evitar.
+
+Queda como un **enlace pequeño**: cuesta encontrarlo a propósito y no se pulsa
+por error.
+
+> **Discreto no es lo mismo que difícil de pulsar.** La primera versión medía
+> 28 px de alto y la regla de esta pantalla son 44: se usa de pie, con una mano
+> y a veces con guantes. Lo pequeño tiene que ser la **letra**, no el blanco de
+> dedo. Se vio midiéndolo en el navegador, no leyendo el código.
+
+### 13.6 El fallo que creó el propio refresco
+
+Los campos del formulario guardan lo contratado **en estado local al
+montarse**, y hasta ahora eso no se movía mientras la pantalla estaba abierta.
+Con el sondeo sí se mueve: al aprobarse la corrección, la reserva pasa a decir
+1.300 pies donde decía 900.
+
+Sin volver a sincronizar, el formulario se quedaría con el 900 de cuando se
+montó, y abrirlo propondría **«de 1.300 a 900»** —deshacer la corrección recién
+aprobada— sin que nadie lo hubiera pedido.
+
+Se sincroniza **solo con el formulario cerrado**: un refresco no puede borrar
+lo que alguien está tecleando de pie en una cocina.
+
+### 13.7 Seguridad
+
+**No se abrió ninguna puerta nueva**: mismo endpoint, misma sesión, mismo
+contrato. `MyJob` sigue sin poder llevar importes, y el sondeo no trae un solo
+campo que no viniera ya.
+
+Lo que sí cambia es **cuántas peticiones se hacen**, y se miró el número: el
+limitador son 60 por minuto, y el sondeo añade **2 por minuto y persona**.
+Holgado. Conviene recordarlo si algún día se baja el intervalo o se añaden más
+pantallas con reloj, porque el limitador cuenta por IP y un equipo entero en el
+wifi de una casa comparte esa cuenta.
+
+Las guardias se validaron **rompiéndolas a propósito**:
+
+| Guardia                                        | Al quitarla       |
+| ---------------------------------------------- | ----------------- |
+| El sondeo no pisa una acción en curso          | 1 prueba en rojo  |
+| Con la pantalla oculta no se pide nada         | 1 prueba en rojo  |
+| El formulario se vuelve a sincronizar          | 3 pruebas en rojo |
+| Con la sesión caducada el reloj se para        | 1 prueba en rojo  |
+| La pantalla se cura sola                       | 1 prueba en rojo  |
+| El botón grande desaparece con una ya aprobada | 3 pruebas en rojo |
+
+> **Una honestidad sobre una de las pruebas.** «La primera carga no avisa» está
+> protegida **dos veces**: la carga inicial usa una función que no avisa, y
+> además solo se avisa de lo que se vio antes como propuesta abierta. Romper
+> una sola de las dos **no** pone la prueba en rojo; hacen falta las dos. Son
+> cinturón y tirantes a propósito, pero conviene saberlo antes de quitar una
+> creyendo que sobra.
+
+### 13.8 Dónde está
+
+| Qué                              | Dónde                                               |
+| -------------------------------- | --------------------------------------------------- |
+| El reloj y el volver             | `apps/admin/src/lib/use-refresco.ts`                |
+| El sondeo, el contador, el aviso | `apps/admin/src/pages/MyJobs.tsx`                   |
+| El cierre del asunto             | `apps/admin/src/components/FieldAdjustmentForm.tsx` |
+| Las pruebas                      | `apps/admin/src/pages/MyJobs.refresco.test.tsx`     |

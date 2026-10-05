@@ -238,6 +238,9 @@ export const es: TranslationResources = {
       adjustmentApplied: 'Cobrado. La reserva ya dice lo que encontró el equipo.',
       adjustmentRejected: 'Rechazado. El equipo puede ver por qué.',
       adjustmentSent: 'Avisado. Coordinación lo mira y te dice algo.',
+      adjustmentApproved:
+        'Coordinación aceptó tu corrección. La reserva ya dice lo que encontraste.',
+      adjustmentRejectedToTeam: 'Coordinación no va a cobrar tu corrección.',
       jobStarted: 'Llegada registrada.',
       jobFinished: 'Trabajo marcado como terminado.',
     },
@@ -919,6 +922,7 @@ export const es: TranslationResources = {
 
       adjustment: {
         open: 'Esto no es lo que dice la reserva',
+        openAgain: '¿Has visto algo más? Avísanos',
         title: '¿Qué te has encontrado?',
         intro: 'Cambia solo lo que sea distinto. Del precio se encarga coordinación.',
         squareFeet: 'Pies cuadrados',

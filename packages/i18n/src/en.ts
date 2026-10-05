@@ -261,6 +261,15 @@ export const en = {
       adjustmentApplied: 'Charged. The booking now says what the team found.',
       adjustmentRejected: 'Turned down. The team can see why.',
       adjustmentSent: 'Sent. Dispatch will look at it and get back to you.',
+      /*
+       * LO QUE LE LLEGA AL EQUIPO cuando coordinacion decide, no al reves
+       * que `adjustmentApplied`, que lo lee quien decidio.
+       *
+       * SIN CIFRAS: «se ajusto», nunca cuanto. Es la misma regla que impide
+       * que esta pantalla lleve importes.
+       */
+      adjustmentApproved: 'Dispatch accepted your correction. The booking now says what you found.',
+      adjustmentRejectedToTeam: 'Dispatch is not charging for your correction.',
       jobStarted: 'Arrival recorded.',
       jobFinished: 'Job marked as finished.',
     },
@@ -951,6 +960,13 @@ export const en = {
        */
       adjustment: {
         open: 'This is not what was booked',
+        /*
+         * EL ENLACE PEQUEÑO, cuando ya hay una correccion aprobada.
+         * Dice que el asunto esta cerrado Y que todavia se puede hablar, en
+         * una linea: sin la primera mitad parece que no se resolvio nada;
+         * sin la segunda, al equipo solo le queda el telefono.
+         */
+        openAgain: 'Found something else? Report it',
         title: 'What did you find?',
         intro: 'Change only what is different. Dispatch decides what happens with the price.',
         squareFeet: 'Square feet',
