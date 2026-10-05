@@ -42,10 +42,13 @@ const RESERVAS = '/api/v1/admin/bookings';
 const CLEO_AUTH = 'auth-cleo-ajustes';
 const DARIO_AUTH = 'auth-dario-ajustes';
 const ADA_AUTH = 'auth-ada-ajustes';
+/** Coordinacion: aprueba precios calculados, NO teclea importes. */
+const BETO_AUTH = 'auth-beto-ajustes';
 
 const CLEO = 'ccc44444-4444-4444-8444-444444444444';
 const DARIO = 'ddd55555-5555-4555-8555-555555555555';
 const ADA = 'aaa66666-6666-4666-8666-666666666666';
+const BETO = 'bbb77777-7777-4777-8777-777777777777';
 
 const CUSTOMER = 'c0000000-0000-4000-8000-000000000011';
 const ADDRESS = 'a0000000-0000-4000-8000-000000000011';
@@ -153,7 +156,8 @@ beforeAll(async () => {
     VALUES
       ('${CLEO}', '${CLEO_AUTH}', 'Cleo', 'Limpia', 'cleo@example.com', 'CLEANER', true, now()),
       ('${DARIO}', '${DARIO_AUTH}', 'Dario', 'Brilla', 'dario@example.com', 'CLEANER', true, now()),
-      ('${ADA}', '${ADA_AUTH}', 'Ada', 'Jefa', 'ada@example.com', 'ADMIN', true, now());
+      ('${ADA}', '${ADA_AUTH}', 'Ada', 'Jefa', 'ada@example.com', 'ADMIN', true, now()),
+      ('${BETO}', '${BETO_AUTH}', 'Beto', 'Coordina', 'beto@example.com', 'DISPATCHER', true, now());
 
     INSERT INTO customers (id, email, "firstName", "lastName", phone, "updatedAt")
     VALUES ('${CUSTOMER}', 'luis@example.com', 'Luis', 'Perez', '+14045559911', now());
@@ -529,3 +533,157 @@ async function contarAjustes(): Promise<number> {
   );
   return filas.rows[0]?.n ?? 0;
 }
+
+/* ======================================================================== */
+/*  SIN PRECIO AUTOMATICO: EL IMPORTE LO PONE ADMINISTRACION                */
+/* ======================================================================== */
+
+describe('cuando el motor no puede dar precio', () => {
+  /*
+   * ESTE BLOQUE SALE DE UN CASO REAL: un ajuste en una casa de Gainesville se
+   * quedaba sin poder resolverse. Gainesville esta a unas 50 millas de
+   * Atlanta, fuera de las 35 del area metropolitana, y ahi Georgia entera se
+   * atiende SIN precio automatico por diseno (`docs/17`). O sea que no es un
+   * caso raro: es la mayor parte del estado.
+   */
+
+  /** Deja la reserva en una zona donde no hay precio automatico. */
+  async function enZonaLejana(): Promise<void> {
+    await db.exec(`UPDATE bookings SET "distanceMiles" = 90, zone = 'C' WHERE id = '${TRABAJO}'`);
+  }
+
+  async function propuestaSinPrecio(): Promise<string> {
+    await enZonaLejana();
+    await cleoFicha();
+    const respuesta = await proponer({ squareFeet: 2000, note: 'La casa es mas grande' });
+    return respuesta.body.adjustments[0].id as string;
+  }
+
+  it('la propuesta dice POR QUE no hay precio, no solo que no lo hay', async () => {
+    /*
+     * El motor se niega por siete razones distintas y el panel las juntaba
+     * todas en «este tamano no tiene precio automatico». Casi nunca es el
+     * tamano: aqui son 2.000 pies, que la tabla cubre de sobra.
+     */
+    const id = await propuestaSinPrecio();
+
+    const fila = await db.query<{ noPriceReasonKey: string | null; newTotalCents: number | null }>(
+      `SELECT "noPriceReasonKey", "newTotalCents" FROM booking_field_adjustments WHERE id = '${id}'`,
+    );
+
+    expect(fila.rows[0]?.newTotalCents).toBeNull();
+    expect(fila.rows[0]?.noPriceReasonKey).toBe('quote.review.farZone');
+  });
+
+  it('ADMINISTRACION LO APRUEBA CON UN IMPORTE TECLEADO', async () => {
+    const id = await propuestaSinPrecio();
+
+    const respuesta = await resolver(id, { approve: true, newTotalCents: 42000 });
+
+    expect(respuesta.status).toBe(200);
+    const despues = await reserva();
+    expect(despues.totalCents).toBe(42000);
+    expect(despues.squareFeet).toBe(2000);
+    expect(despues.balanceDueCents).toBe(42000 - 3500);
+  });
+
+  it('y queda marcado que el importe lo puso una persona', async () => {
+    /*
+     * Un total calculado y uno tecleado valen lo mismo en la factura y NO
+     * valen lo mismo al revisar las cuentas de un mes: ante un importe raro,
+     * lo primero que se pregunta es si lo puso el sistema o alguien.
+     */
+    const id = await propuestaSinPrecio();
+    await resolver(id, { approve: true, newTotalCents: 42000 });
+
+    const fila = await db.query<{ manualPrice: boolean }>(
+      `SELECT "manualPrice" FROM booking_field_adjustments WHERE id = '${id}'`,
+    );
+    expect(fila.rows[0]?.manualPrice).toBe(true);
+
+    const auditoria = await db.query<{ metadata: unknown }>(
+      `SELECT metadata FROM audit_logs WHERE action = 'booking.adjustment.applied'`,
+    );
+    expect(JSON.stringify(auditoria.rows)).toContain('manualPrice');
+  });
+
+  it('EL DESGLOSE SIGUE CUADRANDO: se anade una linea con la diferencia', async () => {
+    /*
+     * No se puede recalcular el desglose —no hay precio automatico, que es
+     * todo el motivo de estar aqui— asi que se conserva y se le anade la
+     * diferencia. Sin esa linea, el desglose sumaria una cosa y el total
+     * diria otra, que es lo que nadie sabe explicar al revisar una factura.
+     */
+    const id = await propuestaSinPrecio();
+    await resolver(id, { approve: true, newTotalCents: 42000 });
+
+    const fila = await db.query<{ lines: { code: string; amountCents: number }[] }>(
+      `SELECT lines FROM bookings WHERE id = '${TRABAJO}'`,
+    );
+    const ajuste = fila.rows[0]?.lines.find((l) => l.code === 'FIELD_ADJUSTMENT');
+
+    expect(ajuste).toBeDefined();
+    expect(ajuste?.amountCents).toBe(42000 - 25000);
+  });
+
+  it('COORDINACION NO PUEDE TECLEAR IMPORTES', async () => {
+    /*
+     * LA GUARDIA QUE MAS IMPORTA DE ESTE BLOQUE. La linea es la misma que
+     * separa mover una cita de cobrar una tarjeta: el numero que calcula el
+     * motor lo aprueba quien lleva la agenda; un numero que sale de la cabeza
+     * de una persona lo pone quien responde del dinero.
+     */
+    const id = await propuestaSinPrecio();
+
+    const respuesta = await resolver(
+      id,
+      { approve: true, newTotalCents: 42000 },
+      await provider.issue(BETO_AUTH, 'beto@example.com', 3600),
+    );
+
+    expect(respuesta.status).toBe(403);
+    expect((await reserva()).totalCents).toBe(25000);
+  });
+
+  it('sin importe no se puede aprobar', async () => {
+    const id = await propuestaSinPrecio();
+
+    expect((await resolver(id, { approve: true })).status).toBe(400);
+    expect((await reserva()).totalCents).toBe(25000);
+  });
+
+  it('rechazar sigue funcionando igual, sin importe', async () => {
+    const id = await propuestaSinPrecio();
+
+    const respuesta = await resolver(id, { approve: false, note: 'Lo asumimos' });
+
+    expect(respuesta.status).toBe(200);
+    expect((await reserva()).totalCents).toBe(25000);
+  });
+
+  it('un importe desmesurado se rechaza', async () => {
+    // El tope es el techo de cordura que impide que un cero de mas al
+    // teclear se convierta en la factura.
+    const id = await propuestaSinPrecio();
+
+    expect((await resolver(id, { approve: true, newTotalCents: 99_000_000 })).status).toBe(400);
+  });
+});
+
+describe('cuando el motor SI puede dar precio', () => {
+  it('NO SE ADMITE UN IMPORTE TECLEADO ENCIMA', async () => {
+    /*
+     * Dejar sobreescribir el calculo convertiria la tabla de precios en una
+     * sugerencia, y entonces dos casas iguales costarian cosas distintas
+     * segun quien aprobara el ajuste.
+     */
+    await cleoFicha();
+    const propuesta = await proponer({ squareFeet: 1300, note: 'Es mas grande' });
+    const id = propuesta.body.adjustments[0].id as string;
+
+    const respuesta = await resolver(id, { approve: true, newTotalCents: 1 });
+
+    expect(respuesta.status).toBe(400);
+    expect((await reserva()).squareFeet).toBe(900);
+  });
+});

@@ -155,6 +155,36 @@ export const FieldAdjustmentSchema = z.strictObject({
   /** El total que tendría la reserva si se aprueba. `null` por lo mismo. */
   newTotalCents: z.int().nullable(),
 
+  /**
+   * POR QUE no hay precio automático, cuando no lo hay.
+   *
+   * ========================================================================
+   * SIETE MOTIVOS, Y CASI NUNCA ES EL TAMAÑO
+   * ========================================================================
+   * El motor se niega a dar precio por zona lejana, fuera de Georgia, casa
+   * por encima de la tabla, cadencia que ese servicio no ofrece, comercial,
+   * fuera del área o propiedad grande. La primera versión del panel los
+   * juntaba todos en «este tamaño no tiene precio automático».
+   *
+   * **Casi nunca es el tamaño.** El más frecuente con diferencia es la ZONA:
+   * fuera de las 35 millas del área metropolitana, Georgia entera se atiende
+   * sin precio automático por diseño (`docs/17-area-de-servicio.md`). Decirle
+   * a quien decide que el problema es el tamaño le hace buscar donde no es.
+   *
+   * Es una clave de traducción, no una frase.
+   */
+  noPriceReason: z.string().nullable(),
+
+  /**
+   * Si el total lo TECLEO una persona en vez de calcularlo el motor.
+   *
+   * Se marca porque un total calculado y uno tecleado valen lo mismo en la
+   * factura y NO valen lo mismo al revisar las cuentas de un mes: ante un
+   * importe raro, lo primero que se pregunta es si lo puso el sistema o
+   * alguien.
+   */
+  manualPrice: z.boolean(),
+
   /** Quién resolvió y cuándo, si ya está resuelta. */
   resolvedByFirstName: z.string().nullable(),
   resolvedAt: z.iso.datetime().nullable(),
@@ -226,8 +256,35 @@ export const FieldAdjustmentDecisionSchema = z.strictObject({
    * la diferencia, y la próxima vez no lo reportará.
    */
   note: z.string().trim().max(1000).optional(),
+
+  /**
+   * EL TOTAL NUEVO, TECLEADO A MANO.
+   *
+   * ========================================================================
+   * SOLO CUANDO EL MOTOR NO PUEDE DAR PRECIO, Y SOLO ADMINISTRACION
+   * ========================================================================
+   * Existe porque hay trabajos que NUNCA tendrán precio automático: todo lo
+   * que está fuera de las 35 millas del área metropolitana —o sea, casi toda
+   * Georgia— se atiende sin cotización automática por diseño. Sin esto, un
+   * ajuste en una casa de Gainesville se queda sin poder resolverse para
+   * siempre.
+   *
+   * El servidor lo RECHAZA cuando sí hay precio automático: dejar teclear un
+   * importe encima del que calcula el motor convertiría la tabla de precios
+   * en una sugerencia, y entonces dos casas iguales podrían costar cosas
+   * distintas según quién aprobara el ajuste.
+   *
+   * El tope de 100.000 $ no es un límite de negocio: es el techo de cordura
+   * que impide que un cero de más al teclear se convierta en la factura.
+   */
+  newTotalCents: z.int().min(0).max(10_000_000).optional(),
 });
 export type FieldAdjustmentDecision = z.infer<typeof FieldAdjustmentDecisionSchema>;
+
+/** Si una propuesta necesita que alguien teclee el importe. */
+export function needsManualPrice(ajuste: FieldAdjustment): boolean {
+  return ajuste.state === 'PROPOSED' && ajuste.newTotalCents === null;
+}
 
 /** Si una propuesta sigue esperando decisión. */
 export function isOpenAdjustment(ajuste: FieldAdjustment): boolean {

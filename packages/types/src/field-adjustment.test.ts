@@ -28,6 +28,8 @@ function propuesta(cambios: Partial<FieldAdjustment> = {}): FieldAdjustment {
     newTotalCents: 20000,
     resolvedByFirstName: null,
     resolvedAt: null,
+    noPriceReason: null,
+    manualPrice: false,
     resolutionNote: null,
     ...cambios,
   };
@@ -182,13 +184,41 @@ describe('la decision de coordinacion', () => {
     ).toBe(true);
   });
 
-  it('no deja colar un importe a mano', () => {
-    // El importe lo calcula el servidor con la tarifa de la reserva. Dejarlo
-    // llegar del cliente seria dejar escribir el numero que todo esto existe
-    // para calcular.
+  it('ADMITE un importe tecleado, porque hay trabajos sin precio automatico', () => {
+    /*
+     * ESTA PRUEBA DECIA LO CONTRARIO HASTA LA ETAPA 3.7, y su premisa era
+     * incompleta: daba por hecho que el motor SIEMPRE puede dar precio. No
+     * puede. Todo lo que esta fuera de las 35 millas del area metropolitana
+     * —o sea, casi toda Georgia— se atiende sin cotizacion automatica por
+     * diseno, y alli un ajuste se quedaba sin poder resolverse nunca.
+     *
+     * QUIEN LO RECHAZA ES EL SERVIDOR, no el contrato: solo administracion
+     * puede teclearlo, y solo cuando el motor no ha podido calcularlo. Las
+     * dos reglas estan probadas de punta a punta en
+     * `field-adjustments.e2e.test.ts`, porque dependen del rol y del
+     * resultado del motor, que el contrato no conoce.
+     */
     expect(
-      FieldAdjustmentDecisionSchema.safeParse({ approve: true, newTotalCents: 1 }).success,
+      FieldAdjustmentDecisionSchema.safeParse({ approve: true, newTotalCents: 42000 }).success,
+    ).toBe(true);
+  });
+
+  it('pero con un tope: un cero de mas al teclear no es la factura', () => {
+    expect(
+      FieldAdjustmentDecisionSchema.safeParse({ approve: true, newTotalCents: 99_000_000 }).success,
     ).toBe(false);
+    expect(
+      FieldAdjustmentDecisionSchema.safeParse({ approve: true, newTotalCents: -1 }).success,
+    ).toBe(false);
+  });
+
+  it('y sigue sin dejar colar cualquier otro campo', () => {
+    for (const extra of ['state', 'manualPrice', 'differenceCents']) {
+      expect(
+        FieldAdjustmentDecisionSchema.safeParse({ approve: true, [extra]: 1 }).success,
+        extra,
+      ).toBe(false);
+    }
   });
 });
 

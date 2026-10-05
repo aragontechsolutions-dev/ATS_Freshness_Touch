@@ -999,6 +999,30 @@ export const en = {
       bedrooms: 'Bedrooms',
       bathrooms: 'Bathrooms',
       newTotal: 'New total:',
+      /*
+       * EL MOTIVO, DICHO PARA DENTRO.
+       * Los textos de `quote.review` estan escritos para el CLIENTE —«déjanos
+       * tus datos y te llamamos»— y en el panel sonaban absurdos: quien los
+       * lee aqui es quien decide, y necesita saber QUE PASA en media linea.
+       * La clave que llega es `quote.review.<motivo>`; aqui se busca por su
+       * ultimo trozo.
+       */
+      reason: {
+        farZone: 'the house is outside the priced radius',
+        outOfServiceArea: 'the postcode is outside the service area',
+        outOfState: 'the house is outside Georgia',
+        beyondSizeTable: 'the house is bigger than the rate table covers',
+        largeProperty: 'it is a large property',
+        frequencyUnavailable: 'this service is not sold on that schedule',
+        commercialWalkthrough: 'commercial jobs are quoted after a walkthrough',
+        ratesUnavailable: 'the rate table this booking used is no longer stored',
+      },
+      noAutoPriceBecause: 'No automatic price: {{reason}}.',
+      typeBelow: 'Type the new total below.',
+      manualTotal: 'New total for this job',
+      currentTotal: 'It says {{value}} right now',
+      manualNeedsAdmin:
+        'An administrator has to set the amount for this one: the system cannot work it out.',
       noAutoPrice: 'This size has no automatic price. Work the new amount out by hand.',
       approve: 'Charge the difference',
       reject: 'Do not charge it',
@@ -1085,8 +1109,11 @@ export const en = {
     errorAdjustmentResolved: 'Someone already decided on this correction. Refresh the page.',
     errorAdjustmentRejectNeedsNote:
       'Say why you are turning it down: the team needs to know whether they measured wrong or we are absorbing it.',
-    errorAdjustmentNoAutoPrice:
-      'This size has no automatic price, so the new amount has to be worked out by hand.',
+    errorAdjustmentManualNeedsAdmin:
+      'Only an administrator can set the amount by hand. Dispatch can approve a price the system worked out, not type one.',
+    errorAdjustmentNeedsAmount: 'Type the new total before charging it.',
+    errorAdjustmentPriceIsAutomatic:
+      'The system already worked out this price, so it cannot be typed by hand.',
     errorAdjustmentStale:
       'The price works out differently now than when this was reported. Ask the team to send it again so someone can look at the new figure.',
     errorChecklistClosed:
@@ -1223,6 +1250,7 @@ export const en = {
   },
   quote: {
     line: {
+      fieldAdjustment: 'On-site correction',
       /*
        * LA LINEA DICE LO QUE ENTRA EN EL PRECIO, Y NADA MAS. Antes nombraba
        * habitaciones y banos; ninguno de los dos mueve la cifra, y leerlos
@@ -1286,6 +1314,12 @@ export const en = {
         'Distance is estimated from your ZIP code and confirmed once we have the full address.',
     },
     review: {
+      /*
+       * EL MOTIVO, DICHO PARA DENTRO. Los textos de `quote.review` son para
+       * el cliente —«déjanos tus datos y te llamamos»—; estos son para quien
+       * decide en el panel y tienen que decir QUE PASA en una línea.
+       */
+      ratesUnavailable: 'The rate table this booking was priced with is no longer stored',
       commercialWalkthrough:
         'Commercial jobs are priced after a free on-site walkthrough so the scope matches your facility.',
       outOfServiceArea:

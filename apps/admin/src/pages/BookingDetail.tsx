@@ -205,10 +205,14 @@ export function BookingDetailPage({
         booking={booking}
         role={staff.role}
         locale={locale}
-        onResolver={async (adjustmentId, approve, note) => {
+        onResolver={async (adjustmentId, approve, note, newTotalCents) => {
           try {
             setBooking(
-              await resolveFieldAdjustment(booking.bookingId, adjustmentId, { approve, note }),
+              await resolveFieldAdjustment(booking.bookingId, adjustmentId, {
+                approve,
+                note,
+                newTotalCents,
+              }),
             );
             toast.success(
               approve ? 'admin.toast.adjustmentApplied' : 'admin.toast.adjustmentRejected',

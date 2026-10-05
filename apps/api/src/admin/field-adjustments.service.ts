@@ -6,8 +6,10 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
+import { z } from 'zod';
 import {
   API_ERROR_CODES,
+  QuoteLineSchema,
   differsFromBooked,
   type AuthenticatedStaff,
   type FieldAdjustment,
@@ -15,6 +17,7 @@ import {
   type FieldAdjustmentInput,
   type FieldAdjustmentValues,
   type QuoteAddOnInput,
+  type QuoteLine,
   type QuoteResponse,
 } from '@freshness/types';
 import { calculateQuote } from '@freshness/pricing';
@@ -58,6 +61,8 @@ const RESERVA_SELECT = {
   squareFeet: true,
   addOns: true,
   distanceMiles: true,
+  lines: true,
+  surchargesCents: true,
   totalCents: true,
   depositCents: true,
   pricingVersion: true,
@@ -65,6 +70,15 @@ const RESERVA_SELECT = {
 } satisfies Prisma.BookingSelect;
 
 type FilaReserva = Prisma.BookingGetPayload<{ select: typeof RESERVA_SELECT }>;
+
+/**
+ * Las lineas del presupuesto guardadas, releidas con el contrato.
+ *
+ * El JSON de la base lo escribio alguna version del codigo, puede que no la
+ * de hoy. `catch([])` porque un desglose ilegible es «sin desglose», no una
+ * pantalla rota: el total manda, y la linea del ajuste se anade igual.
+ */
+const LineasGuardadasSchema = z.array(QuoteLineSchema).catch([]);
 
 @Injectable()
 export class FieldAdjustmentsService {
@@ -217,6 +231,7 @@ export class FieldAdjustmentsService {
           note: entrada.note,
           differenceCents: nuevo.differenceCents,
           newTotalCents: nuevo.newTotalCents,
+          noPriceReasonKey: nuevo.noPriceReason,
           pricingVersion: reserva.pricingVersion,
           proposedByStaffId: staff.staffId,
         },
@@ -301,7 +316,7 @@ export class FieldAdjustmentsService {
       return this.rechazar(bookingId, ajuste, decision, staff, ipAddress);
     }
 
-    return this.aprobar(bookingId, ajuste, staff, ipAddress);
+    return this.aprobar(bookingId, ajuste, decision, staff, ipAddress);
   }
 
   /* -------------------------------------------------------------------- */
@@ -361,6 +376,7 @@ export class FieldAdjustmentsService {
   private async aprobar(
     bookingId: string,
     ajuste: FilaAjuste & { pricingVersion: string },
+    decision: FieldAdjustmentDecision,
     staff: AuthenticatedStaff,
     ipAddress: string | null,
   ): Promise<FieldAdjustment> {
@@ -382,14 +398,35 @@ export class FieldAdjustmentsService {
     );
 
     /*
-     * SIN PRECIO AUTOMATICO NO SE PUEDE APLICAR SOLO. Una casa por encima del
-     * último tramo de la tabla no se tarifa; el importe lo pone coordinación
-     * a mano, y eso todavía no existe en el panel.
+     * ======================================================================
+     * SIN PRECIO AUTOMATICO, LO TECLEA ADMINISTRACION
+     * ======================================================================
+     * Hay trabajos que NUNCA van a tener precio automatico: todo lo que esta
+     * fuera de las 35 millas del area metropolitana —o sea, casi toda
+     * Georgia— se atiende sin cotizacion automatica por diseno. Sin esta
+     * salida, un ajuste en una casa de Gainesville se queda sin poder
+     * resolverse para siempre.
+     *
+     * SOLO ADMINISTRACION, y no coordinacion como el resto de la aprobacion.
+     * La linea es esta: el numero que calcula el motor lo aprueba quien
+     * lleva la agenda; un numero que sale de la cabeza de una persona lo
+     * pone quien responde del dinero. Es la misma frontera que separa mover
+     * una cita de cobrar una tarjeta.
      */
     if (recalculado.newTotalCents === null || recalculado.quote === null) {
+      return this.aprobarConImporteAMano(bookingId, ajuste, reserva, decision, staff, ipAddress);
+    }
+
+    /*
+     * Y AL REVES: si el motor SI puede dar precio, no se admite uno tecleado.
+     * Dejar sobreescribir el calculo convertiria la tabla de precios en una
+     * sugerencia, y entonces dos casas iguales costarian cosas distintas
+     * segun quien aprobara el ajuste.
+     */
+    if (decision.newTotalCents !== undefined) {
       throw new BadRequestException({
         code: API_ERROR_CODES.VALIDATION_ERROR,
-        messageKey: 'admin.errorAdjustmentNoAutoPrice',
+        messageKey: 'admin.errorAdjustmentPriceIsAutomatic',
       });
     }
 
@@ -502,6 +539,145 @@ export class FieldAdjustmentsService {
   }
 
   /**
+   * Aprueba con un importe TECLEADO por una persona.
+   *
+   * ======================================================================
+   * SOLO ADMINISTRACION, Y QUEDA MARCADO COMO TAL
+   * ======================================================================
+   * Esta cifra no la ha comprobado nadie: no sale de la tabla de tarifas ni
+   * del motor, sale de la cabeza de quien la escribe. Vale lo mismo que una
+   * calculada en la factura y NO vale lo mismo al revisar las cuentas de un
+   * mes, asi que la fila lo dice (`manualPrice`) y la auditoria tambien.
+   */
+  private async aprobarConImporteAMano(
+    bookingId: string,
+    ajuste: FilaAjuste & { pricingVersion: string },
+    reserva: FilaReserva,
+    decision: FieldAdjustmentDecision,
+    staff: AuthenticatedStaff,
+    ipAddress: string | null,
+  ): Promise<FieldAdjustment> {
+    if (staff.role !== 'ADMIN') {
+      /*
+       * La linea es esta: el numero que calcula el motor lo aprueba quien
+       * lleva la agenda; un numero que sale de la cabeza de una persona lo
+       * pone quien responde del dinero. Es la misma frontera que ya separa
+       * mover una cita de cobrar una tarjeta.
+       */
+      throw new ForbiddenException({
+        code: API_ERROR_CODES.FORBIDDEN,
+        messageKey: 'admin.errorAdjustmentManualNeedsAdmin',
+      });
+    }
+
+    const nuevoTotal = decision.newTotalCents;
+    if (nuevoTotal === undefined) {
+      throw new BadRequestException({
+        code: API_ERROR_CODES.VALIDATION_ERROR,
+        messageKey: 'admin.errorAdjustmentNeedsAmount',
+      });
+    }
+
+    const diferencia = nuevoTotal - reserva.totalCents;
+    const porCobrar = Math.max(0, nuevoTotal - reserva.depositCents);
+
+    const fila = await this.prisma.db.$transaction(async (tx) => {
+      /*
+       * EL DESGLOSE SIGUE CUADRANDO.
+       *
+       * No se puede recalcular `lines` —no hay precio automatico, que es todo
+       * el motivo de estar aqui— asi que se CONSERVA el desglose que tenia la
+       * reserva y se le anade una linea con la diferencia. Sin ella, el
+       * desglose sumaria una cosa y el total diria otra, que es justo lo que
+       * nadie sabe explicar al revisar una factura.
+       *
+       * Va como SURCHARGE incluso cuando es negativa: el tipo DISCOUNT tiene
+       * un significado comercial —una rebaja que se concede— y esto no lo es.
+       * Es una correccion de lo que se contrato.
+       */
+      const lineas: QuoteLine[] = [
+        // Lo que ya tenia la reserva, releido con el contrato.
+        ...LineasGuardadasSchema.parse(reserva.lines),
+        {
+          code: 'FIELD_ADJUSTMENT',
+          kind: 'SURCHARGE',
+          labelKey: 'quote.line.fieldAdjustment',
+          quantity: 1,
+          unitAmountCents: diferencia,
+          amountCents: diferencia,
+        },
+      ];
+
+      await tx.booking.update({
+        where: { id: bookingId },
+        data: {
+          squareFeet: ajuste.foundSquareFeet,
+          bedrooms: ajuste.foundBedrooms,
+          bathrooms: ajuste.foundBathrooms,
+          addOns: ExtrasGuardadosSchema.parse(ajuste.foundAddOns),
+          lines: lineas,
+          surchargesCents: reserva.surchargesCents + diferencia,
+          totalCents: nuevoTotal,
+          balanceDueCents: porCobrar,
+          /*
+           * Ni `serviceCents` ni la version de tarifas se tocan: el importe
+           * tecleado no es una tarifa, es una correccion encima de la que
+           * habia. Dejar `serviceCents` como estaba es lo que permite ver
+           * despues cuanto se puso a mano.
+           */
+        },
+      });
+
+      const actualizado = await tx.bookingFieldAdjustment.update({
+        where: { id: ajuste.id },
+        data: {
+          state: 'APPLIED',
+          manualPrice: true,
+          differenceCents: diferencia,
+          newTotalCents: nuevoTotal,
+          resolvedByStaffId: staff.staffId,
+          resolvedAt: new Date(),
+          resolutionNote: decision.note?.trim() || null,
+        },
+        select: AJUSTE_SELECT,
+      });
+
+      await this.audit.record(
+        {
+          staff,
+          surface: 'PANEL',
+          action: 'booking.adjustment.applied',
+          entityType: 'booking',
+          entityId: bookingId,
+          metadata: {
+            reference: reserva.reference,
+            squareFeet: `${ajuste.bookedSquareFeet} → ${ajuste.foundSquareFeet}`,
+            totalCents: `${reserva.totalCents} → ${nuevoTotal}`,
+            differenceCents: diferencia,
+            /*
+             * LO MAS IMPORTANTE DE ESTA ENTRADA. Ante un importe raro en las
+             * cuentas de un mes, la primera pregunta es si lo puso el sistema
+             * o alguien, y esta linea la contesta.
+             */
+            manualPrice: true,
+            noPriceReason: ajuste.noPriceReasonKey,
+          },
+          ipAddress,
+        },
+        tx,
+      );
+
+      return actualizado;
+    });
+
+    this.logger.log(
+      `${reserva.reference}: ajuste aplicado A MANO por ${staff.email}, ` +
+        `total ${reserva.totalCents} → ${nuevoTotal}`,
+    );
+    return ajusteAContrato(fila);
+  }
+
+  /**
    * Vuelve a tarificar con LA TABLA DE LA RESERVA, no con la vigente.
    *
    * ======================================================================
@@ -523,6 +699,8 @@ export class FieldAdjustmentsService {
     differenceCents: number | null;
     newTotalCents: number | null;
     quote: QuoteResponse | null;
+    /** Por que no hay precio, cuando no lo hay. Clave de traduccion. */
+    noPriceReason: string | null;
   }> {
     const config = await this.pricing.atVersion(reserva.pricingVersion);
 
@@ -535,7 +713,12 @@ export class FieldAdjustmentsService {
       this.logger.warn(
         `No existe la tabla de tarifas ${reserva.pricingVersion}: el ajuste va sin importe.`,
       );
-      return { differenceCents: null, newTotalCents: null, quote: null };
+      return {
+        differenceCents: null,
+        newTotalCents: null,
+        quote: null,
+        noPriceReason: 'quote.review.ratesUnavailable',
+      };
     }
 
     const quote = calculateQuote(
@@ -572,13 +755,27 @@ export class FieldAdjustmentsService {
      * significa nada, y enseñarla sería peor que no enseñar ninguna.
      */
     if (quote.manualReview.required) {
-      return { differenceCents: null, newTotalCents: null, quote: null };
+      /*
+       * SE GUARDA EL MOTIVO, no solo el hecho de que no hay precio.
+       *
+       * El motor da siete razones distintas y casi nunca es el tamano: la mas
+       * frecuente es la zona, porque fuera de las 35 millas Georgia entera se
+       * atiende sin precio automatico por diseno. Se queda el primero: cuando
+       * hay varios, el primero es el que de verdad bloquea.
+       */
+      return {
+        differenceCents: null,
+        newTotalCents: null,
+        quote: null,
+        noPriceReason: quote.manualReview.reasonKeys[0] ?? 'quote.review.farZone',
+      };
     }
 
     return {
       differenceCents: quote.totals.totalCents - reserva.totalCents,
       newTotalCents: quote.totals.totalCents,
       quote,
+      noPriceReason: null,
     };
   }
 }

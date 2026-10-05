@@ -1816,3 +1816,37 @@ quién eres tú y a dónde puedes ir.
 Los atributos `width` y `height` reales (256×256) van puestos aunque las clases
 manden el tamaño final: son los que dejan al navegador reservar el hueco antes
 de descargar, y sin ellos la cabecera da un salto al cargar.
+
+---
+
+## 21. Quién mueve el dinero de una reserva ya hecha
+
+Hasta la Etapa 3.6 **nada en el panel podía cambiar el precio de una reserva
+confirmada**. Los ajustes de campo lo cambiaron, así que la frontera hay que
+tenerla escrita (el detalle está en `docs/28-ajustes-de-campo.md`).
+
+| Acción                                                     | ADMIN | DISPATCHER |       CLEANER        |
+| ---------------------------------------------------------- | :---: | :--------: | :------------------: |
+| Ver las propuestas de ajuste de una reserva                |  sí   |     sí     |          no          |
+| Aprobar un ajuste **con el importe que calculó el motor**  |  sí   |     sí     |          no          |
+| Rechazar un ajuste                                         |  sí   |     sí     |          no          |
+| **Teclear el importe** cuando el motor no puede calcularlo |  sí   |   **no**   |          no          |
+| Proponer un ajuste desde la PWA                            |  no   |     no     | solo el responsable¹ |
+
+¹ **Proponer no es una acción del panel**, es de la PWA, y la única persona que
+puede hacerla es la que figura como responsable de **ese** trabajo y ha fichado
+**su propia** llegada. No es un permiso de rol: es un permiso de trabajo.
+
+**La línea es ésta: el número que calcula el motor lo aprueba quien lleva la
+agenda; un número que sale de la cabeza de una persona lo pone quien responde
+del dinero.** Es la misma frontera que ya separa mover una cita de cobrar una
+tarjeta (§11).
+
+Coordinación **no ve el campo del importe**, y tampoco se le dice que escriba
+nada: un aviso que manda a un campo que no está es un fallo propio, no un
+detalle estético. Si intenta aprobar un ajuste sin precio automático, el
+servidor responde `403` con un mensaje que explica el reparto, no un «no
+autorizado» seco.
+
+Y **limpieza no ve ni un importe en ninguna parte** de su pantalla: es una
+prohibición del contrato `MyJob`, no una regla de la interfaz.
