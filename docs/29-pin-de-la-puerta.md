@@ -213,6 +213,65 @@ se guarda un año convertiría el borrado en otro rastro del mismo hecho—.
 
 ---
 
+## 8 bis. El mapa salió gris en producción, por dos fallos a la vez
+
+Al desplegar, el mapa apareció como **un rectángulo gris con el marcador
+roto**. Dos fallos distintos, y **los dos ya estaban resueltos en los mapas
+que existían**: se escribió uno nuevo sin copiar el que funcionaba.
+
+### 1. La URL de las teselas, bloqueada por la CSP
+
+Se usó la URL clásica de Leaflet, `https://{s}.tile.openstreetmap.org/...`,
+que la librería expande a `a.`, `b.` y `c.`. La CSP del sitio permite
+**exactamente** `tile.openstreetmap.org` —host literal, sin comodín—, así que
+el navegador bloqueó todas las teselas.
+
+Faltaba además `referrerPolicy: 'strict-origin-when-cross-origin'`:
+OpenStreetMap responde 403 a quien no se identifica.
+
+**Lo que hace peligroso a este fallo es que no se ve venir:**
+
+|                           |                                             |
+| ------------------------- | ------------------------------------------- |
+| Los tipos                 | No lo ven: es una cadena                    |
+| El lint                   | No lo ve: es una cadena                     |
+| Las pruebas               | No lo veían: ninguna miraba la CSP          |
+| **El navegador en local** | **Tampoco**: en desarrollo no hay cabeceras |
+
+Ahora hay una prueba (`teselas-permitidas.test.ts`) que lee la CSP de
+`vercel.json` y **todas** las URL de teselas del código, y falla si alguna
+quedaría bloqueada. No comprueba «que la URL sea esta» sino que cualquier URL
+esté permitida, así que sigue sirviendo si algún día se cambia de proveedor.
+Validada reintroduciendo el fallo exacto.
+
+### 2. El marcador, una imagen rota
+
+El marcador por defecto de Leaflet carga sus iconos por una ruta relativa que
+los empaquetadores reescriben, así que pide un PNG que no existe. **Esto ya
+estaba documentado** en `LocationPickerMap` del panel, que lo resolvió con un
+círculo vectorial — pero aquí no sirve, porque un `circleMarker` **no se puede
+arrastrar**.
+
+Se usa un `divIcon`: HTML puro, sin archivo que perder, y arrastrable. El
+`iconAnchor` apunta a la **punta** de la gota y no a su centro; si apuntara al
+centro, el pin señalaría unos metros al norte de donde se soltó, que es justo
+la precisión que esta pantalla existe para dar.
+
+> **La lección, que es la misma de los otros fallos de esta familia:** antes
+> de escribir un componente parecido a uno que ya existe, hay que leer el que
+> existe. Las dos trampas estaban resueltas y comentadas a cuatro archivos de
+> distancia.
+
+### Y un fallo en la propia prueba
+
+La primera versión de `teselas-permitidas.test.ts` quitaba los comentarios con
+`.replace(/\/\/.*$/gm, '')` — **y eso se comía el `https://` de las URL que
+tenía que mirar**. Leía basura y fallaba sin motivo. Ahora solo quita los
+comentarios de línea que empiezan la línea. El mismo patrón estaba en la
+prueba del motor de precios y se corrigió también.
+
+---
+
 ## 9. Lo que quedó sin resolver
 
 - **Coordinación no lo ve en el panel.** El equipo sí, en su PWA. Si alguien
