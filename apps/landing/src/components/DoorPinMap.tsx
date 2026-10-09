@@ -43,6 +43,35 @@ import { CAJA_DE_GEORGIA, type DoorPin } from '@freshness/types';
 /** El azul de marca. Va en codigo porque Leaflet pinta SVG con atributos. */
 const COLOR_MARCA = '#145788';
 
+/**
+ * EL MARCADOR, DIBUJADO CON HTML Y SIN NINGUNA IMAGEN.
+ *
+ * ========================================================================
+ * EL MARCADOR POR DEFECTO DE LEAFLET SALE ROTO EN PRODUCCION
+ * ========================================================================
+ * Carga sus iconos por una ruta relativa que los empaquetadores reescriben,
+ * asi que acaba pidiendo un PNG que no existe y se pinta el cuadrito de
+ * imagen rota. Ya estaba documentado en el mapa del panel
+ * (`LocationPickerMap`), que lo resolvio con un circulo vectorial; aqui no
+ * sirve, porque un `circleMarker` NO SE PUEDE ARRASTRAR.
+ *
+ * Un `divIcon` es las dos cosas: HTML puro —no hay archivo que perder— y un
+ * marcador de verdad, arrastrable.
+ *
+ * `iconAnchor` apunta a la PUNTA de la gota, no a su centro: si apuntara al
+ * centro, el pin señalaria unos metros mas al norte de donde se solto, que
+ * es justo la precision que esta pantalla existe para dar.
+ */
+const ICONO_DE_PUERTA = L.divIcon({
+  className: '',
+  html:
+    `<div style="width:26px;height:26px;border-radius:50% 50% 50% 0;` +
+    `transform:rotate(-45deg);background:${COLOR_MARCA};` +
+    `border:3px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4)"></div>`,
+  iconSize: [26, 26],
+  iconAnchor: [13, 26],
+});
+
 interface DoorPinMapProps {
   /** Donde se centra mientras no hay pin: la sede, o la ciudad escrita. */
   centro: { lat: number; lon: number };
@@ -85,9 +114,29 @@ export function DoorPinMap({ centro, valor, onCambiar, descripcion }: DoorPinMap
     instancia.on('click', () => instancia.scrollWheelZoom.enable());
     instancia.on('mouseout', () => instancia.scrollWheelZoom.disable());
 
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    /*
+     * SIN EL `{s}` DE SUBDOMINIO, Y ES OBLIGATORIO.
+     *
+     * ====================================================================
+     * ESTE MAPA SALIO GRIS EN PRODUCCION POR ESCRIBIRLO CON `{s}`
+     * ====================================================================
+     * Leaflet expande `{s}` a `a.`, `b.` y `c.`, y la CSP del sitio permite
+     * EXACTAMENTE `https://tile.openstreetmap.org` —host literal, sin
+     * comodin—, asi que el navegador bloqueo todas las teselas y el mapa
+     * quedo en gris. En local no se ve: ahi no hay cabeceras.
+     *
+     * Tiene que ser la MISMA URL que `ServiceAreaMap`. Hay una prueba que
+     * compara las dos cosas (`teselas-permitidas.test.ts`), porque este
+     * fallo no lo caza ni el lint ni los tipos ni el navegador en local.
+     */
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '&copy; OpenStreetMap',
       maxZoom: 19,
+      /*
+       * OpenStreetMap responde 403 a quien no se identifica. Sin esto el
+       * mapa sale gris en produccion y en local no. Ver `ServiceAreaMap`.
+       */
+      referrerPolicy: 'strict-origin-when-cross-origin',
     }).addTo(instancia);
 
     /** Pone o mueve el marcador, y avisa hacia arriba. */
@@ -107,7 +156,7 @@ export function DoorPinMap({ centro, valor, onCambiar, descripcion }: DoorPinMap
       if (marcador.current) {
         marcador.current.setLatLng(punto);
       } else {
-        marcador.current = L.marker(punto, { draggable: true })
+        marcador.current = L.marker(punto, { draggable: true, icon: ICONO_DE_PUERTA })
           .addTo(instancia)
           .on('dragend', (evento) => ponerPin((evento.target as L.Marker).getLatLng()));
       }

@@ -99,7 +99,7 @@ describe('el motor de precios y el pin de la puerta', () => {
       .filter((ruta) => {
         const fuente = readFileSync(ruta, 'utf8');
         // Solo codigo: un comentario que lo mencione no es usarlo.
-        const sinComentarios = fuente.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+        const sinComentarios = fuente.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
         return /\blatitude\b|\blongitude\b|\blat\b|\blon\b|\blng\b/.test(sinComentarios);
       });
 
