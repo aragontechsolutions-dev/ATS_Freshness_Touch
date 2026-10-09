@@ -113,6 +113,31 @@ afterAll(async () => {
   await db?.close();
 });
 
+/**
+ * El proximo lunes, en formato ISO.
+ *
+ * ==========================================================================
+ * ESTO ERA UNA BOMBA DE TIEMPO, Y EXPLOTO
+ * ==========================================================================
+ * Aqui habia una fecha fija —'2026-10-05'— escrita en dos sitios. Funciono
+ * hasta que ese lunes paso: la agenda no ofrece franjas para un dia que ya
+ * fue, asi que cinco pruebas se pusieron en rojo SOLAS, sin que nadie tocara
+ * el codigo que prueban. Es el segundo fallo de esta familia en el proyecto,
+ * despues del de `admin-access.e2e.test.ts`.
+ *
+ * La regla que sale de las dos veces: UNA PRUEBA NO PUEDE LLEVAR UNA FECHA
+ * ESCRITA A MANO si lo que prueba depende de que sea futura.
+ *
+ * Se busca a partir de MANANA, no de hoy: si hoy es lunes, la agenda de hoy
+ * puede estar ya medio pasada segun la hora a la que corran las pruebas.
+ */
+function proximoLunes(): string {
+  const dia = new Date();
+  dia.setUTCDate(dia.getUTCDate() + 1);
+  while (dia.getUTCDay() !== 1) dia.setUTCDate(dia.getUTCDate() + 1);
+  return dia.toISOString().slice(0, 10);
+}
+
 describe('quien puede cambiar los datos publicos de la empresa', () => {
   it('sin sesion no se puede leer la pantalla de configuracion', async () => {
     const respuesta = await request(app.getHttpServer()).get(ADMIN);
@@ -267,7 +292,26 @@ describe('lo que ve el visitante', () => {
 });
 
 describe('el horario guardado manda sobre la agenda', () => {
-  const LUNES = '2026-10-05';
+  /**
+   * EL PROXIMO LUNES, CALCULADO, NO ESCRITO A MANO.
+   *
+   * ======================================================================
+   * ESTO ERA UNA BOMBA DE TIEMPO, Y EXPLOTO
+   * ======================================================================
+   * Aqui habia una fecha fija —'2026-10-05'—. Funciono hasta que ese lunes
+   * paso: la agenda no ofrece franjas para un dia que ya fue, asi que estas
+   * cinco pruebas se pusieron en rojo SOLAS, sin que nadie tocara el codigo
+   * que prueban. Es el segundo fallo de esta familia en el proyecto, despues
+   * del de `admin-access.e2e.test.ts`.
+   *
+   * La regla que se saca de las dos veces: UNA PRUEBA NO PUEDE LLEVAR UNA
+   * FECHA ESCRITA A MANO si lo que prueba depende de que sea futura.
+   *
+   * Se busca el proximo lunes a partir de manana. Manana y no hoy porque si
+   * hoy ES lunes, la agenda de hoy puede estar ya medio pasada segun la hora
+   * a la que corran las pruebas.
+   */
+  const LUNES = proximoLunes();
 
   /** Consulta franjas para un lunes concreto con un trabajo pequeno. */
   async function franjasDelLunes(): Promise<{ businessOpen: boolean; slots: unknown[] }> {
@@ -346,7 +390,8 @@ describe('cuando lo guardado no sirve', () => {
 
   it('y la agenda sigue funcionando con el horario de partida', async () => {
     const respuesta = await request(app.getHttpServer()).get('/api/v1/availability').query({
-      date: '2026-10-05',
+      // Calculada, no escrita a mano: ver el comentario de `LUNES` arriba.
+      date: proximoLunes(),
       service: 'STANDARD',
       bedrooms: 1,
       bathrooms: 1,

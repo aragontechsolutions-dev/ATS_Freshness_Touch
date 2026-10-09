@@ -1,4 +1,6 @@
 import { useTranslation } from 'react-i18next';
+import { useCatalog } from '../../hooks/useCatalog';
+import { DoorPinMap } from '../DoorPinMap';
 import {
   formatUsPhone,
   type BookingDetailsForm,
@@ -24,10 +26,26 @@ interface DetailsStepProps {
  */
 export function DetailsStep({ form, errors, onChange }: DetailsStepProps) {
   const { t } = useTranslation();
+  const { catalog } = useCatalog();
 
   const set = <K extends keyof BookingDetailsForm>(key: K, value: BookingDetailsForm[K]): void => {
     onChange({ ...form, [key]: value });
   };
+
+  /*
+   * DONDE SE CENTRA EL MAPA MIENTRAS NO HAY PIN.
+   *
+   * En la sede, que es lo unico que sabemos con certeza en este punto: la
+   * direccion que el cliente acaba de escribir todavia no esta
+   * geocodificada —eso pasa DESPUES de reservar, fuera del camino del
+   * dinero (`docs/24-geocodificacion.md`)— y geocodificarla aqui metaria
+   * una llamada a un servicio externo en medio del formulario, que puede
+   * tardar o fallar justo antes de cobrar.
+   *
+   * El cliente desplaza el mapa hasta su calle. Es un gesto mas, y es el
+   * precio de no retrasar la reserva por una llamada que puede fallar.
+   */
+  const base = catalog?.baseOfOperations ?? null;
 
   return (
     <div className="space-y-6">
@@ -150,6 +168,51 @@ export function DetailsStep({ form, errors, onChange }: DetailsStepProps) {
           {t('booking.details.accessNotesHelp')}
         </p>
       </div>
+
+      {/*
+        SIN CATALOGO NO HAY MAPA, y la reserva sigue. El catalogo trae la
+        sede; si la API no contesta, se pinta el formulario sin esta seccion
+        en vez de bloquear una reserva por un mapa que es opcional.
+      */}
+      {base && (
+        <>
+          {/*
+        EL PIN DE LA PUERTA, justo despues de las instrucciones de acceso.
+        Las dos cosas responden a la misma pregunta —«como entro»— y ponerlas
+        juntas es lo que hace que se entienda para que sirve el mapa. Antes
+        de la direccion no tendria sentido: el mapa se centra en la ciudad
+        que acaba de escribir.
+      */}
+          <div>
+            <label className="ft-label" id="doorPin-label">
+              {t('booking.details.doorPin')}
+            </label>
+            <p id="doorPin-help" className="mb-2 text-xs text-slate-500 dark:text-slate-400">
+              {t('booking.details.doorPinHelp')}
+            </p>
+            <DoorPinMap
+              centro={{ lat: base.latitude, lon: base.longitude }}
+              valor={form.doorPin}
+              onCambiar={(pin) => set('doorPin', pin)}
+              descripcion={t('booking.details.doorPinAria')}
+            />
+            {/*
+          LA PROMESA, DEBAJO DEL MAPA Y SIEMPRE VISIBLE.
+          No en un enlace de «mas informacion» ni en la politica de
+          privacidad: lo que se promete sobre un dato se lee donde se da ese
+          dato, o no se ha prometido nada.
+        */}
+            <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+              {form.doorPin
+                ? t('booking.details.doorPinSet')
+                : t('booking.details.doorPinOptional')}{' '}
+              <span className="font-medium text-slate-700 dark:text-slate-300">
+                {t('booking.details.doorPinRetention')}
+              </span>
+            </p>
+          </div>
+        </>
+      )}
 
       <div>
         <label className="ft-label" htmlFor="customerNotes">

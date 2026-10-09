@@ -100,6 +100,7 @@ function trabajo(checklist: JobChecklistEntry[], cambios: Partial<MyJob> = {}): 
     iHaveLeft: false,
     clockIns: [],
     adjustments: [],
+    doorPin: null,
     checklist,
     ...cambios,
   };

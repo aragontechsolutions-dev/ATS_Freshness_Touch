@@ -911,6 +911,7 @@ export const es: TranslationResources = {
         'No leas esto en alto delante de nadie y cierra la pantalla al guardar el móvil.',
       customerNotes: 'Lo que pidió el cliente',
       call: 'Llamar',
+      doorPin: 'El cliente marcó la entrada — ábrela',
       directions: 'Cómo llegar',
       rooms: '{{bedrooms}} habitaciones · {{bathrooms}} baños',
       start: 'He llegado',
@@ -1125,6 +1126,13 @@ export const es: TranslationResources = {
       accessNotes: 'Instrucciones de acceso (opcional)',
       accessNotesHelp:
         'Código del portón, dónde está la llave, si hay perro en el jardín. Solo lo ven el equipo asignado a tu trabajo y nuestra oficina.',
+      doorPin: 'Enséñanos la puerta (opcional)',
+      doorPinHelp:
+        'Toca en el mapa donde debemos parar. Las direcciones del campo suelen caer a cien metros de donde son, y esto le ahorra vueltas al equipo.',
+      doorPinAria: 'Mapa para marcar dónde está la entrada de tu casa',
+      doorPinOptional: 'No has marcado nada, y no pasa nada.',
+      doorPinSet: 'Marcado. Arrastra el pin si no está donde querías.',
+      doorPinRetention: 'Este pin lo borramos al día siguiente de tu limpieza.',
       customerNotes: '¿Algo más que debamos saber? (opcional)',
       marketingOptIn: 'Quiero recibir ofertas y consejos de limpieza de vez en cuando.',
       priceNotice:

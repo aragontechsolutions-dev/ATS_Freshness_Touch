@@ -401,6 +401,28 @@ model Booking {
   customerNotes String?
 
   // --- Cierre ---
+  /// EL PIN DE LA PUERTA, si el cliente lo marco al reservar.
+  ///
+  /// Donde se entra de verdad: la puerta, el camino de coches, cual de los
+  /// seis edificios del complejo. Existe porque el geocodificador interpola
+  /// sobre el tramo de via y en la Georgia rural deja la casa a cientos de
+  /// metros.
+  ///
+  /// VA AQUI Y NO EN `addresses` A PROPOSITO. Alli seria una propiedad
+  /// permanente de la casa y la promesa de que se borra no tendria de donde
+  /// colgar: una direccion no termina nunca, un trabajo si.
+  ///
+  /// SE BORRA 24 H DESPUES DE QUE EL TRABAJO TERMINE, medido desde el final
+  /// real si lo hay y desde el previsto si no. No hay columna de caducidad:
+  /// se calcula de `completedAt`, `cancelledAt` y `scheduledEnd`, que ya
+  /// estan, y asi no puede desincronizarse. Ver `door-pin.ts`.
+  ///
+  /// NO TOCA EL PRECIO. La distancia sale del codigo postal; si saliera de
+  /// aqui, el cliente podria arrastrar el pin hacia Atlanta y pagarse un
+  /// descuento. Hay una prueba que lo vigila en el motor de precios.
+  doorPinLatitude  Float?
+  doorPinLongitude Float?
+
   startedAt          DateTime?    @db.Timestamptz(3)
   completedAt        DateTime?    @db.Timestamptz(3)
   cancelledAt        DateTime?    @db.Timestamptz(3)

@@ -97,6 +97,7 @@ function trabajo(cambios: Partial<MyJob> = {}): MyJob {
     iHaveLeft: false,
     clockIns: [],
     adjustments: [],
+    doorPin: null,
     checklist: [],
     ...cambios,
   };

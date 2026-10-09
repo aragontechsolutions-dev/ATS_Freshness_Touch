@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { FrequencySchema, LocaleSchema, ServiceTypeSchema } from './enums';
 import { PaymentIntentSchema } from './payment';
+import { DoorPinSchema } from './door-pin';
 import { QuoteAddOnInputSchema, QuoteDepositSchema, QuoteTotalsSchema } from './quote';
 
 /**
@@ -78,6 +79,18 @@ export const BookingRequestSchema = z
     address: BookingAddressSchema,
 
     customerNotes: z.string().trim().max(1000).optional(),
+
+    /**
+     * DONDE ESTA LA PUERTA, si el cliente se molesto en marcarlo.
+     *
+     * OPCIONAL Y SIN CONSECUENCIAS. Reservar no puede depender de que
+     * alguien sepa usar un mapa: quien lo salta reserva igual y el equipo
+     * llega con la direccion, como hasta ahora.
+     *
+     * NO TOCA EL PRECIO. La cotizacion ya esta hecha cuando esto se manda, y
+     * la distancia sale del codigo postal. Ver `door-pin.ts`.
+     */
+    doorPin: DoorPinSchema.optional(),
   })
   .refine(
     (value) => new Set(value.addOns.map((addOn) => addOn.code)).size === value.addOns.length,

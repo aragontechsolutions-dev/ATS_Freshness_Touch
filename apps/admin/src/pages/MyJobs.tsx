@@ -589,6 +589,28 @@ function Tarjeta({
           <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
             {t('admin.myJobs.rooms', { bedrooms: job.bedrooms, bathrooms: job.bathrooms })}
           </p>
+          {/*
+            EL PIN QUE MARCO EL CLIENTE, cuando lo marco.
+            ================================================================
+            VA COMO UN SEGUNDO ENLACE Y NO SUSTITUYE A LA DIRECCION. Los dos
+            sirven para cosas distintas: la calle es la que se reconoce y la
+            que se le dice a alguien por telefono; el pin es el que lleva a
+            la puerta correcta cuando la calle no basta.
+            Y el pin puede estar equivocado —lo puso una persona—, asi que
+            quitar la direccion dejaria al equipo sin nada a lo que volver.
+            Se le dice que lo marco EL CLIENTE, no nosotros: es lo que
+            permite decidir de cual fiarse si los dos no coinciden.
+          */}
+          {job.doorPin && (
+            <a
+              className="mt-1 inline-block text-sm font-medium text-brand-700 underline dark:text-sun-300"
+              href={`https://maps.google.com/?q=${job.doorPin.latitude},${job.doorPin.longitude}`}
+              target="_blank"
+              rel="noreferrer"
+            >
+              {t('admin.myJobs.doorPin')}
+            </a>
+          )}
         </div>
       </div>
 

@@ -12,6 +12,7 @@ export * from './site-copy';
 export * from './service-area';
 export * from './geo-distance';
 export * from './clock-in';
+export * from './door-pin';
 export * from './field-adjustment';
 export * from './geocoding';
 export * from './georgia-outline';

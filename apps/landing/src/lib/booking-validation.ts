@@ -1,3 +1,4 @@
+import type { DoorPin } from '@freshness/types';
 /**
  * VALIDACION DEL FORMULARIO DE RESERVA
  * ------------------------------------
@@ -21,6 +22,11 @@ export interface BookingDetailsForm {
   state: string;
   postalCode: string;
   accessNotes: string;
+  /**
+   * El pin de la puerta, si el cliente lo marco. OPCIONAL SIEMPRE: reservar
+   * no puede depender de que alguien sepa usar un mapa.
+   */
+  doorPin: DoorPin | null;
   customerNotes: string;
   marketingOptIn: boolean;
 }
@@ -38,6 +44,7 @@ export const EMPTY_DETAILS: BookingDetailsForm = {
   state: 'GA',
   postalCode: '',
   accessNotes: '',
+  doorPin: null,
   customerNotes: '',
   marketingOptIn: false,
 };

@@ -932,6 +932,9 @@ export const en = {
         'Do not read this aloud in front of anyone, and close the screen when you put your phone away.',
       customerNotes: 'What the customer asked for',
       call: 'Call',
+      /* El pin que marco el cliente. Se dice QUIEN lo puso: si no coincide
+       * con la calle, el equipo tiene que poder decidir de cual fiarse. */
+      doorPin: 'The customer marked the entrance — open it',
       directions: 'Directions',
       rooms: '{{bedrooms}} bedrooms · {{bathrooms}} bathrooms',
       start: 'I have arrived',
@@ -1197,6 +1200,22 @@ export const en = {
       accessNotes: 'Access instructions (optional)',
       accessNotesHelp:
         'Gate code, where the key is, a dog in the yard. Only the team assigned to your job and our office can see this.',
+      /*
+       * EL PIN DE LA PUERTA.
+       *
+       * LA PROMESA SE DICE DONDE SE DA EL DATO, y se dice exacta: se borra
+       * EL PIN, no «tu ubicacion». La direccion de la casa se queda, porque
+       * hay que facturar y volver, y prometer que se olvida seria mentira.
+       * Una promesa de privacidad que no se cumple al pie de la letra es
+       * peor que no hacerla.
+       */
+      doorPin: 'Show us the door (optional)',
+      doorPinHelp:
+        'Tap the map where we should pull up. Street addresses out in the county often land a few hundred feet off, and this saves the crew driving in circles.',
+      doorPinAria: 'Map to mark where the entrance to your home is',
+      doorPinOptional: 'Nothing marked yet, and that is fine.',
+      doorPinSet: 'Marked. Drag the pin if it is not quite right.',
+      doorPinRetention: 'We delete this pin the day after your cleaning.',
       customerNotes: 'Anything else we should know? (optional)',
       marketingOptIn: 'Send me occasional offers and cleaning tips.',
       priceNotice:
