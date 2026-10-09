@@ -242,6 +242,13 @@ del cliente (que en la Etapa 1 no se pide a propósito).
   (con el motivo, si la rechaza) y **cierra el asunto** cuando administración ya
   puso el precio, dejando una salida pequeña por si aparece algo nuevo. En
   segundo plano no pide nada: es la batería y los datos de quien trabaja.
+- ✅ **El pin de la puerta** (`docs/29-pin-de-la-puerta.md`): el cliente marca
+  en un mapa por dónde se entra a su casa, porque el geocodificador deja las
+  casas rurales a cientos de metros. **Se borra 24 h después del trabajo**, con
+  dos defensas: caduca al leerse y además lo borra un barrido. **No toca el
+  precio nunca** —si lo tocara, el cliente podría arrastrarlo hacia Atlanta y
+  cobrarse un descuento—, y hay tres pruebas que leen el motor de precios para
+  impedirlo.
 - ⬜ Fotos antes y después. Requiere decidir dónde se almacenan.
 - ⬜ Funcionamiento sin conexión con cola de sincronización (zonas rurales de
   Georgia).

@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { BookingStatusSchema } from './booking';
 import { ClockInLocationSchema, ClockInRecordSchema } from './clock-in';
+import { DoorPinSchema } from './door-pin';
 import { MyJobAdjustmentSchema } from './field-adjustment';
 import { QuoteAddOnInputSchema } from './quote';
 import { JobChecklistEntrySchema } from './job-checklist';
@@ -165,6 +166,24 @@ export const MyJobSchema = z.strictObject({
    * quien limpia al lado como para quien la escribió.
    */
   adjustments: z.array(MyJobAdjustmentSchema),
+
+  /**
+   * DONDE DIJO EL CLIENTE QUE ESTA LA PUERTA.
+   *
+   * La direccion dice a que casa ir; esto dice por donde se entra, que en
+   * una carretera comarcal no es lo mismo. Lo marco el cliente al reservar
+   * porque el geocodificador interpola sobre el tramo de via y en el campo
+   * deja la casa a cientos de metros.
+   *
+   * `null` es el caso NORMAL, no un error: marcar el pin es opcional y la
+   * mayoria no lo hara. Y es `null` tambien cuando el pin ya caduco —se
+   * borra 24 h despues del trabajo—, asi que la pantalla no puede dar por
+   * hecho que lo que habia ayer sigue estando.
+   *
+   * Sigue sin haber un solo importe en este contrato. Un punto en un mapa
+   * no es dinero.
+   */
+  doorPin: DoorPinSchema.nullable(),
 });
 export type MyJob = z.infer<typeof MyJobSchema>;
 

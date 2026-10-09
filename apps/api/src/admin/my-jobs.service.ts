@@ -18,6 +18,7 @@ import {
   type MyJobs,
 } from '@freshness/types';
 import { AuditService } from '../audit/audit.service';
+import { PIN_SELECT, pinVisible } from '../bookings/door-pin.helper';
 import { PrismaService } from '../database/prisma.service';
 import { AJUSTE_SELECT, ExtrasGuardadosSchema, ajusteAContrato } from './field-adjustment.helper';
 import {
@@ -35,6 +36,14 @@ import type { Prisma } from '../generated/prisma/client';
  * base, y asi un descuido en la plantilla no puede ensenar un precio.
  */
 const JOB_SELECT = {
+  /*
+   * EL PIN DE LA PUERTA y las tres fechas que deciden si todavia vale. No
+   * bastan las coordenadas: la caducidad se calcula, no se guarda.
+   *
+   * Va PRIMERO para que los campos de abajo que se repiten —`scheduledEnd`—
+   * manden sobre el, y no al reves.
+   */
+  ...PIN_SELECT,
   id: true,
   reference: true,
   status: true,
@@ -677,6 +686,13 @@ function toMyJob(trabajo: FilaTrabajo, staffId: string, catalogo: readonly Check
      * cuesta lo dice coordinacion. Ver `field-adjustment.ts`.
      */
     adjustments: trabajo.fieldAdjustments.map((fila) => toMyJobAdjustment(ajusteAContrato(fila))),
+    /*
+     * EL PIN, SI TODAVIA VALE. `pinVisible` devuelve null cuando ya pasaron
+     * las 24 h, AUNQUE LA FILA SIGA AHI: el barrido que la borra puede
+     * fallar, y la promesa que se le hizo al cliente no puede depender de
+     * que un temporizador haya corrido. Ver `door-pin.helper.ts`.
+     */
+    doorPin: pinVisible(trabajo),
     clockIns: trabajo.clockIns.map((f): ClockInRecord => ({
       staffId: f.staffId,
       staffFirstName: f.staff.firstName,

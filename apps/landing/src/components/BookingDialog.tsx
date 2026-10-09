@@ -181,6 +181,12 @@ export function BookingDialog({ open, job, quote, locale, onClose }: BookingDial
             ...(details.accessNotes.trim() ? { accessNotes: details.accessNotes.trim() } : {}),
           },
           ...(details.customerNotes.trim() ? { customerNotes: details.customerNotes.trim() } : {}),
+          /*
+           * EL PIN DE LA PUERTA, solo si lo marco. Se manda APARTE de todo
+           * lo que calcula el precio: la cotizacion ya esta hecha y la
+           * distancia sale del codigo postal.
+           */
+          ...(details.doorPin ? { doorPin: details.doorPin } : {}),
         },
         controller.signal,
       );

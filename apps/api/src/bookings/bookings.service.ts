@@ -381,6 +381,17 @@ export class BookingsService {
             balanceDueCents: quote.balanceDueAtServiceCents,
             pricingVersion: version,
             customerNotes: request.customerNotes ?? null,
+            /*
+             * EL PIN DE LA PUERTA, si el cliente se molesto en marcarlo.
+             *
+             * Entra aqui y NO toca nada mas: no se mezcla con la cotizacion
+             * —que ya esta hecha y calculada desde el codigo postal— ni con
+             * la distancia ni con la zona. Si alguna vez tocara el precio,
+             * el cliente podria arrastrarlo hacia Atlanta y cobrarse un
+             * descuento (`packages/types/src/door-pin.ts`).
+             */
+            doorPinLatitude: request.doorPin?.latitude ?? null,
+            doorPinLongitude: request.doorPin?.longitude ?? null,
           },
         });
 
