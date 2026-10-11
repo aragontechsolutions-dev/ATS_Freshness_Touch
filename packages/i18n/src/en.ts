@@ -450,10 +450,28 @@ export const en = {
       telegramOnNewBooking: 'Send a Telegram message for each new booking',
       telegramOnNewBookingHelp:
         'Only for bookings that are confirmed and paid. Abandoned forms are not reported, so the alert stays worth reading.',
-      telegramChatId: 'Telegram chat',
+      telegramChatId: 'Operations chat',
       telegramChatIdHelp:
-        'The numeric chat id. Write to your bot, then open api.telegram.org/bot<token>/getUpdates to read it.',
+        'New bookings and arrivals that look wrong. The numeric chat id: write to your bot, then open api.telegram.org/bot<token>/getUpdates to read it.',
       telegramChatIdInvalid: 'The chat id is a number, for example 123456789.',
+
+      telegramOnTeamArrivedFar: 'Tell operations when the team clocks in far from the house',
+      telegramOnTeamArrivedFarHelp:
+        'Only when the phone itself says the person cannot be at the house: the GPS margin of error is subtracted first. Normal arrivals send nothing.',
+
+      telegramCleaningChatId: 'Cleaning team group',
+      telegramCleaningChatIdHelp:
+        'Must be a GROUP, not a person: a bot cannot message someone who has not written to it first. Add the bot to the group and paste its id (it starts with a minus sign). Everyone in the group sees the street and city of every job, and never any amount.',
+      telegramCleaningChatIdInvalid: 'The group id is a number, for example -1001234567890.',
+
+      telegramOnJobAssigned: 'Tell the team when a job is assigned or changed',
+      telegramOnJobAssignedHelp:
+        'Sent again when the team changes, so an old message is never left standing as if it were current.',
+
+      telegramTechChatId: 'Technical chat',
+      telegramTechChatIdHelp:
+        'System failures only: pending migrations, payments in test mode, jobs that stopped running. If left empty they go to the operations chat, because a broken system nobody hears about is worse than a message to the wrong person.',
+      telegramTechChatIdInvalid: 'The chat id is a number, for example 123456789.',
 
       credentialsNote:
         'The email API key and the Telegram bot token are set on the server, not here. Credentials stored in the database end up in every backup, so they stay in the server environment alongside the payment keys.',

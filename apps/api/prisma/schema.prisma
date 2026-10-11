@@ -83,6 +83,10 @@ enum NotificationEvent {
   BOOKING_CONFIRMED
   BOOKING_CANCELLED
   BOOKING_REMINDER
+  /// El equipo ficho la entrada lejos de la casa. Solo las que no cuadran.
+  TEAM_ARRIVED_FAR
+  /// Se asigno equipo a una reserva, o se cambio el que habia.
+  JOB_ASSIGNED
 }
 
 enum NotificationChannel {
@@ -90,9 +94,11 @@ enum NotificationChannel {
   TELEGRAM
 }
 
+/// Decide QUE DATOS puede llevar un mensaje dentro. CLEANING nunca ve dinero.
 enum NotificationAudience {
   CUSTOMER
   INTERNAL
+  CLEANING
 }
 
 /// SKIPPED no es un fallo: es "estaba apagado o sin configurar".
@@ -750,6 +756,10 @@ model Notification {
   /// la migracion 20260921210000: Prisma no sabe expresar indices parciales.
   /// Es lo que convierte un reenvio en un error de clave duplicada en vez de
   /// en un segundo correo.
+  ///
+  /// JOB_ASSIGNED QUEDA FUERA de esa restriccion desde la migracion
+  /// 20261011120100. Una reasignacion tiene que poder volver a avisar: si no,
+  /// el grupo del equipo seguiria creyendo que va quien ya no va.
   @@index([bookingId, createdAt(sort: Desc)])
   @@map("notifications")
 }

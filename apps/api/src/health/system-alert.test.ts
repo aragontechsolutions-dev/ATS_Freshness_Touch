@@ -67,12 +67,15 @@ const TARIFAS_ROTAS: SystemCheck = {
 let actual: SystemHealth;
 let enviados: { chatId: string; text: string }[];
 let chatId: string | null;
+let chatTecnico: string | null;
 let servicio: SystemAlertService;
 
 function construir(): SystemAlertService {
   const checks = { run: () => Promise.resolve(actual) };
 
-  const ajustes = { get: () => Promise.resolve({ telegramChatId: chatId }) };
+  const ajustes = {
+    get: () => Promise.resolve({ telegramChatId: chatId, telegramTechChatId: chatTecnico }),
+  };
 
   const telegram = {
     name: 'telegram' as const,
@@ -97,6 +100,7 @@ function construir(): SystemAlertService {
 beforeEach(() => {
   enviados = [];
   chatId = '-100123';
+  chatTecnico = '-100999';
   actual = informe({});
   servicio = construir();
 });
@@ -256,12 +260,42 @@ describe('la alarma de estado', () => {
        * dejaria el fallo sin registrar justo cuando mas falta hace.
        */
       chatId = null;
+      chatTecnico = null;
       actual = informe({ migrations: MIGRACIONES_PENDIENTES });
 
       const mensajes = await servicio.pasada(0);
 
       expect(mensajes).toHaveLength(1);
       expect(enviados).toEqual([]);
+    });
+  });
+
+  describe('a que chat va el aviso (etapa 3.13)', () => {
+    it('al TECNICO, no al de operaciones', async () => {
+      /*
+       * Quien lleva el negocio no puede hacer nada con «faltan migraciones».
+       * Mezclar esos mensajes con los de reservas nuevas ensena a no leer
+       * ninguno de los dos.
+       */
+      actual = informe({ migrations: MIGRACIONES_PENDIENTES });
+
+      await servicio.pasada(0);
+
+      expect(enviados).toHaveLength(1);
+      expect(enviados[0]?.chatId).toBe('-100999');
+    });
+
+    it('y si no hay tecnico, al de operaciones antes que a ninguno', async () => {
+      /*
+       * Esta caida SI es deliberada: molestar a quien no puede arreglarlo es
+       * mucho menos grave que un sistema roto del que no se entera nadie.
+       */
+      chatTecnico = null;
+      actual = informe({ migrations: MIGRACIONES_PENDIENTES });
+
+      await servicio.pasada(0);
+
+      expect(enviados[0]?.chatId).toBe('-100123');
     });
   });
 

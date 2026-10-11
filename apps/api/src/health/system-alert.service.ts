@@ -6,7 +6,12 @@ import {
   type OnModuleInit,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { requiereAtencion, type SystemCheck, type SystemCheckId } from '@freshness/types';
+import {
+  requiereAtencion,
+  telegramChatForSystemAlerts,
+  type SystemCheck,
+  type SystemCheckId,
+} from '@freshness/types';
 import type { Env } from '../common/config/env';
 import { NotificationSettingsService } from '../notifications/notification-settings.service';
 import { TELEGRAM_PROVIDER, type TelegramProvider } from '../notifications/notifications.types';
@@ -220,7 +225,18 @@ export class SystemAlertService implements OnModuleInit, OnModuleDestroy {
     this.logger.warn(`Aviso de estado: ${mensaje}`);
 
     const ajustes = await this.ajustes.get();
-    if (ajustes.telegramChatId === null) return;
+
+    /*
+     * EL CHAT TECNICO, NO EL DE OPERACIONES (etapa 3.13).
+     *
+     * Quien lleva el negocio no puede hacer nada con «faltan migraciones», y
+     * mezclar esos mensajes con los de reservas nuevas ensena a no leer
+     * ninguno de los dos. Si no hay chat tecnico configurado se cae al de
+     * operaciones: molestar a quien no puede arreglarlo es mucho menos grave
+     * que un sistema roto del que no se entera nadie.
+     */
+    const chat = telegramChatForSystemAlerts(ajustes);
+    if (chat === null) return;
 
     /*
      * NO se mira `telegramOnNewBooking`. Ese ajuste dice si se quieren avisos
@@ -229,7 +245,7 @@ export class SystemAlertService implements OnModuleInit, OnModuleDestroy {
      * SYSTEM_ALERT_MINUTES=0, que es una decision del entorno y no una
      * casilla que se pueda desmarcar sin querer una tarde.
      */
-    const resultado = await this.telegram.send(ajustes.telegramChatId, mensaje);
+    const resultado = await this.telegram.send(chat, mensaje);
 
     if (!resultado.ok) {
       this.logger.error(`No se pudo mandar el aviso de estado: ${resultado.failureReason}`);

@@ -41,6 +41,8 @@ export function NotificationSettingsForm({ onSessionLost }: Props) {
   // contenido para reescribirlo lo daría por vacío a mitad de camino.
   const [internalEmail, setInternalEmail] = useState('');
   const [telegramChatId, setTelegramChatId] = useState('');
+  const [telegramCleaningChatId, setTelegramCleaningChatId] = useState('');
+  const [telegramTechChatId, setTelegramTechChatId] = useState('');
   const [horasAntes, setHorasAntes] = useState(
     String(DEFAULT_NOTIFICATION_SETTINGS.reminderHoursBefore),
   );
@@ -54,6 +56,8 @@ export function NotificationSettingsForm({ onSessionLost }: Props) {
       setValores(datos);
       setInternalEmail(datos.internalEmail ?? '');
       setTelegramChatId(datos.telegramChatId ?? '');
+      setTelegramCleaningChatId(datos.telegramCleaningChatId ?? '');
+      setTelegramTechChatId(datos.telegramTechChatId ?? '');
       setHorasAntes(String(datos.reminderHoursBefore));
     } catch (error) {
       if (error instanceof ApiClientError && error.statusCode === 401) {
@@ -82,6 +86,9 @@ export function NotificationSettingsForm({ onSessionLost }: Props) {
       ...valores,
       internalEmail: internalEmail.trim() === '' ? null : internalEmail.trim(),
       telegramChatId: telegramChatId.trim() === '' ? null : telegramChatId.trim(),
+      telegramCleaningChatId:
+        telegramCleaningChatId.trim() === '' ? null : telegramCleaningChatId.trim(),
+      telegramTechChatId: telegramTechChatId.trim() === '' ? null : telegramTechChatId.trim(),
       // Number('') es 0, que el contrato rechaza por debajo del minimo: el
       // campo vacio da un error claro en vez de guardarse como cero.
       reminderHoursBefore: Number(horasAntes),
@@ -107,6 +114,8 @@ export function NotificationSettingsForm({ onSessionLost }: Props) {
       setValores(datos);
       setInternalEmail(datos.internalEmail ?? '');
       setTelegramChatId(datos.telegramChatId ?? '');
+      setTelegramCleaningChatId(datos.telegramCleaningChatId ?? '');
+      setTelegramTechChatId(datos.telegramTechChatId ?? '');
       setHorasAntes(String(datos.reminderHoursBefore));
       toast.success('admin.settings.saved');
     } catch (error) {
@@ -272,6 +281,74 @@ export function NotificationSettingsForm({ onSessionLost }: Props) {
           </p>
           {fieldErrors.telegramChatId && (
             <p className="mt-1 text-xs text-red-700">{t(fieldErrors.telegramChatId)}</p>
+          )}
+        </div>
+
+        <Interruptor
+          id="aviso-llegada-lejos"
+          etiqueta={t('admin.notifications.telegramOnTeamArrivedFar')}
+          ayuda={t('admin.notifications.telegramOnTeamArrivedFarHelp')}
+          valor={valores.telegramOnTeamArrivedFar}
+          onChange={(v) => marcar('telegramOnTeamArrivedFar', v)}
+        />
+
+        {/*
+          EL GRUPO DEL EQUIPO DE LIMPIEZA.
+          La ayuda avisa de las dos cosas que no son evidentes: que tiene que
+          ser un GRUPO (un bot no puede escribirle a quien no le escribio
+          antes) y que todo el equipo vera la direccion de todos los trabajos.
+        */}
+        <div>
+          <label className="ft-label" htmlFor="aviso-chat-limpieza">
+            {t('admin.notifications.telegramCleaningChatId')}
+          </label>
+          <input
+            id="aviso-chat-limpieza"
+            className="ft-input"
+            inputMode="numeric"
+            autoComplete="off"
+            value={telegramCleaningChatId}
+            placeholder="-1001234567890"
+            onChange={(evento) => {
+              setTelegramCleaningChatId(evento.target.value);
+            }}
+          />
+          <p className="mt-1 text-xs text-slate-600 dark:text-slate-400">
+            {t('admin.notifications.telegramCleaningChatIdHelp')}
+          </p>
+          {fieldErrors.telegramCleaningChatId && (
+            <p className="mt-1 text-xs text-red-700">{t(fieldErrors.telegramCleaningChatId)}</p>
+          )}
+        </div>
+
+        <Interruptor
+          id="aviso-asignacion"
+          etiqueta={t('admin.notifications.telegramOnJobAssigned')}
+          ayuda={t('admin.notifications.telegramOnJobAssignedHelp')}
+          valor={valores.telegramOnJobAssigned}
+          onChange={(v) => marcar('telegramOnJobAssigned', v)}
+        />
+
+        <div>
+          <label className="ft-label" htmlFor="aviso-chat-tecnico">
+            {t('admin.notifications.telegramTechChatId')}
+          </label>
+          <input
+            id="aviso-chat-tecnico"
+            className="ft-input"
+            inputMode="numeric"
+            autoComplete="off"
+            value={telegramTechChatId}
+            placeholder="123456789"
+            onChange={(evento) => {
+              setTelegramTechChatId(evento.target.value);
+            }}
+          />
+          <p className="mt-1 text-xs text-slate-600 dark:text-slate-400">
+            {t('admin.notifications.telegramTechChatIdHelp')}
+          </p>
+          {fieldErrors.telegramTechChatId && (
+            <p className="mt-1 text-xs text-red-700">{t(fieldErrors.telegramTechChatId)}</p>
           )}
         </div>
 

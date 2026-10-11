@@ -421,10 +421,29 @@ export const es: TranslationResources = {
       telegramOnNewBooking: 'Enviar un mensaje de Telegram por cada reserva nueva',
       telegramOnNewBookingHelp:
         'Solo de las reservas confirmadas y pagadas. Los formularios abandonados no se avisan, para que el aviso siga mereciendo la pena leerlo.',
-      telegramChatId: 'Chat de Telegram',
+      telegramChatId: 'Chat de operaciones',
       telegramChatIdHelp:
-        'El identificador numérico del chat. Escribe a tu bot y ábrelo en api.telegram.org/bot<token>/getUpdates para leerlo.',
+        'Reservas nuevas y llegadas que no cuadran. El identificador numérico del chat: escribe a tu bot y ábrelo en api.telegram.org/bot<token>/getUpdates para leerlo.',
       telegramChatIdInvalid: 'El identificador de chat es un número, por ejemplo 123456789.',
+
+      telegramOnTeamArrivedFar: 'Avisar a operaciones cuando el equipo fiche lejos de la casa',
+      telegramOnTeamArrivedFarHelp:
+        'Solo cuando el propio móvil dice que la persona no puede estar en la casa: antes se descuenta el margen de error del GPS. Una llegada normal no manda nada.',
+
+      telegramCleaningChatId: 'Grupo del equipo de limpieza',
+      telegramCleaningChatIdHelp:
+        'Tiene que ser un GRUPO, no una persona: un bot no puede escribirle a quien no le haya escrito antes. Mete el bot en el grupo y pega su identificador (empieza por un signo menos). Todo el grupo ve la calle y la ciudad de todos los trabajos, y nunca ningún importe.',
+      telegramCleaningChatIdInvalid:
+        'El identificador del grupo es un número, por ejemplo -1001234567890.',
+
+      telegramOnJobAssigned: 'Avisar al equipo cuando se le asigna o cambia un trabajo',
+      telegramOnJobAssignedHelp:
+        'Se vuelve a avisar si cambia el equipo, para que un mensaje antiguo no se quede en pie como si siguiera vigente.',
+
+      telegramTechChatId: 'Chat técnico',
+      telegramTechChatIdHelp:
+        'Solo fallos del sistema: migraciones pendientes, pagos en modo de prueba, procesos que dejaron de pasar. Si lo dejas vacío van al chat de operaciones, porque un sistema roto del que no se entera nadie es peor que un mensaje a quien no toca.',
+      telegramTechChatIdInvalid: 'El identificador de chat es un número, por ejemplo 123456789.',
 
       credentialsNote:
         'La clave del proveedor de correo y el token del bot se configuran en el servidor, no aquí. Una credencial guardada en la base de datos acaba en cada copia de seguridad, así que viven en el entorno del servidor junto a las claves de pago.',

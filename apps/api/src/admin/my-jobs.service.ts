@@ -17,9 +17,11 @@ import {
   type MyJobProgress,
   type MyJobs,
 } from '@freshness/types';
+import { isFarByNumbers } from '@freshness/types';
 import { AuditService } from '../audit/audit.service';
 import { PIN_SELECT, pinVisible } from '../bookings/door-pin.helper';
 import { PrismaService } from '../database/prisma.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { AJUSTE_SELECT, ExtrasGuardadosSchema, ajusteAContrato } from './field-adjustment.helper';
 import {
   JOB_CHECKLIST_CATALOG_TOKEN,
@@ -165,6 +167,7 @@ export class MyJobsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly notifications: NotificationsService,
     @Inject(JOB_CHECKLIST_CATALOG_TOKEN)
     private readonly catalogo: readonly ChecklistItem[],
   ) {}
@@ -415,6 +418,34 @@ export class MyJobsService {
         `(${fichaje.locationState}` +
         `${fichaje.distanceMeters === null ? '' : `, a ${fichaje.distanceMeters} m`})`,
     );
+
+    /*
+     * AVISO A OPERACIONES SI LA LLEGADA NO CUADRA (etapa 3.13).
+     *
+     * Las tres condiciones importan:
+     *
+     *   - SOLO AL LLEGAR. Fichar la salida lejos tiene otra lectura —se
+     *     terminó y se fue— y avisar de las dos cosas duplicaria el ruido.
+     *   - SOLO SI `isFarByNumbers`. Esa funcion descuenta el margen de error
+     *     del propio GPS antes de comparar, asi que solo salta cuando el
+     *     movil mismo dice que la persona NO PUEDE estar en la casa. Un
+     *     telefono impreciso no acusa a nadie.
+     *   - FUERA DE LA TRANSACCION y sin esperar a que salga bien: el fichaje
+     *     ya esta guardado y vale mas que el aviso.
+     *
+     * Lo que viaja son METROS, nunca coordenadas. Misma linea que la
+     * auditoria y la base de datos desde la etapa 3.3.
+     */
+    if (fichaje.kind === 'ARRIVAL' && fichaje.distanceMeters !== null) {
+      if (isFarByNumbers(fichaje.distanceMeters, fichaje.accuracyMeters)) {
+        await this.notifications.teamArrivedFar(
+          bookingId,
+          `${staff.firstName} ${staff.lastName}`.trim(),
+          fichaje.distanceMeters,
+        );
+      }
+    }
+
     return toMyJob(actualizado, staff.staffId, this.catalogo);
   }
 

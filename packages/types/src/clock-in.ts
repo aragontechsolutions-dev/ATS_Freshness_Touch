@@ -152,10 +152,30 @@ export const CLOCK_IN_FAR_METERS = 250;
  * persona no puede estar en la casa. Un GPS malo no acusa a nadie.
  */
 export function isFarFromHouse(record: ClockInRecord): boolean {
-  if (record.distanceMeters === null) return false;
+  return isFarByNumbers(record.distanceMeters, record.accuracyMeters);
+}
 
-  const margen = record.accuracyMeters ?? 0;
-  const distanciaMinimaPosible = record.distanceMeters - margen;
+/**
+ * La misma regla, pero sobre los dos numeros sueltos.
+ *
+ * Existe porque hay un sitio que la necesita ANTES de que el fichaje sea un
+ * `ClockInRecord`: el aviso a operaciones de la etapa 3.13, que se decide
+ * justo despues de escribir en la base y solo tiene a mano la distancia y la
+ * precision.
+ *
+ * Se extrae en vez de forzar un objeto a medias con un `as`. Un `as` ahi
+ * habria dicho al compilador «confia, esto es un fichaje entero» cuando no lo
+ * es, y el dia que `isFarFromHouse` mirase un tercer campo, la mentira se
+ * descubriria en ejecucion en lugar de al compilar.
+ */
+export function isFarByNumbers(
+  distanceMeters: number | null,
+  accuracyMeters: number | null,
+): boolean {
+  if (distanceMeters === null) return false;
+
+  const margen = accuracyMeters ?? 0;
+  const distanciaMinimaPosible = distanceMeters - margen;
 
   return distanciaMinimaPosible > CLOCK_IN_FAR_METERS;
 }
