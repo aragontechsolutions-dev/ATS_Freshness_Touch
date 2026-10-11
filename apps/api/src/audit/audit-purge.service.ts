@@ -2,6 +2,7 @@ import { Injectable, Logger, type OnModuleDestroy, type OnModuleInit } from '@ne
 import { ConfigService } from '@nestjs/config';
 import type { Env } from '../common/config/env';
 import { PrismaService } from '../database/prisma.service';
+import { SweepHeartbeatService } from '../health/sweep-heartbeat.service';
 import { AuditService } from './audit.service';
 
 /** Filas por vuelta. Ver el comentario de `borrarLote`. */
@@ -46,6 +47,7 @@ export class AuditPurgeService implements OnModuleInit, OnModuleDestroy {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly config: ConfigService<Env, true>,
+    private readonly latidos: SweepHeartbeatService,
   ) {}
 
   onModuleInit(): void {
@@ -78,6 +80,8 @@ export class AuditPurgeService implements OnModuleInit, OnModuleDestroy {
     this.temporizador = setInterval(() => void this.ejecutar(), horas * 3_600_000);
     this.temporizador.unref();
 
+    this.latidos.registrar('auditPurge', horas * 3_600_000);
+
     this.logger.log(`Purga de auditoria cada ${horas} h, reteniendo ${dias} dias`);
   }
 
@@ -100,6 +104,10 @@ export class AuditPurgeService implements OnModuleInit, OnModuleDestroy {
    * filas viejas.
    */
   async ejecutar(now: Date = new Date()): Promise<number> {
+    // El latido va antes de las guardas: dice que el temporizador sigue
+    // disparando, no que el trabajo saliera bien. Ver `sweep-heartbeat`.
+    this.latidos.anotar('auditPurge');
+
     const dias = this.config.get('AUDIT_RETENTION_DAYS', { infer: true });
     if (dias === 0) return 0;
 

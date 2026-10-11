@@ -637,6 +637,66 @@ export const es: TranslationResources = {
       selfNote: 'Esta es tu ficha: no puedes cambiarte el puesto ni darte de baja tú misma.',
     },
 
+    /* --------------------- Estado del sistema ---------------------- */
+    systemHealth: {
+      title: 'Estado del sistema',
+      intro:
+        'Si el sistema puede hacer su trabajo ahora mismo. Esta pantalla solo informa: desde aquí no se arregla nada.',
+      checkedAt: 'Comprobado a las {{time}}',
+      errorLoad: 'No se pudo leer el estado del sistema.',
+
+      state: {
+        ok: 'Funciona',
+        degraded: 'A medias',
+        down: 'No funciona',
+        unknown: 'No se sabe',
+      },
+
+      check: {
+        database: 'Base de datos',
+        migrations: 'Esquema de la base',
+        pricingRates: 'Tabla de tarifas',
+        paymentProvider: 'Cobros con tarjeta',
+        sweeps: 'Procesos automáticos',
+      },
+
+      /*
+       * ANIDADO DE VERDAD, NO CON PUNTOS DENTRO DE LA CLAVE.
+       *
+       * La primera version escribia `'database.notConfigured': '...'`, que es
+       * como se llama la clave en el contrato. No funciona: i18next usa el
+       * punto como separador de anidamiento, asi que al pedir
+       * `detail.database.notConfigured` busca un objeto `database` que no
+       * existia. Lo cazo la prueba de recursos de i18n.
+       *
+       * La clave del contrato sigue siendo `database.notConfigured`; aqui se
+       * escribe como el arbol que esa clave describe.
+       */
+      detail: {
+        database: {
+          notConfigured: 'No hay base de datos configurada. Se cotiza; no se reserva.',
+          unreachable: 'La base de datos no responde. No se puede reservar.',
+        },
+        migrations: {
+          pending:
+            'A la base le falta una actualización que el código ya necesita. Las reservas pueden fallar. Actualizaciones pendientes:',
+          unverifiable: 'No se pudo leer la lista de actualizaciones de la base.',
+        },
+        pricingRates: {
+          fallback:
+            'La tabla de tarifas guardada no se puede leer y los precios salen del código. Los precios son correctos, pero un presupuesto antiguo no se puede reproducir.',
+          unreadable: 'No se pudo leer la tabla de tarifas.',
+        },
+        paymentProvider: {
+          simulated:
+            'Los pagos están en modo de prueba: se aceptan reservas y NO se retiene ningún depósito.',
+        },
+        sweeps: {
+          stalled: 'Un proceso automático ha dejado de pasar. Procesos afectados:',
+        },
+      },
+    },
+
     /* -------------------------- Auditoria -------------------------- */
     audit: {
       title: 'Registro de actividad',

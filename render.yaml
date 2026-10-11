@@ -146,6 +146,17 @@ services:
       # de cron aparte: el plan starter no suspende la API.
       - key: REMINDER_SWEEP_MINUTES
         value: '15'
+
+      # ALARMA DE ESTADO (etapa 3.12, ver docs/30).
+      # Dos caidas reales estuvieron escritas en el log horas y dias sin que
+      # nadie las leyera. Esto es lo que convierte ese log en un aviso al
+      # telefono. Cero lo apaga.
+      - key: SYSTEM_ALERT_MINUTES
+        value: '5'
+      # Silencio minimo entre dos avisos del MISMO problema. Sin esto, el
+      # fallo del pin de la puerta habria mandado 576 mensajes en dos dias.
+      - key: SYSTEM_ALERT_SILENCE_HOURS
+        value: '6'
       # Dias que dura la retencion. Siete es el maximo de las redes de tarjetas.
       - key: PAYMENT_AUTHORIZATION_DAYS
         value: '7'

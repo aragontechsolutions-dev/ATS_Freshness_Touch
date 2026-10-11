@@ -365,6 +365,21 @@ No hace falta ningún servicio de cron en Render: el barrido va dentro de la
 API, que en el plan `starter` no se suspende. Las horas de antelación se
 configuran desde el panel, no aquí.
 
+### Alarma de estado del sistema
+
+| Variable                     | Valor                     | Obligatoria |
+| ---------------------------- | ------------------------- | ----------- |
+| `SYSTEM_ALERT_MINUTES`       | 5 por defecto, 0 lo apaga | No          |
+| `SYSTEM_ALERT_SILENCE_HOURS` | 6 por defecto             | No          |
+
+Avisa al chat de Telegram de la empresa cuando el sistema se rompe. **No es un
+secreto**: ninguna de las dos lleva `sync: false`.
+
+`SYSTEM_ALERT_SILENCE_HOURS` es el silencio mínimo entre dos avisos del **mismo
+problema**, y es la pieza que decide si esto sirve de algo: sin ella, un fallo
+que dure dos días manda 576 mensajes y a partir del cuarto nadie los lee. Ver
+`docs/30`.
+
 ### Base de operaciones
 
 | Variable                 | Valor               | Obligatoria |

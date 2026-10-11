@@ -348,6 +348,23 @@ export function ShieldIcon({ className }: IconProps) {
   );
 }
 
+/**
+ * Cuadrante con aguja: el estado del sistema.
+ *
+ * Se elige un cuadrante y no un corazon ni un latido porque lo que mide no
+ * es «esta vivo» —eso ya lo dice `/health`— sino COMO DE BIEN va, que es una
+ * escala y no un si o un no.
+ */
+export function GaugeIcon({ className }: IconProps) {
+  return (
+    <Trazo className={className}>
+      <path d="M4 16.5a8 8 0 1 1 16 0" />
+      <path d="M12 16.5 15.5 11" />
+      <circle cx="12" cy="16.5" r="1.2" />
+    </Trazo>
+  );
+}
+
 /** Candado: la pantalla de acceso y las de contrasena. */
 export function LockIcon({ className }: IconProps) {
   return (

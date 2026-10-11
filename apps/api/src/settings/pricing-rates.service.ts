@@ -63,20 +63,52 @@ const CACHE_TTL_MS = 30_000;
  * la pagina que genera ingresos porque no se pudo leer una tabla seria un
  * intercambio pesimo.
  */
+/**
+ * DE DONDE SALIERON LAS TARIFAS QUE SE ESTAN COBRANDO.
+ *
+ * ==========================================================================
+ * ESTE CAMPO EXISTE PORQUE EL RESPALDO FUNCIONO DEMASIADO BIEN
+ * ==========================================================================
+ * Cuando la fila guardada no cumple el contrato, este servicio cotiza con
+ * las tarifas del codigo en vez de caerse. Es lo correcto —tumbar la pagina
+ * que genera ingresos por no poder leer una tabla seria un intercambio
+ * pesimo— pero tiene un precio: NO SE NOTA. Los precios que ve el cliente
+ * son los buenos y el sitio funciona igual.
+ *
+ * Lo que si se rompe es que cada reserva queda sellada con una version cuya
+ * fila no se puede volver a leer, asi que su presupuesto no se puede
+ * reproducir. Eso tardo diez dias en descubrirse, y de casualidad.
+ *
+ * Con esto el estado deja de vivir solo en una linea de log: alguien puede
+ * PREGUNTARLO. Lo hace `SystemChecksService`.
+ */
+export type OrigenDeTarifas =
+  /** De la tabla, que es lo normal. */
+  | 'table'
+  /** La fila vigente no cumple el contrato: se usan las del codigo. */
+  | 'fallback'
+  /** No se pudo leer la tabla. Distinto de que este mal. */
+  | 'unreadable';
+
+export interface TarifasVigentes {
+  version: string;
+  rates: PricingRates;
+  source: OrigenDeTarifas;
+}
+
 @Injectable()
 export class PricingRatesService {
   private readonly logger = new Logger(PricingRatesService.name);
 
-  private cached: { value: { version: string; rates: PricingRates }; expiresAt: number } | null =
-    null;
+  private cached: { value: TarifasVigentes; expiresAt: number } | null = null;
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
   ) {}
 
-  /** Las tarifas vigentes, con su version. */
-  async current(): Promise<{ version: string; rates: PricingRates }> {
+  /** Las tarifas vigentes, con su version y de donde salieron. */
+  async current(): Promise<TarifasVigentes> {
     if (this.cached && this.cached.expiresAt > Date.now()) return this.cached.value;
 
     const value = await this.leerVigente();
@@ -220,7 +252,7 @@ export class PricingRatesService {
 
   /* ---------------------------------------------------------------------- */
 
-  private async leerVigente(): Promise<{ version: string; rates: PricingRates }> {
+  private async leerVigente(): Promise<TarifasVigentes> {
     try {
       const fila = await this.prisma.db.pricingTable.findFirst({
         orderBy: { createdAt: 'desc' },
@@ -234,13 +266,21 @@ export class PricingRatesService {
           `La tabla de tarifas ${fila.version} no cumple el contrato y se ignora. ` +
             'Se usan las tarifas del codigo.',
         );
-        return { version: defaultPricingConfig.version, rates: TARIFAS_DE_PARTIDA };
+        return {
+          version: defaultPricingConfig.version,
+          rates: TARIFAS_DE_PARTIDA,
+          source: 'fallback',
+        };
       }
 
-      return { version: fila.version, rates: parsed.data };
+      return { version: fila.version, rates: parsed.data, source: 'table' };
     } catch (error) {
       this.logger.error(`No se pudieron leer las tarifas: ${describir(error)}`);
-      return { version: defaultPricingConfig.version, rates: TARIFAS_DE_PARTIDA };
+      return {
+        version: defaultPricingConfig.version,
+        rates: TARIFAS_DE_PARTIDA,
+        source: 'unreadable',
+      };
     }
   }
 
@@ -257,7 +297,7 @@ export class PricingRatesService {
    * lectura o un despliegue sin permisos no puede dejar al sitio sin
    * precios.
    */
-  private async sembrar(): Promise<{ version: string; rates: PricingRates }> {
+  private async sembrar(): Promise<TarifasVigentes> {
     try {
       await this.prisma.db.pricingTable.create({
         data: { version: VERSION_SEMILLA, rates: TARIFAS_DE_PARTIDA },
@@ -272,7 +312,15 @@ export class PricingRatesService {
       this.logger.warn(`No se pudieron sembrar las tarifas iniciales: ${describir(error)}`);
     }
 
-    return { version: VERSION_SEMILLA, rates: TARIFAS_DE_PARTIDA };
+    /*
+     * `table` aunque la escritura haya fallado, y es deliberado: la siembra
+     * escribe EXACTAMENTE las tarifas del codigo bajo la version del codigo,
+     * asi que lo que se devuelve coincide con lo que la tabla tiene (o
+     * tendra en el proximo intento). No hay discrepancia que avisar, y
+     * marcarlo como respaldo encenderia una alarma por una instalacion nueva
+     * perfectamente sana.
+     */
+    return { version: VERSION_SEMILLA, rates: TARIFAS_DE_PARTIDA, source: 'table' };
   }
 }
 

@@ -1,6 +1,7 @@
 import { Injectable, Logger, type OnModuleDestroy, type OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { Env } from '../common/config/env';
+import { SweepHeartbeatService } from '../health/sweep-heartbeat.service';
 import { GeocodingService } from './geocoding.service';
 
 /**
@@ -40,6 +41,7 @@ export class GeocodingSweepService implements OnModuleInit, OnModuleDestroy {
   constructor(
     private readonly geocoding: GeocodingService,
     private readonly config: ConfigService<Env, true>,
+    private readonly latidos: SweepHeartbeatService,
   ) {}
 
   onModuleInit(): void {
@@ -59,6 +61,12 @@ export class GeocodingSweepService implements OnModuleInit, OnModuleDestroy {
     this.temporizador = setInterval(() => void this.ejecutar(), minutos * 60_000);
     this.temporizador.unref();
 
+    /*
+     * EL LATIDO. Si este barrido deja de pasar, nada falla a la vista: el
+     * resto del sistema sigue igual. Esto es lo unico que lo delata.
+     */
+    this.latidos.registrar('geocoding', minutos * 60_000);
+
     this.logger.log(`Barrido de geocodificacion cada ${minutos} min`);
   }
 
@@ -76,6 +84,17 @@ export class GeocodingSweepService implements OnModuleInit, OnModuleDestroy {
       this.logger.warn('El barrido anterior sigue en curso; se salta esta pasada');
       return 0;
     }
+
+    /*
+     * EL LATIDO VA ANTES DE CUALQUIER GUARDA, Y A PROPOSITO.
+     *
+     * Significa «el temporizador sigue disparando», no «el trabajo salio
+     * bien». Si se anotara despues de la guarda de conexion, una caida de
+     * base de datos pintaria ADEMAS los barridos en rojo, y el aviso diria
+     * dos problemas donde hay uno. Que la base este caida ya lo dice su
+     * propia comprobacion.
+     */
+    this.latidos.anotar('geocoding');
 
     this.enCurso = true;
     try {

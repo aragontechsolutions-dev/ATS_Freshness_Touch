@@ -666,6 +666,73 @@ export const en = {
       selfNote: 'This is your own record: you cannot change your own role or deactivate yourself.',
     },
 
+    /* --------------------- Estado del sistema ---------------------- */
+    systemHealth: {
+      title: 'System status',
+      intro:
+        'Whether the system can do its job right now. This screen only reports: nothing here is fixed from a browser.',
+      checkedAt: 'Checked at {{time}}',
+      errorLoad: 'Could not read the system status.',
+
+      state: {
+        ok: 'Working',
+        degraded: 'Partly working',
+        down: 'Not working',
+        unknown: 'Unknown',
+      },
+
+      check: {
+        database: 'Database',
+        migrations: 'Database schema',
+        pricingRates: 'Pricing table',
+        paymentProvider: 'Card payments',
+        sweeps: 'Scheduled jobs',
+      },
+
+      /*
+       * EL DETALLE SE EXPLICA EN LENGUAJE LLANO Y DICE QUE HACER.
+       *
+       * Quien lee esto no es quien escribio el codigo: es el titular del
+       * negocio en su telefono. «migrations.pending» no le dice nada;
+       * «bookings cannot be created» le dice si tiene que llamar a alguien
+       * ahora mismo o puede esperar al lunes.
+       */
+      /*
+       * ANIDADO DE VERDAD, NO CON PUNTOS DENTRO DE LA CLAVE.
+       *
+       * La primera version escribia `'database.notConfigured': '...'`, que es
+       * como se llama la clave en el contrato. No funciona: i18next usa el
+       * punto como separador de anidamiento, asi que al pedir
+       * `detail.database.notConfigured` busca un objeto `database` que no
+       * existia. Lo cazo la prueba de recursos de i18n.
+       *
+       * La clave del contrato sigue siendo `database.notConfigured`; aqui se
+       * escribe como el arbol que esa clave describe.
+       */
+      detail: {
+        database: {
+          notConfigured: 'No database configured. Quotes work; bookings do not.',
+          unreachable: 'The database is not responding. No bookings can be made.',
+        },
+        migrations: {
+          pending:
+            'The database is missing an update the current code needs. Bookings may fail. Pending updates:',
+          unverifiable: 'The list of database updates could not be read.',
+        },
+        pricingRates: {
+          fallback:
+            'The saved pricing table cannot be read, so prices come from the code. Prices are correct, but old quotes cannot be reproduced.',
+          unreadable: 'The pricing table could not be read.',
+        },
+        paymentProvider: {
+          simulated: 'Payments are in test mode: bookings are accepted and NO deposit is held.',
+        },
+        sweeps: {
+          stalled: 'A scheduled job has stopped running. Jobs affected:',
+        },
+      },
+    },
+
     /* -------------------------- Auditoria -------------------------- */
     audit: {
       title: 'Activity log',
