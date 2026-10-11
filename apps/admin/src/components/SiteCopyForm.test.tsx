@@ -123,8 +123,8 @@ describe('lo que se ve al abrir', () => {
      * El texto de referencia sale del propio diccionario, con la misma clave
      * que se guarda. Si esto se rompiera, el campo vacio no diria nada.
      */
-    expect(contenedor.textContent).toContain('Insured and bonded');
-    expect(contenedor.textContent).toContain('Asegurados y afianzados');
+    expect(contenedor.textContent).toContain('Fully insured');
+    expect(contenedor.textContent).toContain('Asegurados');
   });
 
   it('agrupa las promesas y las preguntas por separado', async () => {
@@ -159,10 +159,16 @@ describe('la linea de referencia', () => {
      * «ahora en el sitio» y mostraba lo que acababas de teclear.
      */
     await montar();
-    escribir(campo('whyUs.insured.title', 'en'), 'Fully insured and bonded');
+    /*
+     * EL BORRADOR NO PUEDE CONTENER AL PUBLICADO. Si se tecleara algo como
+     * «Fully insured and more», `toContain('Fully insured')` encontraria el
+     * BORRADOR y la prueba pasaria sin mirar la referencia. Tiene que ser un
+     * texto que no comparta ninguna palabra con el publicado.
+     */
+    escribir(campo('whyUs.insured.title', 'en'), 'Covered by our policy');
     await act(async () => {});
 
-    expect(contenedor.textContent).toContain('Insured and bonded');
+    expect(contenedor.textContent).toContain('Fully insured');
   });
 
   it('con un texto guardado, la referencia es ese y no el del codigo', async () => {

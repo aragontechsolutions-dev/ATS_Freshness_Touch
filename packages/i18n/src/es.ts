@@ -43,7 +43,7 @@ export const es: TranslationResources = {
   },
 
   hero: {
-    badge: 'Con licencia · Asegurados · Afianzados',
+    badge: 'Con licencia · Asegurados',
     title: 'Una casa impecable, sin sorpresas en el precio',
     subtitle:
       'Obtén un precio real en menos de un minuto. Sin llamadas de vuelta, sin cargos ocultos y con un depósito de traslado transparente que se descuenta de tu factura final.',
@@ -1299,8 +1299,8 @@ export const es: TranslationResources = {
   whyUs: {
     title: '¿Por qué Freshness Touch?',
     insured: {
-      title: 'Asegurados y afianzados',
-      body: 'Póliza de responsabilidad civil y fianza de limpieza que protegen tu hogar y tus bienes.',
+      title: 'Asegurados',
+      body: 'Póliza de responsabilidad civil que protege tu hogar y tus bienes.',
     },
     vetted: {
       title: 'Equipo verificado',
