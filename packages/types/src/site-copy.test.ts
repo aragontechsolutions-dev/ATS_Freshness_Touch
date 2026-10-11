@@ -52,7 +52,7 @@ describe('textos del sitio', () => {
 
     it('un idioma puede quedarse sin configurar', () => {
       const parsed = SiteCopySchema.safeParse({
-        'whyUs.insured.title': { en: 'Insured and bonded', es: null },
+        'whyUs.insured.title': { en: 'Fully insured', es: null },
       });
       expect(parsed.success).toBe(true);
     });

@@ -92,8 +92,34 @@ El sitio contiene afirmaciones comerciales que deben ser **verdaderas**:
 
 | Texto                                       | Qué hay que confirmar                                                                                           |
 | ------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| "Con licencia · Asegurados · Afianzados"    | Que existan licencia local, póliza de responsabilidad civil y fianza vigentes                                   |
+| "Con licencia · Asegurados"                 | Que existan licencia local y póliza de responsabilidad civil vigentes. **La fianza se retiró**: ver abajo       |
 | "Personal con verificación de antecedentes" | Que el proceso de verificación esté realmente implantado                                                        |
 | "Garantía de repaso" (24 horas)             | Que la empresa acepte esa política                                                                              |
 | Horario publicado                           | Se edita desde el panel y es **el mismo** que usa la agenda: no puede anunciarse uno y aceptar reservas en otro |
 | Teléfono y correo                           | Se editan desde el panel. Sin configurar, el sitio **no muestra** nada: no hay números de relleno               |
+
+### La fianza se retiró del sitio (11 de octubre de 2026)
+
+El sitio anunciaba una **fianza de limpieza** (_janitorial bond_) que **la
+empresa no tiene contratada**. Apareció en tres textos, y el tercero era el
+más grave porque no la insinuaba: la describía como un producto vigente que
+protege los bienes del cliente.
+
+| Clave                 | Antes                                                                  | Ahora                                        |
+| --------------------- | ---------------------------------------------------------------------- | -------------------------------------------- |
+| `hero.badge`          | Con licencia · Asegurados · Afianzados                                 | Con licencia · Asegurados                    |
+| `whyUs.insured.title` | Asegurados y afianzados                                                | Asegurados                                   |
+| `whyUs.insured.body`  | Póliza de responsabilidad civil **y fianza de limpieza** que protegen… | Póliza de responsabilidad civil que protege… |
+
+**NO SE VUELVE A PONER SIN LA PÓLIZA DELANTE.** Anunciar una fianza que no
+existe no es una exageración comercial: es decirle a alguien que sus bienes
+están cubiertos cuando no lo están, y el día que haya un daño y una
+reclamación, ese texto es lo primero que se lee. Si algún día se contrata
+(estimado en la tabla de arriba: 9-11 USD/mes), se devuelven los tres textos.
+
+**OJO CON EL PANEL.** `whyUs.insured.title` y `whyUs.insured.body` **se pueden
+editar desde Datos del negocio → Textos del sitio**, y lo guardado ahí GANA
+sobre el código. Cambiar estos valores arregla el respaldo, pero si alguien
+había guardado su propia versión con la fianza, el sitio la seguirá
+mostrando. Hay que mirarlo en el panel. `hero.badge` no es editable: solo
+vive aquí.

@@ -41,7 +41,7 @@ export const en = {
   },
 
   hero: {
-    badge: 'Licensed · Insured · Bonded',
+    badge: 'Licensed · Insured',
     title: 'A cleaner home, without the guesswork',
     subtitle:
       'Get a real price in under a minute. No callbacks, no surprise fees, and a transparent travel deposit that is credited back on your final bill.',
@@ -1387,8 +1387,8 @@ export const en = {
   whyUs: {
     title: 'Why Freshness Touch',
     insured: {
-      title: 'Insured and bonded',
-      body: 'General liability coverage and a janitorial bond protect your home and belongings.',
+      title: 'Fully insured',
+      body: 'General liability coverage protects your home and belongings.',
     },
     vetted: {
       title: 'Background-checked team',
