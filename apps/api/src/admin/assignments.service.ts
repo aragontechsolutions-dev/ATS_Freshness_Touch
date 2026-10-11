@@ -13,6 +13,7 @@ import {
   type AuthenticatedStaff,
 } from '@freshness/types';
 import { AuditService } from '../audit/audit.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../database/prisma.service';
 
 /**
@@ -34,6 +35,7 @@ export class AssignmentsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   /**
@@ -148,6 +150,35 @@ export class AssignmentsService {
     this.logger.log(
       `Reserva ${booking.reference}: equipo de ${assignments.length} persona(s) por ${staff.email}`,
     );
+
+    /*
+     * EL AVISO VA FUERA DE LA TRANSACCION, igual que los de reserva. Dentro,
+     * un Telegram caido desharia una asignacion que coordinacion ya dio por
+     * hecha, y el trabajo se quedaria sin equipo por no haber podido mandar
+     * un mensaje.
+     *
+     * `jobAssigned` no lanza nunca; se espera para que el envio no quede
+     * colgando cuando el proceso termine.
+     */
+    await this.notifications.jobAssigned(bookingId, await this.nombresDePila(assignments));
+  }
+
+  /**
+   * Los nombres de pila del equipo, para el mensaje del grupo.
+   *
+   * SOLO EL NOMBRE, sin apellidos: el grupo ya sabe quien es quien, y un
+   * apellido completo en un chat de Telegram es un dato de empleado viajando
+   * a un servicio de terceros sin ninguna necesidad.
+   */
+  private async nombresDePila(assignments: AdminAssignment[]): Promise<string[]> {
+    if (assignments.length === 0) return [];
+
+    const personas = await this.prisma.db.staff.findMany({
+      where: { id: { in: assignments.map((a) => a.staffId) } },
+      select: { firstName: true },
+    });
+
+    return personas.map((p) => p.firstName);
   }
 
   /** Que nadie asignado sea un identificador inventado o alguien de baja. */

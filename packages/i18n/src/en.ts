@@ -450,10 +450,28 @@ export const en = {
       telegramOnNewBooking: 'Send a Telegram message for each new booking',
       telegramOnNewBookingHelp:
         'Only for bookings that are confirmed and paid. Abandoned forms are not reported, so the alert stays worth reading.',
-      telegramChatId: 'Telegram chat',
+      telegramChatId: 'Operations chat',
       telegramChatIdHelp:
-        'The numeric chat id. Write to your bot, then open api.telegram.org/bot<token>/getUpdates to read it.',
+        'New bookings and arrivals that look wrong. The numeric chat id: write to your bot, then open api.telegram.org/bot<token>/getUpdates to read it.',
       telegramChatIdInvalid: 'The chat id is a number, for example 123456789.',
+
+      telegramOnTeamArrivedFar: 'Tell operations when the team clocks in far from the house',
+      telegramOnTeamArrivedFarHelp:
+        'Only when the phone itself says the person cannot be at the house: the GPS margin of error is subtracted first. Normal arrivals send nothing.',
+
+      telegramCleaningChatId: 'Cleaning team group',
+      telegramCleaningChatIdHelp:
+        'Must be a GROUP, not a person: a bot cannot message someone who has not written to it first. Add the bot to the group and paste its id (it starts with a minus sign). Everyone in the group sees the street and city of every job, and never any amount.',
+      telegramCleaningChatIdInvalid: 'The group id is a number, for example -1001234567890.',
+
+      telegramOnJobAssigned: 'Tell the team when a job is assigned or changed',
+      telegramOnJobAssignedHelp:
+        'Sent again when the team changes, so an old message is never left standing as if it were current.',
+
+      telegramTechChatId: 'Technical chat',
+      telegramTechChatIdHelp:
+        'System failures only: pending migrations, payments in test mode, jobs that stopped running. If left empty they go to the operations chat, because a broken system nobody hears about is worse than a message to the wrong person.',
+      telegramTechChatIdInvalid: 'The chat id is a number, for example 123456789.',
 
       credentialsNote:
         'The email API key and the Telegram bot token are set on the server, not here. Credentials stored in the database end up in every backup, so they stay in the server environment alongside the payment keys.',
@@ -664,6 +682,73 @@ export const en = {
         'This deployment has no invitation sending configured. The service key is missing on the server.',
       inviteSent: 'Invitation sent.',
       selfNote: 'This is your own record: you cannot change your own role or deactivate yourself.',
+    },
+
+    /* --------------------- Estado del sistema ---------------------- */
+    systemHealth: {
+      title: 'System status',
+      intro:
+        'Whether the system can do its job right now. This screen only reports: nothing here is fixed from a browser.',
+      checkedAt: 'Checked at {{time}}',
+      errorLoad: 'Could not read the system status.',
+
+      state: {
+        ok: 'Working',
+        degraded: 'Partly working',
+        down: 'Not working',
+        unknown: 'Unknown',
+      },
+
+      check: {
+        database: 'Database',
+        migrations: 'Database schema',
+        pricingRates: 'Pricing table',
+        paymentProvider: 'Card payments',
+        sweeps: 'Scheduled jobs',
+      },
+
+      /*
+       * EL DETALLE SE EXPLICA EN LENGUAJE LLANO Y DICE QUE HACER.
+       *
+       * Quien lee esto no es quien escribio el codigo: es el titular del
+       * negocio en su telefono. «migrations.pending» no le dice nada;
+       * «bookings cannot be created» le dice si tiene que llamar a alguien
+       * ahora mismo o puede esperar al lunes.
+       */
+      /*
+       * ANIDADO DE VERDAD, NO CON PUNTOS DENTRO DE LA CLAVE.
+       *
+       * La primera version escribia `'database.notConfigured': '...'`, que es
+       * como se llama la clave en el contrato. No funciona: i18next usa el
+       * punto como separador de anidamiento, asi que al pedir
+       * `detail.database.notConfigured` busca un objeto `database` que no
+       * existia. Lo cazo la prueba de recursos de i18n.
+       *
+       * La clave del contrato sigue siendo `database.notConfigured`; aqui se
+       * escribe como el arbol que esa clave describe.
+       */
+      detail: {
+        database: {
+          notConfigured: 'No database configured. Quotes work; bookings do not.',
+          unreachable: 'The database is not responding. No bookings can be made.',
+        },
+        migrations: {
+          pending:
+            'The database is missing an update the current code needs. Bookings may fail. Pending updates:',
+          unverifiable: 'The list of database updates could not be read.',
+        },
+        pricingRates: {
+          fallback:
+            'The saved pricing table cannot be read, so prices come from the code. Prices are correct, but old quotes cannot be reproduced.',
+          unreadable: 'The pricing table could not be read.',
+        },
+        paymentProvider: {
+          simulated: 'Payments are in test mode: bookings are accepted and NO deposit is held.',
+        },
+        sweeps: {
+          stalled: 'A scheduled job has stopped running. Jobs affected:',
+        },
+      },
     },
 
     /* -------------------------- Auditoria -------------------------- */

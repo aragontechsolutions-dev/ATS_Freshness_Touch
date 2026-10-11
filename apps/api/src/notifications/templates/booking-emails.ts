@@ -237,6 +237,91 @@ export function newBookingTelegramMessage(data: {
   ].join('\n');
 }
 
+/* -------------------------------------------------------------------------- */
+/*  Los dos mensajes de la etapa 3.13                                          */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * AL GRUPO DEL EQUIPO DE LIMPIEZA: tienes un trabajo.
+ *
+ * ==========================================================================
+ * NO LLEVA NI UN IMPORTE, Y ESO ES EL PUNTO
+ * ==========================================================================
+ * Fijate en la diferencia con `newBookingTelegramMessage`, que esta justo
+ * arriba: aquel lleva `totalCents` porque va a operaciones. Este no recibe
+ * siquiera el dato.
+ *
+ * Y no es que se omita al escribir el texto: es que NO ESTA EN LOS
+ * PARAMETROS. Si manana alguien quisiera anadirlo tendria que cambiar la
+ * firma, que es un gesto deliberado y visible en una revision, en vez de
+ * descomentar una linea.
+ *
+ * Es la misma regla que ya cumple `MyJob`, el contrato de la pantalla del
+ * equipo: quien limpia la casa no necesita saber lo que paga quien vive en
+ * ella, y saberlo cambia la relacion.
+ */
+export function jobAssignedTelegramMessage(data: {
+  reference: string;
+  scheduledStart: Date;
+  timezone: string;
+  addressLine: string;
+  city: string;
+  /** Nombres de pila. Ver abajo por que no van los apellidos. */
+  teamFirstNames: string[];
+  serviceLabel: string;
+}): string {
+  const cuando = formatearFecha(data.scheduledStart, data.timezone, 'en');
+
+  /*
+   * SOLO EL NOMBRE DE PILA. El grupo ya sabe quien es quien, y un apellido
+   * completo en un chat de Telegram es un dato de empleado viajando a un
+   * servicio de terceros sin ninguna necesidad.
+   */
+  const equipo = data.teamFirstNames.length > 0 ? data.teamFirstNames.join(', ') : '-';
+
+  return [
+    `Trabajo asignado`,
+    ``,
+    `Referencia: ${data.reference}`,
+    `Cuando: ${cuando}`,
+    `Donde: ${data.addressLine}, ${data.city}`,
+    `Servicio: ${data.serviceLabel}`,
+    `Equipo: ${equipo}`,
+  ].join('\n');
+}
+
+/**
+ * A OPERACIONES: alguien ficho la entrada lejos de la casa.
+ *
+ * Solo sale cuando `isFarFromHouse` lo dice, es decir, cuando el propio movil
+ * afirma que la persona NO PUEDE estar en la casa: a la distancia medida se
+ * le descuenta antes el margen de error del GPS. Un telefono impreciso no
+ * acusa a nadie.
+ *
+ * NO LLEVA COORDENADAS, solo metros. Es la misma linea que ya respetan la
+ * auditoria y la base de datos desde la etapa 3.3: la ubicacion de un
+ * empleado no se guarda ni se transmite en ningun sitio; lo que viaja es una
+ * distancia, que no situa a nadie en un mapa.
+ */
+export function teamArrivedFarTelegramMessage(data: {
+  reference: string;
+  staffName: string;
+  distanceMeters: number;
+  addressLine: string;
+  city: string;
+}): string {
+  return [
+    `Fichaje lejos de la casa`,
+    ``,
+    `Referencia: ${data.reference}`,
+    `Quien: ${data.staffName}`,
+    `A: ${data.distanceMeters} m del domicilio`,
+    `Donde: ${data.addressLine}, ${data.city}`,
+    ``,
+    `Puede ser un GPS malo o una direccion mal geocodificada. Conviene mirarlo.`,
+  ].join('\n');
+}
+
 // ---------------------------------------------------------------------------
 // Composicion
 // ---------------------------------------------------------------------------

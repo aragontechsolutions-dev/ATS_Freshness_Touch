@@ -2,6 +2,8 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import {
   maskChatId,
   maskEmail,
+  telegramChatForAudience,
+  type EmailNotificationEvent,
   type NotificationAudience,
   type NotificationChannel,
   type NotificationEvent,
@@ -26,6 +28,8 @@ import {
   bookingConfirmedEmail,
   bookingReminderEmail,
   newBookingTelegramMessage,
+  jobAssignedTelegramMessage,
+  teamArrivedFarTelegramMessage,
   type BookingEmailData,
 } from './templates/booking-emails';
 
@@ -39,6 +43,8 @@ import {
  */
 interface ReservaParaAviso {
   reference: string;
+  /** Que clase de limpieza. Solo lo usa el aviso al equipo. */
+  service: string;
   scheduledStart: Date;
   timezone: string;
   depositCents: number;
@@ -107,7 +113,157 @@ export class NotificationsService {
     await this.despachar(bookingId, 'BOOKING_REMINDER');
   }
 
-  private async despachar(bookingId: string, event: NotificationEvent): Promise<void> {
+  /* ---------------------------------------------------------------------- */
+  /*  Los dos avisos de la etapa 3.13                                        */
+  /* ---------------------------------------------------------------------- */
+
+  /**
+   * AL GRUPO DEL EQUIPO: se te asigno un trabajo, o cambio el equipo.
+   *
+   * ======================================================================
+   * SE PUEDE REPETIR, Y ES OBLIGATORIO QUE SE PUEDA
+   * ======================================================================
+   * Los demas avisos pasan por `yaEnviado` para que una reentrega no mande
+   * dos correos. Este no, y la migracion `20261011120100` saca este evento
+   * del indice unico a proposito:
+   *
+   *   coordinacion asigna a Ana -> el grupo lo lee
+   *   coordinacion reasigna a Pedro -> SIN segundo aviso, el grupo sigue
+   *   creyendo que va Ana
+   *
+   * Un mensaje antiguo que nadie contradice se lee como vigente, y acaba
+   * yendo a la casa quien no toca, o nadie. Peor que no avisar.
+   *
+   * Y no hay nada que deduplicar: esto no lo dispara un barrido, lo dispara
+   * una persona pulsando un boton.
+   */
+  async jobAssigned(bookingId: string, teamFirstNames: string[]): Promise<void> {
+    try {
+      const reserva = await this.cargar(bookingId);
+      if (!reserva) return;
+
+      const ajustes = await this.settings.get();
+      const chat = telegramChatForAudience('CLEANING', ajustes);
+
+      if (!ajustes.telegramOnJobAssigned || chat === null) {
+        await this.registrar({
+          bookingId,
+          event: 'JOB_ASSIGNED',
+          channel: 'TELEGRAM',
+          audience: 'CLEANING',
+          status: 'SKIPPED',
+          target: chat === null ? null : maskChatId(chat),
+          failureReason: !ajustes.telegramOnJobAssigned
+            ? 'El aviso esta desactivado en la configuracion'
+            : 'No hay grupo de limpieza configurado',
+          providerMessageId: null,
+        });
+        return;
+      }
+
+      const texto = jobAssignedTelegramMessage({
+        reference: reserva.reference,
+        scheduledStart: reserva.scheduledStart,
+        timezone: reserva.timezone,
+        addressLine: reserva.address.line1,
+        city: reserva.address.city,
+        teamFirstNames,
+        serviceLabel: reserva.service,
+      });
+
+      const resultado = await this.enviarSinLanzar(() => this.telegram.send(chat, texto));
+
+      await this.registrar({
+        bookingId,
+        event: 'JOB_ASSIGNED',
+        channel: 'TELEGRAM',
+        audience: 'CLEANING',
+        status: resultado.ok ? 'SENT' : 'FAILED',
+        target: maskChatId(chat),
+        failureReason: resultado.failureReason,
+        providerMessageId: resultado.providerMessageId,
+      });
+    } catch (error) {
+      /*
+       * NO SE PROPAGA. Esto se llama DESPUES de que la asignacion ya este
+       * guardada: dejar que un fallo de Telegram deshaga el trabajo de
+       * coordinacion seria cambiar un aviso perdido por una asignacion
+       * perdida.
+       */
+      this.logger.error(`No se pudo avisar de la asignacion: ${describeFailure(error)}`);
+    }
+  }
+
+  /**
+   * A OPERACIONES: alguien ficho la entrada lejos de la casa.
+   *
+   * SOLO LOS QUE NO CUADRAN. Quien decide que es «lejos» es `isFarFromHouse`,
+   * que descuenta el margen de error del propio GPS antes de comparar: solo
+   * salta cuando el movil mismo dice que la persona no puede estar alli.
+   *
+   * Un aviso por cada fichaje normal serian varios al dia de pura rutina, y
+   * lo que se lee todos los dias sin que pase nada se deja de leer. La misma
+   * regla que la alarma de estado.
+   */
+  async teamArrivedFar(
+    bookingId: string,
+    staffName: string,
+    distanceMeters: number,
+  ): Promise<void> {
+    try {
+      const reserva = await this.cargar(bookingId);
+      if (!reserva) return;
+
+      const ajustes = await this.settings.get();
+      const chat = telegramChatForAudience('INTERNAL', ajustes);
+
+      if (!ajustes.telegramOnTeamArrivedFar || chat === null) {
+        await this.registrar({
+          bookingId,
+          event: 'TEAM_ARRIVED_FAR',
+          channel: 'TELEGRAM',
+          audience: 'INTERNAL',
+          status: 'SKIPPED',
+          target: chat === null ? null : maskChatId(chat),
+          failureReason: !ajustes.telegramOnTeamArrivedFar
+            ? 'El aviso esta desactivado en la configuracion'
+            : 'No hay chat de Telegram configurado',
+          providerMessageId: null,
+        });
+        return;
+      }
+
+      // Este si pasa por la guardia: un reintento no debe avisar dos veces
+      // del mismo fichaje.
+      if (await this.yaEnviado(bookingId, 'TEAM_ARRIVED_FAR', 'TELEGRAM', 'INTERNAL')) return;
+
+      const texto = teamArrivedFarTelegramMessage({
+        reference: reserva.reference,
+        staffName,
+        distanceMeters,
+        addressLine: reserva.address.line1,
+        city: reserva.address.city,
+      });
+
+      const resultado = await this.enviarSinLanzar(() => this.telegram.send(chat, texto));
+
+      await this.registrar({
+        bookingId,
+        event: 'TEAM_ARRIVED_FAR',
+        channel: 'TELEGRAM',
+        audience: 'INTERNAL',
+        status: resultado.ok ? 'SENT' : 'FAILED',
+        target: maskChatId(chat),
+        failureReason: resultado.failureReason,
+        providerMessageId: resultado.providerMessageId,
+      });
+    } catch (error) {
+      // Igual que arriba: el fichaje ya esta guardado y vale mas que el aviso.
+      this.logger.error(`No se pudo avisar del fichaje lejano: ${describeFailure(error)}`);
+    }
+  }
+
+  private async despachar(bookingId: string, event: EmailNotificationEvent): Promise<void> {
     try {
       const reserva = await this.cargar(bookingId);
       if (!reserva) {
@@ -155,7 +311,7 @@ export class NotificationsService {
   /** Confirmacion o cancelacion, al correo del cliente. */
   private async correoAlCliente(
     bookingId: string,
-    event: NotificationEvent,
+    event: EmailNotificationEvent,
     ajustes: NotificationSettings,
     destinatario: string,
     datos: BookingEmailData,
@@ -282,7 +438,7 @@ export class NotificationsService {
 
   /** Elige la plantilla que toca. */
   private componer(
-    event: NotificationEvent,
+    event: EmailNotificationEvent,
     destinatario: string,
     datos: BookingEmailData,
   ): EmailMessage {
@@ -391,6 +547,8 @@ export class NotificationsService {
       where: { id: bookingId },
       select: {
         reference: true,
+        // Para el aviso al equipo: que clase de limpieza es.
+        service: true,
         scheduledStart: true,
         timezone: true,
         depositCents: true,

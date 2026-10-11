@@ -13,6 +13,7 @@ import {
 } from '@freshness/types';
 import { ApiClientError, fetchSettings, saveSettings } from '../lib/api';
 import { AuditLog } from '../components/AuditLog';
+import { SystemHealthPanel } from '../components/SystemHealthPanel';
 import { PricingRatesForm } from '../components/PricingRatesForm';
 import { ServiceAreaForm } from '../components/ServiceAreaForm';
 import { CompanyLocationForm } from '../components/CompanyLocationForm';
@@ -30,6 +31,7 @@ import {
   ShieldIcon,
   SpinnerIcon,
   UsersIcon,
+  GaugeIcon,
 } from '../components/Icons';
 import { formatTimestamp } from '../lib/format';
 
@@ -76,6 +78,7 @@ type Seccion =
   | 'siteCopy'
   | 'notifications'
   | 'staff'
+  | 'systemHealth'
   | 'audit';
 
 /**
@@ -166,6 +169,19 @@ export function SettingsPage({ staff, locale, onSessionLost }: SettingsShellProp
           {t('admin.staff.title')}
         </Pestana>
         {/*
+          El estado del sistema va junto al registro de actividad y no en la
+          barra principal, por el mismo motivo: no es una pantalla de trabajo
+          diario. Si hay algo que mirar, la alarma avisa sola; esto es para
+          cuando quieres COMPROBARLO, normalmente despues de arreglar algo.
+        */}
+        <Pestana
+          activa={seccion === 'systemHealth'}
+          onClick={() => setSeccion('systemHealth')}
+          icono={<GaugeIcon className="h-4 w-4" />}
+        >
+          {t('admin.systemHealth.title')}
+        </Pestana>
+        {/*
           El registro de actividad va LA ULTIMA y dentro de configuracion, no
           como pestana principal del panel. No es una pantalla de trabajo
           diario: se abre cuando hay algo que aclarar, y ponerla junto a la
@@ -194,6 +210,8 @@ export function SettingsPage({ staff, locale, onSessionLost }: SettingsShellProp
         <NotificationSettingsForm onSessionLost={onSessionLost} />
       ) : seccion === 'staff' ? (
         <StaffDirectory staff={staff} locale={locale} onSessionLost={onSessionLost} />
+      ) : seccion === 'systemHealth' ? (
+        <SystemHealthPanel onSessionLost={onSessionLost} />
       ) : (
         <AuditLog locale={locale} onSessionLost={onSessionLost} />
       )}

@@ -1,4 +1,6 @@
 import {
+  SystemHealthSchema,
+  type SystemHealth,
   AdminBookingDetailSchema,
   AdminBookingListSchema,
   AdminStaffListSchema,
@@ -530,6 +532,25 @@ export function fetchAuditLog(query: AuditQueryInput = {}): Promise<AuditPage> {
   return request(`/admin/audit${sufijo ? `?${sufijo}` : ''}`, (payload) => {
     const parsed = AuditPageSchema.safeParse(payload);
     if (!parsed.success) throw contractError('/admin/audit', parsed.error.issues);
+    return parsed.data;
+  });
+}
+
+/* ------------------------------------------------------------------------ */
+/*  Estado del sistema. Solo administracion.                                 */
+/* ------------------------------------------------------------------------ */
+
+/**
+ * El diagnostico de la API.
+ *
+ * SE PUEDE LLAMAR A MENUDO, al reves que el registro de auditoria: esto no
+ * escribe nada y la respuesta viene cacheada treinta segundos en el
+ * servidor, asi que la pantalla puede refrescarse sola sin pesar.
+ */
+export function fetchSystemHealth(): Promise<SystemHealth> {
+  return request('/admin/system-health', (payload) => {
+    const parsed = SystemHealthSchema.safeParse(payload);
+    if (!parsed.success) throw contractError('/admin/system-health', parsed.error.issues);
     return parsed.data;
   });
 }

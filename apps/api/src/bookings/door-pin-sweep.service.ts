@@ -1,6 +1,7 @@
 import { Injectable, Logger, type OnModuleDestroy, type OnModuleInit } from '@nestjs/common';
 import { HORAS_DE_VIDA_DEL_PIN } from '@freshness/types';
 import { PrismaService } from '../database/prisma.service';
+import { SweepHeartbeatService } from '../health/sweep-heartbeat.service';
 
 /**
  * EL BORRADO, EN UNA SOLA CADENA Y EXPORTADA.
@@ -74,9 +75,18 @@ export class DoorPinSweepService implements OnModuleInit, OnModuleDestroy {
   /** Evita que dos pasadas se solapen si una tarda mas que el intervalo. */
   private enCurso = false;
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly latidos: SweepHeartbeatService,
+  ) {}
 
   onModuleInit(): void {
+    /*
+     * EL LATIDO. Si este barrido deja de pasar, nada falla a la vista: el
+     * resto del sistema sigue igual. Esto es lo unico que lo delata.
+     */
+    this.latidos.registrar('doorPin', CADA_MS);
+
     this.arranque = setTimeout(() => {
       void this.pasada();
       this.temporizador = setInterval(() => void this.pasada(), CADA_MS);
@@ -111,6 +121,17 @@ export class DoorPinSweepService implements OnModuleInit, OnModuleDestroy {
    * se borraria el pin de un trabajo que acaba de reprogramarse.
    */
   private async pasada(): Promise<void> {
+    /*
+     * EL LATIDO VA ANTES DE CUALQUIER GUARDA, Y A PROPOSITO.
+     *
+     * Significa «el temporizador sigue disparando», no «el trabajo salio
+     * bien». Si se anotara despues de la guarda de conexion, una caida de
+     * base de datos pintaria ADEMAS los barridos en rojo, y el aviso diria
+     * dos problemas donde hay uno. Que la base este caida ya lo dice su
+     * propia comprobacion.
+     */
+    this.latidos.anotar('doorPin');
+
     if (this.enCurso || !this.prisma.isConnected) return;
     this.enCurso = true;
 

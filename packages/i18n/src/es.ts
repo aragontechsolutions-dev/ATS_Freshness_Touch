@@ -421,10 +421,29 @@ export const es: TranslationResources = {
       telegramOnNewBooking: 'Enviar un mensaje de Telegram por cada reserva nueva',
       telegramOnNewBookingHelp:
         'Solo de las reservas confirmadas y pagadas. Los formularios abandonados no se avisan, para que el aviso siga mereciendo la pena leerlo.',
-      telegramChatId: 'Chat de Telegram',
+      telegramChatId: 'Chat de operaciones',
       telegramChatIdHelp:
-        'El identificador numérico del chat. Escribe a tu bot y ábrelo en api.telegram.org/bot<token>/getUpdates para leerlo.',
+        'Reservas nuevas y llegadas que no cuadran. El identificador numérico del chat: escribe a tu bot y ábrelo en api.telegram.org/bot<token>/getUpdates para leerlo.',
       telegramChatIdInvalid: 'El identificador de chat es un número, por ejemplo 123456789.',
+
+      telegramOnTeamArrivedFar: 'Avisar a operaciones cuando el equipo fiche lejos de la casa',
+      telegramOnTeamArrivedFarHelp:
+        'Solo cuando el propio móvil dice que la persona no puede estar en la casa: antes se descuenta el margen de error del GPS. Una llegada normal no manda nada.',
+
+      telegramCleaningChatId: 'Grupo del equipo de limpieza',
+      telegramCleaningChatIdHelp:
+        'Tiene que ser un GRUPO, no una persona: un bot no puede escribirle a quien no le haya escrito antes. Mete el bot en el grupo y pega su identificador (empieza por un signo menos). Todo el grupo ve la calle y la ciudad de todos los trabajos, y nunca ningún importe.',
+      telegramCleaningChatIdInvalid:
+        'El identificador del grupo es un número, por ejemplo -1001234567890.',
+
+      telegramOnJobAssigned: 'Avisar al equipo cuando se le asigna o cambia un trabajo',
+      telegramOnJobAssignedHelp:
+        'Se vuelve a avisar si cambia el equipo, para que un mensaje antiguo no se quede en pie como si siguiera vigente.',
+
+      telegramTechChatId: 'Chat técnico',
+      telegramTechChatIdHelp:
+        'Solo fallos del sistema: migraciones pendientes, pagos en modo de prueba, procesos que dejaron de pasar. Si lo dejas vacío van al chat de operaciones, porque un sistema roto del que no se entera nadie es peor que un mensaje a quien no toca.',
+      telegramTechChatIdInvalid: 'El identificador de chat es un número, por ejemplo 123456789.',
 
       credentialsNote:
         'La clave del proveedor de correo y el token del bot se configuran en el servidor, no aquí. Una credencial guardada en la base de datos acaba en cada copia de seguridad, así que viven en el entorno del servidor junto a las claves de pago.',
@@ -635,6 +654,66 @@ export const es: TranslationResources = {
         'Este despliegue no tiene configurado el envío de invitaciones. Falta la clave de servicio en el servidor.',
       inviteSent: 'Invitación enviada.',
       selfNote: 'Esta es tu ficha: no puedes cambiarte el puesto ni darte de baja tú misma.',
+    },
+
+    /* --------------------- Estado del sistema ---------------------- */
+    systemHealth: {
+      title: 'Estado del sistema',
+      intro:
+        'Si el sistema puede hacer su trabajo ahora mismo. Esta pantalla solo informa: desde aquí no se arregla nada.',
+      checkedAt: 'Comprobado a las {{time}}',
+      errorLoad: 'No se pudo leer el estado del sistema.',
+
+      state: {
+        ok: 'Funciona',
+        degraded: 'A medias',
+        down: 'No funciona',
+        unknown: 'No se sabe',
+      },
+
+      check: {
+        database: 'Base de datos',
+        migrations: 'Esquema de la base',
+        pricingRates: 'Tabla de tarifas',
+        paymentProvider: 'Cobros con tarjeta',
+        sweeps: 'Procesos automáticos',
+      },
+
+      /*
+       * ANIDADO DE VERDAD, NO CON PUNTOS DENTRO DE LA CLAVE.
+       *
+       * La primera version escribia `'database.notConfigured': '...'`, que es
+       * como se llama la clave en el contrato. No funciona: i18next usa el
+       * punto como separador de anidamiento, asi que al pedir
+       * `detail.database.notConfigured` busca un objeto `database` que no
+       * existia. Lo cazo la prueba de recursos de i18n.
+       *
+       * La clave del contrato sigue siendo `database.notConfigured`; aqui se
+       * escribe como el arbol que esa clave describe.
+       */
+      detail: {
+        database: {
+          notConfigured: 'No hay base de datos configurada. Se cotiza; no se reserva.',
+          unreachable: 'La base de datos no responde. No se puede reservar.',
+        },
+        migrations: {
+          pending:
+            'A la base le falta una actualización que el código ya necesita. Las reservas pueden fallar. Actualizaciones pendientes:',
+          unverifiable: 'No se pudo leer la lista de actualizaciones de la base.',
+        },
+        pricingRates: {
+          fallback:
+            'La tabla de tarifas guardada no se puede leer y los precios salen del código. Los precios son correctos, pero un presupuesto antiguo no se puede reproducir.',
+          unreadable: 'No se pudo leer la tabla de tarifas.',
+        },
+        paymentProvider: {
+          simulated:
+            'Los pagos están en modo de prueba: se aceptan reservas y NO se retiene ningún depósito.',
+        },
+        sweeps: {
+          stalled: 'Un proceso automático ha dejado de pasar. Procesos afectados:',
+        },
+      },
     },
 
     /* -------------------------- Auditoria -------------------------- */

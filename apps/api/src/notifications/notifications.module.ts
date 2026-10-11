@@ -102,6 +102,14 @@ import { NoopTelegramProvider } from './providers/noop-telegram.provider';
     ReminderSweepService,
     EMAIL_PROVIDER,
     /*
+     * El canal de Telegram se exporta para la ALARMA DE ESTADO, que vive en
+     * `health` y manda al mismo chat de la empresa cuando el sistema se
+     * rompe. Reutiliza el canal que ya existia en vez de abrir otro: un
+     * segundo bot seria un segundo token que custodiar para decir lo mismo
+     * por el mismo sitio.
+     */
+    TELEGRAM_PROVIDER,
+    /*
      * La marca se exporta porque los correos al personal —invitacion y
      * recuperacion— los compone el modulo de administracion, que ya usa de
      * aqui el proveedor de correo.

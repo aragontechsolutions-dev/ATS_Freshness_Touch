@@ -198,6 +198,26 @@ export const EnvSchema = z
      */
     AUDIT_PURGE_HOURS: z.coerce.number().int().min(0).max(168).default(24),
 
+    /**
+     * AVISO DE QUE ALGO VA MAL, cada cuantos minutos se mira. Cero lo apaga.
+     *
+     * Existe porque dos caidas reales estuvieron escritas en el log durante
+     * horas y dias sin que nadie las leyera. Un registro que nadie mira no
+     * es vigilancia; esto es lo que convierte el registro en un aviso.
+     */
+    SYSTEM_ALERT_MINUTES: z.coerce.number().int().min(0).max(1440).default(5),
+
+    /**
+     * SILENCIO MINIMO entre dos avisos del MISMO problema, en horas.
+     *
+     * Es la pieza que decide si este sistema sirve de algo. Sin ella, el
+     * fallo del pin de la puerta —que se repetia cada media hora durante dos
+     * dias— habria mandado casi cien mensajes al telefono del titular, y a
+     * partir del tercero nadie los habria vuelto a leer. Una alarma que
+     * suena todo el rato es ruido, y el ruido se silencia.
+     */
+    SYSTEM_ALERT_SILENCE_HOURS: z.coerce.number().int().min(1).max(168).default(6),
+
     AUTH_PROVIDER: z.enum(['local', 'supabase']).default('local'),
     /** Direccion del proyecto de Supabase: https://<ref>.supabase.co */
     SUPABASE_URL: z.string().url().optional(),

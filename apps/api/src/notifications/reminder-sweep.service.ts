@@ -2,6 +2,7 @@ import { Injectable, Logger, type OnModuleDestroy, type OnModuleInit } from '@ne
 import { ConfigService } from '@nestjs/config';
 import type { Env } from '../common/config/env';
 import { PrismaService } from '../database/prisma.service';
+import { SweepHeartbeatService } from '../health/sweep-heartbeat.service';
 import { NotificationSettingsService } from './notification-settings.service';
 import { NotificationsService } from './notifications.service';
 import { describeFailure } from './notifications.types';
@@ -43,6 +44,7 @@ export class ReminderSweepService implements OnModuleInit, OnModuleDestroy {
     private readonly settings: NotificationSettingsService,
     private readonly notifications: NotificationsService,
     private readonly config: ConfigService<Env, true>,
+    private readonly latidos: SweepHeartbeatService,
   ) {}
 
   onModuleInit(): void {
@@ -62,6 +64,12 @@ export class ReminderSweepService implements OnModuleInit, OnModuleDestroy {
      */
     this.temporizador = setInterval(() => void this.ejecutar(), minutos * 60_000);
     this.temporizador.unref();
+
+    /*
+     * EL LATIDO. Si este barrido deja de pasar, nada falla a la vista: el
+     * resto del sistema sigue igual. Esto es lo unico que lo delata.
+     */
+    this.latidos.registrar('reminders', minutos * 60_000);
 
     this.logger.log(`Barrido de recordatorios cada ${minutos} min`);
   }
@@ -83,6 +91,10 @@ export class ReminderSweepService implements OnModuleInit, OnModuleDestroy {
    * se caeria por un fallo al mandar un recordatorio.
    */
   async ejecutar(now: Date = new Date()): Promise<number> {
+    // El latido va antes de las guardas: dice que el temporizador sigue
+    // disparando, no que el trabajo saliera bien. Ver `sweep-heartbeat`.
+    this.latidos.anotar('reminders');
+
     if (this.enCurso) {
       this.logger.warn('El barrido anterior sigue en curso: se salta esta pasada');
       return 0;

@@ -5,6 +5,8 @@ import {
   TelegramChatIdSchema,
   maskChatId,
   maskEmail,
+  telegramChatForAudience,
+  telegramChatForSystemAlerts,
 } from './notifications';
 
 describe('identificador de chat de Telegram', () => {
@@ -174,5 +176,103 @@ describe('antelacion del recordatorio', () => {
   it('el valor de partida es la vispera', () => {
     expect(DEFAULT_NOTIFICATION_SETTINGS.reminderHoursBefore).toBe(24);
     expect(DEFAULT_NOTIFICATION_SETTINGS.emailBookingReminder).toBe(true);
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/*  Los tres destinos de Telegram (etapa 3.13)                                 */
+/* -------------------------------------------------------------------------- */
+
+describe('a que chat va cada aviso', () => {
+  const chats = {
+    telegramChatId: '-100111',
+    telegramCleaningChatId: '-100222',
+    telegramTechChatId: '-100333',
+  };
+
+  it('operaciones y limpieza van a chats DISTINTOS', () => {
+    /*
+     * La prueba mas importante del bloque. Si estos dos coincidieran, el
+     * mensaje de reserva nueva —que lleva el importe dentro— acabaria en el
+     * grupo de quien limpia la casa.
+     */
+    const operaciones = telegramChatForAudience('INTERNAL', chats);
+    const limpieza = telegramChatForAudience('CLEANING', chats);
+
+    expect(operaciones).toBe('-100111');
+    expect(limpieza).toBe('-100222');
+    expect(operaciones).not.toBe(limpieza);
+  });
+
+  it('el cliente NUNCA tiene chat, pase lo que pase', () => {
+    /*
+     * Devolver aqui cualquiera de los otros mandaria al equipo un texto
+     * redactado para el cliente, con su nombre y su precio.
+     */
+    expect(telegramChatForAudience('CUSTOMER', chats)).toBeNull();
+  });
+
+  it('sin grupo de limpieza configurado no se inventa otro', () => {
+    const sinGrupo = { ...chats, telegramCleaningChatId: null };
+
+    // Caer al de operaciones aqui seria exactamente el fallo que se evita.
+    expect(telegramChatForAudience('CLEANING', sinGrupo)).toBeNull();
+  });
+
+  it('los fallos del sistema van al chat tecnico', () => {
+    expect(telegramChatForSystemAlerts(chats)).toBe('-100333');
+  });
+
+  it('y sin chat tecnico caen al de operaciones, que es mejor que a ninguno', () => {
+    /*
+     * Esta caida SI es deliberada, al reves que la de limpieza. Molestar a
+     * quien no puede arreglarlo es menos grave que un sistema roto del que
+     * no se entera nadie.
+     */
+    expect(telegramChatForSystemAlerts({ ...chats, telegramTechChatId: null })).toBe('-100111');
+  });
+
+  it('sin ningun chat, no se manda nada en vez de fallar', () => {
+    const vacio = { telegramChatId: null, telegramCleaningChatId: null, telegramTechChatId: null };
+
+    expect(telegramChatForAudience('INTERNAL', vacio)).toBeNull();
+    expect(telegramChatForSystemAlerts(vacio)).toBeNull();
+  });
+});
+
+describe('la fila ya guardada sigue siendo valida', () => {
+  it('UNA FILA SIN LOS CAMPOS NUEVOS SE LEE IGUAL', () => {
+    /*
+     * ESTA PRUEBA EVITA REPETIR UNA CAIDA QUE YA PASO.
+     *
+     * Estos ajustes se guardan como un JSON validado con `strictObject`. Al
+     * cambiar el contrato de las tarifas sin pensar en esto, la fila guardada
+     * dejo de validar y el sistema volvio a los valores de partida. Tardo
+     * diez dias en descubrirse.
+     *
+     * Aqui el efecto habria sido peor y mas rapido: los valores de partida
+     * tienen `telegramChatId: null`, asi que el chat que la empresa ya tenia
+     * configurado se habria APAGADO SOLO, sin un error en ningun sitio.
+     *
+     * Por eso los campos nuevos llevan `.default(null)`: lo que hay guardado
+     * hoy sigue entrando.
+     */
+    const filaDeAntesDeLaEtapa = {
+      internalEmail: null,
+      telegramChatId: '-100111',
+      telegramOnNewBooking: true,
+      emailBookingConfirmed: true,
+      emailBookingCancelled: true,
+      emailBookingReminder: true,
+      reminderHoursBefore: 24,
+    };
+
+    const parsed = NotificationSettingsSchema.safeParse(filaDeAntesDeLaEtapa);
+
+    expect(parsed.success).toBe(true);
+    // Y lo que importa: el chat que ya estaba puesto NO se pierde.
+    expect(parsed.success && parsed.data.telegramChatId).toBe('-100111');
+    expect(parsed.success && parsed.data.telegramCleaningChatId).toBeNull();
+    expect(parsed.success && parsed.data.telegramTechChatId).toBeNull();
   });
 });
