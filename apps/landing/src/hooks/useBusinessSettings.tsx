@@ -3,7 +3,8 @@ import {
   DEFAULT_BUSINESS_SETTINGS,
   emailHref,
   formatPhone,
-  phoneHref,
+  whatsappHref,
+  whatsappNumber,
   type BusinessSettings,
 } from '@freshness/types';
 import { fetchBusinessSettings } from '../lib/api';
@@ -26,17 +27,31 @@ import { fetchBusinessSettings } from '../lib/api';
  *      ninguno. Un numero de relleno que dura dos segundos es tiempo
  *      suficiente para que alguien lo marque.
  *
- *   3. SIN TELEFONO NO HAY BOTON DE LLAMAR. Un enlace `tel:` vacio abre la
- *      aplicacion del telefono sin numero, que parece una web rota.
+ *   3. SIN NUMERO NO HAY BOTON. Un enlace vacio abre WhatsApp sin
+ *      destinatario, que parece una web rota.
+ *
+ * DESDE LA ETAPA 3.16 SE ESCRIBE, NO SE LLAMA. Todos los botones de contacto
+ * del sitio abren WhatsApp en vez del marcador del telefono. El motivo es de
+ * negocio: un enlace `tel:` en un ordenador abre Skype o nada, de noche nadie
+ * llama, y sobre todo NO DEJA RASTRO —un cliente que no llama es un cliente
+ * del que nunca te enteraste—. Por WhatsApp puede escribir, mandar un audio o
+ * llamar igual, y queda la conversacion.
  */
 
 /** Lo que necesita la interfaz, ya listo para pintar. */
 export interface BusinessContact {
   settings: BusinessSettings;
-  /** Numero legible, o `null` si no hay ninguno configurado. */
+  /** Numero legible por el que se escribe, o `null` si no hay ninguno. */
   phoneDisplay: string | null;
-  /** Enlace `tel:`, o `null`. */
-  phoneHref: string | null;
+  /**
+   * Enlace de WhatsApp, o `null` si no hay numero.
+   *
+   * ES UNA FUNCION Y NO UNA CADENA porque cada boton manda un mensaje
+   * distinto: el del cotizador lejano lleva dentro el codigo postal y los
+   * pies cuadrados, y los demas un saludo. Sin el mensaje, el cliente llega
+   * a un chat vacio y la empresa no sabe de que le hablan.
+   */
+  whatsappHref: (message?: string) => string | null;
   email: string | null;
   /** Enlace `mailto:`, o `null`. */
   emailHref: string | null;
@@ -51,7 +66,7 @@ export interface BusinessContact {
 const INICIAL: BusinessContact = {
   settings: DEFAULT_BUSINESS_SETTINGS,
   phoneDisplay: null,
-  phoneHref: null,
+  whatsappHref: () => null,
   email: null,
   emailHref: null,
 };
@@ -83,8 +98,13 @@ export function BusinessSettingsProvider({ children }: { children: ReactNode }) 
 
     return {
       settings,
-      phoneDisplay: formatPhone(settings.phone),
-      phoneHref: phoneHref(settings.phone),
+      /*
+       * SE ENSENA EL NUMERO POR EL QUE SE ESCRIBE, no el telefono fijo. Si
+       * la empresa configura un WhatsApp distinto, pintar el otro numero
+       * seria el fallo que el contrato evita: ensenar uno y escribir a otro.
+       */
+      phoneDisplay: formatPhone(whatsappNumber(settings)),
+      whatsappHref: (message?: string) => whatsappHref(settings, message),
       email: settings.email,
       emailHref: emailHref(settings.email),
     };

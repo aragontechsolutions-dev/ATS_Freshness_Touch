@@ -14,7 +14,7 @@ import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { useFlashOnChange } from '../hooks/useFlashOnChange';
 import { ApiClientError, requestQuote } from '../lib/api';
 import { formatCents, formatDate, formatMiles } from '../lib/format';
-import { PhoneIcon } from '../components/Icons';
+import { WhatsAppIcon } from '../components/Icons';
 import { NumberField, clampNumber } from '../components/NumberField';
 import type { BookingJob } from '../components/BookingDialog';
 
@@ -416,9 +416,14 @@ export function QuoteCalculator() {
                   {t('calculator.errorTitle')}
                 </h3>
                 <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">{t(errorKey)}</p>
-                {contacto.phoneHref && (
-                  <a href={contacto.phoneHref} className="ft-btn-outline mt-4 w-full">
-                    <PhoneIcon className="h-4 w-4" />
+                {contacto.whatsappHref() !== null && (
+                  <a
+                    href={contacto.whatsappHref() ?? '#'}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="ft-btn-outline mt-4 w-full"
+                  >
+                    <WhatsAppIcon className="h-4 w-4" />
                     {contacto.phoneDisplay}
                   </a>
                 )}
@@ -508,8 +513,36 @@ function QuoteResult({ quote, locale, canBook, onBook }: QuoteResultProps) {
         <p className="mt-3 text-sm text-slate-600 dark:text-slate-400">
           {t('calculator.manualReviewBody')}
         </p>
-        <a href={contacto.phoneHref ?? '#contact'} className="ft-btn-secondary mt-4 w-full">
-          {t('calculator.requestCallback')}
+        {/*
+          EL MENSAJE LLEGA ESCRITO (etapa 3.16).
+
+          Antes esto era un enlace `tel:`, y eso tenia dos problemas. En un
+          ordenador abre Skype o nada; y sobre todo NO DEJA RASTRO: si el
+          cliente no llama, la empresa no se entera de que existio. Las zonas
+          lejanas son justo donde los trabajos son mas grandes.
+
+          Lo que viaja en el texto es lo que el visitante acaba de teclear
+          el mismo —codigo postal y pies cuadrados—, nunca datos personales:
+          el nombre y la direccion se siguen pidiendo al reservar.
+
+          Si no hay numero configurado se baja a la seccion de contacto en
+          vez de dejar un boton roto.
+        */}
+        <a
+          href={
+            contacto.whatsappHref(
+              t('calculator.whatsappQuote', {
+                zip: quote.input.destination.postalCode,
+                sqft: quote.input.squareFeet,
+              }),
+            ) ?? '#contact'
+          }
+          target="_blank"
+          rel="noopener noreferrer"
+          className="ft-btn-secondary mt-4 w-full"
+        >
+          <WhatsAppIcon className="h-4 w-4" />
+          {t('calculator.whatsappCta')}
         </a>
       </div>
     );

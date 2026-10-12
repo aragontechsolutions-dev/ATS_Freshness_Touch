@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { company } from '../config/company';
-import { MailIcon, PhoneIcon, MapPinIcon } from '../components/Icons';
+import { MailIcon, WhatsAppIcon, MapPinIcon } from '../components/Icons';
 import { BusinessHoursList } from '../components/BusinessHoursList';
 import { Reveal } from '../components/Reveal';
 import { useBusinessContact } from '../hooks/useBusinessSettings';
@@ -8,6 +8,7 @@ import { useBusinessContact } from '../hooks/useBusinessSettings';
 export function Contact() {
   const { t } = useTranslation();
   const contacto = useBusinessContact();
+  const whatsapp = contacto.whatsappHref();
 
   return (
     <section id="contact" className="py-12 sm:py-16 lg:py-20">
@@ -32,15 +33,20 @@ export function Contact() {
               {/* Las filas de telefono y correo desaparecen si no hay dato.
                   Una etiqueta "Telefono" sin numero debajo solo genera la
                   duda de si la web esta rota. */}
-              {contacto.phoneHref && (
+              {whatsapp && (
                 <div className="flex items-start gap-3">
-                  <PhoneIcon className="mt-0.5 h-5 w-5 text-brand-700 dark:text-brand-300" />
+                  <WhatsAppIcon className="mt-0.5 h-5 w-5 text-brand-700 dark:text-brand-300" />
                   <div>
                     <dt className="font-semibold text-slate-900 dark:text-white">
-                      {t('contact.phone')}
+                      {t('contact.whatsapp')}
                     </dt>
                     <dd>
-                      <a href={contacto.phoneHref} className="text-slate-600 dark:text-slate-400">
+                      <a
+                        href={whatsapp}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-slate-600 dark:text-slate-400"
+                      >
                         {contacto.phoneDisplay}
                       </a>
                     </dd>

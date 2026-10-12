@@ -8,7 +8,8 @@ import {
   formatPhone,
   groupWeeklyHours,
   normalizePhoneInput,
-  phoneHref,
+  whatsappHref,
+  whatsappNumber,
   type WeeklyHours,
 } from './business-settings';
 
@@ -26,10 +27,10 @@ describe('telefono', () => {
   });
 
   /*
-   * ESTA ES LA PRUEBA QUE IMPORTA. El telefono acaba dentro de un enlace
-   * `tel:`; si se colara otro esquema, el boton de llamar de todo el sitio
-   * pasaria a ejecutar lo que quiera quien lo guardo. Se prueba con las
-   * formas que un atacante intentaria de verdad, no solo con "texto feo".
+   * ESTA ES LA PRUEBA QUE IMPORTA. El telefono acaba dentro del enlace de
+   * WhatsApp de todo el sitio; si se colara otro esquema, ese boton pasaria
+   * a ejecutar lo que quiera quien lo guardo. Se prueba con las formas que
+   * un atacante intentaria de verdad, no solo con "texto feo".
    */
   it.each([
     'javascript:alert(1)',
@@ -50,9 +51,10 @@ describe('telefono', () => {
     expect(resultado.success).toBe(false);
   });
 
-  it('el enlace generado siempre empieza por tel: y nada mas', () => {
-    expect(phoneHref('+14045550123')).toBe('tel:+14045550123');
-    expect(phoneHref(null)).toBeNull();
+  it('el enlace generado siempre es un wa.me de solo digitos', () => {
+    expect(whatsappHref({ whatsapp: null, phone: '+14045550123' })).toBe(
+      'https://wa.me/14045550123',
+    );
   });
 
   it('presenta los numeros de Estados Unidos como los lee un cliente', () => {
@@ -63,9 +65,9 @@ describe('telefono', () => {
     expect(formatPhone('+34911223344')).toBe('+34911223344');
   });
 
-  it('sin telefono no hay texto ni enlace: nada de numeros de relleno', () => {
+  it('sin numero no hay texto ni enlace: nada de numeros de relleno', () => {
     expect(formatPhone(null)).toBeNull();
-    expect(phoneHref(null)).toBeNull();
+    expect(whatsappHref({ whatsapp: null, phone: null })).toBeNull();
   });
 });
 
@@ -230,5 +232,92 @@ describe('valores de partida', () => {
   it('no traen telefono ni correo inventados', () => {
     expect(DEFAULT_BUSINESS_SETTINGS.phone).toBeNull();
     expect(DEFAULT_BUSINESS_SETTINGS.email).toBeNull();
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+
+describe('WhatsApp (etapa 3.16)', () => {
+  /*
+   * TODOS LOS BOTONES DE CONTACTO DEL SITIO PASAN POR AQUI. Un enlace mal
+   * construido no da un error: da un boton que no escribe a nadie, o peor,
+   * que escribe a otro numero.
+   */
+
+  it('vacio significa «el mismo telefono»', () => {
+    // La regla 1 de este archivo: el numero se guarda UNA vez, para que el
+    // sitio no pueda ensenar uno y escribir a otro.
+    expect(whatsappNumber({ whatsapp: null, phone: '+14045550123' })).toBe('+14045550123');
+  });
+
+  it('y si hay una linea propia de WhatsApp, manda esa', () => {
+    expect(whatsappNumber({ whatsapp: '+16785551234', phone: '+14045550123' })).toBe(
+      '+16785551234',
+    );
+  });
+
+  it('sin ningun numero no hay enlace, en vez de uno roto', () => {
+    expect(whatsappNumber({ whatsapp: null, phone: null })).toBeNull();
+    expect(whatsappHref({ whatsapp: null, phone: null }, 'hola')).toBeNull();
+  });
+
+  it('EL NUMERO VIAJA SIN SIGNOS, que es lo que exige wa.me', () => {
+    // Con el «+» delante, wa.me devuelve un error en vez de abrir el chat.
+    expect(whatsappHref({ whatsapp: '+16785551234', phone: null })).toBe(
+      'https://wa.me/16785551234',
+    );
+  });
+
+  it('el mensaje va codificado, no pegado en crudo', () => {
+    /*
+     * Sin codificar, un «&» o un «#» en el texto cortarian la URL y el
+     * cliente llegaria al chat con media frase.
+     */
+    const enlace = whatsappHref({ whatsapp: null, phone: '+14045550123' }, 'Hola 30655 & 1800 ft²');
+
+    expect(enlace).toContain('?text=');
+    expect(enlace).not.toContain(' ');
+    expect(enlace).not.toContain('&text');
+    expect(decodeURIComponent(enlace?.split('?text=')[1] ?? '')).toBe('Hola 30655 & 1800 ft²');
+  });
+
+  it('un mensaje vacio no deja un ?text= colgando', () => {
+    expect(whatsappHref({ whatsapp: null, phone: '+14045550123' }, '   ')).toBe(
+      'https://wa.me/14045550123',
+    );
+  });
+
+  it('NO SE PIERDE EL TELEFONO con una fila de antes de la etapa', () => {
+    /*
+     * LA PRUEBA QUE JUSTIFICA EL `.default(null)`.
+     *
+     * Esto es un `strictObject`. Sin el valor por defecto, la fila guardada
+     * —que no tiene `whatsapp`— dejaria de cumplir el contrato, el servicio
+     * caeria a DEFAULT_BUSINESS_SETTINGS y el telefono desapareceria de toda
+     * la web sin un solo error. Es la caida muda que costo diez dias con los
+     * precios.
+     */
+    const filaDeAntes = {
+      phone: '+14045550123',
+      email: 'hola@ejemplo.com',
+      hours: horarioValido,
+    };
+
+    const resultado = BusinessSettingsSchema.safeParse(filaDeAntes);
+
+    expect(resultado.success).toBe(true);
+    expect(resultado.data?.phone).toBe('+14045550123');
+    expect(resultado.data?.whatsapp).toBeNull();
+  });
+
+  it('y el numero de WhatsApp se valida igual de duro que el telefono', () => {
+    const resultado = BusinessSettingsSchema.safeParse({
+      phone: '+14045550123',
+      whatsapp: 'javascript:alert(1)',
+      email: null,
+      hours: horarioValido,
+    });
+
+    expect(resultado.success).toBe(false);
   });
 });

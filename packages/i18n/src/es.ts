@@ -11,7 +11,7 @@ export const es: TranslationResources = {
   common: {
     companyName: 'Freshness Touch',
     tagline: 'Limpieza profesional en todo Georgia',
-    callUs: 'Llámanos',
+    whatsapp: 'WhatsApp',
     emailUs: 'Escríbenos',
     getQuote: 'Cotiza gratis',
     bookNow: 'Reservar limpieza',
@@ -201,8 +201,10 @@ export const es: TranslationResources = {
     noTax: 'Impuesto sobre ventas: $0.00 (exento en Georgia)',
     manualReviewTitle: 'Este caso necesita revisión',
     manualReviewBody:
-      'Cuéntanos un poco más y un miembro de nuestro equipo te enviará una propuesta personalizada.',
-    requestCallback: 'Solicitar propuesta personalizada',
+      'Escríbenos por WhatsApp y te preparamos una propuesta personalizada. Texto, nota de voz o llamada: como te venga mejor.',
+    whatsappCta: 'Escríbenos por WhatsApp',
+    whatsappQuote:
+      '¡Hola! Me gustaría una propuesta personalizada para una limpieza en el código postal {{zip}} (unos {{sqft}} ft²).',
     errorTitle: 'No pudimos calcular tu precio',
     errorGeneric: 'Ocurrió un problema de nuestro lado. Inténtalo de nuevo o llámanos.',
     errorNetwork:
@@ -359,7 +361,11 @@ export const es: TranslationResources = {
       contact: 'Contacto',
       phone: 'Telefono',
       phoneSaved: 'Se guardara como {{value}}',
-      phoneEmpty: 'Sin telefono. La web no mostrara boton de llamar.',
+      phoneEmpty: 'Sin telefono. La web no mostrara boton de contacto.',
+      whatsapp: 'Numero de WhatsApp',
+      whatsappHelp: 'Dejalo vacio para usar el telefono de arriba.',
+      whatsappSameAsPhone: 'Los mensajes iran al {{value}}, el mismo del telefono.',
+      whatsappUses: 'Los mensajes iran al {{value}}.',
       email: 'Correo electronico',
       emailHelp: 'Aparece en la seccion de contacto de la web.',
       emailEmpty: 'Sin correo. La web no mostrara enlace de correo.',
@@ -382,6 +388,7 @@ export const es: TranslationResources = {
       },
 
       phoneInvalid: 'Escribe un telefono valido, por ejemplo (404) 555-0123.',
+      whatsappInvalid: 'Escribe un numero de WhatsApp valido, por ejemplo (404) 555-0123.',
       emailInvalid: 'Escribe un correo valido.',
       hoursInvalid: 'Revisa este horario: la hora de cierre debe ser posterior a la de apertura.',
 
@@ -1235,7 +1242,7 @@ export const es: TranslationResources = {
       simulatedDecline: 'Simular tarjeta rechazada',
       unavailableTitle: 'El pago con tarjeta no está disponible ahora mismo',
       unavailableBody:
-        'Tu franja queda reservada. Llámanos al {{phone}} y terminamos la reserva contigo.',
+        'Tu franja queda reservada. Escríbenos por WhatsApp al {{phone}} y terminamos la reserva contigo.',
       unavailableBodyNoPhone:
         'Tu franja queda reservada. Te escribiremos por correo para terminar la reserva contigo.',
     },
@@ -1254,7 +1261,7 @@ export const es: TranslationResources = {
       finish: 'Listo',
       pendingTitle: 'Reserva recibida, pago pendiente',
       pendingBody:
-        'No pudimos iniciar la retención en tu tarjeta, así que la reserva aún no está confirmada. Llámanos al {{phone}} y la terminamos contigo.',
+        'No pudimos iniciar la retención en tu tarjeta, así que la reserva aún no está confirmada. Escríbenos por WhatsApp al {{phone}} y la terminamos contigo.',
       pendingBodyNoPhone:
         'No pudimos iniciar la retención en tu tarjeta, así que la reserva aún no está confirmada. Te escribiremos por correo para terminarla contigo.',
       declinedTitle: 'Tu tarjeta fue rechazada',
@@ -1477,7 +1484,7 @@ export const es: TranslationResources = {
   contact: {
     title: 'Cuando tú digas',
     subtitle: 'Obtén tu precio en línea o habla con una persona: como prefieras.',
-    phone: 'Teléfono',
+    whatsapp: 'WhatsApp',
     email: 'Correo',
     hours: 'Horario',
     closed: 'Cerrado',
