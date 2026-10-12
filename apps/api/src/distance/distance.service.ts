@@ -44,7 +44,7 @@ export class DistanceService {
     /** Calle y ciudad, si se conocen (solo al reservar). */
     detail: { line1?: string; city?: string } = {},
   ): Promise<ResolvedDistance> {
-    const originPostalCode = (await this.ubicacion.get()).postalCode;
+    const origin = await this.ubicacion.get();
 
     /*
      * EL ORIGEN VA EN LA CLAVE, y no es decorativo: si la empresa se muda,
@@ -52,13 +52,20 @@ export class DistanceService {
      * clave, esas distancias viejas seguirian sirviendose durante horas y
      * cobrarian traslados que ya no corresponden.
      *
+     * DESDE LA ETAPA 3.14 LO QUE ENTRA SON LAS COORDENADAS, no el codigo
+     * postal, porque son ellas las que se mandan al proveedor. Con el
+     * codigo postal en la clave, mover el marcador unas millas dentro del
+     * mismo codigo postal cambiaba la medida pero NO la clave, y se seguia
+     * sirviendo la distancia de la sede anterior.
+     *
      * El detalle tambien: la distancia hasta un portal concreto no es la
      * misma que hasta el centro del codigo postal, y mezclarlas daria
      * depositos incorrectos.
      */
     const key = [
       this.provider.name,
-      originPostalCode,
+      origin.latitude,
+      origin.longitude,
       state,
       destinationPostalCode,
       detail.line1 ?? '',
@@ -71,7 +78,7 @@ export class DistanceService {
     }
 
     const result = await this.provider.resolve({
-      originPostalCode,
+      origin: { latitude: origin.latitude, longitude: origin.longitude },
       destinationPostalCode,
       state,
       ...(detail.line1 ? { destinationLine1: detail.line1 } : {}),
