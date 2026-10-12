@@ -1524,6 +1524,15 @@ export const en = {
     mapViewLabel: 'Map view',
     viewWholeState: 'Whole state',
     viewInstantArea: 'Instant-price area ({{miles}} mi)',
+    /*
+     * EL ANILLO SIN RECARGO DE TRASLADO (etapa 3.15).
+     *
+     * Dice lo que se COBRA, no hasta donde se va ni donde sale el precio
+     * solo. Es un ajuste distinto del limite de las zonas, y el mapa tiene
+     * que poder contarlo por separado el dia que dejen de coincidir.
+     */
+    mapFreeRadius: 'Up to {{miles}} miles — no travel charge',
+    legendFreeRadius: 'No travel charge ({{miles}} mi)',
     legendInstant: 'Instant price online',
     legendOnRequest: 'We price it in person',
 

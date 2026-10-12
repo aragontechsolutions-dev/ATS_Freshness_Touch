@@ -48,6 +48,30 @@ interface ServiceAreaMapProps {
    * no se distingue ninguna. Cambiando el encuadre se ven las dos cosas.
    */
   focoMillas: number;
+  /**
+   * EL RADIO QUE NO COBRA TRASLADO, como anillo propio. 0 lo oculta.
+   *
+   * ========================================================================
+   * POR QUE NO VALE CON DIBUJAR LAS ZONAS (etapa 3.15)
+   * ========================================================================
+   * Hasta esta etapa el mapa solo pintaba zonas, y el radio sin recargo no
+   * se dibujaba en ningun sitio: se VEIA porque la zona mas cercana y el
+   * radio libre valian los dos 35 millas, y el mismo circulo contaba las
+   * dos cosas a la vez.
+   *
+   * Pero son dos ajustes independientes. En cuanto administracion amplie la
+   * zona cercana para dar precio automatico mas lejos —que es una decision
+   * comercial razonable— el circulo crece, el radio libre se queda donde
+   * estaba, y el mapa pasa a prometer un area sin recargo que ya no existe.
+   * Nadie veria un error: solo clientes discutiendo una factura.
+   *
+   * Por eso el anillo se dibuja SIEMPRE y por su cuenta. Hoy cae encima del
+   * circulo de la zona cercana, y eso tambien informa: dice que ahi
+   * coinciden.
+   */
+  radioLibreMillas: number;
+  /** Lo que se lee al pulsar el anillo del radio libre. Ya traducido. */
+  etiquetaRadioLibre: string;
   className?: string;
 }
 
@@ -62,6 +86,16 @@ const METROS_POR_MILLA = 1609.34;
  */
 const COLOR_INSTANTANEO = '#145788';
 const COLOR_A_PETICION = '#f0b429';
+
+/*
+ * El anillo sin recargo de traslado.
+ *
+ * VERDE Y DE TRAZO DISCONTINUO, y las dos cosas importan. El color lo separa
+ * de las zonas; el trazo discontinuo lo separa SIN DEPENDER DEL COLOR, que
+ * es lo unico que sirve para quien no distingue bien el verde del azul.
+ * Misma regla que la pantalla de estado del panel.
+ */
+const COLOR_RADIO_LIBRE = '#047857';
 
 /**
  * El borde del estado, siempre visible y en gris.
@@ -81,6 +115,8 @@ export function ServiceAreaMap({
   zonas,
   descripcion,
   focoMillas,
+  radioLibreMillas,
+  etiquetaRadioLibre,
   className,
 }: ServiceAreaMapProps) {
   const contenedor = useRef<HTMLDivElement | null>(null);
@@ -195,6 +231,30 @@ export function ServiceAreaMap({
       forma.addTo(instancia).bindPopup(zona.etiqueta);
     }
 
+    /*
+     * EL ANILLO SIN RECARGO, EL ULTIMO Y POR ENCIMA DE TODO.
+     *
+     * Es el dato que mas le importa a quien mira el mapa —«¿me cobras el
+     * viaje o no?»— y el unico que ninguna zona garantiza: las zonas dicen
+     * si el precio sale solo, no si el traslado entra en el.
+     *
+     * SIN RELLENO. Un relleno mas encima de los circulos de zona emborrona
+     * los colores de todo lo que hay debajo, y ademas se tragaria los clics
+     * de la zona cercana: sin relleno, Leaflet solo atiende el trazo, asi
+     * que el interior sigue siendo de la zona y el borde cuenta lo suyo.
+     */
+    if (radioLibreMillas > 0) {
+      L.circle(puntoCentral, {
+        radius: radioLibreMillas * METROS_POR_MILLA,
+        color: COLOR_RADIO_LIBRE,
+        weight: 2,
+        dashArray: '6 4',
+        fill: false,
+      })
+        .addTo(instancia)
+        .bindPopup(etiquetaRadioLibre);
+    }
+
     mapa.current = instancia;
 
     /*
@@ -206,7 +266,7 @@ export function ServiceAreaMap({
       instancia.remove();
       mapa.current = null;
     };
-  }, [centro.lat, centro.lon, zonas]);
+  }, [centro.lat, centro.lon, zonas, radioLibreMillas, etiquetaRadioLibre]);
 
   /*
    * El encuadre va en su PROPIO efecto, aparte del que crea el mapa.
