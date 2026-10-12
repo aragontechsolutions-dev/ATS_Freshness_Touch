@@ -105,6 +105,18 @@ export function ServiceAreas() {
                 centro={{ lat: base.latitude, lon: base.longitude }}
                 descripcion={t('areas.mapDescription', { miles: maxServiceableMiles })}
                 focoMillas={verCercanas ? instantMiles : maxServiceableMiles}
+                /*
+                  EL RADIO SIN RECARGO, COMO ANILLO PROPIO (etapa 3.15).
+
+                  Hasta ahora no se dibujaba: se veia porque la zona mas
+                  cercana y el radio libre valian los dos 35 millas. Son dos
+                  ajustes independientes, y el dia que administracion amplie
+                  la zona para dar precio automatico mas lejos, el circulo
+                  crece y el radio libre no. Sin este anillo, el mapa
+                  prometeria un area sin traslado que ya no existe.
+                */
+                radioLibreMillas={radioLibreMillas}
+                etiquetaRadioLibre={t('areas.mapFreeRadius', { miles: radioLibreMillas })}
                 zonas={zones
                   .filter((zone) => zone.serviceable && zone.maxMiles !== null)
                   .map((zone) => ({
@@ -172,6 +184,12 @@ export function ServiceAreas() {
               <span className="ft-map-clave ft-map-clave-peticion" aria-hidden="true" />
               {t('areas.legendOnRequest')}
             </span>
+            {radioLibreMillas > 0 && (
+              <span className="inline-flex items-center gap-2">
+                <span className="ft-map-clave ft-map-clave-libre" aria-hidden="true" />
+                {t('areas.legendFreeRadius', { miles: radioLibreMillas })}
+              </span>
+            )}
           </p>
 
           {/*

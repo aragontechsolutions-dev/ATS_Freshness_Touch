@@ -393,6 +393,16 @@
     border-color: #f0b429;
     background-color: rgb(240 180 41 / 0.15);
   }
+
+  /*
+   * El anillo sin recargo de traslado. DISCONTINUO como en el mapa: es lo
+   * que lo distingue de las zonas sin depender del color.
+   */
+  .ft-map-clave-libre {
+    border-color: #047857;
+    border-style: dashed;
+    background-color: transparent;
+  }
 }
 
 /*

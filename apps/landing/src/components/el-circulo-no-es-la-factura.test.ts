@@ -75,3 +75,56 @@ describe('el codigo postal de la sede ya no mide nada (etapa 3.14)', () => {
     expect(es.admin.location.postalCodeNote).not.toMatch(/calcula la distancia/i);
   });
 });
+
+/* -------------------------------------------------------------------------- */
+
+describe('el anillo sin recargo de traslado (etapa 3.15)', () => {
+  /*
+   * EL FALLO QUE ESTO EVITA, QUE NO ES EL MISMO DE ARRIBA.
+   *
+   * El mapa solo sabia dibujar ZONAS. El radio sin recargo no se dibujaba en
+   * ningun sitio: se VEIA porque la zona mas cercana y el radio libre valian
+   * los dos 35 millas, y un mismo circulo contaba las dos cosas.
+   *
+   * Pero son dos ajustes independientes. En cuanto administracion amplie la
+   * zona cercana para dar precio automatico mas lejos —una decision comercial
+   * razonable— el circulo crece, el radio libre se queda, y el mapa pasa a
+   * prometer un area sin traslado que ya no existe. Nadie veria un error:
+   * solo clientes discutiendo una factura.
+   */
+
+  it('el mapa lo dibuja con su propio dato, no deducido de las zonas', () => {
+    expect(MAPA).toContain('radioLibreMillas');
+    expect(MAPA).toContain('COLOR_RADIO_LIBRE');
+  });
+
+  it('con trazo discontinuo, para distinguirse SIN depender del color', () => {
+    /*
+     * En torno a uno de cada doce hombres no distingue bien el verde del
+     * azul. Si lo unico que separara el anillo de las zonas fuera el color,
+     * para esa persona el mapa tendria un circulo de mas y ninguna pista.
+     * Misma regla que la pantalla de estado del panel.
+     */
+    expect(MAPA).toContain('dashArray');
+  });
+
+  it('y sin relleno, para no tragarse los clics de la zona que hay debajo', () => {
+    expect(MAPA).toMatch(/fill:\s*false/);
+  });
+
+  it('la seccion se lo pasa y lo pone en la leyenda', () => {
+    expect(SECCION).toContain('radioLibreMillas={radioLibreMillas}');
+    expect(SECCION).toContain('areas.mapFreeRadius');
+    expect(SECCION).toContain('areas.legendFreeRadius');
+  });
+
+  it('el texto habla del TRASLADO, no de la zona', () => {
+    // «Hasta 35 millas» a secas lo confundiria con el limite de una zona,
+    // que es justo la confusion que esta etapa viene a deshacer.
+    expect(en.areas.mapFreeRadius).toMatch(/travel charge/i);
+    expect(es.areas.mapFreeRadius).toMatch(/traslado/i);
+
+    expect(en.areas.legendFreeRadius).toMatch(/travel charge/i);
+    expect(es.areas.legendFreeRadius).toMatch(/traslado/i);
+  });
+});
