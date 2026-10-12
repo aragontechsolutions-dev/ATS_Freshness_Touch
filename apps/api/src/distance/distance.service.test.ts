@@ -16,9 +16,17 @@ import type { DistanceProvider, DistanceQuery, DistanceResult } from './distance
  * y las zonas cambiarian mientras las millas facturadas siguen siendo las
  * de antes. Todo funcionando, todo cobrando mal.
  *
- * El proveedor simulado no sirve para comprobarlo —es una tabla de millas
- * desde Atlanta por prefijo del DESTINO, asi que ignora el origen—, de ahi
- * que aqui se use uno falso que simplemente devuelve lo que recibe.
+ * ========================================================================
+ * Y DESDE LA ETAPA 3.14, EL ORIGEN ES EL PUNTO MARCADO
+ * ========================================================================
+ * Antes se mandaba el CODIGO POSTAL de la sede, y la latitud y la longitud
+ * solo dibujaban el mapa. Dos fuentes para el mismo dato, sin nada que las
+ * obligara a coincidir: arrastrar el marcador y olvidar el campo del codigo
+ * postal dejaba el mapa diciendo una cosa y la factura calculando otra.
+ *
+ * El proveedor simulado no sirve para comprobar nada de esto —es una tabla
+ * de millas desde Atlanta por prefijo del DESTINO, asi que ignora el
+ * origen—, de ahi que aqui se use uno falso que delata lo que recibe.
  */
 
 const AJUSTES: Partial<Record<keyof Env, unknown>> = {
@@ -30,7 +38,7 @@ const configuracion = {
   get: (key: keyof Env) => AJUSTES[key],
 } as unknown as ConfigService<Env, true>;
 
-/** Devuelve el origen recibido como «millas», para poder afirmar sobre el. */
+/** Devuelve la latitud recibida como «millas», para poder afirmar sobre ella. */
 function proveedorQueDelata(): DistanceProvider & { consultas: DistanceQuery[] } {
   const consultas: DistanceQuery[] = [];
 
@@ -40,7 +48,7 @@ function proveedorQueDelata(): DistanceProvider & { consultas: DistanceQuery[] }
     async resolve(query: DistanceQuery): Promise<DistanceResult> {
       consultas.push(query);
       return {
-        miles: Number(query.originPostalCode),
+        miles: query.origin.latitude,
         durationMinutes: 10,
         provider: 'mock',
         estimated: true,
@@ -49,20 +57,28 @@ function proveedorQueDelata(): DistanceProvider & { consultas: DistanceQuery[] }
   };
 }
 
-function ubicacionEn(postalCode: string): CompanyLocationService {
-  const location = { postalCode } as CompanyLocation;
+/** La sede en un punto, con un codigo postal que NO le corresponde. */
+function sedeEn(latitude: number, longitude: number, postalCode = '30303'): CompanyLocation {
+  return { latitude, longitude, city: 'Atlanta', state: 'GA', postalCode } as CompanyLocation;
+}
+
+function ubicacionFija(location: CompanyLocation): CompanyLocationService {
   return { get: () => Promise.resolve(location) } as unknown as CompanyLocationService;
 }
 
 describe('el origen de la distancia', () => {
   it('sale de la ubicacion guardada, no del entorno', async () => {
     const provider = proveedorQueDelata();
-    const service = new DistanceService(provider, configuracion, ubicacionEn('31401'));
+    const service = new DistanceService(
+      provider,
+      configuracion,
+      ubicacionFija(sedeEn(32.08, -81.09)),
+    );
 
     const resultado = await service.resolve('30303', 'GA');
 
-    expect(provider.consultas[0]?.originPostalCode).toBe('31401');
-    expect(resultado.miles).toBe(31401);
+    expect(provider.consultas[0]?.origin).toEqual({ latitude: 32.08, longitude: -81.09 });
+    expect(resultado.miles).toBe(32.08);
   });
 
   it('se pregunta en cada llamada: mudarse surte efecto sin reiniciar', async () => {
@@ -72,18 +88,15 @@ describe('el origen de la distancia', () => {
      * hasta el siguiente despliegue.
      */
     const provider = proveedorQueDelata();
-    const location = { postalCode: '30303' } as CompanyLocation;
-    const ubicacion = {
-      get: () => Promise.resolve(location),
-    } as unknown as CompanyLocationService;
+    const location = sedeEn(33.749, -84.388);
+    const service = new DistanceService(provider, configuracion, ubicacionFija(location));
 
-    const service = new DistanceService(provider, configuracion, ubicacion);
     await service.resolve('31401', 'GA');
 
-    location.postalCode = '31401';
+    location.latitude = 32.08;
     const despues = await service.resolve('31401', 'GA');
 
-    expect(despues.miles).toBe(31401);
+    expect(despues.miles).toBe(32.08);
   });
 
   it('el origen entra en la clave de la cache', async () => {
@@ -92,17 +105,14 @@ describe('el origen de la distancia', () => {
      * durante horas y cobraria traslados que ya no corresponden.
      */
     const provider = proveedorQueDelata();
-    const location = { postalCode: '30303' } as CompanyLocation;
-    const ubicacion = {
-      get: () => Promise.resolve(location),
-    } as unknown as CompanyLocationService;
+    const location = sedeEn(33.749, -84.388);
+    const service = new DistanceService(provider, configuracion, ubicacionFija(location));
 
-    const service = new DistanceService(provider, configuracion, ubicacion);
     await service.resolve('31401', 'GA');
     const repetida = await service.resolve('31401', 'GA');
     expect(repetida.cached).toBe(true);
 
-    location.postalCode = '31401';
+    location.latitude = 32.08;
     const trasMudarse = await service.resolve('31401', 'GA');
 
     expect(trasMudarse.cached).toBe(false);
@@ -110,10 +120,67 @@ describe('el origen de la distancia', () => {
   });
 });
 
+/* -------------------------------------------------------------------------- */
+
+describe('una sola fuente para el origen (etapa 3.14)', () => {
+  it('AL PROVEEDOR LE LLEGA EL PUNTO, NUNCA EL CODIGO POSTAL DE LA SEDE', async () => {
+    /*
+     * La prueba que sostiene la etapa.
+     *
+     * La sede esta marcada en Savannah y el campo del codigo postal se
+     * quedo en el de Atlanta, que es exactamente el descuadre que podia
+     * pasar sin que lo delatara ningun error: el mapa dibujaba Savannah y
+     * la factura se calculaba desde Atlanta, a 250 millas.
+     *
+     * Ahora lo que viaja es el punto, asi que el campo olvidado no puede
+     * cobrar de mas. Y se comprueba que NO va de pasajero: un codigo postal
+     * en la consulta volveria a ser una segunda fuente de verdad, y alguien
+     * acabaria usandola.
+     */
+    const provider = proveedorQueDelata();
+    const service = new DistanceService(
+      provider,
+      configuracion,
+      ubicacionFija(sedeEn(32.08, -81.09, '30303')),
+    );
+
+    await service.resolve('31401', 'GA');
+
+    const consulta = provider.consultas[0];
+    expect(consulta?.origin).toEqual({ latitude: 32.08, longitude: -81.09 });
+    expect(JSON.stringify(consulta)).not.toContain('30303');
+  });
+
+  it('mover el marcador DENTRO del mismo codigo postal invalida la cache', async () => {
+    /*
+     * El caso que la clave anterior no cubria. Con el codigo postal en la
+     * clave, arrastrar el marcador unas millas sin cambiar de codigo postal
+     * cambiaba la medida pero no la clave: se seguia sirviendo la distancia
+     * de la sede anterior hasta veinticuatro horas despues.
+     */
+    const provider = proveedorQueDelata();
+    const location = sedeEn(33.88, -84.67, '30127');
+    const service = new DistanceService(provider, configuracion, ubicacionFija(location));
+
+    await service.resolve('30655', 'GA');
+
+    // Mismo codigo postal, punto distinto.
+    location.latitude = 33.91;
+    const trasMover = await service.resolve('30655', 'GA');
+
+    expect(trasMover.cached).toBe(false);
+    expect(trasMover.miles).toBe(33.91);
+  });
+});
+
 describe('lo que no cambia', () => {
   it('sigue cacheando por destino y detalle', async () => {
     const provider = proveedorQueDelata();
-    const service = new DistanceService(provider, configuracion, ubicacionEn('30303'));
+    const service = new DistanceService(
+      provider,
+      configuracion,
+      ubicacionFija(sedeEn(33.749, -84.388)),
+    );
 
     await service.resolve('31401', 'GA');
     await service.resolve('31401', 'GA', { line1: '1 Bull St' });
@@ -125,7 +192,11 @@ describe('lo que no cambia', () => {
 
   it('no consulta dos veces lo mismo', async () => {
     const provider = proveedorQueDelata();
-    const service = new DistanceService(provider, configuracion, ubicacionEn('30303'));
+    const service = new DistanceService(
+      provider,
+      configuracion,
+      ubicacionFija(sedeEn(33.749, -84.388)),
+    );
 
     await service.resolve('31401', 'GA');
     await service.resolve('31401', 'GA');

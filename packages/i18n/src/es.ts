@@ -558,14 +558,15 @@ export const es: TranslationResources = {
         'Pulsa sobre el mapa para colocar la sede. Es más seguro que teclear coordenadas: un signo cambiado la manda a otro continente.',
       mapDescription:
         'Mapa del estado de Georgia con la ubicación de la empresa marcada y el radio sin recargo por traslado.',
-      radiusNote: 'El círculo son las {{miles}} millas que no cobran traslado.',
+      radiusNote:
+        'El círculo son {{miles}} millas en línea recta. El traslado se cobra por millas de carretera, que siempre son más, así que una casa justo dentro del círculo puede llevar recargo igualmente.',
 
       latitude: 'Latitud',
       longitude: 'Longitud',
       city: 'Ciudad',
       postalCode: 'Código postal',
       postalCodeNote:
-        'El código postal es desde el que el motor calcula la distancia hasta cada cliente.',
+        'Solo para la ficha. Las distancias se miden desde el punto marcado en el mapa, no desde este código postal.',
 
       save: 'Guardar ubicación',
       saved: 'Ubicación guardada. Los presupuestos nuevos ya se miden desde aquí.',
@@ -1416,6 +1417,8 @@ export const es: TranslationResources = {
     /** Lo que oye quien usa lector de pantalla: un mapa sin describir no dice nada. */
     mapDescription:
       'Mapa de nuestra área de servicio: anillos concéntricos alrededor de Atlanta que llegan hasta {{miles}} millas y cubren todo el estado de Georgia.',
+    mapRadiusNote:
+      'Los anillos son distancias en línea recta. El traslado se cobra por millas de carretera, que siempre son más: el cotizador da la cifra exacta.',
     mapZoneInstant: 'Zona {{zone}} — hasta {{miles}} millas · {{amount}}',
     mapZoneOnRequest:
       'Hasta {{miles}} millas — llegamos hasta aquí, y el precio lo damos en persona',

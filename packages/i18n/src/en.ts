@@ -587,13 +587,20 @@ export const en = {
         'Click the map to place the base. It is safer than typing coordinates: one wrong sign sends it to another continent.',
       mapDescription:
         'Map of the State of Georgia showing the company location and the radius with no travel surcharge.',
-      radiusNote: 'The circle is the {{miles}} miles with no travel charge.',
+      /*
+       * EL CIRCULO ES EN LINEA RECTA Y LA FACTURA ES POR CARRETERA.
+       * Decirlo cuesta una linea; no decirlo deja al cliente discutiendo
+       * un recargo que el mapa parecia descartar.
+       */
+      radiusNote:
+        'The circle is {{miles}} miles as the crow flies. Travel is billed by road miles, which are always more, so a house just inside the circle can still carry a charge.',
 
       latitude: 'Latitude',
       longitude: 'Longitude',
       city: 'City',
       postalCode: 'ZIP code',
-      postalCodeNote: 'The ZIP code is what the engine measures from to reach each customer.',
+      postalCodeNote:
+        'For the record only. Distances are measured from the point marked on the map, not from this ZIP code.',
 
       save: 'Save location',
       saved: 'Location saved. New quotes are measured from here.',
@@ -1510,6 +1517,8 @@ export const en = {
     /** Lo que oye quien usa lector de pantalla: un mapa sin describir no dice nada. */
     mapDescription:
       'Map of our service area: concentric rings around Atlanta reaching up to {{miles}} miles, covering the whole State of Georgia.',
+    mapRadiusNote:
+      'The rings are straight-line distances. Travel is billed by road miles, which are always longer — the quote gives you the exact figure.',
     mapZoneInstant: 'Zone {{zone}} — up to {{miles}} miles · {{amount}}',
     mapZoneOnRequest: 'Up to {{miles}} miles — we come out here, and we price the job in person',
     mapViewLabel: 'Map view',

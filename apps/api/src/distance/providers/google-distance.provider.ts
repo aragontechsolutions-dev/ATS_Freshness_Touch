@@ -33,9 +33,11 @@ export interface GoogleDistanceOptions {
  * navegador, porque una clave de Maps expuesta en el front puede ser usada
  * por terceros y facturada a la empresa.
  *
- * NOTA: este proveedor no se ha podido ejecutar contra la API real todavia
- * (no hay credenciales en el proyecto). Antes de activarlo en produccion hay
- * que validarlo con una clave de prueba; ver docs/03-integraciones.md.
+ * VERIFICADO CONTRA LA API REAL el 12 de octubre de 2026: ruta de Powder
+ * Springs a Monroe (GA), 80 millas y 92 minutos, respuesta 200. Lo que esa
+ * prueba ejercito fue el DESTINO como texto; el origen pasa a ser un punto
+ * desde la etapa 3.14 y eso hay que volver a comprobarlo tras desplegar
+ * (ver docs/32-el-mapa-y-la-factura.md).
  */
 @Injectable()
 export class GoogleDistanceProvider implements DistanceProvider {
@@ -60,7 +62,30 @@ export class GoogleDistanceProvider implements DistanceProvider {
           'X-Goog-FieldMask': 'originIndex,destinationIndex,distanceMeters,duration,condition',
         },
         body: JSON.stringify({
-          origins: [{ waypoint: { address: formatAddress(query.originPostalCode, query.state) } }],
+          /*
+           * EL ORIGEN ES UN PUNTO, EL DESTINO ES TEXTO (etapa 3.14).
+           *
+           * No es una incoherencia: de la sede se tiene un marcador puesto a
+           * mano sobre el mapa, y del cliente solo su direccion escrita.
+           *
+           * Mandar «30127, GA, USA» como origen tenia dos problemas. Hacia
+           * salir la ruta del centroide del codigo postal, que puede caer a
+           * un par de millas de la puerta; y sobre todo convertia el codigo
+           * postal en una segunda fuente de verdad que podia discrepar del
+           * punto que el mapa dibuja, sin que lo delatara ningun error.
+           */
+          origins: [
+            {
+              waypoint: {
+                location: {
+                  latLng: {
+                    latitude: query.origin.latitude,
+                    longitude: query.origin.longitude,
+                  },
+                },
+              },
+            },
+          ],
           destinations: [{ waypoint: { address: formatDestination(query) } }],
           travelMode: 'DRIVE',
           routingPreference: 'TRAFFIC_UNAWARE',
@@ -103,7 +128,11 @@ export class GoogleDistanceProvider implements DistanceProvider {
   }
 }
 
-/** Direccion en el formato que espera la API: ZIP, estado y pais. */
+/**
+ * Direccion del DESTINO en el formato que espera la API: ZIP, estado y pais.
+ *
+ * El origen ya no pasa por aqui: desde la etapa 3.14 viaja como coordenadas.
+ */
 function formatAddress(postalCode: string, state: string): string {
   return `${postalCode}, ${state}, USA`;
 }

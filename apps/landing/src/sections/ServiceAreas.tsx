@@ -173,6 +173,22 @@ export function ServiceAreas() {
               {t('areas.legendOnRequest')}
             </span>
           </p>
+
+          {/*
+            EL CIRCULO ES EN LINEA RECTA; LA FACTURA ES POR CARRETERA.
+
+            Leaflet dibuja un circulo geodesico, y el traslado se cobra con
+            las millas que recorre el coche, que en un area metropolitana
+            con rios, interestatales y sin diagonales son siempre mas. Una
+            casa justo dentro del anillo puede llevar recargo igualmente.
+
+            Sin esta linea el mapa promete una cosa y el presupuesto dice
+            otra, y el cliente lo descubre al final, que es cuando peor
+            sienta. Decirlo antes cuesta una frase.
+          */}
+          <p className="mt-2 text-xs text-slate-500 dark:text-slate-500">
+            {t('areas.mapRadiusNote')}
+          </p>
         </div>
 
         <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

@@ -4,7 +4,12 @@ import { MockDistanceProvider } from './mock-distance.provider';
 const provider = new MockDistanceProvider();
 
 function resolve(postalCode: string, state = 'GA') {
-  return provider.resolve({ originPostalCode: '30303', destinationPostalCode: postalCode, state });
+  return provider.resolve({
+    // El simulado ignora el origen a proposito; el punto da igual.
+    origin: { latitude: 33.749, longitude: -84.388 },
+    destinationPostalCode: postalCode,
+    state,
+  });
 }
 
 describe('MockDistanceProvider', () => {
