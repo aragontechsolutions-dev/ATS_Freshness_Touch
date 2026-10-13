@@ -1043,6 +1043,19 @@ export const en = {
        * con la calle, el equipo tiene que poder decidir de cual fiarse. */
       doorPin: 'The customer marked the entrance — open it',
       directions: 'Directions',
+      /*
+       * EL BOTON QUE NAVEGA, no el que ensena el sitio (etapa 3.17).
+       *
+       * Los enlaces de arriba son `?q=`: abren el mapa en el punto y dejan
+       * «Como llegar» por pulsar. Esto abre la ruta ya trazada, que es lo
+       * que hace falta con el coche en marcha.
+       */
+      takeMeThere: 'Take me there',
+      /*
+       * Se nombra la aplicacion y no «otro mapa»: quien lo pulsa tiene que
+       * saber a que aplicacion se va antes de salir de esta.
+       */
+      appleMaps: 'Apple Maps',
       rooms: '{{bedrooms}} bedrooms · {{bathrooms}} bathrooms',
       start: 'I have arrived',
       finish: 'I have finished',

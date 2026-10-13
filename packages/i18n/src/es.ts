@@ -1000,6 +1000,8 @@ export const es: TranslationResources = {
       call: 'Llamar',
       doorPin: 'El cliente marcó la entrada — ábrela',
       directions: 'Cómo llegar',
+      takeMeThere: 'Llévame allí',
+      appleMaps: 'Apple Maps',
       rooms: '{{bedrooms}} habitaciones · {{bathrooms}} baños',
       start: 'He llegado',
       finish: 'He terminado',

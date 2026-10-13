@@ -299,6 +299,15 @@ export function MapPinIcon({ className }: IconProps) {
   );
 }
 
+/** La flecha de navegacion: «llevame alli». */
+export function NavigationIcon({ className }: IconProps) {
+  return (
+    <Trazo className={className}>
+      <path d="M20.5 3.5 3.8 10.2c-.8.3-.7 1.5.1 1.7l6.6 1.6 1.6 6.6c.2.8 1.4.9 1.7.1L20.5 3.5Z" />
+    </Trazo>
+  );
+}
+
 export function ClockIcon({ className }: IconProps) {
   return (
     <Trazo className={className}>
