@@ -29,6 +29,7 @@ import {
   ClockIcon,
   KeyIcon,
   MapPinIcon,
+  NavigationIcon,
   PhoneIcon,
   PlayIcon,
   SpinnerIcon,
@@ -41,6 +42,7 @@ import {
   todayInTimezone,
 } from '../lib/format';
 import { ubicacionParaFichar } from '../lib/geolocalizacion';
+import { enlaceAppleMaps, enlaceGoogleMaps, esDispositivoApple } from '../lib/navegacion';
 import { useRefrescoVisible } from '../lib/use-refresco';
 
 /**
@@ -545,6 +547,13 @@ function Tarjeta({
 }) {
   const { t } = useTranslation();
 
+  /*
+   * Se mira en cada tarjeta y no una vez al arrancar: es una expresion
+   * regular sobre una cadena que ya esta en memoria, y asi no hay un valor
+   * calculado al cargar que haya que invalidar nunca.
+   */
+  const enApple = esDispositivoApple();
+
   const direccion = [job.addressLine1, job.addressLine2].filter(Boolean).join(', ');
   const completa = `${direccion}, ${job.city}, ${job.state} ${job.postalCode}`;
 
@@ -612,6 +621,46 @@ function Tarjeta({
             </a>
           )}
         </div>
+      </div>
+
+      {/*
+        LLEVAME ALLI (etapa 3.17)
+        ====================================================================
+        Los enlaces de arriba ENSENAN el sitio en el mapa —son `?q=`—, y eso
+        deja por hacer «Como llegar» y «Iniciar»: dos toques y una decision
+        con el coche en marcha. Esto abre la ruta ya trazada.
+
+        NO SE MANDA EL ORIGEN. De donde sale lo pone la aplicacion de mapas
+        con la ubicacion del propio movil, asi que la ubicacion de la
+        empleada no pasa por nuestros servidores ni se le pide permiso de
+        geolocalizacion. La regla de la etapa 3.3 queda intacta.
+
+        EL DE GOOGLE SE PINTA SIEMPRE y el de Apple solo se ANADE en iPhone
+        y iPad. La deteccion por la cadena del navegador es fragil, asi que
+        no decide cual se ensena: si acierta de mas sobra un boton, y si
+        acierta de menos queda el de Google, que en un iPhone funciona igual.
+      */}
+      <div className="flex flex-wrap gap-2">
+        <a
+          href={enlaceGoogleMaps(job)}
+          target="_blank"
+          rel="noreferrer"
+          className="ft-btn-primary min-h-11 flex-1"
+        >
+          <NavigationIcon className="h-4 w-4 shrink-0" />
+          {t('admin.myJobs.takeMeThere')}
+        </a>
+
+        {enApple && (
+          <a
+            href={enlaceAppleMaps(job)}
+            target="_blank"
+            rel="noreferrer"
+            className="ft-btn-ghost min-h-11"
+          >
+            {t('admin.myJobs.appleMaps')}
+          </a>
+        )}
       </div>
 
       <div className="flex flex-wrap items-center gap-3 text-sm">
