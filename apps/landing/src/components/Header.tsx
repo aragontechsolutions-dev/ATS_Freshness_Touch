@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { company } from '../config/company';
 import { LanguageSwitcher } from './LanguageSwitcher';
 import { ThemeToggle } from './ThemeToggle';
-import { CloseIcon, MenuIcon, PhoneIcon } from './Icons';
+import { CloseIcon, MenuIcon, WhatsAppIcon } from './Icons';
 import { Logo } from './Logo';
 import { useScrolled } from '../hooks/useScrolled';
 import { useBusinessContact } from '../hooks/useBusinessSettings';
@@ -31,6 +31,7 @@ const NAV_ITEMS = [
 export function Header() {
   const { t } = useTranslation();
   const contacto = useBusinessContact();
+  const whatsapp = contacto.whatsappHref();
   const [open, setOpen] = useState(false);
   const desplazada = useScrolled();
 
@@ -121,15 +122,17 @@ export function Header() {
         </nav>
 
         <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
-          {/* Sin telefono configurado no se pinta nada: un enlace `tel:`
-              vacio abre la aplicacion del telefono sin numero. */}
-          {contacto.phoneHref && (
+          {/* Sin numero configurado no se pinta nada: un enlace de WhatsApp
+              sin destinatario parece una web rota. */}
+          {whatsapp && (
             <a
-              href={contacto.phoneHref}
+              href={whatsapp}
+              target="_blank"
+              rel="noopener noreferrer"
               className="hidden items-center gap-2 text-sm font-semibold text-slate-700
                          xl:inline-flex dark:text-slate-200"
             >
-              <PhoneIcon className="h-4 w-4 text-brand-700 dark:text-brand-300" />
+              <WhatsAppIcon className="h-4 w-4 text-brand-700 dark:text-brand-300" />
               {contacto.phoneDisplay}
             </a>
           )}
@@ -177,10 +180,15 @@ export function Header() {
             ))}
           </ul>
 
-          {contacto.phoneHref && (
+          {whatsapp && (
             <div className="ft-container pb-4">
-              <a href={contacto.phoneHref} className="ft-btn-secondary w-full">
-                <PhoneIcon className="h-4 w-4" />
+              <a
+                href={whatsapp}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="ft-btn-secondary w-full"
+              >
+                <WhatsAppIcon className="h-4 w-4" />
                 {contacto.phoneDisplay}
               </a>
             </div>

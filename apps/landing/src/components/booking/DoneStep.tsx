@@ -3,7 +3,7 @@ import type { BookingResponse, Locale } from '@freshness/types';
 import { useBusinessContact } from '../../hooks/useBusinessSettings';
 import type { BookingDetailsForm } from '../../lib/booking-validation';
 import { formatCents, formatDateTimeLong } from '../../lib/format';
-import { CheckIcon, PhoneIcon } from '../Icons';
+import { CheckIcon, WhatsAppIcon } from '../Icons';
 
 export type BookingOutcome = 'CONFIRMED' | 'PENDING' | 'DECLINED';
 
@@ -31,6 +31,7 @@ interface DoneStepProps {
 export function DoneStep({ booking, details, outcome, locale, onClose, onRestart }: DoneStepProps) {
   const { t } = useTranslation();
   const contacto = useBusinessContact();
+  const whatsapp = contacto.whatsappHref();
 
   if (outcome === 'DECLINED') {
     return (
@@ -61,9 +62,14 @@ export function DoneStep({ booking, details, outcome, locale, onClose, onRestart
         }
       >
         <Referencia reference={booking.reference} />
-        {contacto.phoneHref && (
-          <a href={contacto.phoneHref} className="ft-btn-secondary w-full">
-            <PhoneIcon className="h-4 w-4" />
+        {whatsapp && (
+          <a
+            href={whatsapp}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="ft-btn-secondary w-full"
+          >
+            <WhatsAppIcon className="h-4 w-4" />
             {contacto.phoneDisplay}
           </a>
         )}

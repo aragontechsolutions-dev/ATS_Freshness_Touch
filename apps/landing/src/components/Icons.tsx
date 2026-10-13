@@ -8,7 +8,19 @@ export interface IconProps {
 
 const base = 'h-5 w-5';
 
-export function PhoneIcon({ className = base }: IconProps) {
+/**
+ * WhatsApp: burbuja de conversacion con un auricular dentro.
+ *
+ * NO ES EL LOGOTIPO OFICIAL, y es a proposito. Reproducir una marca ajena de
+ * memoria sale mal de las dos maneras posibles: o se parece lo bastante para
+ * ser un uso indebido, o no se parece y queda peor que un icono propio. Lo
+ * que identifica el canal es la PALABRA «WhatsApp» que acompana al icono, que
+ * ademas es la forma correcta de nombrar un servicio de terceros.
+ *
+ * El trazo es el mismo que el resto de iconos del archivo para que la fila de
+ * botones no parezca pegada de dos sitios distintos.
+ */
+export function WhatsAppIcon({ className = base }: IconProps) {
   return (
     <svg
       viewBox="0 0 24 24"
@@ -21,7 +33,12 @@ export function PhoneIcon({ className = base }: IconProps) {
       <path
         strokeLinecap="round"
         strokeLinejoin="round"
-        d="M2.5 5.5c0-1.1.9-2 2-2h2.2c.9 0 1.7.6 1.9 1.5l.7 2.6c.2.8-.1 1.6-.8 2l-1.2.8a12.5 12.5 0 0 0 5.3 5.3l.8-1.2c.4-.7 1.2-1 2-.8l2.6.7c.9.2 1.5 1 1.5 1.9v2.2c0 1.1-.9 2-2 2C10.2 20.5 2.5 12.8 2.5 5.5Z"
+        d="M20.5 11.6a8.5 8.5 0 0 1-12.4 7.5L3.5 20.5l1.4-4.6a8.5 8.5 0 1 1 15.6-4.3Z"
+      />
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M9.3 9.7c0-.5.4-.9.9-.9h.9c.4 0 .8.3.9.7l.3 1.1c.1.4 0 .8-.3 1l-.5.3a5 5 0 0 0 2.1 2.1l.3-.5c.2-.3.6-.4 1-.3l1.1.3c.4.1.7.5.7.9v.9c0 .5-.4.9-.9.9a6.5 6.5 0 0 1-6.5-6.5Z"
       />
     </svg>
   );

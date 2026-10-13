@@ -9,7 +9,7 @@ export const en = {
   common: {
     companyName: 'Freshness Touch',
     tagline: 'Professional cleaning across Georgia',
-    callUs: 'Call us',
+    whatsapp: 'WhatsApp',
     emailUs: 'Email us',
     getQuote: 'Get a Free Quote',
     bookNow: 'Book a Cleaning',
@@ -226,8 +226,18 @@ export const en = {
     noTax: 'Sales tax: $0.00 (exempt in Georgia)',
     manualReviewTitle: 'We need to review this one',
     manualReviewBody:
-      'Tell us a bit more and a member of our team will send you a personalised proposal.',
-    requestCallback: 'Request a custom proposal',
+      'Send us a WhatsApp message and we will put together a personalised proposal. Text, voice note or call — whatever suits you.',
+    whatsappCta: 'Message us on WhatsApp',
+    /*
+     * EL MENSAJE QUE LLEVA EL BOTON YA ESCRITO.
+     *
+     * Son datos que el visitante acaba de teclear el mismo —codigo postal y
+     * pies cuadrados—, no datos personales: el nombre y la direccion se
+     * siguen pidiendo en el formulario de reserva. Sin esto el cliente llega
+     * al chat con un «hola» y la empresa no sabe de que le hablan.
+     */
+    whatsappQuote:
+      'Hi! I would like a custom proposal for a cleaning in ZIP {{zip}} (about {{sqft}} sq ft).',
     errorTitle: 'We could not calculate your price',
     errorGeneric: 'Something went wrong on our side. Please try again or call us.',
     errorNetwork: 'We could not reach our pricing service. Check your connection and try again.',
@@ -389,7 +399,11 @@ export const en = {
       contact: 'Contact',
       phone: 'Phone number',
       phoneSaved: 'Will be saved as {{value}}',
-      phoneEmpty: 'No phone number. The website will not show a call button.',
+      phoneEmpty: 'No phone number. The website will not show a contact button.',
+      whatsapp: 'WhatsApp number',
+      whatsappHelp: 'Leave it empty to use the phone number above.',
+      whatsappSameAsPhone: 'Messages will go to {{value}}, the same as the phone number.',
+      whatsappUses: 'Messages will go to {{value}}.',
       email: 'Email address',
       emailHelp: 'Shown on the contact section of the website.',
       emailEmpty: 'No email address. The website will not show an email link.',
@@ -412,6 +426,7 @@ export const en = {
       },
 
       phoneInvalid: 'Enter a valid phone number, for example (404) 555-0123.',
+      whatsappInvalid: 'Enter a valid WhatsApp number, for example (404) 555-0123.',
       emailInvalid: 'Enter a valid email address.',
       hoursInvalid: 'Check these hours: the closing time must be after the opening time.',
 
@@ -1330,7 +1345,7 @@ export const en = {
       simulatedDecline: 'Simulate a declined card',
       unavailableTitle: 'Card payments are not available right now',
       unavailableBody:
-        'Your slot is held. Call us on {{phone}} and we will finish the booking with you.',
+        'Your slot is held. Message us on WhatsApp at {{phone}} and we will finish the booking with you.',
       // Variante sin telefono: la empresa puede no tener uno configurado, y
       // "llamanos al" seguido de nada deja al cliente sin saber que hacer.
       unavailableBodyNoPhone:
@@ -1351,7 +1366,7 @@ export const en = {
       finish: 'Done',
       pendingTitle: 'Booking received, payment pending',
       pendingBody:
-        'We could not start the card hold, so your booking is not confirmed yet. Call us on {{phone}} and we will finish it with you.',
+        'We could not start the card hold, so your booking is not confirmed yet. Message us on WhatsApp at {{phone}} and we will finish it with you.',
       pendingBodyNoPhone:
         'We could not start the card hold, so your booking is not confirmed yet. We will email you to finish it with you.',
       declinedTitle: 'Your card was declined',
@@ -1576,7 +1591,7 @@ export const en = {
   contact: {
     title: 'Ready when you are',
     subtitle: 'Get your instant price online, or talk to a human — whichever you prefer.',
-    phone: 'Phone',
+    whatsapp: 'WhatsApp',
     email: 'Email',
     hours: 'Hours',
     closed: 'Closed',

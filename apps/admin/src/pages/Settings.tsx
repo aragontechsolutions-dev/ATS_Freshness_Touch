@@ -257,6 +257,7 @@ function BusinessSettingsForm({ locale, onSessionLost }: SettingsPageProps) {
   // normaliza al enviar: normalizar en cada pulsacion mueve el cursor y hace
   // imposible corregir un digito del medio.
   const [phone, setPhone] = useState('');
+  const [whatsapp, setWhatsapp] = useState('');
   const [email, setEmail] = useState('');
   const [hours, setHours] = useState(DEFAULT_BUSINESS_SETTINGS.hours);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
@@ -270,6 +271,7 @@ function BusinessSettingsForm({ locale, onSessionLost }: SettingsPageProps) {
     try {
       const datos = await fetchSettings();
       setPhone(datos.settings.phone ?? '');
+      setWhatsapp(datos.settings.whatsapp ?? '');
       setEmail(datos.settings.email ?? '');
       setHours(datos.settings.hours);
       setAutoria({ updatedAt: datos.updatedAt, updatedBy: datos.updatedBy });
@@ -304,6 +306,7 @@ function BusinessSettingsForm({ locale, onSessionLost }: SettingsPageProps) {
      */
     const candidato: unknown = {
       phone: phone.trim() === '' ? null : normalizePhoneInput(phone),
+      whatsapp: whatsapp.trim() === '' ? null : normalizePhoneInput(whatsapp),
       email: email.trim() === '' ? null : email.trim(),
       hours,
     };
@@ -319,6 +322,7 @@ function BusinessSettingsForm({ locale, onSessionLost }: SettingsPageProps) {
     try {
       const datos = await saveSettings(validado.data);
       setPhone(datos.settings.phone ?? '');
+      setWhatsapp(datos.settings.whatsapp ?? '');
       setEmail(datos.settings.email ?? '');
       setHours(datos.settings.hours);
       setAutoria({ updatedAt: datos.updatedAt, updatedBy: datos.updatedBy });
@@ -351,6 +355,16 @@ function BusinessSettingsForm({ locale, onSessionLost }: SettingsPageProps) {
 
   // Lo que quedara guardado, para que no haya sorpresas al pulsar el boton.
   const telefonoNormalizado = phone.trim() === '' ? null : normalizePhoneInput(phone);
+  const whatsappNormalizado = whatsapp.trim() === '' ? null : normalizePhoneInput(whatsapp);
+
+  /*
+   * A DONDE IRAN LOS MENSAJES DE VERDAD.
+   *
+   * El campo vacio significa «el mismo telefono», y eso es comodo pero mudo:
+   * sin esta linea, quien lo deja vacio no tiene forma de saber adonde
+   * escriben los clientes. Se dice en pantalla, con el numero delante.
+   */
+  const destinoWhatsapp = whatsappNormalizado ?? telefonoNormalizado;
 
   return (
     <form onSubmit={(evento) => void enviar(evento)} className="space-y-6">
@@ -393,6 +407,38 @@ function BusinessSettingsForm({ locale, onSessionLost }: SettingsPageProps) {
                 })}
           </p>
           {fieldErrors.phone && <p className="mt-1 text-xs text-red-700">{t(fieldErrors.phone)}</p>}
+        </div>
+
+        <div>
+          <label className="ft-label" htmlFor="ajuste-whatsapp">
+            {t('admin.settings.whatsapp')}
+          </label>
+          <input
+            id="ajuste-whatsapp"
+            className="ft-input"
+            type="tel"
+            inputMode="tel"
+            autoComplete="off"
+            value={whatsapp}
+            placeholder={t('admin.settings.whatsappHelp')}
+            onChange={(evento) => {
+              setWhatsapp(evento.target.value);
+            }}
+          />
+          <p className="mt-1 text-xs text-slate-600 dark:text-slate-400">
+            {destinoWhatsapp === null
+              ? t('admin.settings.phoneEmpty')
+              : whatsappNormalizado === null
+                ? t('admin.settings.whatsappSameAsPhone', {
+                    value: formatPhone(destinoWhatsapp) ?? destinoWhatsapp,
+                  })
+                : t('admin.settings.whatsappUses', {
+                    value: formatPhone(destinoWhatsapp) ?? destinoWhatsapp,
+                  })}
+          </p>
+          {fieldErrors.whatsapp && (
+            <p className="mt-1 text-xs text-red-700">{t(fieldErrors.whatsapp)}</p>
+          )}
         </div>
 
         <div>
@@ -545,7 +591,7 @@ function clavesDeError(issues: { path: PropertyKey[] }[]): Record<string, string
 
     if (primero === 'hours') {
       errores[`hours.${String(segundo)}`] ??= 'admin.settings.hoursInvalid';
-    } else if (primero === 'phone' || primero === 'email') {
+    } else if (primero === 'phone' || primero === 'whatsapp' || primero === 'email') {
       errores[primero] ??= `admin.settings.${primero}Invalid`;
     }
   }

@@ -4,7 +4,7 @@ import type { BookingResponse, Locale } from '@freshness/types';
 import { useBusinessContact } from '../../hooks/useBusinessSettings';
 import { ApiClientError, confirmMockPayment } from '../../lib/api';
 import { formatCents, formatTimeInZone } from '../../lib/format';
-import { PhoneIcon } from '../Icons';
+import { WhatsAppIcon } from '../Icons';
 import { StripePaymentForm, stripeIsConfigured } from './StripePaymentForm';
 
 export type PaymentOutcome = 'AUTHORISED' | 'DECLINED';
@@ -102,6 +102,7 @@ export function PaymentStep({ booking, locale, onResolved }: PaymentStepProps) {
 function Unavailable() {
   const { t } = useTranslation();
   const contacto = useBusinessContact();
+  const whatsapp = contacto.whatsappHref();
 
   return (
     <div className="rounded-xl border border-sun-400 bg-sun-50 p-4 dark:border-sun-600 dark:bg-night-700">
@@ -113,9 +114,14 @@ function Unavailable() {
           ? t('booking.payment.unavailableBody', { phone: contacto.phoneDisplay })
           : t('booking.payment.unavailableBodyNoPhone')}
       </p>
-      {contacto.phoneHref && (
-        <a href={contacto.phoneHref} className="ft-btn-outline mt-3 w-full">
-          <PhoneIcon className="h-4 w-4" />
+      {whatsapp && (
+        <a
+          href={whatsapp}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="ft-btn-outline mt-3 w-full"
+        >
+          <WhatsAppIcon className="h-4 w-4" />
           {contacto.phoneDisplay}
         </a>
       )}

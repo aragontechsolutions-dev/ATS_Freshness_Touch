@@ -104,6 +104,29 @@ export type WeeklyHours = z.infer<typeof WeeklyHoursSchema>;
  */
 export const BusinessSettingsSchema = z.strictObject({
   phone: PhoneE164Schema.nullable(),
+  /**
+   * EL NUMERO DE WHATSAPP, cuando no es el mismo que el telefono.
+   *
+   * ======================================================================
+   * EL `.default(null)` NO ES UN ADORNO (etapa 3.16)
+   * ======================================================================
+   * Esto es un `strictObject`, y la fila guardada se valida contra el al
+   * leerla. Un campo nuevo sin valor por defecto deja invalida la fila que
+   * ya existe, y entonces `business-settings.service.ts` devuelve
+   * `DEFAULT_BUSINESS_SETTINGS`, que lleva `phone: null`.
+   *
+   * Es decir: EL TELEFONO DESAPARECERIA DE TODA LA WEB —cabecera, barra
+   * del movil, contacto, cotizador— sin un solo error en ninguna pantalla.
+   * Es la misma caida muda que costo diez dias con los precios.
+   *
+   * VACIO SIGNIFICA «EL MISMO TELEFONO», y por eso es opcional en vez de
+   * obligatorio. La regla 1 de este archivo dice que el numero se guarda
+   * UNA sola vez para que el sitio no pueda ensenar uno y marcar otro; un
+   * segundo campo obligatorio seria exactamente eso. Asi, por defecto hay
+   * un solo numero, y el campo existe solo para el caso real de que el
+   * WhatsApp del negocio sea una linea distinta.
+   */
+  whatsapp: PhoneE164Schema.nullable().default(null),
   email: z.string().trim().toLowerCase().email().max(160).nullable(),
   hours: WeeklyHoursSchema,
 });
@@ -117,6 +140,7 @@ export type BusinessSettingsInput = z.input<typeof BusinessSettingsSchema>;
  */
 export const DEFAULT_BUSINESS_SETTINGS: BusinessSettings = {
   phone: null,
+  whatsapp: null,
   email: null,
   hours: {
     1: { open: '08:00', close: '18:00' },
@@ -133,18 +157,52 @@ export const DEFAULT_BUSINESS_SETTINGS: BusinessSettings = {
 // Derivados para mostrar
 // ---------------------------------------------------------------------------
 
-/**
- * Enlace para llamar. Devuelve `null` cuando no hay telefono, para que quien
- * lo use tenga que decidir que ensenar en ese caso en vez de pintar un enlace
- * roto.
- */
-export function phoneHref(phone: string | null): string | null {
-  return phone === null ? null : `tel:${phone}`;
-}
-
 /** Enlace para escribir. Mismo criterio que el telefono. */
 export function emailHref(email: string | null): string | null {
   return email === null ? null : `mailto:${email}`;
+}
+
+/** Lo minimo que hace falta para construir un enlace de WhatsApp. */
+export type WhatsAppNumbers = Pick<BusinessSettings, 'whatsapp' | 'phone'>;
+
+/**
+ * El numero por el que se escribe: el de WhatsApp si lo hay, y si no el
+ * telefono. `null` cuando no hay ninguno.
+ *
+ * Existe aparte del enlace porque el panel necesita poder DECIR cual se va a
+ * usar. Un campo vacio que silenciosamente usa otro numero es util hasta el
+ * dia que alguien se pregunta por que los mensajes llegan a otro sitio.
+ */
+export function whatsappNumber(settings: WhatsAppNumbers): string | null {
+  return settings.whatsapp ?? settings.phone;
+}
+
+/**
+ * Enlace para escribir por WhatsApp, con el mensaje ya redactado.
+ *
+ * ==========================================================================
+ * POR QUE `wa.me` Y NO UN ENLACE `whatsapp://`
+ * ==========================================================================
+ * `wa.me` es el enlace oficial y resuelve solo segun el dispositivo: abre la
+ * aplicacion si esta instalada, la tienda si no, y `web.whatsapp.com` en un
+ * ordenador. Un esquema `whatsapp://` no hace nada en un navegador sin la
+ * aplicacion, que es justo donde mas gente se queda sin poder escribir.
+ *
+ * EL NUMERO VA SIN SIGNOS, que es lo que exige `wa.me`. Los digitos se sacan
+ * de una cadena que YA paso `PhoneE164Schema`, asi que no hay forma de colar
+ * otro esquema en el enlace: lo que queda despues de quitar lo que no es un
+ * digito solo pueden ser digitos.
+ */
+export function whatsappHref(settings: WhatsAppNumbers, message?: string): string | null {
+  const numero = whatsappNumber(settings);
+  if (numero === null) return null;
+
+  const digitos = numero.replace(/\D/g, '');
+  const texto = message !== undefined && message.trim() !== '' ? message.trim() : null;
+
+  return texto === null
+    ? `https://wa.me/${digitos}`
+    : `https://wa.me/${digitos}?text=${encodeURIComponent(texto)}`;
 }
 
 /**
