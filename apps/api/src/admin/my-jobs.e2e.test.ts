@@ -1045,4 +1045,51 @@ describe('lo que la pantalla necesita para pintar el boton correcto', () => {
     expect(deDario.iHaveArrived).toBe(true);
     expect(deDario.iHaveLeft).toBe(false);
   });
+
+  /*
+   * ========================================================================
+   * LA RESPUESTA DE MARCAR, NO SOLO EL LISTADO (etapa 3.18)
+   * ========================================================================
+   * Por aqui se colo un fallo que llego a produccion, y conviene entender
+   * por que: la prueba de arriba comprueba el LISTADO, que estaba bien. La
+   * respuesta del PATCH no, y es la que pinta la pantalla justo despues de
+   * pulsar.
+   *
+   * `markProgress` leia la reserva dentro de la transaccion ANTES de crear
+   * la fila del fichaje y devolvia esa foto, asi que `iHaveArrived` salia en
+   * `false` recien fichado. Sintoma: el aviso aparecia, el fichaje quedaba
+   * guardado, y la pantalla seguia ofreciendo «He llegado». Habia que
+   * recargar a mano.
+   *
+   * Una respuesta que no refleja lo que acaba de pasar es peor que un error:
+   * el error se ve, esto parecia que no se habia guardado.
+   */
+  it('AL MARCAR LA LLEGADA, la respuesta ya dice que he llegado', async () => {
+    const respuesta = await marcar(DE_CLEO, 'IN_PROGRESS');
+
+    expect(respuesta.status).toBe(200);
+    expect(
+      respuesta.body.iHaveArrived,
+      'la respuesta de marcar no refleja el fichaje que acaba de crear',
+    ).toBe(true);
+    expect(respuesta.body.iHaveLeft).toBe(false);
+  });
+
+  it('y al marcar la salida, que me he ido', async () => {
+    await marcar(DE_CLEO, 'IN_PROGRESS');
+    const respuesta = await marcar(DE_CLEO, 'COMPLETED');
+
+    expect(respuesta.status).toBe(200);
+    expect(respuesta.body.iHaveArrived).toBe(true);
+    expect(respuesta.body.iHaveLeft).toBe(true);
+  });
+
+  it('y el fichaje recien hecho viene en la lista de fichajes', async () => {
+    // Misma causa que lo anterior: la pantalla pinta los fichajes del equipo
+    // con este mismo objeto, y el propio faltaba hasta recargar.
+    const respuesta = await marcar(DE_CLEO, 'IN_PROGRESS');
+
+    expect(respuesta.body.clockIns).toHaveLength(1);
+    expect(respuesta.body.clockIns[0].kind).toBe('ARRIVAL');
+  });
 });

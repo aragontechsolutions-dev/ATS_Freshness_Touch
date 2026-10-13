@@ -446,7 +446,30 @@ export class MyJobsService {
       }
     }
 
-    return toMyJob(actualizado, staff.staffId, this.catalogo);
+    /*
+     * ======================================================================
+     * SE VUELVE A LEER, Y NO ES UN CAPRICHO (etapa 3.18)
+     * ======================================================================
+     * Aqui habia `toMyJob(actualizado, ...)`, y era un fallo con sintoma en
+     * la pantalla de quien limpia.
+     *
+     * `actualizado` es la reserva leida DENTRO de la transaccion pero ANTES
+     * de crear la fila del fichaje. Asi que sus `clockIns` no incluyen el
+     * fichaje que se acaba de hacer, y `toMyJob` deduce de ahi dos campos:
+     *
+     *     iHaveArrived: trabajo.clockIns.some(... kind === 'ARRIVAL')
+     *     iHaveLeft:    trabajo.clockIns.some(... kind === 'DEPARTURE')
+     *
+     * Los dos salian en `false`. La peticion iba bien, el aviso aparecia, el
+     * fichaje quedaba guardado... y la pantalla seguia ofreciendo «He
+     * llegado» porque el servidor acababa de decirle que no habia llegado.
+     * Habia que recargar a mano para ver la verdad.
+     *
+     * `getOne` lee despues de que la transaccion haya terminado, que es
+     * exactamente lo que ya hacen marcar una tarea y proponer un ajuste. La
+     * regla era buena; a este metodo se le habia escapado.
+     */
+    return this.getOne(bookingId, staff);
   }
 
   /**

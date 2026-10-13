@@ -43,6 +43,12 @@ import {
 } from '../lib/format';
 import { ubicacionParaFichar } from '../lib/geolocalizacion';
 import { enlaceAppleMaps, enlaceGoogleMaps, esDispositivoApple } from '../lib/navegacion';
+import {
+  navegacionReciente,
+  olvidarNavegacion,
+  recordarNavegacion,
+} from '../lib/vuelta-de-navegacion';
+import { DialogoLlegada } from '../components/DialogoLlegada';
 import { useRefrescoVisible } from '../lib/use-refresco';
 
 /**
@@ -122,6 +128,7 @@ export function MyJobs({ locale, staffFirstName, onSessionLost }: MyJobsProps) {
   const ultimaPeticion = useRef(new Map<string, number>());
   /** El trabajo cuyo ajuste se esta enviando, si hay alguno. */
   const [ajustando, setAjustando] = useState<string | null>(null);
+  const [preguntarLlegada, setPreguntarLlegada] = useState<string | null>(null);
   const toast = useToast();
 
   /**
@@ -285,6 +292,42 @@ export function MyJobs({ locale, staffFirstName, onSessionLost }: MyJobsProps) {
 
   useRefrescoVisible(() => void refrescar(), REFRESCO_MS);
 
+  /*
+   * ======================================================================
+   * «¿HAS LLEGADO?» AL VOLVER DE LA NAVEGACION (etapa 3.18)
+   * ======================================================================
+   * Depende de `jobs` y de nada mas, y eso resuelve solo el problema de
+   * orden que tenia escucharlo por `visibilitychange`: al volver a la
+   * aplicacion, `useRefrescoVisible` ya pide la lista, y cuando llega este
+   * efecto vuelve a correr con los datos FRESCOS. Preguntando en el evento
+   * se decidiria con la foto vieja, y se le preguntaria a quien ya ficho.
+   *
+   * Tambien cubre el arranque en frio: un movil con poca memoria mata la
+   * PWA mientras se conduce, y al volver se carga entera. El recuerdo vive
+   * en `sessionStorage` precisamente para sobrevivir a eso.
+   */
+  useEffect(() => {
+    if (!jobs) return;
+
+    const bookingId = navegacionReciente();
+    if (bookingId === null) return;
+
+    const job = jobs.find((j) => j.bookingId === bookingId);
+
+    /*
+     * No se pregunta si el trabajo ya no esta en la lista —se cancelo, se
+     * reasigno, es de otro dia— ni si esta persona ya ficho su llegada,
+     * por el boton o por una pregunta anterior. Y se olvida, para que no
+     * vuelva a mirar en cada refresco.
+     */
+    if (!job || job.iHaveArrived) {
+      olvidarNavegacion();
+      return;
+    }
+
+    setPreguntarLlegada(bookingId);
+  }, [jobs]);
+
   const marcar = async (job: MyJob, status: 'IN_PROGRESS' | 'COMPLETED'): Promise<void> => {
     setOcupado(job.bookingId);
     accionesEnVuelo.current += 1;
@@ -308,6 +351,16 @@ export function MyJobs({ locale, staffFirstName, onSessionLost }: MyJobsProps) {
       setJobs((actual) =>
         (actual ?? []).map((j) => (j.bookingId === actualizado.bookingId ? actualizado : j)),
       );
+
+      /*
+       * Fichada la llegada, el recuerdo de la navegacion ya no sirve: sin
+       * esto la pregunta volveria al siguiente cambio de aplicacion, y una
+       * pregunta que insiste se contesta sin leerla.
+       */
+      if (status === 'IN_PROGRESS') {
+        olvidarNavegacion();
+        setPreguntarLlegada(null);
+      }
       /*
        * ESTO ES LO QUE MAS FALTA HACIA DE TODA LA PANTALLA. Marcar la llegada
        * cambiaba el boton y nada mas; con el movil al sol, en la puerta de
@@ -481,6 +534,10 @@ export function MyJobs({ locale, staffFirstName, onSessionLost }: MyJobsProps) {
   const deHoy = jobs.filter((j) => dateInTimezone(j.scheduledStart, j.timezone) === hoy);
   const siguientes = jobs.filter((j) => dateInTimezone(j.scheduledStart, j.timezone) !== hoy);
 
+  // El trabajo por el que se pregunta, si sigue en la lista.
+  const trabajoDeLlegada =
+    preguntarLlegada === null ? null : (jobs.find((j) => j.bookingId === preguntarLlegada) ?? null);
+
   return (
     <div className="space-y-4">
       {deHoy.length > 0 && (
@@ -498,6 +555,7 @@ export function MyJobs({ locale, staffFirstName, onSessionLost }: MyJobsProps) {
               onMarcarTarea={marcarTarea}
               ajustando={ajustando === job.bookingId}
               onAjustar={ajustar}
+              onNavegar={(destino) => recordarNavegacion(destino.bookingId)}
             />
           ))}
         </>
@@ -518,9 +576,36 @@ export function MyJobs({ locale, staffFirstName, onSessionLost }: MyJobsProps) {
               onMarcarTarea={marcarTarea}
               ajustando={ajustando === job.bookingId}
               onAjustar={ajustar}
+              onNavegar={(destino) => recordarNavegacion(destino.bookingId)}
             />
           ))}
         </>
+      )}
+
+      {/*
+        LA PREGUNTA AL VOLVER DE LA NAVEGACION.
+        ====================================================================
+        Va al final del arbol y no dentro de la tarjeta: un `<dialog>` en
+        modal se pinta en la capa superior del navegador, asi que su sitio
+        en el documento no afecta a como se ve, pero si a quien lo monta y
+        lo desmonta. Colgando de la tarjeta, cerrar la pregunta dependeria
+        de que esa tarjeta siguiera en la lista.
+
+        Se le pasa la llave del trabajo para que, si se pregunta por otro,
+        React monte un cuadro nuevo en vez de reutilizar el anterior ya
+        abierto.
+      */}
+      {trabajoDeLlegada && (
+        <DialogoLlegada
+          key={trabajoDeLlegada.bookingId}
+          direccion={`${trabajoDeLlegada.addressLine1}, ${trabajoDeLlegada.city}`}
+          ocupado={ocupado === trabajoDeLlegada.bookingId}
+          onConfirmar={() => void marcar(trabajoDeLlegada, 'IN_PROGRESS')}
+          onDescartar={() => {
+            olvidarNavegacion();
+            setPreguntarLlegada(null);
+          }}
+        />
       )}
     </div>
   );
@@ -536,6 +621,7 @@ function Tarjeta({
   onMarcarTarea,
   ajustando,
   onAjustar,
+  onNavegar,
 }: {
   job: MyJob;
   locale: Locale;
@@ -544,6 +630,7 @@ function Tarjeta({
   onMarcarTarea: (job: MyJob, code: string, done: boolean) => Promise<void>;
   ajustando: boolean;
   onAjustar: (job: MyJob, cambios: FieldAdjustmentInput) => Promise<void>;
+  onNavegar: (job: MyJob) => void;
 }) {
   const { t } = useTranslation();
 
@@ -646,6 +733,7 @@ function Tarjeta({
           target="_blank"
           rel="noreferrer"
           className="ft-btn-primary min-h-11 flex-1"
+          onClick={() => onNavegar(job)}
         >
           <NavigationIcon className="h-4 w-4 shrink-0" />
           {t('admin.myJobs.takeMeThere')}
@@ -657,6 +745,7 @@ function Tarjeta({
             target="_blank"
             rel="noreferrer"
             className="ft-btn-ghost min-h-11"
+            onClick={() => onNavegar(job)}
           >
             {t('admin.myJobs.appleMaps')}
           </a>

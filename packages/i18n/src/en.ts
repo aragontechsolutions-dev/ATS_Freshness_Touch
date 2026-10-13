@@ -1052,6 +1052,18 @@ export const en = {
        */
       takeMeThere: 'Take me there',
       /*
+       * LA PREGUNTA AL VOLVER DE LA NAVEGACION (etapa 3.18).
+       *
+       * Pregunta, no afirma. La aplicacion no sabe si ha llegado —no mira el
+       * GPS para decidir si preguntar— y decirle «has llegado» a quien
+       * todavia esta aparcando es tratarla de mentirosa o de tonta.
+       */
+      arrivedTitle: 'Have you arrived?',
+      arrivedBody: 'Marking your arrival lets the office know and starts the job.',
+      arrivedConfirm: 'Yes, I am here',
+      /* Corto y sin disculpas: decir que no tiene que costar un toque. */
+      arrivedDismiss: 'Not yet',
+      /*
        * Se nombra la aplicacion y no «otro mapa»: quien lo pulsa tiene que
        * saber a que aplicacion se va antes de salir de esta.
        */
