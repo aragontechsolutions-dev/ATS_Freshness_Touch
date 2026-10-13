@@ -108,6 +108,27 @@
     @apply border-night-600 bg-night-800;
   }
 
+  /*
+   * EL CUADRO DE «¿HAS LLEGADO?».
+   *
+   * `p-0` porque el relleno lo pone el contenido: con relleno aqui, el
+   * fondo del cuadro asomaria por debajo en los moviles estrechos.
+   */
+  .ft-dialogo {
+    @apply m-auto w-[min(26rem,calc(100vw-2rem))] rounded-xl border border-slate-200
+           bg-white p-0 text-slate-900 shadow-xl;
+  }
+
+  .dark .ft-dialogo {
+    @apply border-night-600 bg-night-800 text-white;
+  }
+
+  /* El fondo oscurecido. Sin esto, el cuadro flota sobre la pantalla sin
+     que se entienda que lo de detras esta inerte. */
+  .ft-dialogo::backdrop {
+    background-color: rgb(15 23 42 / 0.6);
+  }
+
   .ft-input {
     @apply w-full rounded-lg border border-slate-400 bg-white px-3 py-2 text-slate-900
            placeholder:text-slate-500 focus:border-brand-600 focus:ring-2 focus:ring-brand-400
