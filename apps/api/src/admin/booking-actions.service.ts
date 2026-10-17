@@ -262,7 +262,16 @@ export class BookingActionsService {
          * leerían el mismo valor y la segunda pisaría a la primera. La suma
          * la hace la base de datos sobre la fila que acaba de bloquear.
          */
-        data: { amountRefundedCents: { increment: resultado.amountCents } },
+        data: {
+          amountRefundedCents: { increment: resultado.amountCents },
+          /*
+           * SE LIMPIA LA MARCA DE UNA DEVOLUCION RECHAZADA ANTERIOR
+           * (etapa 3.22). Sin esto, el aviso rojo del panel se quedaria para
+           * siempre y acabaria sin leerse, que es como no tenerlo.
+           */
+          lastErrorCode: null,
+          lastErrorMessage: null,
+        },
       });
 
       await this.audit.record(

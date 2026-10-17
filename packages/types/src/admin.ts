@@ -146,6 +146,15 @@ export const AdminBookingDetailSchema = AdminBookingListItemSchema.extend({
       amountAuthorizedCents: z.int(),
       amountCapturedCents: z.int(),
       amountRefundedCents: z.int(),
+      /**
+       * UNA DEVOLUCION QUE EL PROVEEDOR ACABO RECHAZANDO (etapa 3.22).
+       *
+       * Un si o un no, no el texto del proveedor: ese es tecnico, viene en
+       * ingles y puede arrastrar detalles de la cuenta. Lo que la pantalla
+       * necesita decir es «ese dinero sigue aqui y hay que devolverlo por
+       * otra via», y para eso basta con saber que paso.
+       */
+      refundFailed: z.boolean(),
       cardBrand: z.string().nullable(),
       cardLast4: z.string().nullable(),
       authorizedAt: z.iso.datetime().nullable(),

@@ -7,6 +7,7 @@ import {
   type PaymentProvider,
   type ProviderPayment,
   type ProviderRefund,
+  type ProviderRefundEvent,
   type ProviderWebhookEvent,
   type RefundRequest,
 } from '../payments.types';
@@ -142,8 +143,15 @@ export class MockPaymentProvider implements PaymentProvider {
     const id = object?.['id'];
     const estado = PaymentStatusSchema.safeParse(object?.['status']);
 
+    /*
+     * Una devolucion se reconoce por `object: 'refund'`, igual que en el
+     * proveedor real. Sin esa marca, un evento de devolucion con estado
+     * `failed` se confundiria con un pago fallido y cancelaria la reserva.
+     */
+    const refund = object?.['object'] === 'refund' ? traducirDevolucion(object) : null;
+
     const payment: ProviderPayment | null =
-      typeof id === 'string' && estado.success
+      refund === null && typeof id === 'string' && estado.success
         ? {
             providerPaymentIntentId: id,
             status: estado.data satisfies PaymentStatus,
@@ -158,8 +166,25 @@ export class MockPaymentProvider implements PaymentProvider {
           }
         : null;
 
-    return { id: event.id, type: event.type, payment, payload };
+    return { id: event.id, type: event.type, payment, refund, payload };
   }
+}
+
+/** Traduce el objeto de una devolucion, imitando la forma de las de Stripe. */
+function traducirDevolucion(object: Record<string, unknown>): ProviderRefundEvent | null {
+  const id = object['id'];
+  const intent = object['payment_intent'];
+  if (typeof id !== 'string' || typeof intent !== 'string') return null;
+
+  const estado = object['status'];
+
+  return {
+    providerPaymentIntentId: intent,
+    providerRefundId: id,
+    amountCents: numberOr(object['amount'], 0),
+    status: estado === 'succeeded' ? 'SUCCEEDED' : estado === 'failed' ? 'FAILED' : 'PENDING',
+    failureReason: stringOrNull(object['failure_reason']),
+  };
 }
 
 function parseJson(rawBody: Buffer): unknown {

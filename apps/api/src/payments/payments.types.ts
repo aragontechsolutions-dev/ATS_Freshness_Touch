@@ -67,6 +67,32 @@ export interface ProviderRefund {
   status: 'SUCCEEDED' | 'PENDING' | 'FAILED';
 }
 
+/**
+ * UNA DEVOLUCION DE LA QUE EL PROVEEDOR AVISA POR SU CUENTA (etapa 3.22).
+ *
+ * Existe porque una devolucion puede CAER DIAS DESPUES de haberse aceptado:
+ * la tarjeta caduco, la cuenta se cerro, el banco la rechaza. Cuando eso
+ * pasa, el dinero se queda en la cuenta de la empresa y el cliente sigue
+ * esperandolo, y nadie se entera si el aviso no se procesa.
+ *
+ * Es distinto de `ProviderRefund` —lo que devuelve el proveedor al pedirle
+ * una devolucion— porque este llega SOLO, sin que nadie lo haya pedido, y
+ * tiene que decir a que cobro pertenece.
+ */
+export interface ProviderRefundEvent {
+  /** El cobro al que pertenece. Es por donde se encuentra nuestra fila. */
+  providerPaymentIntentId: string;
+  providerRefundId: string;
+  amountCents: number;
+  status: ProviderRefund['status'];
+  /**
+   * Motivo tecnico del proveedor (`expired_or_canceled_card`,
+   * `lost_or_stolen_card`...). Se guarda para soporte: es lo unico que
+   * explica por que no se pudo devolver por la misma via.
+   */
+  failureReason: string | null;
+}
+
 /** Estado de un movimiento tal y como lo devuelve el proveedor. */
 export interface ProviderPayment {
   providerPaymentIntentId: string;
@@ -94,6 +120,14 @@ export interface ProviderWebhookEvent {
   type: string;
   /** Movimiento afectado, o null si el evento no habla de un pago nuestro. */
   payment: ProviderPayment | null;
+  /**
+   * Devolucion afectada, o null si el evento no habla de una.
+   *
+   * VA APARTE DE `payment` y no dentro de el: son dos objetos distintos del
+   * proveedor —`payment_intent` y `refund`— y un evento habla de uno o de
+   * otro, nunca de los dos.
+   */
+  refund: ProviderRefundEvent | null;
   /** Cuerpo original, que se archiva para poder investigar despues. */
   payload: unknown;
 }

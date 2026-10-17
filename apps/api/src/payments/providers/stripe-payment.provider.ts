@@ -7,6 +7,7 @@ import {
   type PaymentProvider,
   type ProviderPayment,
   type ProviderRefund,
+  type ProviderRefundEvent,
   type ProviderWebhookEvent,
   type RefundRequest,
 } from '../payments.types';
@@ -164,13 +165,22 @@ export class StripePaymentProvider implements PaymentProvider {
       );
     }
 
+    /*
+     * UN EVENTO HABLA DE UN OBJETO, Y HAY DOS QUE NOS INTERESAN. Hasta la
+     * etapa 3.22 solo se traducia `payment_intent`, asi que un
+     * `refund.failed` entraba, se respondia 200 y no hacia nada: la empresa
+     * se quedaba creyendo que habia devuelto un dinero que seguia en su
+     * cuenta.
+     */
     const object = event.data.object as { object?: string };
     const payment =
       object.object === 'payment_intent'
         ? this.translate(event.data.object as Stripe.PaymentIntent)
         : null;
+    const refund =
+      object.object === 'refund' ? translateRefund(event.data.object as Stripe.Refund) : null;
 
-    return { id: event.id, type: event.type, payment, payload: event };
+    return { id: event.id, type: event.type, payment, refund, payload: event };
   }
 
   /** Traduce un PaymentIntent de Stripe al modelo interno. */
@@ -226,6 +236,29 @@ function mapStatus(status: Stripe.PaymentIntent.Status): PaymentStatus {
       // alguien lo revise, en vez de darlo por bueno en silencio.
       return 'FAILED';
   }
+}
+
+/**
+ * Traduce una devolucion de la que avisa Stripe.
+ *
+ * Devuelve `null` si no se puede saber a que cobro pertenece: sin eso no hay
+ * fila nuestra que tocar, y adivinarla seria peor que ignorar el aviso.
+ */
+function translateRefund(refund: Stripe.Refund): ProviderRefundEvent | null {
+  const intent =
+    typeof refund.payment_intent === 'string'
+      ? refund.payment_intent
+      : (refund.payment_intent?.id ?? null);
+
+  if (intent === null) return null;
+
+  return {
+    providerPaymentIntentId: intent,
+    providerRefundId: refund.id,
+    amountCents: refund.amount,
+    status: mapRefundStatus(refund.status),
+    failureReason: refund.failure_reason ?? null,
+  };
 }
 
 /**

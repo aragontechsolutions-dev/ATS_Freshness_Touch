@@ -387,6 +387,8 @@ export const en = {
     held: 'Held on card',
     charged: 'Charged',
     refunded: 'Refunded',
+    refundFailedNotice:
+      'A refund was turned down by the bank. That money is still in the company account and the customer is waiting for it: send it back another way and tell them.',
     card: 'Card',
     holdExpires: 'Hold expires',
     noPayment: 'No card hold was created for this booking.',

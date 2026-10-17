@@ -181,6 +181,9 @@ export class BookingsAdminService {
             amountAuthorizedCents: true,
             amountCapturedCents: true,
             amountRefundedCents: true,
+            // Solo para saber SI fallo una devolucion. El mensaje del
+            // proveedor no sale de aqui: ver `refundFailed` en el contrato.
+            lastErrorCode: true,
             cardBrand: true,
             cardLast4: true,
             authorizedAt: true,
@@ -286,6 +289,7 @@ export class BookingsAdminService {
             amountAuthorizedCents: pago.amountAuthorizedCents,
             amountCapturedCents: pago.amountCapturedCents,
             amountRefundedCents: pago.amountRefundedCents,
+            refundFailed: pago.lastErrorCode === 'refund_failed',
             cardBrand: pago.cardBrand,
             cardLast4: pago.cardLast4,
             authorizedAt: pago.authorizedAt?.toISOString() ?? null,

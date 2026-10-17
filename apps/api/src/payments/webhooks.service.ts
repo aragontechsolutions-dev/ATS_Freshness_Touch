@@ -1,6 +1,9 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
+import { telegramChatForAudience, telegramChatForSystemAlerts } from '@freshness/types';
 import { PrismaService } from '../database/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { NotificationSettingsService } from '../notifications/notification-settings.service';
+import { TELEGRAM_PROVIDER, type TelegramProvider } from '../notifications/notifications.types';
 import type { Prisma } from '../generated/prisma/client';
 import { PaymentsService } from './payments.service';
 import {
@@ -15,6 +18,12 @@ export type WebhookOutcome = 'processed' | 'duplicate' | 'ignored';
 interface BookingTransition {
   bookingId: string;
   to: 'CONFIRMED' | 'CANCELLED';
+}
+
+/** Una devolucion que el proveedor acabo rechazando. Ver `avisarDevolucion`. */
+interface RefundFailure {
+  reference: string;
+  amountCents: number;
 }
 
 /**
@@ -44,6 +53,8 @@ export class WebhooksService {
     private readonly payments: PaymentsService,
     private readonly prisma: PrismaService,
     private readonly notifications: NotificationsService,
+    private readonly ajustes: NotificationSettingsService,
+    @Inject(TELEGRAM_PROVIDER) private readonly telegram: TelegramProvider,
   ) {}
 
   /** Verifica la firma. Lanza WebhookSignatureError si no es autentica. */
@@ -86,12 +97,27 @@ export class WebhooksService {
           ? await this.syncBooking(tx, resultado.bookingId, resultado.status)
           : null;
 
+        /*
+         * LA DEVOLUCION QUE EL PROVEEDOR ACABA RECHAZANDO (etapa 3.22).
+         *
+         * Va DENTRO de la misma transaccion y del mismo bloqueo por evento
+         * que todo lo demas: es la idempotencia la que impide que un reenvio
+         * —y el proveedor reenvia— reste el importe dos veces.
+         */
+        const devolucion = event.refund
+          ? await this.payments.applyRefundState(tx, event.refund)
+          : null;
+
         await tx.webhookEvent.update({
           where: { id: event.id },
           data: { processedAt: new Date() },
         });
 
-        return { outcome: resultado ? 'processed' : 'ignored', transicion } as const;
+        return {
+          outcome: resultado || devolucion ? 'processed' : 'ignored',
+          transicion,
+          devolucion,
+        } as const;
       });
 
       /*
@@ -108,6 +134,10 @@ export class WebhooksService {
         await this.notifications.bookingConfirmed(procesado.transicion.bookingId);
       } else if (procesado.transicion?.to === 'CANCELLED') {
         await this.notifications.bookingCancelled(procesado.transicion.bookingId);
+      }
+
+      if (procesado.devolucion) {
+        await this.avisarDevolucionFallida(procesado.devolucion);
       }
 
       return procesado.outcome;
@@ -162,6 +192,57 @@ export class WebhooksService {
     }
 
     return null;
+  }
+
+  /**
+   * AVISA DE QUE UNA DEVOLUCION NO LLEGO A SU DESTINO (etapa 3.22)
+   * ==============================================================
+   * Es la pieza por la que existe esta etapa. Lo de deshacer el contador deja
+   * la base de datos diciendo la verdad; esto hace que alguien SE ENTERE, que
+   * es lo unico que arregla la situacion: el dinero sigue en la cuenta de la
+   * empresa y el cliente lo esta esperando, y nadie va a entrar en el panel
+   * de Stripe un martes por la tarde sin un motivo.
+   *
+   * A OPERACIONES PRIMERO, Y AL CHAT TECNICO SI NO LO HAY. Al reves que la
+   * alarma de estado de la etapa 3.12: aquello es «el sistema esta roto» y lo
+   * arregla quien programa; esto es «hay que devolverle 20 dolares a una
+   * persona por otra via», y eso lo hace quien lleva el negocio.
+   *
+   * EL IMPORTE SI VA EN EL MENSAJE. Es un destino interno, y sin la cifra el
+   * aviso no sirve para actuar. Lo que NO va, aqui tampoco: ni datos de la
+   * tarjeta, ni el identificador del cobro, ni el de la devolucion.
+   *
+   * NO LANZA NUNCA. Un fallo de Telegram no puede hacer que el webhook
+   * responda error: el proveedor reintentaria el evento y volveriamos a
+   * restar... salvo que la idempotencia lo impide. Aun asi, el aviso es lo
+   * accesorio y el apunte es lo importante.
+   */
+  private async avisarDevolucionFallida(fallo: RefundFailure): Promise<void> {
+    try {
+      const ajustes = await this.ajustes.get();
+      const chat =
+        telegramChatForAudience('INTERNAL', ajustes) ?? telegramChatForSystemAlerts(ajustes);
+      if (chat === null) return;
+
+      const dolares = (fallo.amountCents / 100).toFixed(2);
+      const resultado = await this.telegram.send(
+        chat,
+        `⚠️ Devolucion rechazada — ${fallo.reference}\n` +
+          `${dolares} USD no han vuelto a la tarjeta del cliente.\n` +
+          'Ese dinero sigue en la cuenta de la empresa: hay que devolverlo por otra via ' +
+          'y avisar al cliente.',
+      );
+
+      if (!resultado.ok) {
+        this.logger.error(
+          `No se pudo avisar de la devolucion rechazada: ${resultado.failureReason}`,
+        );
+      }
+    } catch (error) {
+      this.logger.error(
+        `No se pudo avisar de la devolucion rechazada: ${error instanceof Error ? error.message : 'error desconocido'}`,
+      );
+    }
   }
 
   private async recordFailure(event: ProviderWebhookEvent, motivo: string): Promise<void> {

@@ -415,19 +415,92 @@ simulador** y **11 contra PostgreSQL real** (`admin-access.e2e.test.ts`):
   no recibe nada: se le dice por teléfono o por WhatsApp. Conviene encenderlo
   antes de devolverle dinero a alguien de verdad.
 
-- **No se entera si el proveedor anula la devolución días después.** Es raro
-  (cuenta cerrada, tarjeta caducada o perdida) y llega por un evento
-  **`refund.failed`** que hoy no se procesa: `parseWebhook` solo traduce
-  objetos `payment_intent` y devuelve `payment: null` para todo lo demás, así
-  que el aviso se acepta con un 200 y no hace nada. Si pasa, **la empresa cree
-  que devolvió un dinero que sigue en su cuenta y el cliente espera un abono
-  que no va a llegar**; lo cuenta el panel de Stripe y hay que corregirlo a
-  mano.
+- **No se entera de una devolución hecha desde el panel del proveedor.** Si
+  alguien devuelve dinero desde Stripe en vez de desde aquí, nuestra tabla no
+  lo sabe. Lo que sí está cubierto es el rechazo: ver §8 bis.
 
-  > `charge.refund.updated` era el evento de antes y está **obsoleto**: desde
-  > la versión de API `2024-10-28` los eventos de devolución son
-  > `refund.created`, `refund.updated` y `refund.failed`, y valen para todas
-  > las devoluciones.
+---
+
+## 8 bis. Cuando el proveedor acaba rechazando la devolución
+
+> Etapa 3.22.
+
+Una devolución aceptada **puede caer días después**: tarjeta caducada o
+perdida, cuenta cerrada, el banco que la rechaza. Cuando pasa, el dinero se
+queda en la cuenta de la empresa y el cliente sigue esperándolo.
+
+Hasta esta etapa, ese aviso entraba y **no hacía nada**: `parseWebhook` solo
+traducía objetos `payment_intent` y devolvía `payment: null` para todo lo
+demás, así que el webhook respondía 200 y se olvidaba. El resultado era el
+peor posible: la empresa creyendo que devolvió un dinero que seguía en su
+cuenta.
+
+### Qué llega, y qué hay que suscribir
+
+El evento es **`refund.failed`**. `charge.refund.updated` era el de antes y
+está **obsoleto**: desde la versión de API `2024-10-28` los eventos de
+devolución son `refund.created`, `refund.updated` y `refund.failed`, y valen
+para todas las devoluciones.
+
+> ⚠️ **Paso de configuración, no de código.** En Stripe → Developers →
+> Webhooks hay que añadir `refund.failed` a los eventos del endpoint. Sin eso
+> el aviso no llega aunque el código sepa procesarlo. Ver `docs/08` §2.
+
+### Qué hace ahora
+
+1. **Deshace el apunte.** `amountRefundedCents` significa «dinero que de
+   verdad salió»; si la devolución falló, ese dinero sigue aquí. Dejarlo
+   quieto haría que el panel dijera «devuelto 20 $» de algo que no se
+   devolvió, y **además impediría volver a intentarlo**, porque de ahí sale lo
+   que queda por devolver.
+2. **Marca la fila**: `lastErrorCode = 'refund_failed'` y el motivo técnico
+   del proveedor en `lastErrorMessage` (columnas de la etapa 2.4: sin
+   migración). El panel pinta un aviso en rojo en la tarjeta de pago. La marca
+   **se limpia sola** en cuanto una devolución posterior sale bien.
+3. **Avisa por Telegram**, que es la parte que de verdad arregla la situación:
+   nadie entra en el panel de Stripe un martes por la tarde sin un motivo.
+
+```sql
+UPDATE payments
+SET "amountRefundedCents" = GREATEST(0, "amountRefundedCents" - $1), ...
+```
+
+**Una sola sentencia, con `GREATEST`.** Leer y luego escribir la resta serían
+dos pasos, y dos avisos a la vez —que es justo cuando esto ocurre— podrían
+leer el mismo número y restar una sola vez. El `GREATEST` evita además que un
+importe descuadrado deje el contador en negativo, que haría ofrecer más de lo
+que se cobró.
+
+### A quién se avisa, y por qué no al chat técnico
+
+**A operaciones primero; al técnico solo si no hay chat de operaciones.** Es
+al revés que la alarma de estado de la etapa 3.12, y a propósito: aquello es
+«el sistema está roto» y lo arregla quien programa; esto es «hay que
+devolverle 20 dólares a una persona por otra vía», y eso lo hace quien lleva
+el negocio.
+
+El importe **sí** va en el mensaje: es un destino interno y sin la cifra el
+aviso no sirve para actuar. Lo que no va, aquí tampoco: ni datos de la
+tarjeta, ni el identificador del cobro, ni el de la devolución.
+
+El aviso **no puede tumbar el webhook**: va fuera de la transacción y dentro
+de un `try`. Si Telegram falla, el apunte ya está hecho y queda en el registro
+del servidor.
+
+### Qué se comprueba
+
+**7 pruebas contra PostgreSQL real** y **5 del traductor del simulador**:
+
+| Prueba                                                     | Qué protege                                                          |
+| ---------------------------------------------------------- | -------------------------------------------------------------------- |
+| Una devolución que va bien no cambia nada                  | Que un `refund.updated` normal no deshaga un apunte correcto         |
+| **Una rechazada deshace el apunte y marca la fila**        | El punto de la etapa                                                 |
+| **El reenvío del mismo aviso no vuelve a restar**          | El proveedor reenvía; sin idempotencia el contador acabaría negativo |
+| Nunca baja de cero                                         | Que `refundableCents` no ofrezca más de lo que se cobró              |
+| Un aviso de una devolución que no es nuestra no revienta   | La misma cuenta del proveedor usada por otro sistema                 |
+| Sin firma válida no se procesa                             | Es el mismo endpoint público de siempre                              |
+| **El aviso de devolución NO cancela la reserva**           | `failed` de una devolución no es `FAILED` de un pago                 |
+| Un aviso de devolución no se traduce como pago, y al revés | Lo mismo, en el traductor                                            |
 
 ---
 

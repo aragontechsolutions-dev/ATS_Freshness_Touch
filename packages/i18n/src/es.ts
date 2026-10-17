@@ -350,6 +350,8 @@ export const es: TranslationResources = {
     held: 'Retenido en la tarjeta',
     charged: 'Cobrado',
     refunded: 'Devuelto',
+    refundFailedNotice:
+      'El banco rechazó una devolución. Ese dinero sigue en la cuenta de la empresa y el cliente lo está esperando: devuélveselo por otra vía y avísale.',
     card: 'Tarjeta',
     holdExpires: 'La retención caduca',
     noPayment: 'No se llegó a crear ninguna retención para esta reserva.',

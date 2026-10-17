@@ -472,3 +472,162 @@ describe('confirmacion simulada de la tarjeta', () => {
     expect(respuesta.body.code).toBe('VALIDATION_ERROR');
   });
 });
+
+/**
+ * UNA DEVOLUCION QUE EL PROVEEDOR ACABA RECHAZANDO (etapa 3.22)
+ * =============================================================
+ * El caso raro y caro: la devolucion se acepta, y dias despues el banco la
+ * rechaza —tarjeta caducada, cuenta cerrada—. Hasta esta etapa ese aviso
+ * entraba, se respondia 200 y no hacia nada, asi que la empresa se quedaba
+ * creyendo que habia devuelto un dinero que seguia en su cuenta y el cliente
+ * esperando un abono que no iba a llegar.
+ */
+describe('devolucion rechazada por el proveedor', () => {
+  let bookingId: string;
+  let paymentIntentId: string;
+
+  /**
+   * Deja uno de los depositos ya creados como COBRADO y con 20 $ devueltos.
+   *
+   * Se reutiliza una reserva de las de arriba en vez de hacer otra: lo que se
+   * prueba aqui es el webhook, no el formulario, y el limitador de reservas
+   * —que existe por un buen motivo— no tiene por que gastarse en montar el
+   * decorado.
+   */
+  beforeAll(async () => {
+    const fila = await db.query<{ providerPaymentIntentId: string; bookingId: string }>(
+      `UPDATE payments SET status = 'SUCCEEDED',
+         "amountCapturedCents" = "amountAuthorizedCents", "amountRefundedCents" = 2000,
+         "lastErrorCode" = NULL, "lastErrorMessage" = NULL
+       WHERE id = (SELECT id FROM payments ORDER BY "createdAt" DESC LIMIT 1)
+       RETURNING "providerPaymentIntentId", "bookingId"`,
+    );
+
+    paymentIntentId = fila.rows[0]?.providerPaymentIntentId as string;
+    bookingId = fila.rows[0]?.bookingId as string;
+
+    // Confirmada y pagada, que es la situacion real de la que se parte.
+    await db.exec(`UPDATE bookings SET status = 'CONFIRMED' WHERE id = '${bookingId}'`);
+  });
+
+  /** El aviso de una devolucion, con la forma que tienen los del proveedor. */
+  function eventoDeDevolucion(id: string, status: string, amount = 2000): Record<string, unknown> {
+    return {
+      id,
+      type: status === 'failed' ? 'refund.failed' : 'refund.updated',
+      data: {
+        object: {
+          object: 'refund',
+          id: `re_mock_${id}`,
+          payment_intent: paymentIntentId,
+          amount,
+          status,
+          failure_reason: status === 'failed' ? 'expired_or_canceled_card' : null,
+        },
+      },
+    };
+  }
+
+  const devuelto = async (): Promise<{ refunded: number; errorCode: string | null }> => {
+    const fila = await db.query<{ amountRefundedCents: number; lastErrorCode: string | null }>(
+      `SELECT "amountRefundedCents", "lastErrorCode" FROM payments WHERE "bookingId" = $1`,
+      [bookingId],
+    );
+    return {
+      refunded: fila.rows[0]?.amountRefundedCents ?? -1,
+      errorCode: fila.rows[0]?.lastErrorCode ?? null,
+    };
+  };
+
+  it('una devolucion que va bien no cambia nada: ya estaba apuntada', async () => {
+    await enviarEvento(eventoDeDevolucion('evt_refund_ok', 'succeeded')).expect(200);
+
+    const estado = await devuelto();
+    expect(estado.refunded).toBe(2000);
+    expect(estado.errorCode).toBeNull();
+  });
+
+  it('UNA RECHAZADA DESHACE EL APUNTE: ese dinero no salio', async () => {
+    /*
+     * Es el punto de toda la etapa. Si el contador se quedara en 2000, el
+     * panel diria «devuelto 20 $» de un dinero que sigue en la cuenta de la
+     * empresa, y ademas no dejaria volver a intentarlo.
+     */
+    await enviarEvento(eventoDeDevolucion('evt_refund_ko', 'failed')).expect(200);
+
+    const estado = await devuelto();
+    expect(estado.refunded).toBe(0);
+    expect(estado.errorCode).toBe('refund_failed');
+  });
+
+  it('y el reenvio del mismo aviso NO vuelve a restar', async () => {
+    /*
+     * El proveedor reenvia si no recibe un 2xx a tiempo. Sin idempotencia,
+     * cada reenvio restaria otra vez: con dos devoluciones parciales
+     * apuntadas, el contador acabaria en negativo y se podria devolver un
+     * dinero que ya se devolvio.
+     */
+    await db.exec(
+      `UPDATE payments SET "amountRefundedCents" = 2000 WHERE "bookingId" = '${bookingId}'`,
+    );
+
+    await enviarEvento(eventoDeDevolucion('evt_refund_ko', 'failed')).expect(200);
+
+    expect((await devuelto()).refunded).toBe(2000);
+  });
+
+  it('nunca baja de cero, aunque el importe no cuadre', async () => {
+    /*
+     * Pasaria si alguien devolviera desde el panel del proveedor y nuestra
+     * fila se enterara a medias. Un contador negativo haria que
+     * `refundableCents` ofreciera devolver mas de lo que se cobro.
+     */
+    await db.exec(
+      `UPDATE payments SET "amountRefundedCents" = 500 WHERE "bookingId" = '${bookingId}'`,
+    );
+
+    await enviarEvento(eventoDeDevolucion('evt_refund_ko_grande', 'failed', 99_999)).expect(200);
+
+    expect((await devuelto()).refunded).toBe(0);
+  });
+
+  it('un aviso de una devolucion que no es nuestra no revienta', async () => {
+    const respuesta = await enviarEvento({
+      id: 'evt_refund_ajena',
+      type: 'refund.failed',
+      data: {
+        object: {
+          object: 'refund',
+          id: 're_mock_ajena',
+          payment_intent: 'pi_mock_de_otro_sistema',
+          amount: 1000,
+          status: 'failed',
+        },
+      },
+    });
+
+    expect(respuesta.status).toBe(200);
+  });
+
+  it('sin firma valida no se procesa, como el resto', async () => {
+    const respuesta = await enviarEvento(
+      eventoDeDevolucion('evt_refund_sin_firma', 'failed'),
+      'firma-inventada',
+    );
+
+    expect(respuesta.status).toBe(401);
+  });
+
+  it('el aviso de devolucion NO cancela la reserva', async () => {
+    /*
+     * El estado `failed` de una DEVOLUCION no es el `FAILED` de un pago. Sin
+     * la marca `object: 'refund'`, el traductor lo habria tomado por un
+     * deposito rechazado y habria cancelado una reserva que esta pagada.
+     */
+    const fila = await db.query<{ status: string }>(`SELECT status FROM bookings WHERE id = $1`, [
+      bookingId,
+    ]);
+
+    expect(fila.rows[0]?.status).toBe('CONFIRMED');
+  });
+});

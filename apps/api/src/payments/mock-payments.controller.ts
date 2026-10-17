@@ -110,6 +110,9 @@ export class MockPaymentsController {
         expiresAt: null,
         lastError: autoriza ? null : { code: 'card_declined', message: 'Tarjeta rechazada' },
       },
+      // Este endpoint simula la confirmacion de la TARJETA, nunca una
+      // devolucion: esas llegan por el webhook como en el proveedor real.
+      refund: null,
       payload: { simulated: true, outcome: request.outcome },
     });
 

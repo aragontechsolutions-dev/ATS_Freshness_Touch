@@ -8,6 +8,7 @@ import {
   type PaymentProvider,
   type ProviderPayment,
   type ProviderRefund,
+  type ProviderRefundEvent,
 } from './payments.types';
 
 /** Cliente de base de datos, sea el normal o el de dentro de una transaccion. */
@@ -175,6 +176,70 @@ export class PaymentsService {
     const resultado = await this.provider.cancel(providerPaymentIntentId, reason);
     this.logger.log(`Retencion liberada (${this.provider.name})`);
     return resultado;
+  }
+
+  /**
+   * UNA DEVOLUCION QUE EL PROVEEDOR ACABA RECHAZANDO (etapa 3.22)
+   * ============================================================
+   * Una devolucion aceptada puede caer DIAS DESPUES: tarjeta caducada,
+   * cuenta cerrada, el banco que la rechaza. Cuando pasa, el dinero se queda
+   * en la cuenta de la empresa y el cliente sigue esperandolo.
+   *
+   * SE DESHACE EL CONTADOR, y no es un detalle contable: `amountRefundedCents`
+   * significa «dinero que de verdad salio». Dejarlo como estaba haria que el
+   * panel dijera «devuelto 20 $» de un dinero que no se devolvio, y ademas
+   * impediria volver a intentarlo, porque de ahi sale lo que queda por
+   * devolver.
+   *
+   * SE HACE EN UNA SOLA SENTENCIA, con `GREATEST` para no bajar de cero. Leer
+   * el valor y escribir la resta serian dos pasos, y dos avisos del proveedor
+   * a la vez —que es justo cuando esto ocurre— podrian leer los dos el mismo
+   * numero y restar solo una vez.
+   *
+   * Devuelve lo que hace falta para avisar DESPUES de consolidar, o `null` si
+   * el movimiento no es nuestro o si la devolucion no fallo (un aviso de una
+   * que fue bien no cambia nada: ya estaba apuntada).
+   */
+  async applyRefundState(
+    db: Db,
+    estado: ProviderRefundEvent,
+  ): Promise<{ bookingId: string; reference: string; amountCents: number } | null> {
+    const existente = await db.payment.findUnique({
+      where: {
+        provider_providerPaymentIntentId: {
+          provider: this.provider.name,
+          providerPaymentIntentId: estado.providerPaymentIntentId,
+        },
+      },
+      select: { id: true, bookingId: true, booking: { select: { reference: true } } },
+    });
+
+    if (!existente) return null;
+    if (estado.status !== 'FAILED') return null;
+
+    await db.$executeRaw`
+      UPDATE payments
+      SET "amountRefundedCents" = GREATEST(0, "amountRefundedCents" - ${estado.amountCents}),
+          "lastErrorCode" = 'refund_failed',
+          "lastErrorMessage" = ${estado.failureReason ?? 'El proveedor rechazo la devolucion'},
+          "updatedAt" = now()
+      WHERE id = ${existente.id}::uuid
+    `;
+
+    /*
+     * El importe y la referencia si; el identificador de la devolucion no,
+     * igual que en el resto del modulo: es una credencial, no informacion.
+     */
+    this.logger.error(
+      `Devolucion rechazada por el proveedor en ${existente.booking.reference}: ` +
+        `${estado.amountCents} centavos siguen en la cuenta de la empresa`,
+    );
+
+    return {
+      bookingId: existente.bookingId,
+      reference: existente.booking.reference,
+      amountCents: estado.amountCents,
+    };
   }
 
   /**
