@@ -1,0 +1,32 @@
+-- ===========================================================================
+-- LA TARJETA GUARDADA, PARA COBRAR EL SALDO FINAL
+-- ===========================================================================
+-- Etapa 3.23. Hasta ahora el sistema retenia y cobraba el deposito de 35
+-- dolares, y los 150 restantes de una limpieza se cobraban FUERA del sistema:
+-- a mano, por otro medio, sin quedar escritos en ninguna parte.
+--
+-- Para cobrarlos al terminar sin tener al cliente delante hace falta que el
+-- proveedor guarde su tarjeta al reservar y nos devuelva una referencia.
+--
+-- ---------------------------------------------------------------------------
+-- ESTO NO ES UN DATO DE TARJETA
+-- ---------------------------------------------------------------------------
+-- Lo que se guarda aqui es un identificador del proveedor (`pm_...` en
+-- Stripe): una referencia opaca que NO SIRVE PARA NADA sin la clave secreta
+-- de la cuenta. El numero de la tarjeta, su caducidad y su codigo no pasan
+-- nunca por este servidor —los manda el navegador directamente al proveedor—
+-- y no estan en esta tabla ni en ninguna otra.
+--
+-- Es la misma naturaleza que `providerCustomerId`, que ya estaba aqui.
+--
+-- ---------------------------------------------------------------------------
+-- POR QUE ES NULA
+-- ---------------------------------------------------------------------------
+-- Una retencion nace antes de que el cliente confirme su tarjeta, asi que
+-- durante ese rato no hay ninguna que guardar. Y las reservas anteriores a
+-- esta etapa no la tienen ni la van a tener: su saldo se cobra como se venia
+-- cobrando. Ponerla obligatoria habria exigido inventarse un valor para
+-- todas ellas.
+-- ===========================================================================
+
+ALTER TABLE "payments" ADD COLUMN "providerPaymentMethodId" TEXT;

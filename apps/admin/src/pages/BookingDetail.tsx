@@ -315,6 +315,39 @@ export function BookingDetailPage({
                 value={formatCents(booking.payment.amountRefundedCents, locale)}
               />
             )}
+            {/*
+             * UNA DEVOLUCION QUE EL PROVEEDOR RECHAZO (etapa 3.22). Es lo
+             * unico de esta tarjeta que pide hacer algo, asi que va en rojo
+             * y con `role="alert"`: el dinero sigue en la cuenta de la
+             * empresa y el cliente lo esta esperando.
+             */}
+            {booking.payment.refundFailed && (
+              <p
+                className="rounded-md bg-red-50 p-2 text-xs font-medium text-red-700
+                           dark:bg-red-950/40 dark:text-red-300"
+                role="alert"
+              >
+                {t('admin.refundFailedNotice')}
+              </p>
+            )}
+            {/*
+             * EL COBRO DEL SALDO (etapa 3.23). Es la mayor parte del importe,
+             * asi que aparece junto al deposito y no en otra pantalla. Si no
+             * salio bien se dice en la misma linea: un importe a secas se
+             * leeria como cobrado.
+             */}
+            {booking.finalCharge && (
+              <Row
+                label={t('admin.balanceCharged')}
+                value={
+                  booking.finalCharge.status === 'SUCCEEDED'
+                    ? formatCents(booking.finalCharge.amountCents, locale)
+                    : `${formatCents(booking.finalCharge.amountCents, locale)} · ${t(
+                        `admin.paymentState.${booking.finalCharge.status}`,
+                      )}`
+                }
+              />
+            )}
             {booking.payment.cardLast4 && (
               <Row
                 label={t('admin.card')}

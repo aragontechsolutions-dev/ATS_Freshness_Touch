@@ -58,6 +58,18 @@ export function PaymentStep({ booking, locale, onResolved }: PaymentStepProps) {
             {formatCents(booking.balanceDueAtServiceCents, locale)}
           </dd>
         </div>
+        {/*
+         * SE LE DICE QUE SE GUARDA SU TARJETA (etapa 3.23), y va aqui y no
+         * en la letra pequena: es la linea que convierte «retenemos 35» en
+         * «y cobraremos el resto con esta misma tarjeta al terminar». Sin
+         * ella, el primer cobro del saldo seria una sorpresa, y una sorpresa
+         * en el extracto de alguien acaba en una reclamacion al banco.
+         */}
+        <p className="pt-1 text-xs text-slate-600 dark:text-slate-400">
+          {t('booking.payment.cardKeptNotice', {
+            amount: formatCents(booking.balanceDueAtServiceCents, locale),
+          })}
+        </p>
         {booking.holdExpiresAt && (
           <p className="pt-1 text-xs text-slate-500 dark:text-slate-400">
             {t('booking.payment.holdExpires', {

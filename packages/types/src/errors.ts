@@ -82,6 +82,24 @@ export const API_ERROR_CODES = {
    * dejaria a administracion buscando un cobro que ya devolvio entera.
    */
   PAYMENT_NOT_REFUNDABLE: 'PAYMENT_NOT_REFUNDABLE',
+  /** No hay saldo que cobrar, o ya se esta cobrando. */
+  BALANCE_NOT_CHARGEABLE: 'BALANCE_NOT_CHARGEABLE',
+  /**
+   * No hay tarjeta guardada con la que cobrar.
+   *
+   * Pasa con las reservas anteriores a la etapa 3.23 y con las que nunca
+   * llegaron a confirmar la tarjeta. No es un fallo del sistema: es que a esa
+   * persona hay que cobrarle por otra via.
+   */
+  NO_CARD_ON_FILE: 'NO_CARD_ON_FILE',
+  /**
+   * El banco exige que el titular verifique el pago (3D Secure).
+   *
+   * Con el cliente delante se resuelve solo; cobrando sin el, no hay a quien
+   * preguntar. Se distingue de un rechazo normal porque la accion es otra:
+   * mandarle un enlace de pago en vez de pedirle otra tarjeta.
+   */
+  CARD_NEEDS_CUSTOMER: 'CARD_NEEDS_CUSTOMER',
   PAYMENT_UNAVAILABLE: 'PAYMENT_UNAVAILABLE',
   WEBHOOK_SIGNATURE_INVALID: 'WEBHOOK_SIGNATURE_INVALID',
   BOOKING_NOT_QUOTABLE: 'BOOKING_NOT_QUOTABLE',

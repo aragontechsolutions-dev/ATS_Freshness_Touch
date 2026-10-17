@@ -8,6 +8,7 @@ import {
   type PaymentProvider,
   type ProviderPayment,
   type ProviderRefund,
+  type ProviderRefundEvent,
 } from './payments.types';
 
 /** Cliente de base de datos, sea el normal o el de dentro de una transaccion. */
@@ -124,6 +125,37 @@ export class PaymentsService {
   }
 
   /**
+   * COBRA EL SALDO FINAL con la tarjeta guardada (etapa 3.23).
+   *
+   * La clave de idempotencia sale de la reserva y del importe: si la
+   * peticion se reintenta tras un fallo de red —y aqui se reintenta pulsando
+   * el boton otra vez, porque la pantalla no sabe si llego— el proveedor
+   * devuelve el mismo cobro en vez de hacer uno segundo. Cobrarle dos veces
+   * 150 dolares a una persona es el peor fallo que puede tener este sistema.
+   */
+  async chargeBalance(input: {
+    bookingId: string;
+    bookingReference: string;
+    amountCents: number;
+    providerCustomerId: string;
+    providerPaymentMethodId: string;
+  }): Promise<ProviderPayment> {
+    const resultado = await this.provider.chargeBalance({
+      ...input,
+      idempotencyKey: createHash('sha256')
+        .update(`balance:${input.bookingId}:${input.amountCents}`)
+        .digest('hex'),
+    });
+
+    this.logger.log(
+      `Saldo cobrado: ${input.amountCents} centavos de ${input.bookingReference} ` +
+        `(proveedor: ${this.provider.name}, estado: ${resultado.status})`,
+    );
+
+    return resultado;
+  }
+
+  /**
    * DEVUELVE DINERO YA COBRADO, entero o en parte.
    *
    * LA CLAVE DE IDEMPOTENCIA ES LA PIEZA DELICADA, y por eso se construye
@@ -178,6 +210,70 @@ export class PaymentsService {
   }
 
   /**
+   * UNA DEVOLUCION QUE EL PROVEEDOR ACABA RECHAZANDO (etapa 3.22)
+   * ============================================================
+   * Una devolucion aceptada puede caer DIAS DESPUES: tarjeta caducada,
+   * cuenta cerrada, el banco que la rechaza. Cuando pasa, el dinero se queda
+   * en la cuenta de la empresa y el cliente sigue esperandolo.
+   *
+   * SE DESHACE EL CONTADOR, y no es un detalle contable: `amountRefundedCents`
+   * significa «dinero que de verdad salio». Dejarlo como estaba haria que el
+   * panel dijera «devuelto 20 $» de un dinero que no se devolvio, y ademas
+   * impediria volver a intentarlo, porque de ahi sale lo que queda por
+   * devolver.
+   *
+   * SE HACE EN UNA SOLA SENTENCIA, con `GREATEST` para no bajar de cero. Leer
+   * el valor y escribir la resta serian dos pasos, y dos avisos del proveedor
+   * a la vez —que es justo cuando esto ocurre— podrian leer los dos el mismo
+   * numero y restar solo una vez.
+   *
+   * Devuelve lo que hace falta para avisar DESPUES de consolidar, o `null` si
+   * el movimiento no es nuestro o si la devolucion no fallo (un aviso de una
+   * que fue bien no cambia nada: ya estaba apuntada).
+   */
+  async applyRefundState(
+    db: Db,
+    estado: ProviderRefundEvent,
+  ): Promise<{ bookingId: string; reference: string; amountCents: number } | null> {
+    const existente = await db.payment.findUnique({
+      where: {
+        provider_providerPaymentIntentId: {
+          provider: this.provider.name,
+          providerPaymentIntentId: estado.providerPaymentIntentId,
+        },
+      },
+      select: { id: true, bookingId: true, booking: { select: { reference: true } } },
+    });
+
+    if (!existente) return null;
+    if (estado.status !== 'FAILED') return null;
+
+    await db.$executeRaw`
+      UPDATE payments
+      SET "amountRefundedCents" = GREATEST(0, "amountRefundedCents" - ${estado.amountCents}),
+          "lastErrorCode" = 'refund_failed',
+          "lastErrorMessage" = ${estado.failureReason ?? 'El proveedor rechazo la devolucion'},
+          "updatedAt" = now()
+      WHERE id = ${existente.id}::uuid
+    `;
+
+    /*
+     * El importe y la referencia si; el identificador de la devolucion no,
+     * igual que en el resto del modulo: es una credencial, no informacion.
+     */
+    this.logger.error(
+      `Devolucion rechazada por el proveedor en ${existente.booking.reference}: ` +
+        `${estado.amountCents} centavos siguen en la cuenta de la empresa`,
+    );
+
+    return {
+      bookingId: existente.bookingId,
+      reference: existente.booking.reference,
+      amountCents: estado.amountCents,
+    };
+  }
+
+  /**
    * Actualiza la fila de pago con lo que dice el proveedor y devuelve la
    * reserva afectada. Devuelve null si el movimiento no es nuestro: un evento
    * de una cuenta de pruebas, o de otro sistema que comparte la cuenta.
@@ -206,6 +302,16 @@ export class PaymentsService {
         // un evento posterior sin ellos no debe borrar los que ya teniamos.
         ...(estado.cardBrand ? { cardBrand: estado.cardBrand } : {}),
         ...(estado.cardLast4 ? { cardLast4: estado.cardLast4 } : {}),
+        /*
+         * LA TARJETA GUARDADA Y SU TITULAR (etapa 3.23). Llegan al confirmar,
+         * no al crear la retencion, y son lo que permite cobrar el saldo al
+         * terminar sin volver a pedirle la tarjeta al cliente. Mismo criterio
+         * que arriba: un evento posterior que no los traiga no los borra.
+         */
+        ...(estado.providerCustomerId ? { providerCustomerId: estado.providerCustomerId } : {}),
+        ...(estado.providerPaymentMethodId
+          ? { providerPaymentMethodId: estado.providerPaymentMethodId }
+          : {}),
         ...(estado.amountCapturedCents > 0
           ? { amountCapturedCents: estado.amountCapturedCents }
           : {}),

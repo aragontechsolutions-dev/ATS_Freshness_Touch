@@ -146,3 +146,91 @@ describe('devoluciones (etapa 3.21)', () => {
     expect(grande.amountCents).toBe(999_999);
   });
 });
+
+describe('avisos de devolucion (etapa 3.22)', () => {
+  function firmado(evento: Record<string, unknown>) {
+    const cuerpo = Buffer.from(JSON.stringify(evento));
+    return provider.parseWebhook(cuerpo, provider.sign(cuerpo));
+  }
+
+  const DEVOLUCION = {
+    id: 'evt_1',
+    type: 'refund.failed',
+    data: {
+      object: {
+        object: 'refund',
+        id: 're_mock_1',
+        payment_intent: 'pi_mock_1',
+        amount: 2000,
+        status: 'failed',
+        failure_reason: 'expired_or_canceled_card',
+      },
+    },
+  };
+
+  it('traduce la devolucion y dice a que cobro pertenece', () => {
+    const evento = firmado(DEVOLUCION);
+
+    expect(evento.refund).toEqual({
+      providerPaymentIntentId: 'pi_mock_1',
+      providerRefundId: 're_mock_1',
+      amountCents: 2000,
+      status: 'FAILED',
+      failureReason: 'expired_or_canceled_card',
+    });
+  });
+
+  /**
+   * LA PRUEBA QUE EVITA EL FALLO CARO. El estado `failed` de una DEVOLUCION
+   * no es el `FAILED` de un pago. Sin la marca `object: 'refund'`, el
+   * traductor lo tomaria por un deposito rechazado y el webhook cancelaria
+   * una reserva que esta pagada.
+   */
+  it('un aviso de devolucion NO se traduce como un pago', () => {
+    const evento = firmado(DEVOLUCION);
+
+    expect(evento.payment).toBeNull();
+  });
+
+  it('un aviso de pago sigue sin traer devolucion', () => {
+    const evento = firmado({
+      id: 'evt_2',
+      type: 'payment_intent.succeeded',
+      data: { object: { id: 'pi_mock_2', status: 'SUCCEEDED', amount: 3500 } },
+    });
+
+    expect(evento.refund).toBeNull();
+    expect(evento.payment?.providerPaymentIntentId).toBe('pi_mock_2');
+  });
+
+  it('una devolucion sin cobro al que pertenecer se ignora', () => {
+    // Sin `payment_intent` no hay fila nuestra que tocar, y adivinarla seria
+    // peor que ignorar el aviso.
+    const evento = firmado({
+      id: 'evt_3',
+      type: 'refund.failed',
+      data: { object: { object: 'refund', id: 're_mock_3', amount: 100, status: 'failed' } },
+    });
+
+    expect(evento.refund).toBeNull();
+  });
+
+  it('una devolucion que va bien se traduce igual, con su estado', () => {
+    const evento = firmado({
+      id: 'evt_4',
+      type: 'refund.updated',
+      data: {
+        object: {
+          object: 'refund',
+          id: 're_mock_4',
+          payment_intent: 'pi_mock_4',
+          amount: 500,
+          status: 'succeeded',
+        },
+      },
+    });
+
+    expect(evento.refund?.status).toBe('SUCCEEDED');
+    expect(evento.refund?.failureReason).toBeNull();
+  });
+});

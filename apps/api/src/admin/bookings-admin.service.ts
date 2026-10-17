@@ -171,23 +171,36 @@ export class BookingsAdminService {
           orderBy: { doneAt: 'asc' },
         },
         payments: {
-          where: { kind: 'DEPOSIT_HOLD' },
+          /*
+           * LOS DOS MOVIMIENTOS QUE LE INTERESAN A LA PANTALLA: el deposito
+           * y el cobro del saldo (etapa 3.23). Se piden en la misma consulta
+           * y se separan despues: dos consultas ordenadas distinto sobre la
+           * misma tabla cuestan mas y se desincronizan con mas facilidad.
+           */
+          where: { kind: { in: ['DEPOSIT_HOLD', 'FINAL_CHARGE'] } },
           orderBy: { createdAt: 'desc' },
-          take: 1,
           select: {
             id: true,
+            kind: true,
             provider: true,
             status: true,
             amountAuthorizedCents: true,
             amountCapturedCents: true,
             amountRefundedCents: true,
+            // Solo para saber SI fallo una devolucion. El mensaje del
+            // proveedor no sale de aqui: ver `refundFailed` en el contrato.
+            lastErrorCode: true,
             cardBrand: true,
             cardLast4: true,
             authorizedAt: true,
             capturedAt: true,
             expiresAt: true,
-            // Ni providerPaymentIntentId ni nada parecido: son credenciales,
-            // no informacion, y no pintan nada en una pantalla.
+            /*
+             * Solo para decir SI hay tarjeta guardada. La referencia del
+             * proveedor no sale de aqui, igual que no sale
+             * `providerPaymentIntentId`: son credenciales, no informacion.
+             */
+            providerPaymentMethodId: true,
           },
         },
       },
@@ -200,7 +213,8 @@ export class BookingsAdminService {
       });
     }
 
-    const pago = booking.payments[0] ?? null;
+    const pago = booking.payments.find((fila) => fila.kind === 'DEPOSIT_HOLD') ?? null;
+    const saldo = booking.payments.find((fila) => fila.kind === 'FINAL_CHARGE') ?? null;
     /*
      * Los ajustes se leen APARTE y no dentro de la consulta del trabajo.
      *
@@ -286,11 +300,21 @@ export class BookingsAdminService {
             amountAuthorizedCents: pago.amountAuthorizedCents,
             amountCapturedCents: pago.amountCapturedCents,
             amountRefundedCents: pago.amountRefundedCents,
+            refundFailed: pago.lastErrorCode === 'refund_failed',
+            cardOnFile: pago.providerPaymentMethodId !== null,
             cardBrand: pago.cardBrand,
             cardLast4: pago.cardLast4,
             authorizedAt: pago.authorizedAt?.toISOString() ?? null,
             capturedAt: pago.capturedAt?.toISOString() ?? null,
             expiresAt: pago.expiresAt?.toISOString() ?? null,
+          }
+        : null,
+      finalCharge: saldo
+        ? {
+            paymentId: saldo.id,
+            status: saldo.status,
+            amountCents: saldo.amountAuthorizedCents,
+            chargedAt: saldo.capturedAt?.toISOString() ?? null,
           }
         : null,
       cancelledAt: booking.cancelledAt?.toISOString() ?? null,

@@ -277,10 +277,15 @@ VITE_STRIPE_PUBLISHABLE_KEY=pk_test_...  # navegador, es pública por diseño
 
 **2. Endpoint de webhook** (Stripe → Developers → Webhooks → Add endpoint):
 
-| Campo   | Valor                                                                                                                              |
-| ------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| URL     | `https://TU-API.onrender.com/api/v1/payments/webhook`                                                                              |
-| Eventos | `payment_intent.amount_capturable_updated`, `payment_intent.succeeded`, `payment_intent.payment_failed`, `payment_intent.canceled` |
+| Campo   | Valor                                                                                                                                                   |
+| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| URL     | `https://TU-API.onrender.com/api/v1/payments/webhook`                                                                                                   |
+| Eventos | `payment_intent.amount_capturable_updated`, `payment_intent.succeeded`, `payment_intent.payment_failed`, `payment_intent.canceled`, **`refund.failed`** |
+
+> **`refund.failed` es de la etapa 3.22** y no es opcional si se devuelve
+> dinero: es el aviso de que una devolución ya aceptada acabó rechazada por el
+> banco. Sin él, la empresa se queda creyendo que devolvió un dinero que sigue
+> en su cuenta (`docs/12` §8 bis).
 
 Stripe muestra entonces un **secreto de firma** (`whsec_...`) que es **distinto**
 de la clave secreta de la cuenta:

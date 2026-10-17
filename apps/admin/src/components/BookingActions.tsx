@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   allowedTransitions,
+  chargeableBalanceCents,
   refundableCents,
   type AdminBookingDetail,
   type AuthenticatedStaff,
@@ -12,6 +13,7 @@ import {
   ApiClientError,
   captureDeposit,
   changeBookingStatus,
+  chargeBalance,
   refundDeposit,
   releaseDeposit,
 } from '../lib/api';
@@ -23,7 +25,7 @@ import { formatCents } from '../lib/format';
 /** Estados que exigen explicar por qué: son los que el cliente puede discutir. */
 const NEEDS_REASON: BookingStatus[] = ['CANCELLED', 'NO_SHOW'];
 
-type Accion = BookingStatus | 'capture' | 'release' | 'refund';
+type Accion = BookingStatus | 'capture' | 'release' | 'refund' | 'charge';
 
 interface BookingActionsProps {
   booking: AdminBookingDetail;
@@ -79,6 +81,14 @@ export function BookingActions({
    */
   const devolvible = booking.payment ? refundableCents(booking.payment) : 0;
 
+  /*
+   * EL SALDO DEL TRABAJO TERMINADO (etapa 3.23). Son los 150 dolares de una
+   * limpieza de 185: la mayor parte del importe, que hasta ahora se cobraba
+   * fuera del sistema.
+   */
+  const saldoPendiente = chargeableBalanceCents(booking.balanceDueCents, booking.finalCharge);
+  const hayTarjeta = booking.payment?.cardOnFile === true;
+
   const ejecutar = async (
     accion: Accion,
     llamada: () => Promise<AdminBookingDetail>,
@@ -107,7 +117,17 @@ export function BookingActions({
   };
 
   const puedeDevolver = puedeTocarDinero && devolvible > 0;
-  const nada = transiciones.length === 0 && !(puedeTocarDinero && retencionViva) && !puedeDevolver;
+  /*
+   * Solo con el trabajo TERMINADO: cobrar antes convierte cualquier
+   * incidencia en una devolucion, que es mas cara y mas lenta que no haber
+   * cobrado todavia. El servidor lo vuelve a comprobar.
+   */
+  const puedeCobrarSaldo = puedeTocarDinero && booking.status === 'COMPLETED' && saldoPendiente > 0;
+  const nada =
+    transiciones.length === 0 &&
+    !(puedeTocarDinero && retencionViva) &&
+    !puedeDevolver &&
+    !puedeCobrarSaldo;
   if (nada) {
     return (
       <section className="ft-card p-5">
@@ -225,6 +245,40 @@ export function BookingActions({
             </button>
           </div>
           <p className="text-xs text-slate-500 dark:text-slate-400">{t('admin.depositHelp')}</p>
+        </div>
+      )}
+
+      {/* ------------------------- Cobrar el saldo -------------------------- */}
+      {puedeCobrarSaldo && (
+        <div className="space-y-2 border-t border-slate-200 pt-4 dark:border-night-600">
+          <p className="text-xs text-slate-600 dark:text-slate-400">
+            {t('admin.balanceDueNotice', { amount: formatCents(saldoPendiente, locale) })}
+          </p>
+
+          <button
+            type="button"
+            className="ft-btn-primary"
+            disabled={pending !== null || !hayTarjeta}
+            // Sin tarjeta guardada no es un fallo del sistema: es que a esa
+            // persona hay que cobrarle por otra via, y hay que decirlo.
+            title={hayTarjeta ? undefined : t('admin.noCardOnFile')}
+            onClick={() =>
+              void ejecutar(
+                'charge',
+                () => chargeBalance(booking.bookingId),
+                'admin.toast.balanceCharged',
+              )
+            }
+          >
+            {pending === 'charge' && <SpinnerIcon className="h-4 w-4" />}
+            {pending === 'charge'
+              ? t('admin.working')
+              : t('admin.chargeBalance', { amount: formatCents(saldoPendiente, locale) })}
+          </button>
+
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            {t('admin.chargeBalanceHelp')}
+          </p>
         </div>
       )}
 

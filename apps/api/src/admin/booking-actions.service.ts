@@ -8,6 +8,7 @@ import {
 import {
   API_ERROR_CODES,
   canTransition,
+  chargeableBalanceCents,
   refundableCents,
   type AdminCaptureDeposit,
   type AdminRefundDeposit,
@@ -20,6 +21,7 @@ import { AuditService } from '../audit/audit.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../database/prisma.service';
 import { PaymentsService } from '../payments/payments.service';
+import { PaymentProviderError } from '../payments/payments.types';
 
 /** Marcas de tiempo que acompañan a cada estado. */
 const TIMESTAMPS: Partial<Record<BookingStatus, 'startedAt' | 'completedAt' | 'cancelledAt'>> = {
@@ -202,6 +204,181 @@ export class BookingActionsService {
   }
 
   /**
+   * COBRA EL SALDO FINAL DE UN TRABAJO TERMINADO (etapa 3.23)
+   * =========================================================
+   * El movimiento mas grande del sistema: el deposito son 35 dolares de una
+   * limpieza de 185, y hasta ahora los otros 150 se cobraban FUERA del
+   * sistema, sin quedar escritos en ninguna parte.
+   *
+   * SOLO CON EL TRABAJO TERMINADO. No es puritanismo: cobrar antes de que el
+   * equipo haya acabado convierte cualquier incidencia —una casa que no se
+   * pudo limpiar, un ajuste de campo a medias— en una devolucion, y una
+   * devolucion es mas cara y mas lenta que no haber cobrado todavia.
+   *
+   * SIN IMPORTE EN LA PETICION: se cobra lo que la reserva dice que se debe.
+   * Si el equipo encontro mas casa de la contratada, eso ya re-tarifico la
+   * reserva por el camino de los ajustes de campo, que tiene su propia
+   * aprobacion.
+   */
+  async chargeBalance(
+    bookingId: string,
+    staff: AuthenticatedStaff,
+    ipAddress: string | null,
+  ): Promise<void> {
+    const booking = await this.prisma.db.booking.findUnique({
+      where: { id: bookingId },
+      select: {
+        reference: true,
+        status: true,
+        balanceDueCents: true,
+        payments: {
+          where: { kind: { in: ['DEPOSIT_HOLD', 'FINAL_CHARGE'] } },
+          orderBy: { createdAt: 'desc' },
+          select: {
+            kind: true,
+            status: true,
+            amountAuthorizedCents: true,
+            providerCustomerId: true,
+            providerPaymentMethodId: true,
+          },
+        },
+      },
+    });
+
+    if (!booking) throw this.notFound();
+
+    if (booking.status !== 'COMPLETED') {
+      throw new ConflictException({
+        code: API_ERROR_CODES.BALANCE_NOT_CHARGEABLE,
+        messageKey: 'admin.errorBalanceNotCompleted',
+      });
+    }
+
+    const cobroPrevio = booking.payments.find((fila) => fila.kind === 'FINAL_CHARGE') ?? null;
+    const importe = chargeableBalanceCents(
+      booking.balanceDueCents,
+      cobroPrevio && { status: cobroPrevio.status, amountCents: cobroPrevio.amountAuthorizedCents },
+    );
+
+    if (importe <= 0) {
+      throw new ConflictException({
+        code: API_ERROR_CODES.BALANCE_NOT_CHARGEABLE,
+        messageKey: 'admin.errorBalanceNothingToCharge',
+      });
+    }
+
+    const deposito = booking.payments.find((fila) => fila.kind === 'DEPOSIT_HOLD') ?? null;
+
+    if (!deposito?.providerCustomerId || !deposito.providerPaymentMethodId) {
+      /*
+       * Las reservas anteriores a esta etapa no tienen tarjeta guardada, y
+       * las que nunca confirmaron la suya tampoco. No es un fallo del
+       * sistema: es que a esa persona hay que cobrarle por otra via, y el
+       * panel tiene que decirlo con esas palabras.
+       */
+      throw new ConflictException({
+        code: API_ERROR_CODES.NO_CARD_ON_FILE,
+        messageKey: 'admin.errorNoCardOnFile',
+      });
+    }
+
+    const resultado = await this.cobrarEnElProveedor({
+      bookingId,
+      bookingReference: booking.reference,
+      amountCents: importe,
+      providerCustomerId: deposito.providerCustomerId,
+      providerPaymentMethodId: deposito.providerPaymentMethodId,
+    });
+
+    await this.prisma.db.$transaction(async (tx) => {
+      /*
+       * UNA FILA NUEVA, al contrario que el cobro del deposito o una
+       * devolucion. Esto no es un cambio de estado de la retencion: es otro
+       * movimiento, con su propio identificador en el proveedor y su propio
+       * estado, y es para lo que existe `FINAL_CHARGE` en el enumerado desde
+       * la etapa 2.4.
+       */
+      await tx.payment.create({
+        data: {
+          bookingId,
+          kind: 'FINAL_CHARGE',
+          status: resultado.status,
+          provider: this.payments.providerName,
+          providerPaymentIntentId: resultado.providerPaymentIntentId,
+          providerCustomerId: resultado.providerCustomerId,
+          providerPaymentMethodId: resultado.providerPaymentMethodId,
+          cardBrand: resultado.cardBrand,
+          cardLast4: resultado.cardLast4,
+          amountAuthorizedCents: resultado.amountAuthorizedCents,
+          amountCapturedCents: resultado.amountCapturedCents,
+          capturedAt: resultado.status === 'SUCCEEDED' ? new Date() : null,
+        },
+      });
+
+      await this.audit.record(
+        {
+          staff,
+          surface: 'PANEL',
+          action: 'payment.balance_charged',
+          entityType: 'booking',
+          entityId: bookingId,
+          // El importe si; los identificadores del proveedor no.
+          metadata: { amountCents: importe },
+          ipAddress,
+        },
+        tx,
+      );
+    });
+
+    this.logger.log(
+      `Reserva ${booking.reference}: cobrado el saldo de ${importe} centavos por ${staff.email}`,
+    );
+  }
+
+  /**
+   * Habla con el proveedor y traduce sus fallos a algo accionable.
+   *
+   * UN RECHAZO NO ES UN ERROR DEL SERVIDOR. Que una tarjeta no pase es un
+   * desenlace normal del negocio, y devolver un 500 haria que el panel
+   * dijera «algo ha fallado» cuando lo que hay que hacer es llamar al
+   * cliente. Y `authentication_required` se separa del resto porque la
+   * salida es distinta: ahi no sirve pedir otra tarjeta, hay que mandarle un
+   * enlace para que pague el mismo.
+   *
+   * EL MENSAJE DEL PROVEEDOR NO SALE DE AQUI: puede traer detalles de la
+   * cuenta. Se queda en el registro del servidor.
+   */
+  private async cobrarEnElProveedor(peticion: {
+    bookingId: string;
+    bookingReference: string;
+    amountCents: number;
+    providerCustomerId: string;
+    providerPaymentMethodId: string;
+  }): ReturnType<PaymentsService['chargeBalance']> {
+    try {
+      return await this.payments.chargeBalance(peticion);
+    } catch (error) {
+      if (!(error instanceof PaymentProviderError)) throw error;
+
+      this.logger.error(
+        `No se pudo cobrar el saldo de ${peticion.bookingReference}: ${error.message}`,
+      );
+
+      throw new ConflictException(
+        error.code === 'authentication_required'
+          ? {
+              code: API_ERROR_CODES.CARD_NEEDS_CUSTOMER,
+              messageKey: 'admin.errorCardNeedsCustomer',
+            }
+          : {
+              code: API_ERROR_CODES.PAYMENT_UNAVAILABLE,
+              messageKey: 'admin.errorChargeDeclined',
+            },
+      );
+    }
+  }
+
+  /**
    * DEVUELVE DINERO YA COBRADO, entero o en parte.
    *
    * NO ES LO MISMO QUE LIBERAR, y la diferencia la nota el cliente en su
@@ -262,7 +439,16 @@ export class BookingActionsService {
          * leerían el mismo valor y la segunda pisaría a la primera. La suma
          * la hace la base de datos sobre la fila que acaba de bloquear.
          */
-        data: { amountRefundedCents: { increment: resultado.amountCents } },
+        data: {
+          amountRefundedCents: { increment: resultado.amountCents },
+          /*
+           * SE LIMPIA LA MARCA DE UNA DEVOLUCION RECHAZADA ANTERIOR
+           * (etapa 3.22). Sin esto, el aviso rojo del panel se quedaria para
+           * siempre y acabaria sin leerse, que es como no tenerlo.
+           */
+          lastErrorCode: null,
+          lastErrorMessage: null,
+        },
       });
 
       await this.audit.record(

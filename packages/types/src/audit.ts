@@ -108,6 +108,14 @@ const ACCIONES_FIJAS = [
    * dentro de un importe no se filtra.
    */
   'payment.refunded',
+  /**
+   * SE COBRO EL SALDO FINAL de un trabajo terminado.
+   *
+   * Es el movimiento mas grande del sistema —el deposito son 35 dolares de
+   * una limpieza de 185— y el unico que se cobra sin el cliente delante. La
+   * pregunta de dentro de tres meses sera «quien cobro esto y cuando».
+   */
+  'payment.balance_charged',
 
   /* --- Personal -------------------------------------------------------- */
   'staff.created',

@@ -404,18 +404,215 @@ simulador** y **11 contra PostgreSQL real** (`admin-access.e2e.test.ts`):
 
 ### Lo que NO hace
 
-- **No avisa al cliente por correo desde nuestro sistema.** Con Stripe, el
-  proveedor manda su propio aviso de devolución al correo de la reserva. Un
-  aviso propio exigiría un valor nuevo en el enumerado de avisos —y con él una
-  migración— y se decidió dejarlo para cuando haga falta de verdad.
-- **No se entera si el proveedor anula la devolución días después.** Es raro
-  (cuenta cerrada, tarjeta caducada) y llega por un evento `charge.refund`
-  que hoy no se procesa: el webhook solo traduce eventos de `payment_intent`.
-  Si pasa, lo cuenta el panel de Stripe y hay que corregirlo a mano.
+- **No avisa al cliente por correo desde nuestro sistema.** Un aviso propio
+  exigiría un valor nuevo en el enumerado de avisos —y con él una migración— y
+  se decidió dejarlo para cuando haga falta de verdad.
+
+  **Y NO SE PUEDE DAR POR HECHO QUE LO AVISE STRIPE.** Manda su propio recibo
+  de devolución solo si está encendido en _Settings → Customer emails → Email
+  customers about → **Refunds**_, y **en modo de prueba no manda ninguno**
+  (ahí se envía a mano desde su panel). Con ese ajuste apagado, hoy el cliente
+  no recibe nada: se le dice por teléfono o por WhatsApp. Conviene encenderlo
+  antes de devolverle dinero a alguien de verdad.
+
+- **No se entera de una devolución hecha desde el panel del proveedor.** Si
+  alguien devuelve dinero desde Stripe en vez de desde aquí, nuestra tabla no
+  lo sabe. Lo que sí está cubierto es el rechazo: ver §8 bis.
 
 ---
 
-## 9. Lo que NO está verificado
+## 8 bis. Cuando el proveedor acaba rechazando la devolución
+
+> Etapa 3.22.
+
+Una devolución aceptada **puede caer días después**: tarjeta caducada o
+perdida, cuenta cerrada, el banco que la rechaza. Cuando pasa, el dinero se
+queda en la cuenta de la empresa y el cliente sigue esperándolo.
+
+Hasta esta etapa, ese aviso entraba y **no hacía nada**: `parseWebhook` solo
+traducía objetos `payment_intent` y devolvía `payment: null` para todo lo
+demás, así que el webhook respondía 200 y se olvidaba. El resultado era el
+peor posible: la empresa creyendo que devolvió un dinero que seguía en su
+cuenta.
+
+### Qué llega, y qué hay que suscribir
+
+El evento es **`refund.failed`**. `charge.refund.updated` era el de antes y
+está **obsoleto**: desde la versión de API `2024-10-28` los eventos de
+devolución son `refund.created`, `refund.updated` y `refund.failed`, y valen
+para todas las devoluciones.
+
+> ⚠️ **Paso de configuración, no de código.** En Stripe → Developers →
+> Webhooks hay que añadir `refund.failed` a los eventos del endpoint. Sin eso
+> el aviso no llega aunque el código sepa procesarlo. Ver `docs/08` §2.
+
+### Qué hace ahora
+
+1. **Deshace el apunte.** `amountRefundedCents` significa «dinero que de
+   verdad salió»; si la devolución falló, ese dinero sigue aquí. Dejarlo
+   quieto haría que el panel dijera «devuelto 20 $» de algo que no se
+   devolvió, y **además impediría volver a intentarlo**, porque de ahí sale lo
+   que queda por devolver.
+2. **Marca la fila**: `lastErrorCode = 'refund_failed'` y el motivo técnico
+   del proveedor en `lastErrorMessage` (columnas de la etapa 2.4: sin
+   migración). El panel pinta un aviso en rojo en la tarjeta de pago. La marca
+   **se limpia sola** en cuanto una devolución posterior sale bien.
+3. **Avisa por Telegram**, que es la parte que de verdad arregla la situación:
+   nadie entra en el panel de Stripe un martes por la tarde sin un motivo.
+
+```sql
+UPDATE payments
+SET "amountRefundedCents" = GREATEST(0, "amountRefundedCents" - $1), ...
+```
+
+**Una sola sentencia, con `GREATEST`.** Leer y luego escribir la resta serían
+dos pasos, y dos avisos a la vez —que es justo cuando esto ocurre— podrían
+leer el mismo número y restar una sola vez. El `GREATEST` evita además que un
+importe descuadrado deje el contador en negativo, que haría ofrecer más de lo
+que se cobró.
+
+### A quién se avisa, y por qué no al chat técnico
+
+**A operaciones primero; al técnico solo si no hay chat de operaciones.** Es
+al revés que la alarma de estado de la etapa 3.12, y a propósito: aquello es
+«el sistema está roto» y lo arregla quien programa; esto es «hay que
+devolverle 20 dólares a una persona por otra vía», y eso lo hace quien lleva
+el negocio.
+
+El importe **sí** va en el mensaje: es un destino interno y sin la cifra el
+aviso no sirve para actuar. Lo que no va, aquí tampoco: ni datos de la
+tarjeta, ni el identificador del cobro, ni el de la devolución.
+
+El aviso **no puede tumbar el webhook**: va fuera de la transacción y dentro
+de un `try`. Si Telegram falla, el apunte ya está hecho y queda en el registro
+del servidor.
+
+### Qué se comprueba
+
+**7 pruebas contra PostgreSQL real** y **5 del traductor del simulador**:
+
+| Prueba                                                     | Qué protege                                                          |
+| ---------------------------------------------------------- | -------------------------------------------------------------------- |
+| Una devolución que va bien no cambia nada                  | Que un `refund.updated` normal no deshaga un apunte correcto         |
+| **Una rechazada deshace el apunte y marca la fila**        | El punto de la etapa                                                 |
+| **El reenvío del mismo aviso no vuelve a restar**          | El proveedor reenvía; sin idempotencia el contador acabaría negativo |
+| Nunca baja de cero                                         | Que `refundableCents` no ofrezca más de lo que se cobró              |
+| Un aviso de una devolución que no es nuestra no revienta   | La misma cuenta del proveedor usada por otro sistema                 |
+| Sin firma válida no se procesa                             | Es el mismo endpoint público de siempre                              |
+| **El aviso de devolución NO cancela la reserva**           | `failed` de una devolución no es `FAILED` de un pago                 |
+| Un aviso de devolución no se traduce como pago, y al revés | Lo mismo, en el traductor                                            |
+
+---
+
+## 9. Cobrar el saldo final
+
+> Etapa 3.23.
+
+El depósito son **35 dólares de una limpieza de 185**. Hasta esta etapa los
+otros 150 se cobraban **fuera del sistema**: a mano, por otro medio, sin
+quedar escritos en ninguna parte. Esta es la etapa que convierte esto en algo
+que cobra de verdad.
+
+### Las dos decisiones de producto, y quién las tomó
+
+| Decisión            | Lo elegido                                                      |
+| ------------------- | --------------------------------------------------------------- |
+| **Cuándo se cobra** | Un **botón de administración**, con el trabajo ya terminado     |
+| **Con qué tarjeta** | La que el cliente dejó al reservar, **guardada y avisándoselo** |
+
+Lo decidió la dirección de la empresa. La primera descarta cobrar
+automáticamente al marcar COMPLETADA: **nada se cobra sin que una persona lo
+mire**, y así los ajustes de campo —que re-tarifican la reserva— están
+resueltos antes de tocar la tarjeta.
+
+### Qué cambia al reservar
+
+La retención del depósito pasa a crear un **cliente** en el proveedor y a
+pedir `setup_future_usage: 'off_session'`, que es lo que hace que la tarjeta
+quede guardada. La referencia (`pm_...`) se guarda en
+`payments.providerPaymentMethodId` cuando el cliente confirma, no antes.
+
+**Y se le dice al cliente, en el paso de pago y no en la letra pequeña:**
+
+> «Guardamos esta tarjeta para cobrar los 150 $ restantes cuando terminemos tu
+> limpieza. No se le cobra nada más, y puedes pedirnos que la quitemos cuando
+> quieras.»
+
+Sin esa línea, el primer cobro del saldo sería una sorpresa en el extracto de
+alguien, y una sorpresa en un extracto acaba en una reclamación al banco —que
+cuesta dinero y reputación— en vez de en una llamada.
+
+### Las cuatro puertas antes de cobrar
+
+1. **Solo `ADMIN`.** Coordinación mueve la agenda, no el dinero.
+2. **Solo con el trabajo `COMPLETED`.** Cobrar antes convierte cualquier
+   incidencia en una devolución, que es más cara y más lenta que no haber
+   cobrado todavía.
+3. **Solo si queda saldo.** `chargeableBalanceCents` lo decide, y vive en el
+   contrato compartido como `refundableCents`: el panel apaga el botón con la
+   misma función con la que el servidor rechaza la petición. **Un cobro en
+   curso (`PROCESSING`) bloquea igual que uno hecho**: el banco todavía no ha
+   dicho que sí, pero tampoco que no, y reintentar mientras tanto es la forma
+   más fácil de cobrarle dos veces a una persona. **Uno rechazado no bloquea**:
+   el saldo se sigue debiendo.
+4. **Solo con tarjeta guardada.** Las reservas anteriores a esta etapa no la
+   tienen, y el panel lo dice con esas palabras: no es un fallo del sistema,
+   es que a esa persona hay que cobrarle por otra vía.
+
+Además, la clave de idempotencia sale de `(reserva, importe)`: pulsar el botón
+dos veces porque la pantalla tardó **no cobra dos veces**.
+
+### Una fila nueva, no un cambio de estado
+
+Al contrario que el cobro del depósito o una devolución, aquí **sí** se crea
+una fila `payments` con `kind: 'FINAL_CHARGE'`. Es otro movimiento, con su
+propio identificador en el proveedor y su propio estado, y es para lo que ese
+valor existía en el enumerado desde la etapa 2.4. El panel las separa por
+`kind`, así que el depósito sigue leyéndose donde siempre.
+
+### Cuando la tarjeta no pasa
+
+Cobrar **sin el cliente delante** cambia cómo se falla, y el panel distingue
+dos casos porque la salida es distinta:
+
+| Qué pasó                                      | Qué dice el panel                                     |
+| --------------------------------------------- | ----------------------------------------------------- |
+| `authentication_required` (el banco pide 3DS) | «Mándale un enlace de pago»: no hay a quien preguntar |
+| Cualquier otro rechazo                        | «La tarjeta fue rechazada»: habla con el cliente      |
+
+**Un rechazo no es un error del servidor**: responde `409`, no `500`. Y **no
+se apunta nada** si el proveedor rechaza, igual que con las devoluciones: la
+fila se crea solo cuando el cobro existe de verdad. El mensaje del proveedor
+se queda en el registro del servidor, nunca llega al navegador.
+
+### Qué se comprueba
+
+**5 pruebas del contrato** y **7 contra PostgreSQL real**:
+
+| Prueba                                               | Qué protege                                           |
+| ---------------------------------------------------- | ----------------------------------------------------- |
+| No se cobra un trabajo sin terminar                  | La puerta número 2                                    |
+| Coordinación recibe `403`                            | Quién mueve dinero                                    |
+| Sin tarjeta guardada se dice **por qué**             | Que no parezca un fallo del sistema                   |
+| **No se cobra dos veces**                            | El fallo más caro que puede tener este sistema        |
+| Un cobro en curso bloquea; uno rechazado no          | Que ni se cobre doble ni se olvide un saldo pendiente |
+| El saldo se guarda como movimiento **aparte**        | Que el depósito siga leyéndose donde siempre          |
+| La auditoría no contiene `pi_`, `pm_` ni `cus_`      | Que una credencial no acabe en una pantalla           |
+| El detalle dice que hay tarjeta **sin enseñar cuál** | Lo mismo, en la API                                   |
+
+### Lo que NO hace
+
+- **No devuelve el saldo.** La devolución de la etapa 3.21 solo mira el
+  depósito (`kind: 'DEPOSIT_HOLD'`). Devolver un cobro final hay que hacerlo
+  hoy desde el panel del proveedor; extenderlo es una etapa pequeña y
+  pendiente.
+- **No cobra solo.** Es un botón, a propósito (ver arriba).
+- **No reclama a quien no se le pudo cobrar.** No hay recordatorios ni
+  reintentos automáticos: el saldo se queda pendiente y visible en la reserva.
+
+---
+
+## 10. Lo que NO está verificado
 
 Honestidad sobre el alcance de las pruebas:
 
@@ -430,13 +627,14 @@ Honestidad sobre el alcance de las pruebas:
 
 ---
 
-## 10. Pendiente
+## 11. Pendiente
 
-| Tarea                                           | Etapa |
-| ----------------------------------------------- | ----- |
-| Probar el pago real con credenciales de Stripe  | 2.2c  |
-| ~~Captura desde el panel~~ — hecho              | 2.3   |
-| ~~Devolución desde el panel~~ — hecho (§8)      | 3.21  |
-| Liberar franjas cuyo `holdExpiresAt` ya venció  | 2.3   |
-| Reintentar la retención de una reserva sin pago | 2.3   |
-| Cobro del importe final al terminar el servicio | 2.5   |
+| Tarea                                              | Etapa |
+| -------------------------------------------------- | ----- |
+| Probar el pago real con credenciales de Stripe     | 2.2c  |
+| ~~Captura desde el panel~~ — hecho                 | 2.3   |
+| ~~Devolución desde el panel~~ — hecho (§8)         | 3.21  |
+| ~~Cobro del saldo final al terminar~~ — hecho (§9) | 3.23  |
+| Devolver un cobro final, no solo el depósito       | —     |
+| Liberar franjas cuyo `holdExpiresAt` ya venció     | 2.3   |
+| Reintentar la retención de una reserva sin pago    | 2.3   |

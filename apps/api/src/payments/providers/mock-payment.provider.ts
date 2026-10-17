@@ -3,10 +3,12 @@ import type { PaymentProviderName, PaymentStatus } from '@freshness/types';
 import { PaymentStatusSchema } from '@freshness/types';
 import {
   WebhookSignatureError,
+  type BalanceChargeRequest,
   type DepositHoldRequest,
   type PaymentProvider,
   type ProviderPayment,
   type ProviderRefund,
+  type ProviderRefundEvent,
   type ProviderWebhookEvent,
   type RefundRequest,
 } from '../payments.types';
@@ -48,8 +50,38 @@ export class MockPaymentProvider implements PaymentProvider {
       providerCustomerId: `cus_mock_${randomBytes(8).toString('hex')}`,
       cardBrand: null,
       cardLast4: null,
+      /*
+       * Todavia no hay tarjeta que guardar: el cliente no la ha confirmado.
+       * Llega en el aviso de confirmacion, igual que la marca y los cuatro
+       * ultimos digitos.
+       */
+      providerPaymentMethodId: null,
       expiresAt: new Date(Date.now() + this.authorizationDays * 86_400_000),
       lastError: null,
+    });
+  }
+
+  /**
+   * Cobra el saldo con la tarjeta guardada.
+   *
+   * Sale bien siempre: el simulador no imita rechazos del banco, igual que no
+   * los imita al retener. Lo que se prueba con el son las reglas nuestras
+   * —que no se cobre dos veces, que haga falta tarjeta guardada, que la
+   * reserva este terminada—, que es donde estan los errores que podemos
+   * cometer.
+   */
+  chargeBalance(request: BalanceChargeRequest): Promise<ProviderPayment> {
+    const id = `pi_mock_${randomBytes(12).toString('hex')}`;
+
+    return Promise.resolve({
+      ...this.base(id),
+      status: 'SUCCEEDED',
+      amountAuthorizedCents: request.amountCents,
+      amountCapturedCents: request.amountCents,
+      providerCustomerId: request.providerCustomerId,
+      providerPaymentMethodId: request.providerPaymentMethodId,
+      cardBrand: 'visa',
+      cardLast4: '4242',
     });
   }
 
@@ -121,6 +153,7 @@ export class MockPaymentProvider implements PaymentProvider {
       providerCustomerId: null,
       cardBrand: null,
       cardLast4: null,
+      providerPaymentMethodId: null,
       expiresAt: null,
       lastError: null,
     };
@@ -142,8 +175,15 @@ export class MockPaymentProvider implements PaymentProvider {
     const id = object?.['id'];
     const estado = PaymentStatusSchema.safeParse(object?.['status']);
 
+    /*
+     * Una devolucion se reconoce por `object: 'refund'`, igual que en el
+     * proveedor real. Sin esa marca, un evento de devolucion con estado
+     * `failed` se confundiria con un pago fallido y cancelaria la reserva.
+     */
+    const refund = object?.['object'] === 'refund' ? traducirDevolucion(object) : null;
+
     const payment: ProviderPayment | null =
-      typeof id === 'string' && estado.success
+      refund === null && typeof id === 'string' && estado.success
         ? {
             providerPaymentIntentId: id,
             status: estado.data satisfies PaymentStatus,
@@ -153,13 +193,31 @@ export class MockPaymentProvider implements PaymentProvider {
             providerCustomerId: null,
             cardBrand: stringOrNull(object?.['card_brand']),
             cardLast4: stringOrNull(object?.['card_last4']),
+            providerPaymentMethodId: stringOrNull(object?.['payment_method']),
             expiresAt: null,
             lastError: null,
           }
         : null;
 
-    return { id: event.id, type: event.type, payment, payload };
+    return { id: event.id, type: event.type, payment, refund, payload };
   }
+}
+
+/** Traduce el objeto de una devolucion, imitando la forma de las de Stripe. */
+function traducirDevolucion(object: Record<string, unknown>): ProviderRefundEvent | null {
+  const id = object['id'];
+  const intent = object['payment_intent'];
+  if (typeof id !== 'string' || typeof intent !== 'string') return null;
+
+  const estado = object['status'];
+
+  return {
+    providerPaymentIntentId: intent,
+    providerRefundId: id,
+    amountCents: numberOr(object['amount'], 0),
+    status: estado === 'succeeded' ? 'SUCCEEDED' : estado === 'failed' ? 'FAILED' : 'PENDING',
+    failureReason: stringOrNull(object['failure_reason']),
+  };
 }
 
 function parseJson(rawBody: Buffer): unknown {

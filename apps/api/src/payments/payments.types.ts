@@ -32,6 +32,30 @@ export interface DepositHoldRequest {
 }
 
 /**
+ * Peticion para cobrar el saldo final de un trabajo terminado.
+ *
+ * SE COBRA SIN EL CLIENTE DELANTE, con la tarjeta que guardo el proveedor al
+ * reservar. Eso cambia dos cosas respecto a la retencion:
+ *
+ *   - El banco puede exigir que el titular verifique el pago. Cuando pasa no
+ *     hay a quien preguntar, y el proveedor devuelve un error propio que hay
+ *     que distinguir de un rechazo normal: la salida es mandarle un enlace,
+ *     no pedirle otra tarjeta.
+ *   - El cobro es inmediato, no una retencion: aqui no hay nada que capturar
+ *     despues.
+ */
+export interface BalanceChargeRequest {
+  bookingId: string;
+  bookingReference: string;
+  amountCents: number;
+  /** La tarjeta guardada y su titular en el proveedor. */
+  providerCustomerId: string;
+  providerPaymentMethodId: string;
+  /** Deriva de la reserva y del importe: un reintento no cobra dos veces. */
+  idempotencyKey: string;
+}
+
+/**
  * Peticion para devolver dinero ya cobrado.
  *
  * NO LLEVA EL MOTIVO QUE ESCRIBIO ADMINISTRACION, y es deliberado: ese texto
@@ -67,6 +91,32 @@ export interface ProviderRefund {
   status: 'SUCCEEDED' | 'PENDING' | 'FAILED';
 }
 
+/**
+ * UNA DEVOLUCION DE LA QUE EL PROVEEDOR AVISA POR SU CUENTA (etapa 3.22).
+ *
+ * Existe porque una devolucion puede CAER DIAS DESPUES de haberse aceptado:
+ * la tarjeta caduco, la cuenta se cerro, el banco la rechaza. Cuando eso
+ * pasa, el dinero se queda en la cuenta de la empresa y el cliente sigue
+ * esperandolo, y nadie se entera si el aviso no se procesa.
+ *
+ * Es distinto de `ProviderRefund` —lo que devuelve el proveedor al pedirle
+ * una devolucion— porque este llega SOLO, sin que nadie lo haya pedido, y
+ * tiene que decir a que cobro pertenece.
+ */
+export interface ProviderRefundEvent {
+  /** El cobro al que pertenece. Es por donde se encuentra nuestra fila. */
+  providerPaymentIntentId: string;
+  providerRefundId: string;
+  amountCents: number;
+  status: ProviderRefund['status'];
+  /**
+   * Motivo tecnico del proveedor (`expired_or_canceled_card`,
+   * `lost_or_stolen_card`...). Se guarda para soporte: es lo unico que
+   * explica por que no se pudo devolver por la misma via.
+   */
+  failureReason: string | null;
+}
+
 /** Estado de un movimiento tal y como lo devuelve el proveedor. */
 export interface ProviderPayment {
   providerPaymentIntentId: string;
@@ -82,6 +132,13 @@ export interface ProviderPayment {
   /** Marca y ultimos cuatro digitos, solo para mostrarlos. */
   cardBrand: string | null;
   cardLast4: string | null;
+  /**
+   * La tarjeta guardada, para cobrar el saldo final despues (etapa 3.23).
+   *
+   * NO es un dato de tarjeta: es una referencia del proveedor, inservible
+   * sin su clave secreta. Llega cuando el cliente confirma, no al crear.
+   */
+  providerPaymentMethodId: string | null;
   /** Cuando caduca la autorizacion. Pasada esa fecha ya no se puede capturar. */
   expiresAt: Date | null;
   lastError: { code: string | null; message: string } | null;
@@ -94,6 +151,14 @@ export interface ProviderWebhookEvent {
   type: string;
   /** Movimiento afectado, o null si el evento no habla de un pago nuestro. */
   payment: ProviderPayment | null;
+  /**
+   * Devolucion afectada, o null si el evento no habla de una.
+   *
+   * VA APARTE DE `payment` y no dentro de el: son dos objetos distintos del
+   * proveedor —`payment_intent` y `refund`— y un evento habla de uno o de
+   * otro, nunca de los dos.
+   */
+  refund: ProviderRefundEvent | null;
   /** Cuerpo original, que se archiva para poder investigar despues. */
   payload: unknown;
 }
@@ -110,6 +175,15 @@ export interface PaymentProvider {
 
   /** Libera una retencion sin cobrar nada. */
   cancel(providerPaymentIntentId: string, reason: string): Promise<ProviderPayment>;
+
+  /**
+   * Cobra el saldo final con la tarjeta guardada, sin el cliente delante.
+   *
+   * Lanza `PaymentProviderError` con `code: 'authentication_required'` cuando
+   * el banco exige verificar al titular: es el unico fallo que no se arregla
+   * pidiendo otra tarjeta.
+   */
+  chargeBalance(request: BalanceChargeRequest): Promise<ProviderPayment>;
 
   /**
    * Devuelve dinero YA COBRADO, entero o en parte.
