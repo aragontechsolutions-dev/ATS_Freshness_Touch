@@ -3,6 +3,7 @@ import type { PaymentProviderName, PaymentStatus } from '@freshness/types';
 import {
   PaymentProviderError,
   WebhookSignatureError,
+  type BalanceChargeRequest,
   type DepositHoldRequest,
   type PaymentProvider,
   type ProviderPayment,
@@ -62,6 +63,26 @@ export class StripePaymentProvider implements PaymentProvider {
 
   async createDepositHold(request: DepositHoldRequest): Promise<ProviderPayment> {
     try {
+      /*
+       * UN CLIENTE EN EL PROVEEDOR, PARA PODER COBRAR EL SALDO DESPUES
+       * (etapa 3.23). Sin el no hay donde guardar la tarjeta, y el saldo
+       * final —que es la mayor parte del importe— habria que cobrarlo
+       * siempre por otra via.
+       *
+       * Se crea uno por reserva y no se reutiliza entre reservas del mismo
+       * correo: agrupar a una persona exigiria buscarla antes por correo en
+       * cada peticion, y dos clientes distintos con el mismo correo —una
+       * casa compartida— acabarian con la tarjeta del otro guardada.
+       */
+      const customer = await this.stripe.customers.create(
+        {
+          email: request.customer.email,
+          name: request.customer.name,
+          metadata: { bookingId: request.bookingId, bookingReference: request.bookingReference },
+        },
+        { idempotencyKey: `${request.idempotencyKey}:customer` },
+      );
+
       const intent = await this.stripe.paymentIntents.create(
         {
           amount: request.amountCents,
@@ -69,6 +90,14 @@ export class StripePaymentProvider implements PaymentProvider {
           // Retener, no cobrar.
           capture_method: 'manual',
           payment_method_types: ['card'],
+          customer: customer.id,
+          /*
+           * GUARDA LA TARJETA PARA COBRAR SIN EL CLIENTE DELANTE. Es lo que
+           * permite cobrar el saldo al terminar, y es tambien lo que obliga
+           * a decirselo al cliente en el formulario de reserva: se le esta
+           * pidiendo permiso para guardar su tarjeta, no solo para retener.
+           */
+          setup_future_usage: 'off_session',
           description: `Deposito de traslado - reserva ${request.bookingReference}`,
           receipt_email: request.customer.email,
           statement_descriptor_suffix: this.options.statementDescriptorSuffix,
@@ -97,6 +126,45 @@ export class StripePaymentProvider implements PaymentProvider {
       return this.translate(intent);
     } catch (error) {
       throw toProviderError(error, 'No se pudo capturar el deposito');
+    }
+  }
+
+  /**
+   * Cobra el saldo final con la tarjeta guardada.
+   *
+   * `off_session: true` le dice al banco que el titular NO esta delante. Eso
+   * cambia como se evalua el riesgo y, sobre todo, como falla: en vez de
+   * pedir una verificacion que nadie puede completar, devuelve
+   * `authentication_required`, que es el error que el panel traduce a «hay
+   * que mandarle un enlace de pago».
+   *
+   * `confirm: true` y captura automatica: aqui no hay nada que retener, el
+   * trabajo ya esta hecho.
+   */
+  async chargeBalance(request: BalanceChargeRequest): Promise<ProviderPayment> {
+    try {
+      const intent = await this.stripe.paymentIntents.create(
+        {
+          amount: request.amountCents,
+          currency: 'usd',
+          customer: request.providerCustomerId,
+          payment_method: request.providerPaymentMethodId,
+          off_session: true,
+          confirm: true,
+          description: `Saldo del servicio - reserva ${request.bookingReference}`,
+          statement_descriptor_suffix: this.options.statementDescriptorSuffix,
+          metadata: {
+            bookingId: request.bookingId,
+            bookingReference: request.bookingReference,
+          },
+          expand: ['latest_charge'],
+        },
+        { idempotencyKey: request.idempotencyKey },
+      );
+
+      return this.translate(intent);
+    } catch (error) {
+      throw toProviderError(error, 'No se pudo cobrar el saldo');
     }
   }
 
@@ -196,6 +264,10 @@ export class StripePaymentProvider implements PaymentProvider {
       providerCustomerId: typeof intent.customer === 'string' ? intent.customer : null,
       cardBrand: card?.brand ?? null,
       cardLast4: card?.last4 ?? null,
+      providerPaymentMethodId:
+        typeof intent.payment_method === 'string'
+          ? intent.payment_method
+          : (intent.payment_method?.id ?? null),
       // Stripe no publica la fecha de caducidad de la autorizacion: la regla
       // de las redes de tarjetas son 7 dias desde que se creo.
       expiresAt: new Date((intent.created + this.options.authorizationDays * 86_400) * 1000),

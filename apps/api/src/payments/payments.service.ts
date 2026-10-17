@@ -125,6 +125,37 @@ export class PaymentsService {
   }
 
   /**
+   * COBRA EL SALDO FINAL con la tarjeta guardada (etapa 3.23).
+   *
+   * La clave de idempotencia sale de la reserva y del importe: si la
+   * peticion se reintenta tras un fallo de red —y aqui se reintenta pulsando
+   * el boton otra vez, porque la pantalla no sabe si llego— el proveedor
+   * devuelve el mismo cobro en vez de hacer uno segundo. Cobrarle dos veces
+   * 150 dolares a una persona es el peor fallo que puede tener este sistema.
+   */
+  async chargeBalance(input: {
+    bookingId: string;
+    bookingReference: string;
+    amountCents: number;
+    providerCustomerId: string;
+    providerPaymentMethodId: string;
+  }): Promise<ProviderPayment> {
+    const resultado = await this.provider.chargeBalance({
+      ...input,
+      idempotencyKey: createHash('sha256')
+        .update(`balance:${input.bookingId}:${input.amountCents}`)
+        .digest('hex'),
+    });
+
+    this.logger.log(
+      `Saldo cobrado: ${input.amountCents} centavos de ${input.bookingReference} ` +
+        `(proveedor: ${this.provider.name}, estado: ${resultado.status})`,
+    );
+
+    return resultado;
+  }
+
+  /**
    * DEVUELVE DINERO YA COBRADO, entero o en parte.
    *
    * LA CLAVE DE IDEMPOTENCIA ES LA PIEZA DELICADA, y por eso se construye
@@ -271,6 +302,16 @@ export class PaymentsService {
         // un evento posterior sin ellos no debe borrar los que ya teniamos.
         ...(estado.cardBrand ? { cardBrand: estado.cardBrand } : {}),
         ...(estado.cardLast4 ? { cardLast4: estado.cardLast4 } : {}),
+        /*
+         * LA TARJETA GUARDADA Y SU TITULAR (etapa 3.23). Llegan al confirmar,
+         * no al crear la retencion, y son lo que permite cobrar el saldo al
+         * terminar sin volver a pedirle la tarjeta al cliente. Mismo criterio
+         * que arriba: un evento posterior que no los traiga no los borra.
+         */
+        ...(estado.providerCustomerId ? { providerCustomerId: estado.providerCustomerId } : {}),
+        ...(estado.providerPaymentMethodId
+          ? { providerPaymentMethodId: estado.providerPaymentMethodId }
+          : {}),
         ...(estado.amountCapturedCents > 0
           ? { amountCapturedCents: estado.amountCapturedCents }
           : {}),

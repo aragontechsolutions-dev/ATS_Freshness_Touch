@@ -931,6 +931,120 @@ describe('acciones sobre la reserva', () => {
     });
   });
 
+  /**
+   * COBRAR EL SALDO FINAL (etapa 3.23)
+   * ==================================
+   * El movimiento mas grande del sistema: el deposito son 35 dolares de una
+   * limpieza de 185, y hasta esta etapa los otros 150 se cobraban fuera del
+   * sistema. Lo que se comprueba no es que el cobro salga —eso lo hace el
+   * proveedor— sino las reglas nuestras: cuando NO se puede cobrar.
+   */
+  describe('el saldo final: solo administracion y solo al terminar', () => {
+    const cobrar = (token: string) =>
+      request(app.getHttpServer())
+        .post(`/api/v1/admin/bookings/${bookingId}/payment/charge-balance`)
+        .set('authorization', `Bearer ${token}`)
+        .send({});
+
+    /** Deja la reserva terminada y con tarjeta guardada. */
+    const listoParaCobrar = async (): Promise<void> => {
+      await ponerEstado(bookingId, 'COMPLETED');
+      await db.exec(`UPDATE payments SET "providerCustomerId" = 'cus_mock_x',
+        "providerPaymentMethodId" = 'pm_mock_x' WHERE "bookingId" = '${bookingId}'
+        AND kind = 'DEPOSIT_HOLD'`);
+    };
+
+    it('no se cobra un trabajo que no ha terminado', async () => {
+      /*
+       * Cobrar antes de acabar convierte cualquier incidencia en una
+       * devolucion, que es mas cara y mas lenta que no haber cobrado.
+       */
+      await ponerEstado(bookingId, 'IN_PROGRESS');
+
+      const respuesta = await cobrar(admin);
+
+      expect(respuesta.status).toBe(409);
+      expect(respuesta.body.code).toBe('BALANCE_NOT_CHARGEABLE');
+    });
+
+    it('coordinacion NO puede cobrar el saldo', async () => {
+      await listoParaCobrar();
+
+      expect((await cobrar(coordinacion)).status).toBe(403);
+    });
+
+    it('sin tarjeta guardada no se cobra, y se dice por que', async () => {
+      /*
+       * Es el caso de las reservas anteriores a esta etapa. No es un fallo
+       * del sistema: es que a esa persona hay que cobrarle por otra via, y
+       * el panel tiene que poder decirlo con esas palabras.
+       */
+      await ponerEstado(bookingId, 'COMPLETED');
+      await db.exec(`UPDATE payments SET "providerPaymentMethodId" = NULL
+        WHERE "bookingId" = '${bookingId}' AND kind = 'DEPOSIT_HOLD'`);
+
+      const respuesta = await cobrar(admin);
+
+      expect(respuesta.status).toBe(409);
+      expect(respuesta.body.code).toBe('NO_CARD_ON_FILE');
+    });
+
+    it('cobra el saldo, lo guarda como movimiento aparte y deja rastro', async () => {
+      await listoParaCobrar();
+
+      const respuesta = await cobrar(admin).expect(200);
+
+      expect(respuesta.body.finalCharge.status).toBe('SUCCEEDED');
+      expect(respuesta.body.finalCharge.amountCents).toBe(respuesta.body.balanceDueCents);
+      // Y el deposito sigue siendo el deposito: son dos movimientos.
+      expect(respuesta.body.payment.amountAuthorizedCents).not.toBe(
+        respuesta.body.finalCharge.amountCents,
+      );
+
+      const filas = await db.query<{ kind: string; status: string }>(
+        `SELECT kind, status FROM payments WHERE "bookingId" = $1 ORDER BY "createdAt"`,
+        [bookingId],
+      );
+      expect(filas.rows.map((f) => f.kind)).toContain('FINAL_CHARGE');
+
+      const auditoria = await db.query<{ metadata: { amountCents: number } }>(
+        `SELECT metadata FROM audit_logs
+         WHERE "entityId" = $1 AND action = 'payment.balance_charged' LIMIT 1`,
+        [bookingId],
+      );
+      expect(auditoria.rows[0]?.metadata.amountCents).toBeGreaterThan(0);
+    });
+
+    it('NO SE COBRA DOS VECES', async () => {
+      // El fallo mas caro que puede tener este sistema.
+      const respuesta = await cobrar(admin);
+
+      expect(respuesta.status).toBe(409);
+      expect(respuesta.body.code).toBe('BALANCE_NOT_CHARGEABLE');
+    });
+
+    it('la auditoria del cobro NO guarda credenciales del proveedor', async () => {
+      const auditoria = await db.query<{ metadata: unknown }>(
+        `SELECT metadata FROM audit_logs WHERE action = 'payment.balance_charged'`,
+      );
+
+      const todo = JSON.stringify(auditoria.rows);
+      expect(todo).not.toContain('pi_mock');
+      expect(todo).not.toContain('pm_mock');
+      expect(todo).not.toContain('cus_mock');
+    });
+
+    it('el detalle dice que hay tarjeta guardada, sin ensenar cual', async () => {
+      const respuesta = await request(app.getHttpServer())
+        .get(`/api/v1/admin/bookings/${bookingId}`)
+        .set('authorization', `Bearer ${admin}`)
+        .expect(200);
+
+      expect(respuesta.body.payment.cardOnFile).toBe(true);
+      expect(JSON.stringify(respuesta.body)).not.toContain('pm_mock');
+    });
+  });
+
   describe('la zona sigue cerrada por defecto', () => {
     it('las acciones tambien exigen sesion', async () => {
       const respuesta = await request(app.getHttpServer())

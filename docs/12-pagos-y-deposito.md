@@ -504,7 +504,115 @@ del servidor.
 
 ---
 
-## 9. Lo que NO está verificado
+## 9. Cobrar el saldo final
+
+> Etapa 3.23.
+
+El depósito son **35 dólares de una limpieza de 185**. Hasta esta etapa los
+otros 150 se cobraban **fuera del sistema**: a mano, por otro medio, sin
+quedar escritos en ninguna parte. Esta es la etapa que convierte esto en algo
+que cobra de verdad.
+
+### Las dos decisiones de producto, y quién las tomó
+
+| Decisión            | Lo elegido                                                      |
+| ------------------- | --------------------------------------------------------------- |
+| **Cuándo se cobra** | Un **botón de administración**, con el trabajo ya terminado     |
+| **Con qué tarjeta** | La que el cliente dejó al reservar, **guardada y avisándoselo** |
+
+Lo decidió la dirección de la empresa. La primera descarta cobrar
+automáticamente al marcar COMPLETADA: **nada se cobra sin que una persona lo
+mire**, y así los ajustes de campo —que re-tarifican la reserva— están
+resueltos antes de tocar la tarjeta.
+
+### Qué cambia al reservar
+
+La retención del depósito pasa a crear un **cliente** en el proveedor y a
+pedir `setup_future_usage: 'off_session'`, que es lo que hace que la tarjeta
+quede guardada. La referencia (`pm_...`) se guarda en
+`payments.providerPaymentMethodId` cuando el cliente confirma, no antes.
+
+**Y se le dice al cliente, en el paso de pago y no en la letra pequeña:**
+
+> «Guardamos esta tarjeta para cobrar los 150 $ restantes cuando terminemos tu
+> limpieza. No se le cobra nada más, y puedes pedirnos que la quitemos cuando
+> quieras.»
+
+Sin esa línea, el primer cobro del saldo sería una sorpresa en el extracto de
+alguien, y una sorpresa en un extracto acaba en una reclamación al banco —que
+cuesta dinero y reputación— en vez de en una llamada.
+
+### Las cuatro puertas antes de cobrar
+
+1. **Solo `ADMIN`.** Coordinación mueve la agenda, no el dinero.
+2. **Solo con el trabajo `COMPLETED`.** Cobrar antes convierte cualquier
+   incidencia en una devolución, que es más cara y más lenta que no haber
+   cobrado todavía.
+3. **Solo si queda saldo.** `chargeableBalanceCents` lo decide, y vive en el
+   contrato compartido como `refundableCents`: el panel apaga el botón con la
+   misma función con la que el servidor rechaza la petición. **Un cobro en
+   curso (`PROCESSING`) bloquea igual que uno hecho**: el banco todavía no ha
+   dicho que sí, pero tampoco que no, y reintentar mientras tanto es la forma
+   más fácil de cobrarle dos veces a una persona. **Uno rechazado no bloquea**:
+   el saldo se sigue debiendo.
+4. **Solo con tarjeta guardada.** Las reservas anteriores a esta etapa no la
+   tienen, y el panel lo dice con esas palabras: no es un fallo del sistema,
+   es que a esa persona hay que cobrarle por otra vía.
+
+Además, la clave de idempotencia sale de `(reserva, importe)`: pulsar el botón
+dos veces porque la pantalla tardó **no cobra dos veces**.
+
+### Una fila nueva, no un cambio de estado
+
+Al contrario que el cobro del depósito o una devolución, aquí **sí** se crea
+una fila `payments` con `kind: 'FINAL_CHARGE'`. Es otro movimiento, con su
+propio identificador en el proveedor y su propio estado, y es para lo que ese
+valor existía en el enumerado desde la etapa 2.4. El panel las separa por
+`kind`, así que el depósito sigue leyéndose donde siempre.
+
+### Cuando la tarjeta no pasa
+
+Cobrar **sin el cliente delante** cambia cómo se falla, y el panel distingue
+dos casos porque la salida es distinta:
+
+| Qué pasó                                      | Qué dice el panel                                     |
+| --------------------------------------------- | ----------------------------------------------------- |
+| `authentication_required` (el banco pide 3DS) | «Mándale un enlace de pago»: no hay a quien preguntar |
+| Cualquier otro rechazo                        | «La tarjeta fue rechazada»: habla con el cliente      |
+
+**Un rechazo no es un error del servidor**: responde `409`, no `500`. Y **no
+se apunta nada** si el proveedor rechaza, igual que con las devoluciones: la
+fila se crea solo cuando el cobro existe de verdad. El mensaje del proveedor
+se queda en el registro del servidor, nunca llega al navegador.
+
+### Qué se comprueba
+
+**5 pruebas del contrato** y **7 contra PostgreSQL real**:
+
+| Prueba                                               | Qué protege                                           |
+| ---------------------------------------------------- | ----------------------------------------------------- |
+| No se cobra un trabajo sin terminar                  | La puerta número 2                                    |
+| Coordinación recibe `403`                            | Quién mueve dinero                                    |
+| Sin tarjeta guardada se dice **por qué**             | Que no parezca un fallo del sistema                   |
+| **No se cobra dos veces**                            | El fallo más caro que puede tener este sistema        |
+| Un cobro en curso bloquea; uno rechazado no          | Que ni se cobre doble ni se olvide un saldo pendiente |
+| El saldo se guarda como movimiento **aparte**        | Que el depósito siga leyéndose donde siempre          |
+| La auditoría no contiene `pi_`, `pm_` ni `cus_`      | Que una credencial no acabe en una pantalla           |
+| El detalle dice que hay tarjeta **sin enseñar cuál** | Lo mismo, en la API                                   |
+
+### Lo que NO hace
+
+- **No devuelve el saldo.** La devolución de la etapa 3.21 solo mira el
+  depósito (`kind: 'DEPOSIT_HOLD'`). Devolver un cobro final hay que hacerlo
+  hoy desde el panel del proveedor; extenderlo es una etapa pequeña y
+  pendiente.
+- **No cobra solo.** Es un botón, a propósito (ver arriba).
+- **No reclama a quien no se le pudo cobrar.** No hay recordatorios ni
+  reintentos automáticos: el saldo se queda pendiente y visible en la reserva.
+
+---
+
+## 10. Lo que NO está verificado
 
 Honestidad sobre el alcance de las pruebas:
 
@@ -519,13 +627,14 @@ Honestidad sobre el alcance de las pruebas:
 
 ---
 
-## 10. Pendiente
+## 11. Pendiente
 
-| Tarea                                           | Etapa |
-| ----------------------------------------------- | ----- |
-| Probar el pago real con credenciales de Stripe  | 2.2c  |
-| ~~Captura desde el panel~~ — hecho              | 2.3   |
-| ~~Devolución desde el panel~~ — hecho (§8)      | 3.21  |
-| Liberar franjas cuyo `holdExpiresAt` ya venció  | 2.3   |
-| Reintentar la retención de una reserva sin pago | 2.3   |
-| Cobro del importe final al terminar el servicio | 2.5   |
+| Tarea                                              | Etapa |
+| -------------------------------------------------- | ----- |
+| Probar el pago real con credenciales de Stripe     | 2.2c  |
+| ~~Captura desde el panel~~ — hecho                 | 2.3   |
+| ~~Devolución desde el panel~~ — hecho (§8)         | 3.21  |
+| ~~Cobro del saldo final al terminar~~ — hecho (§9) | 3.23  |
+| Devolver un cobro final, no solo el depósito       | —     |
+| Liberar franjas cuyo `holdExpiresAt` ya venció     | 2.3   |
+| Reintentar la retención de una reserva sin pago    | 2.3   |

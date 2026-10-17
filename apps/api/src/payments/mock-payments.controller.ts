@@ -107,6 +107,12 @@ export class MockPaymentsController {
         providerCustomerId: null,
         cardBrand: autoriza ? 'visa' : null,
         cardLast4: autoriza ? '4242' : null,
+        /*
+         * La tarjeta queda guardada al confirmar, como en el proveedor real
+         * (etapa 3.23). Sin esto no se podria probar el cobro del saldo con
+         * el simulador, que es como se prueba todo lo demas.
+         */
+        providerPaymentMethodId: autoriza ? `pm_mock_${paymentIntentId.slice(-12)}` : null,
         expiresAt: null,
         lastError: autoriza ? null : { code: 'card_declined', message: 'Tarjeta rechazada' },
       },

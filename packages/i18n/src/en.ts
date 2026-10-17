@@ -267,6 +267,7 @@ export const en = {
       depositCaptured: 'Deposit charged.',
       depositReleased: 'Hold released.',
       depositRefunded: 'Refunded. It can take a few days to show on the statement.',
+      balanceCharged: 'Balance charged.',
       teamSaved: 'Team saved.',
       staffSaved: 'Staff record saved.',
       adjustmentApplied: 'Charged. The booking now says what the team found.',
@@ -387,6 +388,14 @@ export const en = {
     held: 'Held on card',
     charged: 'Charged',
     refunded: 'Refunded',
+    /* --- Cobrar el saldo final (etapa 3.23) --- */
+    balanceDueNotice: '{{amount}} is still due for this job.',
+    chargeBalance: 'Charge {{amount}}',
+    chargeBalanceHelp:
+      'This charges the card the customer left when booking. It can only be done once the job is finished.',
+    noCardOnFile:
+      'No card was saved for this booking, so it cannot be charged from here. Bookings made before this was added do not have one.',
+    balanceCharged: 'Balance charged',
     refundFailedNotice:
       'A refund was turned down by the bank. That money is still in the company account and the customer is waiting for it: send it back another way and tell them.',
     card: 'Card',
@@ -987,6 +996,7 @@ export const en = {
           captured: 'Deposit charged',
           released: 'Hold released',
           refunded: 'Money refunded',
+          balance_charged: 'Balance charged',
         },
         staff: {
           created: 'Staff added',
@@ -1303,6 +1313,15 @@ export const en = {
     errorPaymentNotRefundable:
       'There is nothing to refund here: either the deposit was never charged, or it has already been refunded in full.',
     errorRefundTooLarge: 'You cannot refund more than is left of what was charged.',
+    errorBalanceNotCompleted:
+      'The balance is charged once the job is finished. Mark it as completed first.',
+    errorBalanceNothingToCharge: 'There is no balance left to charge on this booking.',
+    errorNoCardOnFile:
+      'No card was saved for this booking. Charge the customer another way: bookings made before we started saving cards do not have one.',
+    errorCardNeedsCustomer:
+      'The bank wants the cardholder to approve this payment, and they are not here. Send them a payment link instead.',
+    errorChargeDeclined:
+      'The card was declined. Check with the customer and try again, or charge them another way.',
     errorRefundFailed:
       'The payment provider turned down the refund, so nothing was recorded. Check the card in the provider dashboard before trying again.',
     errorInvalidCredentials: 'Those details are not correct.',
@@ -1391,6 +1410,9 @@ export const en = {
       depositTitle: 'Travel deposit',
       depositExplainer:
         'We place a hold of {{amount}} on your card. It is not a charge: it is credited in full against your final invoice, and we only take it if you cancel once our team is already on the way.',
+      /* --- Se guarda la tarjeta para el saldo final (etapa 3.23) --- */
+      cardKeptNotice:
+        'We keep this card on file to charge the remaining {{amount}} once your cleaning is finished. Nothing else is charged to it, and you can ask us to remove it at any time.',
       holdExpires: 'Your slot is held until {{time}}.',
       dueLater: 'Due on the day of service',
       authorise: 'Authorise {{amount}} hold',

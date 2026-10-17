@@ -96,9 +96,16 @@ el módulo de pagos por adaptadores eso dejó de ser cierto: el simulador tambi�
 guarda movimientos ahí, y escribir sus identificadores en una columna que dice
 «stripe» sería guardar un dato que miente sobre su origen.
 
-Hoy son `provider`, `providerPaymentIntentId` y `providerCustomerId`, con
-unicidad del **par** `(provider, providerPaymentIntentId)`. Un test falla si
-alguna columna vuelve a llamarse `stripe*`.
+Hoy son `provider`, `providerPaymentIntentId`, `providerCustomerId` y
+`providerPaymentMethodId`, con unicidad del **par**
+`(provider, providerPaymentIntentId)`. Un test falla si alguna columna vuelve
+a llamarse `stripe*`.
+
+> **Ninguna de ellas es un dato de tarjeta.** Son referencias opacas del
+> proveedor, inservibles sin su clave secreta. El número de la tarjeta, su
+> caducidad y su código **no pasan nunca por este servidor**: los manda el
+> navegador directamente al proveedor. Lo único que se guarda para enseñar es
+> la marca y los cuatro últimos dígitos.
 
 ### Por qué las series recurrentes son un objeto propio
 

@@ -155,12 +155,35 @@ export const AdminBookingDetailSchema = AdminBookingListItemSchema.extend({
        * otra via», y para eso basta con saber que paso.
        */
       refundFailed: z.boolean(),
+      /**
+       * Si hay tarjeta guardada con la que cobrar el saldo sin el cliente.
+       *
+       * Un si o un no: la referencia del proveedor no pinta nada en una
+       * pantalla. Las reservas anteriores a la etapa 3.23 no la tienen.
+       */
+      cardOnFile: z.boolean(),
       cardBrand: z.string().nullable(),
       cardLast4: z.string().nullable(),
       authorizedAt: z.iso.datetime().nullable(),
       capturedAt: z.iso.datetime().nullable(),
       /** La retencion caduca: pasada esa fecha ya no se puede capturar. */
       expiresAt: z.iso.datetime().nullable(),
+    })
+    .nullable(),
+
+  /**
+   * EL COBRO DEL SALDO FINAL, SI SE INTENTO (etapa 3.23).
+   *
+   * Va aparte de `payment` porque es otro movimiento: otra fila, otro
+   * identificador en el proveedor y otro estado. Un cobro rechazado tambien
+   * aparece aqui, que es justo cuando hace falta verlo.
+   */
+  finalCharge: z
+    .strictObject({
+      paymentId: z.uuid(),
+      status: PaymentStatusSchema,
+      amountCents: z.int(),
+      chargedAt: z.iso.datetime().nullable(),
     })
     .nullable(),
 
@@ -253,6 +276,23 @@ export const AdminReleaseDepositSchema = z.strictObject({
 });
 export type AdminReleaseDeposit = z.infer<typeof AdminReleaseDepositSchema>;
 export type AdminReleaseDepositInput = z.input<typeof AdminReleaseDepositSchema>;
+
+/**
+ * COBRO DEL SALDO FINAL DE UN TRABAJO TERMINADO.
+ *
+ * NO LLEVA IMPORTE, y es la diferencia con el resto de acciones de dinero: lo
+ * que se cobra es lo que la reserva dice que se debe. Dejar teclear la cifra
+ * invitaria a cobrar algo distinto de lo que el cliente acepto, y para eso ya
+ * estan los ajustes de campo, que re-tarifican la reserva ANTES con su propia
+ * aprobacion.
+ *
+ * TAMPOCO LLEVA MOTIVO. Cobrar el saldo acordado al terminar el trabajo es el
+ * curso normal del negocio, no una excepcion que haya que explicar: el motivo
+ * es la reserva. Queda auditado igual, con el importe y con quien lo hizo.
+ */
+export const AdminChargeBalanceSchema = z.strictObject({});
+export type AdminChargeBalance = z.infer<typeof AdminChargeBalanceSchema>;
+export type AdminChargeBalanceInput = z.input<typeof AdminChargeBalanceSchema>;
 
 /**
  * DEVOLUCION DE UN DEPOSITO YA COBRADO.

@@ -236,6 +236,7 @@ export const es: TranslationResources = {
       depositCaptured: 'Depósito cobrado.',
       depositReleased: 'Retención liberada.',
       depositRefunded: 'Devuelto. Puede tardar unos días en aparecer en el extracto.',
+      balanceCharged: 'Saldo cobrado.',
       teamSaved: 'Equipo guardado.',
       staffSaved: 'Ficha guardada.',
       adjustmentApplied: 'Cobrado. La reserva ya dice lo que encontró el equipo.',
@@ -350,6 +351,14 @@ export const es: TranslationResources = {
     held: 'Retenido en la tarjeta',
     charged: 'Cobrado',
     refunded: 'Devuelto',
+    /* --- Cobrar el saldo final (etapa 3.23) --- */
+    balanceDueNotice: 'Quedan {{amount}} por cobrar de este trabajo.',
+    chargeBalance: 'Cobrar {{amount}}',
+    chargeBalanceHelp:
+      'Esto cobra la tarjeta que el cliente dejó al reservar. Solo se puede hacer con el trabajo terminado.',
+    noCardOnFile:
+      'En esta reserva no se guardó ninguna tarjeta, así que no se puede cobrar desde aquí. Las reservas anteriores a esta función no la tienen.',
+    balanceCharged: 'Saldo cobrado',
     refundFailedNotice:
       'El banco rechazó una devolución. Ese dinero sigue en la cuenta de la empresa y el cliente lo está esperando: devuélveselo por otra vía y avísale.',
     card: 'Tarjeta',
@@ -939,6 +948,7 @@ export const es: TranslationResources = {
           captured: 'Cobró el depósito',
           released: 'Liberó la retención',
           refunded: 'Devolvió dinero',
+          balance_charged: 'Cobró el saldo',
         },
         staff: {
           created: 'Dio de alta a una persona',
@@ -1190,6 +1200,15 @@ export const es: TranslationResources = {
     errorPaymentNotRefundable:
       'Aquí no hay nada que devolver: o el depósito no se llegó a cobrar, o ya se devolvió entero.',
     errorRefundTooLarge: 'No se puede devolver más de lo que queda de lo cobrado.',
+    errorBalanceNotCompleted:
+      'El saldo se cobra con el trabajo terminado. Márcalo como completado primero.',
+    errorBalanceNothingToCharge: 'En esta reserva no queda saldo por cobrar.',
+    errorNoCardOnFile:
+      'En esta reserva no se guardó ninguna tarjeta. Cóbrale por otra vía: las reservas anteriores a que empezáramos a guardarlas no la tienen.',
+    errorCardNeedsCustomer:
+      'El banco quiere que el titular apruebe el pago, y no está delante. Mándale un enlace de pago.',
+    errorChargeDeclined:
+      'La tarjeta fue rechazada. Habla con el cliente y vuelve a intentarlo, o cóbrale por otra vía.',
     errorRefundFailed:
       'El proveedor de pago rechazó la devolución, así que no se ha apuntado nada. Revisa la tarjeta en su panel antes de volver a intentarlo.',
     errorInvalidCredentials: 'Esos datos no son correctos.',
@@ -1269,6 +1288,9 @@ export const es: TranslationResources = {
       depositTitle: 'Depósito de traslado',
       depositExplainer:
         'Retenemos {{amount}} en tu tarjeta. No es un cobro: se acredita íntegro contra tu factura final y solo lo cobramos si cancelas cuando nuestro equipo ya va en camino.',
+      /* --- Se guarda la tarjeta para el saldo final (etapa 3.23) --- */
+      cardKeptNotice:
+        'Guardamos esta tarjeta para cobrar los {{amount}} restantes cuando terminemos tu limpieza. No se le cobra nada más, y puedes pedirnos que la quitemos cuando quieras.',
       holdExpires: 'Tu franja queda reservada hasta las {{time}}.',
       dueLater: 'A pagar el día del servicio',
       authorise: 'Autorizar retención de {{amount}}',

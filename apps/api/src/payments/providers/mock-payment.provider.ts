@@ -3,6 +3,7 @@ import type { PaymentProviderName, PaymentStatus } from '@freshness/types';
 import { PaymentStatusSchema } from '@freshness/types';
 import {
   WebhookSignatureError,
+  type BalanceChargeRequest,
   type DepositHoldRequest,
   type PaymentProvider,
   type ProviderPayment,
@@ -49,8 +50,38 @@ export class MockPaymentProvider implements PaymentProvider {
       providerCustomerId: `cus_mock_${randomBytes(8).toString('hex')}`,
       cardBrand: null,
       cardLast4: null,
+      /*
+       * Todavia no hay tarjeta que guardar: el cliente no la ha confirmado.
+       * Llega en el aviso de confirmacion, igual que la marca y los cuatro
+       * ultimos digitos.
+       */
+      providerPaymentMethodId: null,
       expiresAt: new Date(Date.now() + this.authorizationDays * 86_400_000),
       lastError: null,
+    });
+  }
+
+  /**
+   * Cobra el saldo con la tarjeta guardada.
+   *
+   * Sale bien siempre: el simulador no imita rechazos del banco, igual que no
+   * los imita al retener. Lo que se prueba con el son las reglas nuestras
+   * —que no se cobre dos veces, que haga falta tarjeta guardada, que la
+   * reserva este terminada—, que es donde estan los errores que podemos
+   * cometer.
+   */
+  chargeBalance(request: BalanceChargeRequest): Promise<ProviderPayment> {
+    const id = `pi_mock_${randomBytes(12).toString('hex')}`;
+
+    return Promise.resolve({
+      ...this.base(id),
+      status: 'SUCCEEDED',
+      amountAuthorizedCents: request.amountCents,
+      amountCapturedCents: request.amountCents,
+      providerCustomerId: request.providerCustomerId,
+      providerPaymentMethodId: request.providerPaymentMethodId,
+      cardBrand: 'visa',
+      cardLast4: '4242',
     });
   }
 
@@ -122,6 +153,7 @@ export class MockPaymentProvider implements PaymentProvider {
       providerCustomerId: null,
       cardBrand: null,
       cardLast4: null,
+      providerPaymentMethodId: null,
       expiresAt: null,
       lastError: null,
     };
@@ -161,6 +193,7 @@ export class MockPaymentProvider implements PaymentProvider {
             providerCustomerId: null,
             cardBrand: stringOrNull(object?.['card_brand']),
             cardLast4: stringOrNull(object?.['card_last4']),
+            providerPaymentMethodId: stringOrNull(object?.['payment_method']),
             expiresAt: null,
             lastError: null,
           }

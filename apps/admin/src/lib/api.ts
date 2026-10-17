@@ -267,6 +267,20 @@ export function captureDeposit(
 }
 
 /**
+ * Cobra el saldo final de un trabajo terminado. Solo administracion.
+ *
+ * El cuerpo va vacio: se cobra lo que la reserva dice que se debe, y no hay
+ * nada que elegir.
+ */
+export function chargeBalance(bookingId: string): Promise<AdminBookingDetail> {
+  return request(
+    `/admin/bookings/${bookingId}/payment/charge-balance`,
+    parseDetail('cobro del saldo'),
+    { method: 'POST', body: {} },
+  );
+}
+
+/**
  * Devuelve dinero YA COBRADO, entero o en parte. Solo administracion.
  *
  * Sin `amountCents` se devuelve todo lo que quede pendiente.

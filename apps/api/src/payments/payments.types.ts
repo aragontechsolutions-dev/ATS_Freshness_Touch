@@ -32,6 +32,30 @@ export interface DepositHoldRequest {
 }
 
 /**
+ * Peticion para cobrar el saldo final de un trabajo terminado.
+ *
+ * SE COBRA SIN EL CLIENTE DELANTE, con la tarjeta que guardo el proveedor al
+ * reservar. Eso cambia dos cosas respecto a la retencion:
+ *
+ *   - El banco puede exigir que el titular verifique el pago. Cuando pasa no
+ *     hay a quien preguntar, y el proveedor devuelve un error propio que hay
+ *     que distinguir de un rechazo normal: la salida es mandarle un enlace,
+ *     no pedirle otra tarjeta.
+ *   - El cobro es inmediato, no una retencion: aqui no hay nada que capturar
+ *     despues.
+ */
+export interface BalanceChargeRequest {
+  bookingId: string;
+  bookingReference: string;
+  amountCents: number;
+  /** La tarjeta guardada y su titular en el proveedor. */
+  providerCustomerId: string;
+  providerPaymentMethodId: string;
+  /** Deriva de la reserva y del importe: un reintento no cobra dos veces. */
+  idempotencyKey: string;
+}
+
+/**
  * Peticion para devolver dinero ya cobrado.
  *
  * NO LLEVA EL MOTIVO QUE ESCRIBIO ADMINISTRACION, y es deliberado: ese texto
@@ -108,6 +132,13 @@ export interface ProviderPayment {
   /** Marca y ultimos cuatro digitos, solo para mostrarlos. */
   cardBrand: string | null;
   cardLast4: string | null;
+  /**
+   * La tarjeta guardada, para cobrar el saldo final despues (etapa 3.23).
+   *
+   * NO es un dato de tarjeta: es una referencia del proveedor, inservible
+   * sin su clave secreta. Llega cuando el cliente confirma, no al crear.
+   */
+  providerPaymentMethodId: string | null;
   /** Cuando caduca la autorizacion. Pasada esa fecha ya no se puede capturar. */
   expiresAt: Date | null;
   lastError: { code: string | null; message: string } | null;
@@ -144,6 +175,15 @@ export interface PaymentProvider {
 
   /** Libera una retencion sin cobrar nada. */
   cancel(providerPaymentIntentId: string, reason: string): Promise<ProviderPayment>;
+
+  /**
+   * Cobra el saldo final con la tarjeta guardada, sin el cliente delante.
+   *
+   * Lanza `PaymentProviderError` con `code: 'authentication_required'` cuando
+   * el banco exige verificar al titular: es el unico fallo que no se arregla
+   * pidiendo otra tarjeta.
+   */
+  chargeBalance(request: BalanceChargeRequest): Promise<ProviderPayment>;
 
   /**
    * Devuelve dinero YA COBRADO, entero o en parte.

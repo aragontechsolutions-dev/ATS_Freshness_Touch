@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { AdminRefundDepositSchema } from './admin';
-import { refundableCents, type RefundableAmounts } from './payment';
+import { chargeableBalanceCents, refundableCents, type RefundableAmounts } from './payment';
 
 /**
  * LO QUE SE PUEDE DEVOLVER
@@ -101,5 +101,49 @@ describe('AdminRefundDepositSchema', () => {
     });
 
     expect(parsed.success).toBe(false);
+  });
+});
+
+describe('chargeableBalanceCents', () => {
+  const PENDIENTE = 15_000;
+
+  it('sin cobro previo, se debe todo el saldo', () => {
+    expect(chargeableBalanceCents(PENDIENTE, null)).toBe(15_000);
+  });
+
+  it('cobrado ya, no queda nada', () => {
+    expect(chargeableBalanceCents(PENDIENTE, { status: 'SUCCEEDED', amountCents: 15_000 })).toBe(0);
+  });
+
+  /**
+   * UN COBRO EN CURSO TAMBIEN BLOQUEA, y es lo contrario de lo que parece
+   * seguro: el banco aun no ha dicho que si, pero tampoco que no, y volver a
+   * cobrar mientras tanto es la forma mas facil de cobrarle dos veces a una
+   * persona.
+   */
+  it('un cobro en curso bloquea el segundo intento', () => {
+    expect(chargeableBalanceCents(PENDIENTE, { status: 'PROCESSING', amountCents: 15_000 })).toBe(
+      0,
+    );
+  });
+
+  /**
+   * UN COBRO RECHAZADO NO CUENTA COMO COBRADO. Si la tarjeta no paso, el
+   * saldo sigue debiendose: hay que poder reintentarlo cuando el cliente dé
+   * otra tarjeta o resuelva lo suyo con el banco.
+   */
+  it('un cobro rechazado deja el saldo pendiente otra vez', () => {
+    expect(chargeableBalanceCents(PENDIENTE, { status: 'FAILED', amountCents: 15_000 })).toBe(
+      15_000,
+    );
+    expect(chargeableBalanceCents(PENDIENTE, { status: 'CANCELED', amountCents: 15_000 })).toBe(
+      15_000,
+    );
+  });
+
+  it('una reserva sin saldo no tiene nada que cobrar', () => {
+    // Pasa cuando el deposito cubre el total, o cuando no hay precio
+    // automatico y el total todavia es cero.
+    expect(chargeableBalanceCents(0, null)).toBe(0);
   });
 });

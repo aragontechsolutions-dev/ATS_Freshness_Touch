@@ -19,6 +19,7 @@ import {
   AdminAssignmentsUpdateSchema,
   AdminBookingQuerySchema,
   AdminCaptureDepositSchema,
+  AdminChargeBalanceSchema,
   AdminRefundDepositSchema,
   AdminReleaseDepositSchema,
   AdminStatusChangeSchema,
@@ -28,6 +29,7 @@ import {
   type AdminBookingList,
   type AdminBookingQuery,
   type AdminCaptureDeposit,
+  type AdminChargeBalance,
   type AdminRefundDeposit,
   type AdminReleaseDeposit,
   type AdminStaffList,
@@ -195,6 +197,31 @@ export class BookingActionsController {
     @Req() request: Request,
   ): Promise<AdminBookingDetail> {
     await this.actions.captureDeposit(bookingId, body, staff, request.ip ?? null);
+    return this.bookings.detail(bookingId);
+  }
+
+  /**
+   * Cobra el saldo final de un trabajo terminado.
+   *
+   * SOLO ADMINISTRACION, como el resto del dinero. Es ademas el unico cobro
+   * que se hace SIN EL CLIENTE DELANTE, con la tarjeta que guardo el
+   * proveedor al reservar.
+   *
+   * El cuerpo va vacio a proposito: no hay nada que elegir. Se cobra lo que
+   * la reserva dice que se debe. Aun asi pasa por el esquema, que es
+   * estricto: un campo de mas —un importe inventado— se rechaza.
+   */
+  @Post('payment/charge-balance')
+  @HttpCode(HttpStatus.OK)
+  @Roles('ADMIN')
+  async chargeBalance(
+    @Param('bookingId', new ParseUUIDPipe({ version: '4' })) bookingId: string,
+    @Body(new ZodValidationPipe<AdminChargeBalance>(AdminChargeBalanceSchema))
+    _body: AdminChargeBalance,
+    @CurrentStaff() staff: AuthenticatedStaff,
+    @Req() request: Request,
+  ): Promise<AdminBookingDetail> {
+    await this.actions.chargeBalance(bookingId, staff, request.ip ?? null);
     return this.bookings.detail(bookingId);
   }
 

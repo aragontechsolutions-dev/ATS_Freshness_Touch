@@ -330,6 +330,24 @@ export function BookingDetailPage({
                 {t('admin.refundFailedNotice')}
               </p>
             )}
+            {/*
+             * EL COBRO DEL SALDO (etapa 3.23). Es la mayor parte del importe,
+             * asi que aparece junto al deposito y no en otra pantalla. Si no
+             * salio bien se dice en la misma linea: un importe a secas se
+             * leeria como cobrado.
+             */}
+            {booking.finalCharge && (
+              <Row
+                label={t('admin.balanceCharged')}
+                value={
+                  booking.finalCharge.status === 'SUCCEEDED'
+                    ? formatCents(booking.finalCharge.amountCents, locale)
+                    : `${formatCents(booking.finalCharge.amountCents, locale)} · ${t(
+                        `admin.paymentState.${booking.finalCharge.status}`,
+                      )}`
+                }
+              />
+            )}
             {booking.payment.cardLast4 && (
               <Row
                 label={t('admin.card')}

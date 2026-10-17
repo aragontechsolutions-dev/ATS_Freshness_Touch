@@ -67,6 +67,46 @@ export function refundableCents(payment: RefundableAmounts): number {
   return Math.max(0, payment.amountCapturedCents - payment.amountRefundedCents);
 }
 
+/**
+ * CUANTO QUEDA POR COBRAR DEL SALDO FINAL
+ * ---------------------------------------
+ * El deposito son 35 dolares de una limpieza de 185: los otros 150 se cobran
+ * al terminar. Esta funcion dice si queda algo que cobrar, y la usan los dos
+ * lados —el panel para ensenar el boton, el servidor para rechazar un segundo
+ * cobro— por el mismo motivo que `refundableCents`.
+ *
+ * UN COBRO FALLIDO NO CUENTA COMO COBRADO, y es justo lo contrario de lo que
+ * parece: si la tarjeta fue rechazada, el saldo sigue debiendose y hay que
+ * poder reintentarlo. Lo que bloquea un segundo cobro es uno que salio bien
+ * o que esta en curso.
+ */
+export interface FinalChargeState {
+  status: PaymentStatus;
+  amountCents: number;
+}
+
+export function chargeableBalanceCents(
+  balanceDueCents: number,
+  finalCharge: FinalChargeState | null,
+): number {
+  if (balanceDueCents <= 0) return 0;
+
+  if (finalCharge !== null && EN_CURSO_O_COBRADO.includes(finalCharge.status)) {
+    return 0;
+  }
+
+  return balanceDueCents;
+}
+
+/**
+ * Los estados en los que NO se puede volver a cobrar.
+ *
+ * `PROCESSING` esta dentro a proposito: el banco aun no ha dicho que si, pero
+ * tampoco que no, y cobrar otra vez mientras tanto es la forma mas facil de
+ * cobrarle dos veces a una persona.
+ */
+const EN_CURSO_O_COBRADO: PaymentStatus[] = ['SUCCEEDED', 'PROCESSING', 'REQUIRES_CAPTURE'];
+
 /** Lo que necesita el navegador para completar el pago. */
 export const PaymentIntentSchema = z.strictObject({
   paymentId: z.uuid(),

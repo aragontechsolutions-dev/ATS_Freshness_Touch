@@ -524,6 +524,12 @@ model Payment {
   /// Identificador del movimiento en ese proveedor (pi_... en Stripe).
   providerPaymentIntentId String
   providerCustomerId      String?
+  /// La tarjeta guardada, para cobrar el saldo final sin el cliente delante.
+  ///
+  /// NO ES UN DATO DE TARJETA: es una referencia del proveedor (pm_... en
+  /// Stripe), inservible sin su clave secreta. El numero no pasa nunca por
+  /// este servidor. Nulo mientras el cliente no haya confirmado la tarjeta.
+  providerPaymentMethodId String?
   /// Ultimos cuatro digitos y marca, solo para mostrarlos. NUNCA se guarda
   /// el numero de tarjeta: lo custodia el proveedor.
   cardBrand               String?
