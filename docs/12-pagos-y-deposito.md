@@ -404,14 +404,30 @@ simulador** y **11 contra PostgreSQL real** (`admin-access.e2e.test.ts`):
 
 ### Lo que NO hace
 
-- **No avisa al cliente por correo desde nuestro sistema.** Con Stripe, el
-  proveedor manda su propio aviso de devolución al correo de la reserva. Un
-  aviso propio exigiría un valor nuevo en el enumerado de avisos —y con él una
-  migración— y se decidió dejarlo para cuando haga falta de verdad.
+- **No avisa al cliente por correo desde nuestro sistema.** Un aviso propio
+  exigiría un valor nuevo en el enumerado de avisos —y con él una migración— y
+  se decidió dejarlo para cuando haga falta de verdad.
+
+  **Y NO SE PUEDE DAR POR HECHO QUE LO AVISE STRIPE.** Manda su propio recibo
+  de devolución solo si está encendido en _Settings → Customer emails → Email
+  customers about → **Refunds**_, y **en modo de prueba no manda ninguno**
+  (ahí se envía a mano desde su panel). Con ese ajuste apagado, hoy el cliente
+  no recibe nada: se le dice por teléfono o por WhatsApp. Conviene encenderlo
+  antes de devolverle dinero a alguien de verdad.
+
 - **No se entera si el proveedor anula la devolución días después.** Es raro
-  (cuenta cerrada, tarjeta caducada) y llega por un evento `charge.refund`
-  que hoy no se procesa: el webhook solo traduce eventos de `payment_intent`.
-  Si pasa, lo cuenta el panel de Stripe y hay que corregirlo a mano.
+  (cuenta cerrada, tarjeta caducada o perdida) y llega por un evento
+  **`refund.failed`** que hoy no se procesa: `parseWebhook` solo traduce
+  objetos `payment_intent` y devuelve `payment: null` para todo lo demás, así
+  que el aviso se acepta con un 200 y no hace nada. Si pasa, **la empresa cree
+  que devolvió un dinero que sigue en su cuenta y el cliente espera un abono
+  que no va a llegar**; lo cuenta el panel de Stripe y hay que corregirlo a
+  mano.
+
+  > `charge.refund.updated` era el evento de antes y está **obsoleto**: desde
+  > la versión de API `2024-10-28` los eventos de devolución son
+  > `refund.created`, `refund.updated` y `refund.failed`, y valen para todas
+  > las devoluciones.
 
 ---
 
