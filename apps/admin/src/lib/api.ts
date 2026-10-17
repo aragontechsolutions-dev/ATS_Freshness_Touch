@@ -21,6 +21,7 @@ import {
   type AdminAssignment,
   type AdminBookingQueryInput,
   type AdminCaptureDepositInput,
+  type AdminRefundDepositInput,
   type AdminReleaseDepositInput,
   type AdminBusinessSettings,
   type AdminStaffDirectory,
@@ -261,6 +262,22 @@ export function captureDeposit(
   return request(
     `/admin/bookings/${bookingId}/payment/capture`,
     parseDetail('cobro del deposito'),
+    { method: 'POST', body },
+  );
+}
+
+/**
+ * Devuelve dinero YA COBRADO, entero o en parte. Solo administracion.
+ *
+ * Sin `amountCents` se devuelve todo lo que quede pendiente.
+ */
+export function refundDeposit(
+  bookingId: string,
+  body: AdminRefundDepositInput,
+): Promise<AdminBookingDetail> {
+  return request(
+    `/admin/bookings/${bookingId}/payment/refund`,
+    parseDetail('devolucion del deposito'),
     { method: 'POST', body },
   );
 }

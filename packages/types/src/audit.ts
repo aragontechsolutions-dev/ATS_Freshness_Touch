@@ -99,6 +99,15 @@ const ACCIONES_FIJAS = [
   /* --- Dinero ---------------------------------------------------------- */
   'payment.captured',
   'payment.released',
+  /**
+   * SE DEVOLVIO DINERO YA COBRADO.
+   *
+   * Accion propia y no un `payment.captured` con importe negativo: la
+   * pregunta que se hace sobre las devoluciones —cuantas hubo este mes y
+   * quien las autorizo— se responde con un filtro, y un signo escondido
+   * dentro de un importe no se filtra.
+   */
+  'payment.refunded',
 
   /* --- Personal -------------------------------------------------------- */
   'staff.created',

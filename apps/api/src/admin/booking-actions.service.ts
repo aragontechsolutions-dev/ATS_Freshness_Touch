@@ -8,7 +8,9 @@ import {
 import {
   API_ERROR_CODES,
   canTransition,
+  refundableCents,
   type AdminCaptureDeposit,
+  type AdminRefundDeposit,
   type AdminReleaseDeposit,
   type AdminStatusChange,
   type AuthenticatedStaff,
@@ -200,6 +202,98 @@ export class BookingActionsService {
   }
 
   /**
+   * DEVUELVE DINERO YA COBRADO, entero o en parte.
+   *
+   * NO ES LO MISMO QUE LIBERAR, y la diferencia la nota el cliente en su
+   * extracto: liberar quita una retención que nunca llegó a cobrarse y no
+   * deja rastro; devolver hace aparecer un abono junto a un cargo que sí
+   * existió. Por eso cada una mira un estado distinto y son dos botones.
+   *
+   * EL IMPORTE SE COMPRUEBA CONTRA LO QUE QUEDA, no contra lo cobrado: con
+   * dos devoluciones parciales de 20 sobre un cobro de 35, la segunda tiene
+   * que fallar aunque 20 sea menor que 35.
+   */
+  async refundDeposit(
+    bookingId: string,
+    request: AdminRefundDeposit,
+    staff: AuthenticatedStaff,
+    ipAddress: string | null,
+  ): Promise<void> {
+    const pago = await this.findRefundablePayment(bookingId);
+    const importe = request.amountCents ?? pago.refundableCents;
+
+    if (importe > pago.refundableCents) {
+      throw new BadRequestException({
+        code: API_ERROR_CODES.VALIDATION_ERROR,
+        messageKey: 'admin.errorRefundTooLarge',
+      });
+    }
+
+    /*
+     * La llamada al proveedor va FUERA de la transacción, igual que el cobro
+     * y la liberación: mantener filas bloqueadas mientras se espera a un
+     * servidor ajeno para una operación que tarda segundos es lo que
+     * convierte un día con incidencias en una base de datos atascada.
+     */
+    const resultado = await this.payments.refund({
+      providerPaymentIntentId: pago.providerPaymentIntentId,
+      bookingReference: pago.bookingReference,
+      amountCents: importe,
+      alreadyRefundedCents: pago.amountRefundedCents,
+    });
+
+    /*
+     * UNA DEVOLUCIÓN QUE EL PROVEEDOR RECHAZA NO SE APUNTA. Apuntarla dejaría
+     * a la empresa creyendo que devolvió un dinero que sigue en su cuenta, y
+     * al cliente esperando un abono que no va a llegar. 409 y a mirarlo.
+     */
+    if (resultado.status === 'FAILED') {
+      throw new ConflictException({
+        code: API_ERROR_CODES.PAYMENT_NOT_REFUNDABLE,
+        messageKey: 'admin.errorRefundFailed',
+      });
+    }
+
+    await this.prisma.db.$transaction(async (tx) => {
+      await tx.payment.update({
+        where: { id: pago.id },
+        /*
+         * `increment` y no una suma calculada aquí: dos devoluciones a la vez
+         * leerían el mismo valor y la segunda pisaría a la primera. La suma
+         * la hace la base de datos sobre la fila que acaba de bloquear.
+         */
+        data: { amountRefundedCents: { increment: resultado.amountCents } },
+      });
+
+      await this.audit.record(
+        {
+          staff,
+          surface: 'PANEL',
+          action: 'payment.refunded',
+          entityType: 'booking',
+          entityId: bookingId,
+          /*
+           * El importe y el motivo; NUNCA el identificador del movimiento ni
+           * el de la devolución en el proveedor. `pending` se guarda porque
+           * explica que el cliente aún no lo vea en su extracto.
+           */
+          metadata: {
+            amountCents: resultado.amountCents,
+            reason: request.reason,
+            pending: resultado.status === 'PENDING',
+          },
+          ipAddress,
+        },
+        tx,
+      );
+    });
+
+    this.logger.log(
+      `Reserva ${pago.bookingReference}: devueltos ${importe} centavos por ${staff.email}`,
+    );
+  }
+
+  /**
    * Busca la retención sobre la que se puede actuar.
    *
    * Solo vale una que esté AUTORIZADA Y SIN COBRAR: una ya cobrada no se puede
@@ -247,6 +341,59 @@ export class BookingActionsService {
       id: pago.id,
       providerPaymentIntentId: pago.providerPaymentIntentId,
       amountAuthorizedCents: pago.amountAuthorizedCents,
+    };
+  }
+
+  /**
+   * Busca el cobro del que todavía queda algo por devolver.
+   *
+   * El cuánto lo decide `refundableCents`, que está en el contrato
+   * compartido: el panel apaga el botón con la misma función con la que el
+   * servidor rechaza la petición, así que no pueden discrepar.
+   */
+  private async findRefundablePayment(bookingId: string): Promise<{
+    id: string;
+    providerPaymentIntentId: string;
+    bookingReference: string;
+    amountRefundedCents: number;
+    refundableCents: number;
+  }> {
+    const pago = await this.prisma.db.payment.findFirst({
+      where: { bookingId, kind: 'DEPOSIT_HOLD' },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        status: true,
+        providerPaymentIntentId: true,
+        amountCapturedCents: true,
+        amountRefundedCents: true,
+        booking: { select: { reference: true } },
+      },
+    });
+
+    if (!pago) throw this.notFound();
+
+    const pendiente = refundableCents(pago);
+
+    if (pendiente <= 0) {
+      /*
+       * Dos situaciones distintas con la misma respuesta: no se cobró nada
+       * —la retención sigue viva, o se liberó— o ya se devolvió entero. El
+       * texto del panel las nombra a las dos, porque quien lo lee necesita
+       * saber cuál de las dos le ha pasado.
+       */
+      throw new ConflictException({
+        code: API_ERROR_CODES.PAYMENT_NOT_REFUNDABLE,
+        messageKey: 'admin.errorPaymentNotRefundable',
+      });
+    }
+
+    return {
+      id: pago.id,
+      providerPaymentIntentId: pago.providerPaymentIntentId,
+      bookingReference: pago.booking.reference,
+      amountRefundedCents: pago.amountRefundedCents,
+      refundableCents: pendiente,
     };
   }
 

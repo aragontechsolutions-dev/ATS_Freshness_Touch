@@ -6,7 +6,9 @@ import {
   type DepositHoldRequest,
   type PaymentProvider,
   type ProviderPayment,
+  type ProviderRefund,
   type ProviderWebhookEvent,
+  type RefundRequest,
 } from '../payments.types';
 
 /**
@@ -62,6 +64,23 @@ export class MockPaymentProvider implements PaymentProvider {
 
   cancel(providerPaymentIntentId: string): Promise<ProviderPayment> {
     return Promise.resolve({ ...this.base(providerPaymentIntentId), status: 'CANCELED' });
+  }
+
+  /**
+   * Devuelve dinero. Como el resto del simulador, NO GUARDA ESTADO: no sabe
+   * cuanto se cobro ni cuanto se devolvio ya, y no es su trabajo saberlo. El
+   * limite lo pone nuestra tabla `payments`, que es la fuente de verdad, y
+   * por eso se comprueba antes de llegar aqui.
+   */
+  refund(request: RefundRequest): Promise<ProviderRefund> {
+    return Promise.resolve({
+      // Mismo prefijo que usa Stripe para sus devoluciones, igual que con el
+      // resto de identificadores: el codigo que los consume no descubre
+      // diferencias al cambiar de proveedor.
+      providerRefundId: `re_mock_${randomBytes(12).toString('hex')}`,
+      amountCents: request.amountCents,
+      status: 'SUCCEEDED',
+    });
   }
 
   /**

@@ -287,7 +287,135 @@ por alto: nadie debe creer que ha pagado algo.
 
 ---
 
-## 8. Lo que NO está verificado
+## 8. Devolver dinero ya cobrado
+
+> Etapa 3.21.
+
+### Devolver y liberar no son lo mismo, y confundirlos se nota en el extracto
+
+| Operación    | Sobre qué                    | Qué ve el cliente                |
+| ------------ | ---------------------------- | -------------------------------- |
+| **Liberar**  | Una retención **no** cobrada | Nada: los fondos se desbloquean  |
+| **Devolver** | Un cobro ya hecho            | Un abono junto al cargo que hubo |
+
+Son dos botones distintos y miran estados distintos: liberar exige
+`REQUIRES_CAPTURE`, devolver exige `SUCCEEDED`. Si se pudiera «devolver» una
+retención viva, el cliente vería un cargo y un abono por un dinero que nunca
+salió de su cuenta, y llamaría a preguntar — con razón.
+
+### Hasta dónde se puede devolver
+
+Lo decide **`refundableCents`**, en `packages/types/src/payment.ts`:
+
+```
+devolvible = SUCCEEDED ? max(0, cobrado − ya devuelto) : 0
+```
+
+Vive en el contrato compartido porque **lo usan los dos lados**: el panel para
+apagar el botón y el servidor para rechazar la petición. Escrito dos veces,
+acabarían discrepando y el síntoma sería un botón que no hace nada.
+
+El límite se mide contra **lo que queda**, no contra lo cobrado: con dos
+devoluciones de 20 $ sobre un cobro de 35 $, la segunda falla aunque 20 sea
+menor que 35.
+
+### Dónde se apunta: en la misma fila, no en una nueva
+
+`amountRefundedCents` del depósito, con **`increment` de la base de datos** y
+no con una suma calculada en el servidor: dos devoluciones a la vez leerían el
+mismo valor y la segunda pisaría a la primera, dejando dinero que se podría
+devolver otra vez.
+
+**No se crea una fila `payments` por devolución**, igual que no se crea al
+cobrar ni al liberar. El panel lee `payments[0]` del depósito; una fila nueva
+se colaría en ese primer puesto y la pantalla dejaría de contar lo que pasó.
+Por eso `PaymentKind.REFUND` sigue en el enumerado **sin usarse**: se dejó ahí
+en la etapa 2.4 y tendrá sentido el día que se cobre el importe final, que sí
+es otro movimiento.
+
+**No hay migración**: `amountRefundedCents` existe desde la etapa 2.4. El
+cuándo y el quién los responde la auditoría.
+
+### La clave de idempotencia, que es la pieza delicada
+
+Tiene que cumplir dos cosas que tiran en direcciones opuestas:
+
+- **Un reintento no puede devolver dos veces.** Si la petición llegó al
+  proveedor y la respuesta se perdió, el segundo intento debe recibir la misma
+  devolución.
+- **Dos devoluciones parciales distintas sí son dos.** Con una clave que solo
+  mirase (pago, importe), devolver 10 $ hoy y otros 10 $ mañana haría que la
+  segunda se convirtiera en silencio en la primera: el cliente recibiría 10 y
+  nuestra tabla diría 20.
+
+Lo que las distingue es **cuánto se había devuelto ya**, y por eso entra en la
+clave: `sha256("refund:" + intentId + ":" + importe + ":" + yaDevuelto)`.
+
+### Tres decisiones del lado de Stripe
+
+- **Se manda siempre `requested_by_customer`.** Stripe solo admite tres
+  motivos enlatados, y marcar una devolución como `fraudulent` alimenta sus
+  modelos de riesgo y puede acabar bloqueando tarjetas de clientes que no han
+  hecho nada.
+- **El motivo escrito por administración no sale de aquí.** Es texto libre y
+  puede nombrar al cliente o contar lo que pasó en su casa. Vive en nuestra
+  auditoría.
+- **`pending` cuenta como devuelto.** Con algunas tarjetas el abono tarda días
+  en aparecer, pero el proveedor ya se ha comprometido y el dinero sale de la
+  cuenta de la empresa igual. Tratarlo como fallo llevaría a devolverlo dos
+  veces. Queda anotado en la auditoría para que soporte sepa explicar por qué
+  el cliente aún no lo ve.
+- **Una devolución rechazada (`FAILED`) no se apunta** y responde `409`.
+  Apuntarla dejaría a la empresa creyendo que devolvió un dinero que sigue en
+  su cuenta, y al cliente esperando un abono que no va a llegar.
+
+### Seguridad
+
+- **Solo `ADMIN`.** Coordinación mueve la agenda, no el dinero. Que vaya en la
+  dirección contraria no lo hace inocuo: sale de la empresa.
+- **Motivo obligatorio** (3 a 500 caracteres), y la acción queda en la
+  auditoría como `payment.refunded`, con importe, motivo y si quedó pendiente.
+- **Ni el identificador del cobro ni el de la devolución entran en la
+  auditoría ni en los registros del servidor**, igual que en el resto del
+  módulo: son credenciales, no información. Hay una prueba que lo comprueba
+  buscando `pi_mock` y `re_mock` en todo lo auditado.
+- **La llamada al proveedor va fuera de la transacción**, como el cobro y la
+  liberación: mantener filas bloqueadas esperando a un servidor ajeno es lo
+  que convierte un día con incidencias en una base de datos atascada.
+
+### Qué se comprueba
+
+**11 pruebas del contrato** (`packages/types/src/payment.test.ts`), **7 de la
+conversión del importe** (`apps/admin/src/lib/devolucion.test.ts`), **3 del
+simulador** y **11 contra PostgreSQL real** (`admin-access.e2e.test.ts`):
+
+| Prueba                                                  | Qué protege                                                         |
+| ------------------------------------------------------- | ------------------------------------------------------------------- |
+| Una retención sin cobrar no se devuelve (`409`)         | Que no aparezca un abono por un dinero que no salió                 |
+| Coordinación recibe `403`                               | Quién puede devolver dinero                                         |
+| No se puede devolver más de lo cobrado (`400`)          | Lo obvio                                                            |
+| **La segunda devolución se suma, no pisa a la primera** | El fallo que más cuesta ver: dinero devolvible dos veces            |
+| El límite se mide contra lo que queda                   | Lo mismo, por el otro lado                                          |
+| Sin importe se devuelve todo lo que quede               | El caso más habitual                                                |
+| Después ya no queda nada (`409`)                        | Que no se pueda devolver en bucle                                   |
+| La auditoría no contiene `pi_mock` ni `re_mock`         | Que una credencial no acabe en una pantalla                         |
+| La devolución **no crea filas de pago nuevas**          | Que el panel siga leyendo el depósito en `payments[0]`              |
+| «12abc» y «1,5» no se interpretan a medias              | `parseFloat` daría 12 y 1: el segundo devolvería 1 $ en vez de 1,50 |
+
+### Lo que NO hace
+
+- **No avisa al cliente por correo desde nuestro sistema.** Con Stripe, el
+  proveedor manda su propio aviso de devolución al correo de la reserva. Un
+  aviso propio exigiría un valor nuevo en el enumerado de avisos —y con él una
+  migración— y se decidió dejarlo para cuando haga falta de verdad.
+- **No se entera si el proveedor anula la devolución días después.** Es raro
+  (cuenta cerrada, tarjeta caducada) y llega por un evento `charge.refund`
+  que hoy no se procesa: el webhook solo traduce eventos de `payment_intent`.
+  Si pasa, lo cuenta el panel de Stripe y hay que corregirlo a mano.
+
+---
+
+## 9. Lo que NO está verificado
 
 Honestidad sobre el alcance de las pruebas:
 
@@ -302,12 +430,13 @@ Honestidad sobre el alcance de las pruebas:
 
 ---
 
-## 9. Pendiente
+## 10. Pendiente
 
 | Tarea                                           | Etapa |
 | ----------------------------------------------- | ----- |
 | Probar el pago real con credenciales de Stripe  | 2.2c  |
-| Captura y devolución desde el panel             | 2.3   |
+| ~~Captura desde el panel~~ — hecho              | 2.3   |
+| ~~Devolución desde el panel~~ — hecho (§8)      | 3.21  |
 | Liberar franjas cuyo `holdExpiresAt` ya venció  | 2.3   |
 | Reintentar la retención de una reserva sin pago | 2.3   |
 | Cobro del importe final al terminar el servicio | 2.5   |

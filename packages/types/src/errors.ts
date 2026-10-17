@@ -73,6 +73,15 @@ export const API_ERROR_CODES = {
   STAFF_INVITE_FAILED: 'STAFF_INVITE_FAILED',
   /** La retencion no esta en un estado sobre el que se pueda actuar. */
   PAYMENT_NOT_CAPTURABLE: 'PAYMENT_NOT_CAPTURABLE',
+  /**
+   * No hay nada que devolver.
+   *
+   * ES DISTINTO DE `PAYMENT_NOT_CAPTURABLE`, y separarlos no es puntillismo:
+   * «esta retencion no se puede cobrar» y «de este cobro no queda nada por
+   * devolver» llevan a dos acciones distintas de quien lo lee. Mezclarlos
+   * dejaria a administracion buscando un cobro que ya devolvio entera.
+   */
+  PAYMENT_NOT_REFUNDABLE: 'PAYMENT_NOT_REFUNDABLE',
   PAYMENT_UNAVAILABLE: 'PAYMENT_UNAVAILABLE',
   WEBHOOK_SIGNATURE_INVALID: 'WEBHOOK_SIGNATURE_INVALID',
   BOOKING_NOT_QUOTABLE: 'BOOKING_NOT_QUOTABLE',

@@ -244,3 +244,32 @@ export const AdminReleaseDepositSchema = z.strictObject({
 });
 export type AdminReleaseDeposit = z.infer<typeof AdminReleaseDepositSchema>;
 export type AdminReleaseDepositInput = z.input<typeof AdminReleaseDepositSchema>;
+
+/**
+ * DEVOLUCION DE UN DEPOSITO YA COBRADO.
+ *
+ * Es la unica operacion de pago que devuelve dinero al cliente, y por eso la
+ * unica donde el importe parcial es lo normal y no la excepcion: «te cobramos
+ * los 35 del viaje en balde, te devolvemos 20 porque el equipo ya habia
+ * salido» es una conversacion real. Sin indicar importe se devuelve todo lo
+ * que quede.
+ *
+ * NO SIRVE PARA UNA RETENCION VIVA. Esa se libera (`AdminReleaseDeposit`): no
+ * ha salido dinero de ninguna cuenta y devolverlo no significaria nada.
+ */
+export const AdminRefundDepositSchema = z.strictObject({
+  /**
+   * Importe a devolver, si es menor que lo que queda. Sin indicar, se
+   * devuelve todo lo pendiente. Nunca puede superarlo: el servidor lo
+   * comprueba con el mismo `refundableCents` que usa el panel.
+   */
+  amountCents: z.int().positive().optional(),
+  /**
+   * OBLIGATORIO, igual que para cobrar. Una devolucion es dinero que sale de
+   * la empresa, y a los tres meses la pregunta siempre es la misma: quien la
+   * autorizo y por que.
+   */
+  reason: z.string().trim().min(3).max(500),
+});
+export type AdminRefundDeposit = z.infer<typeof AdminRefundDepositSchema>;
+export type AdminRefundDepositInput = z.input<typeof AdminRefundDepositSchema>;

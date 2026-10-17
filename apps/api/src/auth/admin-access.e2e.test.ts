@@ -779,6 +779,158 @@ describe('acciones sobre la reserva', () => {
     });
   });
 
+  /**
+   * DEVOLVER DINERO YA COBRADO (etapa 3.21)
+   * =======================================
+   * El unico camino por el que sale dinero de la empresa hacia un cliente, y
+   * por eso lo que se comprueba no es solo que funcione: es que NO SE PUEDA
+   * DEVOLVER MAS DE LO QUE SE COBRO, que dos devoluciones parciales se sumen
+   * en vez de pisarse, y que lo que no sale de verdad no quede apuntado como
+   * si hubiera salido.
+   */
+  describe('devoluciones: solo administracion', () => {
+    /** Deja el deposito como si se hubiera cobrado entero. */
+    const dejarCobrado = (): Promise<unknown> =>
+      db.exec(`UPDATE payments SET status = 'SUCCEEDED',
+        "amountCapturedCents" = "amountAuthorizedCents", "amountRefundedCents" = 0
+        WHERE "bookingId" = '${bookingId}'`);
+
+    const devolver = (token: string, cuerpo: Record<string, unknown>) =>
+      request(app.getHttpServer())
+        .post(`/api/v1/admin/bookings/${bookingId}/payment/refund`)
+        .set('authorization', `Bearer ${token}`)
+        .send(cuerpo);
+
+    it('una retencion que no se cobro NO se devuelve: se libera', async () => {
+      /*
+       * Viene liberada de la prueba anterior. Devolver un dinero que nunca
+       * salio de la cuenta del cliente le dejaria un cargo y un abono en el
+       * extracto por algo que no paso.
+       */
+      const respuesta = await devolver(admin, { reason: 'intento de devolver una retencion' });
+
+      expect(respuesta.status).toBe(409);
+      expect(respuesta.body.code).toBe('PAYMENT_NOT_REFUNDABLE');
+    });
+
+    it('coordinacion NO puede devolver dinero', async () => {
+      // Que el dinero vaya en la direccion contraria no lo hace inocuo: sale
+      // de la empresa.
+      await dejarCobrado();
+
+      const respuesta = await devolver(coordinacion, { reason: 'devolucion acordada' });
+
+      expect(respuesta.status).toBe(403);
+    });
+
+    it('exige un motivo', async () => {
+      const respuesta = await devolver(admin, {});
+
+      expect(respuesta.status).toBe(400);
+    });
+
+    it('no se puede devolver mas de lo cobrado', async () => {
+      const respuesta = await devolver(admin, {
+        amountCents: 999_999,
+        reason: 'intento de devolver de mas',
+      });
+
+      expect(respuesta.status).toBe(400);
+      expect(respuesta.body.code).toBe('VALIDATION_ERROR');
+    });
+
+    it('devuelve una parte, lo apunta y deja rastro', async () => {
+      const respuesta = await devolver(admin, {
+        amountCents: 2000,
+        reason: 'el equipo no llego a salir',
+      }).expect(200);
+
+      // El detalle ya trae lo devuelto: el panel no hace una segunda peticion.
+      expect(respuesta.body.payment.amountRefundedCents).toBe(2000);
+      // Y lo cobrado NO se toca: son dos cifras distintas y las dos importan.
+      expect(respuesta.body.payment.amountCapturedCents).toBe(
+        respuesta.body.payment.amountAuthorizedCents,
+      );
+
+      const auditoria = await db.query<{
+        action: string;
+        metadata: { amountCents: number; reason: string; pending: boolean };
+      }>(
+        `SELECT action, metadata FROM audit_logs
+         WHERE "entityId" = $1 AND action = 'payment.refunded' ORDER BY "createdAt" DESC LIMIT 1`,
+        [bookingId],
+      );
+
+      expect(auditoria.rows[0]?.metadata.amountCents).toBe(2000);
+      expect(auditoria.rows[0]?.metadata.reason).toBe('el equipo no llego a salir');
+      expect(auditoria.rows[0]?.metadata.pending).toBe(false);
+    });
+
+    it('LA SEGUNDA DEVOLUCION SE SUMA A LA PRIMERA, no la pisa', async () => {
+      /*
+       * Es el fallo que mas cuesta ver: con una suma calculada en memoria en
+       * vez de un incremento en la base, dos devoluciones del mismo cobro
+       * dejarian apuntada solo la ultima y el resto del dinero se podria
+       * devolver otra vez.
+       */
+      const respuesta = await devolver(admin, {
+        amountCents: 1000,
+        reason: 'el resto acordado por telefono',
+      }).expect(200);
+
+      expect(respuesta.body.payment.amountRefundedCents).toBe(3000);
+    });
+
+    it('y el limite se mide contra lo que QUEDA, no contra lo cobrado', async () => {
+      // Quedan 500 de los 3500: pedir 1000 tiene que fallar aunque 1000 sea
+      // menos que lo cobrado.
+      const respuesta = await devolver(admin, { amountCents: 1000, reason: 'de mas' });
+
+      expect(respuesta.status).toBe(400);
+      expect(respuesta.body.code).toBe('VALIDATION_ERROR');
+    });
+
+    it('sin importe se devuelve todo lo que quede', async () => {
+      const respuesta = await devolver(admin, { reason: 'se devuelve el resto' }).expect(200);
+
+      expect(respuesta.body.payment.amountRefundedCents).toBe(
+        respuesta.body.payment.amountCapturedCents,
+      );
+    });
+
+    it('y despues ya no queda nada que devolver', async () => {
+      const respuesta = await devolver(admin, { reason: 'otra vez' });
+
+      expect(respuesta.status).toBe(409);
+      expect(respuesta.body.code).toBe('PAYMENT_NOT_REFUNDABLE');
+    });
+
+    it('la auditoria de la devolucion NO guarda credenciales del proveedor', async () => {
+      const auditoria = await db.query<{ metadata: unknown }>(
+        `SELECT metadata FROM audit_logs WHERE action = 'payment.refunded'`,
+      );
+
+      const todo = JSON.stringify(auditoria.rows);
+      expect(todo).not.toContain('pi_mock');
+      expect(todo).not.toContain('re_mock');
+    });
+
+    it('la devolucion no crea filas de pago nuevas', async () => {
+      /*
+       * Lo devuelto vive en la MISMA fila del cobro, igual que la captura y
+       * la liberacion. Una fila aparte por devolucion convertiria
+       * `payments[0]` —lo que lee el panel— en la devolucion en vez de en el
+       * deposito, y la pantalla dejaria de contar lo que paso.
+       */
+      const filas = await db.query<{ n: string }>(
+        `SELECT count(*)::text AS n FROM payments WHERE "bookingId" = $1`,
+        [bookingId],
+      );
+
+      expect(filas.rows[0]?.n).toBe('1');
+    });
+  });
+
   describe('la zona sigue cerrada por defecto', () => {
     it('las acciones tambien exigen sesion', async () => {
       const respuesta = await request(app.getHttpServer())
