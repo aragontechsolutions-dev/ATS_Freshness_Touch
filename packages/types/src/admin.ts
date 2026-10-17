@@ -182,7 +182,18 @@ export const AdminBookingDetailSchema = AdminBookingListItemSchema.extend({
     .strictObject({
       paymentId: z.uuid(),
       status: PaymentStatusSchema,
+      /**
+       * Lo cobrado.
+       *
+       * En un cobro inmediato —que es lo que es— lo autorizado y lo cobrado
+       * son la misma cifra: aqui no hay nada que capturar despues. Por eso
+       * basta una, y `refundableCents` la puede usar como lo cobrado.
+       */
       amountCents: z.int(),
+      /** Lo ya devuelto de ese cobro (etapa 3.24). */
+      amountRefundedCents: z.int(),
+      /** Una devolucion de este cobro que el banco acabo rechazando. */
+      refundFailed: z.boolean(),
       chargedAt: z.iso.datetime().nullable(),
     })
     .nullable(),
@@ -295,7 +306,22 @@ export type AdminChargeBalance = z.infer<typeof AdminChargeBalanceSchema>;
 export type AdminChargeBalanceInput = z.input<typeof AdminChargeBalanceSchema>;
 
 /**
- * DEVOLUCION DE UN DEPOSITO YA COBRADO.
+ * QUE MOVIMIENTO SE DEVUELVE.
+ *
+ * Desde la etapa 3.23 una reserva puede tener dos cobros —el deposito de 35
+ * y el saldo de 150— y son dinero distinto: el primero se cobra cuando algo
+ * sale mal, el segundo es el precio del trabajo. Devolver uno u otro son dos
+ * conversaciones distintas con el cliente, y el historico tiene que poder
+ * distinguirlas.
+ *
+ * `DEPOSIT` por defecto para no romper nada de lo que ya llamaba a esto
+ * cuando el deposito era lo unico que se podia devolver.
+ */
+export const RefundTargetSchema = z.enum(['DEPOSIT', 'BALANCE']).default('DEPOSIT');
+export type RefundTarget = z.infer<typeof RefundTargetSchema>;
+
+/**
+ * DEVOLUCION DE UN COBRO YA HECHO.
  *
  * Es la unica operacion de pago que devuelve dinero al cliente, y por eso la
  * unica donde el importe parcial es lo normal y no la excepcion: «te cobramos
@@ -306,7 +332,9 @@ export type AdminChargeBalanceInput = z.input<typeof AdminChargeBalanceSchema>;
  * NO SIRVE PARA UNA RETENCION VIVA. Esa se libera (`AdminReleaseDeposit`): no
  * ha salido dinero de ninguna cuenta y devolverlo no significaria nada.
  */
-export const AdminRefundDepositSchema = z.strictObject({
+export const AdminRefundPaymentSchema = z.strictObject({
+  /** El deposito o el saldo final. Ver `RefundTargetSchema`. */
+  target: RefundTargetSchema,
   /**
    * Importe a devolver, si es menor que lo que queda. Sin indicar, se
    * devuelve todo lo pendiente. Nunca puede superarlo: el servidor lo
@@ -320,5 +348,5 @@ export const AdminRefundDepositSchema = z.strictObject({
    */
   reason: z.string().trim().min(3).max(500),
 });
-export type AdminRefundDeposit = z.infer<typeof AdminRefundDepositSchema>;
-export type AdminRefundDepositInput = z.input<typeof AdminRefundDepositSchema>;
+export type AdminRefundPayment = z.infer<typeof AdminRefundPaymentSchema>;
+export type AdminRefundPaymentInput = z.input<typeof AdminRefundPaymentSchema>;

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   allowedTransitions,
@@ -14,7 +14,7 @@ import {
   captureDeposit,
   changeBookingStatus,
   chargeBalance,
-  refundDeposit,
+  refundPayment,
   releaseDeposit,
 } from '../lib/api';
 import { useToast } from './ToastProvider';
@@ -25,7 +25,7 @@ import { formatCents } from '../lib/format';
 /** Estados que exigen explicar por qué: son los que el cliente puede discutir. */
 const NEEDS_REASON: BookingStatus[] = ['CANCELLED', 'NO_SHOW'];
 
-type Accion = BookingStatus | 'capture' | 'release' | 'refund' | 'charge';
+type Accion = BookingStatus | 'capture' | 'release' | 'refund' | 'refundBalance' | 'charge';
 
 interface BookingActionsProps {
   booking: AdminBookingDetail;
@@ -61,13 +61,6 @@ export function BookingActions({
   const toast = useToast();
   const [pending, setPending] = useState<Accion | null>(null);
   const [reason, setReason] = useState('');
-  /*
-   * EL IMPORTE A DEVOLVER SE TECLEA EN DOLARES, igual que en la pantalla de
-   * tarifas y por lo mismo: nadie piensa en centavos, y un cero de mas en un
-   * campo de centavos es una devolucion diez veces mayor que nadie revisa.
-   * Vacio significa «todo lo que quede», que es el caso mas habitual.
-   */
-  const [refundAmount, setRefundAmount] = useState('');
 
   const transiciones = allowedTransitions(booking.status);
   // Solo administración mueve dinero: quien puede cambiar una cita no tiene
@@ -80,6 +73,19 @@ export function BookingActions({
    * ofrecer algo que la API va a negar.
    */
   const devolvible = booking.payment ? refundableCents(booking.payment) : 0;
+  /*
+   * LO DEVOLVIBLE DEL SALDO (etapa 3.24). Un cobro final es inmediato, no
+   * una retencion: lo autorizado y lo cobrado son la misma cifra, asi que
+   * `amountCents` vale como lo cobrado. El servidor lo vuelve a comprobar
+   * contra la fila de verdad.
+   */
+  const devolvibleSaldo = booking.finalCharge
+    ? refundableCents({
+        status: booking.finalCharge.status,
+        amountCapturedCents: booking.finalCharge.amountCents,
+        amountRefundedCents: booking.finalCharge.amountRefundedCents,
+      })
+    : 0;
 
   /*
    * EL SALDO DEL TRABAJO TERMINADO (etapa 3.23). Son los 150 dolares de una
@@ -98,10 +104,9 @@ export function BookingActions({
 
     try {
       onUpdated(await llamada());
-      // Los dos campos se vacian SOLO si la accion salio bien: tras un fallo,
-      // quien lo intento sigue teniendo delante lo que habia escrito.
+      // El motivo se vacia SOLO si la accion salio bien: tras un fallo, quien
+      // lo intento sigue teniendo delante lo que habia escrito.
       setReason('');
-      setRefundAmount('');
       toast.success(claveDeExito);
     } catch (error) {
       // Un 403 aquí puede ser "tu rol no llega", no solo sesión perdida: solo
@@ -117,6 +122,7 @@ export function BookingActions({
   };
 
   const puedeDevolver = puedeTocarDinero && devolvible > 0;
+  const puedeDevolverSaldo = puedeTocarDinero && devolvibleSaldo > 0;
   /*
    * Solo con el trabajo TERMINADO: cobrar antes convierte cualquier
    * incidencia en una devolucion, que es mas cara y mas lenta que no haber
@@ -127,6 +133,7 @@ export function BookingActions({
     transiciones.length === 0 &&
     !(puedeTocarDinero && retencionViva) &&
     !puedeDevolver &&
+    !puedeDevolverSaldo &&
     !puedeCobrarSaldo;
   if (nada) {
     return (
@@ -139,15 +146,8 @@ export function BookingActions({
   const exigeMotivo =
     transiciones.some((estado) => NEEDS_REASON.includes(estado)) ||
     (puedeTocarDinero && retencionViva) ||
-    puedeDevolver;
-
-  /*
-   * Lo tecleado, en centavos. `null` si no es un importe o si no cabe en lo
-   * que queda: el boton se apaga y dice por que, en vez de dejar que el
-   * servidor rechace una peticion que ya se sabia mala. La conversion vive
-   * en `lib/devolucion` para poder probarla sin montar la pantalla.
-   */
-  const importeDevolucion = centavosADevolver(refundAmount, devolvible);
+    puedeDevolver ||
+    puedeDevolverSaldo;
 
   return (
     <section className="ft-card space-y-4 p-5">
@@ -284,63 +284,151 @@ export function BookingActions({
 
       {/* ------------------------ Devolver lo cobrado ------------------------ */}
       {puedeDevolver && (
-        <div className="space-y-2 border-t border-slate-200 pt-4 dark:border-night-600">
-          <p className="text-xs text-slate-600 dark:text-slate-400">
-            {t('admin.refundAvailable', { amount: formatCents(devolvible, locale) })}
-          </p>
+        <BloqueDevolucion
+          id="deposito"
+          etiqueta={t('admin.refundDeposit')}
+          disponible={devolvible}
+          locale={locale}
+          accion="refund"
+          pending={pending}
+          motivo={reason}
+          onDevolver={(centavos) =>
+            void ejecutar(
+              'refund',
+              () =>
+                refundPayment(booking.bookingId, {
+                  target: 'DEPOSIT',
+                  amountCents: centavos,
+                  reason: reason.trim(),
+                }),
+              'admin.toast.depositRefunded',
+            )
+          }
+        />
+      )}
 
-          <div className="flex flex-wrap items-end gap-2">
-            <div className="w-40">
-              <label className="ft-label" htmlFor="importe-devolucion">
-                {t('admin.refundAmount')}
-              </label>
-              <input
-                id="importe-devolucion"
-                className="ft-input"
-                type="number"
-                inputMode="decimal"
-                min={0}
-                step="0.01"
-                placeholder={t('admin.refundAmountPlaceholder')}
-                value={refundAmount}
-                onChange={(event) => setRefundAmount(event.target.value)}
-              />
-            </div>
-
-            <button
-              type="button"
-              className="ft-btn-ghost"
-              disabled={
-                pending !== null || reason.trim().length === 0 || importeDevolucion === null
-              }
-              title={
-                importeDevolucion === null
-                  ? t('admin.refundTooLarge', { amount: formatCents(devolvible, locale) })
-                  : reason.trim().length === 0
-                    ? t('admin.reasonRequired')
-                    : undefined
-              }
-              onClick={() => {
-                if (importeDevolucion === null) return;
-                void ejecutar(
-                  'refund',
-                  () =>
-                    refundDeposit(booking.bookingId, {
-                      amountCents: importeDevolucion,
-                      reason: reason.trim(),
-                    }),
-                  'admin.toast.depositRefunded',
-                );
-              }}
-            >
-              {pending === 'refund' && <SpinnerIcon className="h-4 w-4" />}
-              {pending === 'refund' ? t('admin.working') : t('admin.refundDeposit')}
-            </button>
-          </div>
-
-          <p className="text-xs text-slate-500 dark:text-slate-400">{t('admin.refundHelp')}</p>
-        </div>
+      {/*
+       * Y EL SALDO, QUE ES OTRO DINERO (etapa 3.24). Son dos conversaciones
+       * distintas con el cliente —«te devolvemos el viaje» no es «te
+       * devolvemos la limpieza»— y por eso dos bloques y dos acciones en la
+       * auditoria, no un desplegable.
+       */}
+      {puedeDevolverSaldo && (
+        <BloqueDevolucion
+          id="saldo"
+          etiqueta={t('admin.refundBalance')}
+          disponible={devolvibleSaldo}
+          locale={locale}
+          accion="refundBalance"
+          pending={pending}
+          motivo={reason}
+          onDevolver={(centavos) =>
+            void ejecutar(
+              'refundBalance',
+              () =>
+                refundPayment(booking.bookingId, {
+                  target: 'BALANCE',
+                  amountCents: centavos,
+                  reason: reason.trim(),
+                }),
+              'admin.toast.balanceRefunded',
+            )
+          }
+        />
       )}
     </section>
+  );
+}
+
+/**
+ * UN BLOQUE DE DEVOLUCION, que se usa para el deposito y para el saldo.
+ *
+ * Tiene su propio importe tecleado a proposito: son dos devoluciones
+ * distintas y compartir el campo haria que lo escrito para una apareciera en
+ * la otra, que con dinero es justo lo que no puede pasar.
+ *
+ * SE TECLEA EN DOLARES, igual que en la pantalla de tarifas: nadie piensa en
+ * centavos, y un cero de mas en un campo de centavos es una devolucion diez
+ * veces mayor que nadie revisa. Vacio significa «todo lo que quede».
+ */
+function BloqueDevolucion({
+  id,
+  etiqueta,
+  disponible,
+  locale,
+  accion,
+  pending,
+  motivo,
+  onDevolver,
+}: {
+  id: string;
+  etiqueta: string;
+  disponible: number;
+  locale: Locale;
+  accion: Accion;
+  pending: Accion | null;
+  motivo: string;
+  onDevolver: (centavos: number) => void;
+}) {
+  const { t } = useTranslation();
+  const [importe, setImporte] = useState('');
+
+  /*
+   * Al cambiar lo disponible —es decir, en cuanto la devolucion sale bien—
+   * el campo se vacia. Dejarlo escrito invitaria a pulsar otra vez y volver
+   * a devolver el mismo importe.
+   */
+  useEffect(() => setImporte(''), [disponible]);
+
+  const centavos = centavosADevolver(importe, disponible);
+  const sinMotivo = motivo.trim().length === 0;
+
+  return (
+    <div className="space-y-2 border-t border-slate-200 pt-4 dark:border-night-600">
+      <p className="text-xs text-slate-600 dark:text-slate-400">
+        {t('admin.refundAvailable', { amount: formatCents(disponible, locale) })}
+      </p>
+
+      <div className="flex flex-wrap items-end gap-2">
+        <div className="w-40">
+          <label className="ft-label" htmlFor={`importe-devolucion-${id}`}>
+            {t('admin.refundAmount')}
+          </label>
+          <input
+            id={`importe-devolucion-${id}`}
+            className="ft-input"
+            type="number"
+            inputMode="decimal"
+            min={0}
+            step="0.01"
+            placeholder={t('admin.refundAmountPlaceholder')}
+            value={importe}
+            onChange={(event) => setImporte(event.target.value)}
+          />
+        </div>
+
+        <button
+          type="button"
+          className="ft-btn-ghost"
+          disabled={pending !== null || sinMotivo || centavos === null}
+          title={
+            centavos === null
+              ? t('admin.refundTooLarge', { amount: formatCents(disponible, locale) })
+              : sinMotivo
+                ? t('admin.reasonRequired')
+                : undefined
+          }
+          onClick={() => {
+            if (centavos === null) return;
+            onDevolver(centavos);
+          }}
+        >
+          {pending === accion && <SpinnerIcon className="h-4 w-4" />}
+          {pending === accion ? t('admin.working') : etiqueta}
+        </button>
+      </div>
+
+      <p className="text-xs text-slate-500 dark:text-slate-400">{t('admin.refundHelp')}</p>
+    </div>
   );
 }

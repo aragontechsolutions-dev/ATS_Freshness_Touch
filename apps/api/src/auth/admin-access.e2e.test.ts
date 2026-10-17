@@ -1045,6 +1045,103 @@ describe('acciones sobre la reserva', () => {
     });
   });
 
+  /**
+   * DEVOLVER EL SALDO, NO SOLO EL DEPOSITO (etapa 3.24)
+   * ===================================================
+   * Hasta aqui la devolucion solo miraba la retencion. Con el saldo ya
+   * cobrado —que es la mayor parte del importe— eso dejaba a administracion
+   * entrando en el panel del proveedor para lo que mas se discute: «me
+   * cobraste 150 por una limpieza que no quedo bien».
+   *
+   * Estas pruebas corren DESPUES de las del cobro, asi que la reserva llega
+   * aqui con su saldo cobrado.
+   */
+  describe('devolver el saldo cobrado', () => {
+    const devolverSaldo = (cuerpo: Record<string, unknown>) =>
+      request(app.getHttpServer())
+        .post(`/api/v1/admin/bookings/${bookingId}/payment/refund`)
+        .set('authorization', `Bearer ${admin}`)
+        .send({ target: 'BALANCE', ...cuerpo });
+
+    const saldo = async (): Promise<{ amount: number; refunded: number }> => {
+      const fila = await db.query<{ amountAuthorizedCents: number; amountRefundedCents: number }>(
+        `SELECT "amountAuthorizedCents", "amountRefundedCents" FROM payments
+         WHERE "bookingId" = $1 AND kind = 'FINAL_CHARGE'`,
+        [bookingId],
+      );
+      return {
+        amount: fila.rows[0]?.amountAuthorizedCents ?? -1,
+        refunded: fila.rows[0]?.amountRefundedCents ?? -1,
+      };
+    };
+
+    it('devuelve una parte del saldo y lo apunta en SU movimiento', async () => {
+      const respuesta = await devolverSaldo({
+        amountCents: 3000,
+        reason: 'la limpieza no quedo bien y se acordo un descuento',
+      }).expect(200);
+
+      expect(respuesta.body.finalCharge.amountRefundedCents).toBe(3000);
+      // Y el deposito no se toca: son dos movimientos distintos.
+      expect(respuesta.body.payment.amountRefundedCents).not.toBe(3000);
+      expect((await saldo()).refunded).toBe(3000);
+    });
+
+    it('queda con accion propia en la auditoria, distinta de la del deposito', async () => {
+      /*
+       * Devolver el viaje y devolver la limpieza son dos conversaciones
+       * distintas, y a fin de mes se preguntan por separado. Con una sola
+       * accion habria que leer importes para distinguirlas.
+       */
+      const filas = await db.query<{ action: string; metadata: { amountCents: number } }>(
+        `SELECT action, metadata FROM audit_logs
+         WHERE "entityId" = $1 AND action = 'payment.balance_refunded'`,
+        [bookingId],
+      );
+
+      expect(filas.rows).toHaveLength(1);
+      expect(filas.rows[0]?.metadata.amountCents).toBe(3000);
+    });
+
+    it('no se puede devolver mas de lo que queda del saldo', async () => {
+      const respuesta = await devolverSaldo({ amountCents: 999_999, reason: 'de mas' });
+
+      expect(respuesta.status).toBe(400);
+      expect(respuesta.body.code).toBe('VALIDATION_ERROR');
+    });
+
+    it('sin importe se devuelve el resto, y despues ya no queda nada', async () => {
+      const respuesta = await devolverSaldo({ reason: 'se devuelve el resto' }).expect(200);
+
+      const estado = await saldo();
+      expect(respuesta.body.finalCharge.amountRefundedCents).toBe(estado.amount);
+
+      const otraVez = await devolverSaldo({ reason: 'otra vez' });
+      expect(otraVez.status).toBe(409);
+      expect(otraVez.body.code).toBe('PAYMENT_NOT_REFUNDABLE');
+    });
+
+    it('coordinacion NO puede devolver el saldo', async () => {
+      const respuesta = await request(app.getHttpServer())
+        .post(`/api/v1/admin/bookings/${bookingId}/payment/refund`)
+        .set('authorization', `Bearer ${coordinacion}`)
+        .send({ target: 'BALANCE', reason: 'devolucion acordada' });
+
+      expect(respuesta.status).toBe(403);
+    });
+
+    it('un destino que no existe se rechaza', async () => {
+      // El contrato es estricto: ni un tercer movimiento inventado ni un
+      // campo de mas.
+      const respuesta = await request(app.getHttpServer())
+        .post(`/api/v1/admin/bookings/${bookingId}/payment/refund`)
+        .set('authorization', `Bearer ${admin}`)
+        .send({ target: 'TIP', reason: 'inventado' });
+
+      expect(respuesta.status).toBe(400);
+    });
+  });
+
   describe('la zona sigue cerrada por defecto', () => {
     it('las acciones tambien exigen sesion', async () => {
       const respuesta = await request(app.getHttpServer())

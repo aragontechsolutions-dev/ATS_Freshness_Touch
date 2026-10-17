@@ -20,7 +20,7 @@ import {
   AdminBookingQuerySchema,
   AdminCaptureDepositSchema,
   AdminChargeBalanceSchema,
-  AdminRefundDepositSchema,
+  AdminRefundPaymentSchema,
   AdminReleaseDepositSchema,
   AdminStatusChangeSchema,
   FieldAdjustmentDecisionSchema,
@@ -30,7 +30,7 @@ import {
   type AdminBookingQuery,
   type AdminCaptureDeposit,
   type AdminChargeBalance,
-  type AdminRefundDeposit,
+  type AdminRefundPayment,
   type AdminReleaseDeposit,
   type AdminStaffList,
   type AdminStatusChange,
@@ -232,18 +232,21 @@ export class BookingActionsController {
    * verdad. Que la direccion sea la contraria no lo hace inocuo —el dinero
    * sale de la empresa— y la pregunta de dentro de tres meses es la misma:
    * quien lo autorizo y por que.
+   *
+   * El cuerpo dice QUE se devuelve: el deposito o el saldo final. Sin
+   * indicarlo, el deposito, que es lo que habia antes de la etapa 3.24.
    */
   @Post('payment/refund')
   @HttpCode(HttpStatus.OK)
   @Roles('ADMIN')
   async refundDeposit(
     @Param('bookingId', new ParseUUIDPipe({ version: '4' })) bookingId: string,
-    @Body(new ZodValidationPipe<AdminRefundDeposit>(AdminRefundDepositSchema))
-    body: AdminRefundDeposit,
+    @Body(new ZodValidationPipe<AdminRefundPayment>(AdminRefundPaymentSchema))
+    body: AdminRefundPayment,
     @CurrentStaff() staff: AuthenticatedStaff,
     @Req() request: Request,
   ): Promise<AdminBookingDetail> {
-    await this.actions.refundDeposit(bookingId, body, staff, request.ip ?? null);
+    await this.actions.refundPayment(bookingId, body, staff, request.ip ?? null);
     return this.bookings.detail(bookingId);
   }
 

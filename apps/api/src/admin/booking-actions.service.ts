@@ -11,7 +11,7 @@ import {
   chargeableBalanceCents,
   refundableCents,
   type AdminCaptureDeposit,
-  type AdminRefundDeposit,
+  type AdminRefundPayment,
   type AdminReleaseDeposit,
   type AdminStatusChange,
   type AuthenticatedStaff,
@@ -389,14 +389,24 @@ export class BookingActionsService {
    * EL IMPORTE SE COMPRUEBA CONTRA LO QUE QUEDA, no contra lo cobrado: con
    * dos devoluciones parciales de 20 sobre un cobro de 35, la segunda tiene
    * que fallar aunque 20 sea menor que 35.
+   *
+   * DOS COBROS DISTINTOS DESDE LA ETAPA 3.24: el depósito y el saldo final.
+   * Lo único que cambia entre ellos es sobre qué fila se opera y con qué
+   * acción queda auditado; las reglas —lo que queda, el motivo obligatorio,
+   * que un rechazo no se apunta— son las mismas para los dos, y por eso es
+   * un método y no dos.
    */
-  async refundDeposit(
+  async refundPayment(
     bookingId: string,
-    request: AdminRefundDeposit,
+    request: AdminRefundPayment,
     staff: AuthenticatedStaff,
     ipAddress: string | null,
   ): Promise<void> {
-    const pago = await this.findRefundablePayment(bookingId);
+    const esSaldo = request.target === 'BALANCE';
+    const pago = await this.findRefundablePayment(
+      bookingId,
+      esSaldo ? 'FINAL_CHARGE' : 'DEPOSIT_HOLD',
+    );
     const importe = request.amountCents ?? pago.refundableCents;
 
     if (importe > pago.refundableCents) {
@@ -455,7 +465,7 @@ export class BookingActionsService {
         {
           staff,
           surface: 'PANEL',
-          action: 'payment.refunded',
+          action: esSaldo ? 'payment.balance_refunded' : 'payment.refunded',
           entityType: 'booking',
           entityId: bookingId,
           /*
@@ -537,7 +547,10 @@ export class BookingActionsService {
    * compartido: el panel apaga el botón con la misma función con la que el
    * servidor rechaza la petición, así que no pueden discrepar.
    */
-  private async findRefundablePayment(bookingId: string): Promise<{
+  private async findRefundablePayment(
+    bookingId: string,
+    kind: 'DEPOSIT_HOLD' | 'FINAL_CHARGE',
+  ): Promise<{
     id: string;
     providerPaymentIntentId: string;
     bookingReference: string;
@@ -545,7 +558,7 @@ export class BookingActionsService {
     refundableCents: number;
   }> {
     const pago = await this.prisma.db.payment.findFirst({
-      where: { bookingId, kind: 'DEPOSIT_HOLD' },
+      where: { bookingId, kind },
       orderBy: { createdAt: 'desc' },
       select: {
         id: true,
@@ -563,10 +576,10 @@ export class BookingActionsService {
 
     if (pendiente <= 0) {
       /*
-       * Dos situaciones distintas con la misma respuesta: no se cobró nada
-       * —la retención sigue viva, o se liberó— o ya se devolvió entero. El
-       * texto del panel las nombra a las dos, porque quien lo lee necesita
-       * saber cuál de las dos le ha pasado.
+       * Tres situaciones distintas con la misma respuesta: no se cobró nada
+       * —la retención sigue viva, o se liberó—, ya se devolvió entero, o el
+       * cobro del saldo no llegó a salir bien. El texto del panel las
+       * nombra, porque quien lo lee necesita saber cuál le ha pasado.
        */
       throw new ConflictException({
         code: API_ERROR_CODES.PAYMENT_NOT_REFUNDABLE,
