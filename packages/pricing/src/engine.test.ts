@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { QuoteRequest } from '@freshness/types';
 import { calculateQuote, type QuoteContext } from './engine';
-import { defaultPricingConfig } from './config';
+import { defaultPricingConfig, type PricingConfig } from './config';
 
 const NOW = new Date('2026-09-20T12:00:00.000Z');
 const QUOTE_ID = '11111111-2222-4333-8444-555555555555';
@@ -39,6 +39,32 @@ function buildContext(miles: number, overrides: Partial<QuoteContext> = {}): Quo
     ...overrides,
   };
 }
+
+/**
+ * UNA CONFIGURACION CON BANDA INTERMEDIA, Y POR QUE HACE FALTA.
+ *
+ * El area de partida tiene DOS zonas: A hasta 35 millas —que es tambien el
+ * radio sin recargo— y C hasta 325 sin precio automatico. Con esas dos, el
+ * recargo por milla NO SE COBRA NUNCA: donde hay precio automatico no hay
+ * millas de exceso, y donde las hay no hay precio que recargar.
+ *
+ * No es un fallo del motor: es la decision comercial de hoy. Pero el
+ * recargo por milla sigue siendo codigo vivo, y basta que el panel suba la
+ * zona A o anada una banda intermedia con precio automatico para que se
+ * aplique. Las pruebas del traslado usan esta configuracion explicita en
+ * vez de la de partida para que no mientan en ninguna de las dos
+ * direcciones: lo que cobra el negocio hoy esta mas abajo, en «las dos
+ * bandas del area de partida».
+ */
+const CON_BANDA_INTERMEDIA: PricingConfig = {
+  ...defaultPricingConfig,
+  zones: [
+    { code: 'A', maxMiles: 35, serviceable: true, instantQuote: true },
+    { code: 'B', maxMiles: 60, serviceable: true, instantQuote: true },
+    { code: 'C', maxMiles: 325, serviceable: true, instantQuote: false },
+    { code: 'OUT_OF_RANGE', maxMiles: null, serviceable: false, instantQuote: false },
+  ],
+};
 
 describe('calculateQuote - que datos entran y cuales no', () => {
   it('la linea del servicio no nombra habitaciones ni banos', () => {
@@ -342,7 +368,14 @@ describe('calculateQuote - traslado y deposito', () => {
   });
 
   it('mas alla del radio se cobran las millas que sobran, ida y vuelta', () => {
-    const quote = calculateQuote(buildRequest(), buildContext(45));
+    /*
+     * Con banda intermedia: hoy, a 45 millas, no hay precio automatico y no
+     * hay nada que recargar. Ver `CON_BANDA_INTERMEDIA`, arriba.
+     */
+    const quote = calculateQuote(
+      buildRequest(),
+      buildContext(45, { config: CON_BANDA_INTERMEDIA }),
+    );
 
     // 10 millas de exceso, ida y vuelta, a la tarifa del IRS de 2026.
     expect(quote.distance.zone).toBe('B');
@@ -360,7 +393,11 @@ describe('calculateQuote - traslado y deposito', () => {
      * el precio y se ve sumado.
      */
     for (const millas of [5, 30, 45, 58]) {
-      expect(calculateQuote(buildRequest(), buildContext(millas)).deposit.amountCents).toBe(3500);
+      const quote = calculateQuote(
+        buildRequest(),
+        buildContext(millas, { config: CON_BANDA_INTERMEDIA }),
+      );
+      expect(quote.deposit.amountCents).toBe(3500);
     }
   });
 
@@ -393,7 +430,10 @@ describe('calculateQuote - traslado y deposito', () => {
   });
 
   it('el saldo pendiente es siempre total menos deposito', () => {
-    const quote = calculateQuote(buildRequest(), buildContext(45));
+    const quote = calculateQuote(
+      buildRequest(),
+      buildContext(45, { config: CON_BANDA_INTERMEDIA }),
+    );
     expect(quote.balanceDueAtServiceCents).toBe(
       quote.totals.totalCents - quote.deposit.amountCents,
     );
@@ -434,17 +474,44 @@ describe('calculateQuote - revision manual', () => {
   });
 
   /*
-   * TRES BANDAS, no cinco anillos: dentro del radio libre, con traslado, y
-   * el resto del estado sin precio automatico.
+   * DOS BANDAS, no tres: dentro del radio libre con precio automatico, y el
+   * resto del estado atendido pero a consultar.
+   *
+   * ESTA ES LA PRUEBA QUE DICE LO QUE COBRA EL NEGOCIO HOY, y existe por lo
+   * que costo no tenerla: el archivo de tarifas declaraba una zona B que el
+   * area guardada no tiene, y leyendolo se concluyo que una casa a 47
+   * millas recibia precio automatico. No lo recibe. A 36 millas el
+   * cotizador ya dice «te llamamos».
    */
-  it('las tres bandas caen donde deben', () => {
+  it('las dos bandas del area de partida caen donde deben', () => {
     expect(calculateQuote(buildRequest(), buildContext(10)).distance.zone).toBe('A');
     expect(calculateQuote(buildRequest(), buildContext(35)).distance.zone).toBe('A');
-    expect(calculateQuote(buildRequest(), buildContext(36)).distance.zone).toBe('B');
-    expect(calculateQuote(buildRequest(), buildContext(60)).distance.zone).toBe('B');
-    expect(calculateQuote(buildRequest(), buildContext(61)).distance.zone).toBe('C');
+    expect(calculateQuote(buildRequest(), buildContext(36)).distance.zone).toBe('C');
+    expect(calculateQuote(buildRequest(), buildContext(325)).distance.zone).toBe('C');
+    expect(calculateQuote(buildRequest(), buildContext(326)).distance.zone).toBe('OUT_OF_RANGE');
 
-    const conTraslado = calculateQuote(buildRequest(), buildContext(55));
+    // Una milla fuera del radio no es un recargo: es una llamada.
+    const justoFuera = calculateQuote(buildRequest(), buildContext(36));
+    expect(justoFuera.manualReview.reasonKeys).toContain('quote.review.farZone');
+    expect(justoFuera.totals.totalCents).toBe(0);
+    expect(justoFuera.totals.surchargesCents).toBe(0);
+  });
+
+  /*
+   * Y TRES SI EL PANEL ANADE LA BANDA INTERMEDIA. El motor no lleva ninguna
+   * zona escrita dentro: recorre las que le pasan, y por eso cambiar el area
+   * desde el panel no exige desplegar.
+   */
+  it('con una banda intermedia el precio automatico llega mas lejos, con traslado', () => {
+    const enBanda = (millas: number): ReturnType<typeof calculateQuote> =>
+      calculateQuote(buildRequest(), buildContext(millas, { config: CON_BANDA_INTERMEDIA }));
+
+    expect(enBanda(35).distance.zone).toBe('A');
+    expect(enBanda(36).distance.zone).toBe('B');
+    expect(enBanda(60).distance.zone).toBe('B');
+    expect(enBanda(61).distance.zone).toBe('C');
+
+    const conTraslado = enBanda(55);
     expect(conTraslado.totals.surchargesCents).toBeGreaterThan(0);
     expect(conTraslado.manualReview.reasonKeys).not.toContain('quote.review.farZone');
   });

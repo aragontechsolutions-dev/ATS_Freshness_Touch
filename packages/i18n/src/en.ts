@@ -266,6 +266,7 @@ export const en = {
       statusChanged: 'Booking updated.',
       depositCaptured: 'Deposit charged.',
       depositReleased: 'Hold released.',
+      depositRefunded: 'Refunded. It can take a few days to show on the statement.',
       teamSaved: 'Team saved.',
       staffSaved: 'Staff record saved.',
       adjustmentApplied: 'Charged. The booking now says what the team found.',
@@ -320,6 +321,15 @@ export const en = {
     releaseDeposit: 'Release the hold',
     depositHelp:
       'Charge it only if the customer cancelled once the team was on the way or was not home. Otherwise release it.',
+
+    /* --- Devolver lo ya cobrado (etapa 3.21) --- */
+    refundAvailable: '{{amount}} was charged and can still be refunded.',
+    refundAmount: 'Refund ($)',
+    refundAmountPlaceholder: 'All of it',
+    refundDeposit: 'Refund',
+    refundTooLarge: 'At most {{amount}} can be refunded.',
+    refundHelp:
+      'This sends money back to the card. Leave the amount empty to refund everything that is left. It cannot be undone, and the bank can take a few days to show it.',
     action: {
       CONFIRMED: 'Mark as confirmed',
       IN_PROGRESS: 'Team has arrived',
@@ -375,6 +385,8 @@ export const en = {
     payment: 'Payment',
     paymentStatus: 'Status',
     held: 'Held on card',
+    charged: 'Charged',
+    refunded: 'Refunded',
     card: 'Card',
     holdExpires: 'Hold expires',
     noPayment: 'No card hold was created for this booking.',
@@ -645,7 +657,16 @@ export const en = {
         'Each ring has to reach further than the one before it. Once a zone stops giving an instant price, the ones beyond it cannot give one either.',
       zoneName: 'Zone {{zone}}',
       maxMiles: 'Up to (miles)',
-      surcharge: 'Travel surcharge ($)',
+
+      /* --- Anadir y quitar zonas (etapa 3.20) --- */
+      addAfter: 'Add a zone after {{zone}}',
+      addBlocked:
+        'No zone fits here: either there is no letter left between these two, or there is no room in miles between their limits.',
+      remove: 'Remove zone {{zone}}',
+      removeBlocked:
+        'This one stays: there has to be at least one zone, and the closest one has to give an instant price.',
+      codesKept:
+        'Removing a zone does not free its letter. It is written in bookings that already exist, so the next zone you add takes the following one.',
       /*
        * Se dice lo que PASA si se desmarca, no el nombre del ajuste. «Precio
        * automatico» no le dice a nadie que el cotizador dejara de dar una
@@ -823,6 +844,8 @@ export const en = {
         reason: 'Reason',
         amountCents: 'Amount',
         totalCents: 'Booking total',
+        /* Una devolucion que el banco aun no ha reflejado en el extracto. */
+        pending: 'Still on the way',
         service: 'Service',
         zone: 'Zone',
         scheduledStart: 'Scheduled for',
@@ -961,6 +984,7 @@ export const en = {
         payment: {
           captured: 'Deposit charged',
           released: 'Hold released',
+          refunded: 'Money refunded',
         },
         staff: {
           created: 'Staff added',
@@ -1274,6 +1298,11 @@ export const en = {
     errorPaymentNotCapturable: 'There is no hold on this booking that can be charged or released.',
     errorHoldExpired: 'The card hold has expired and can no longer be charged.',
     errorCaptureTooLarge: 'You cannot charge more than the amount held.',
+    errorPaymentNotRefundable:
+      'There is nothing to refund here: either the deposit was never charged, or it has already been refunded in full.',
+    errorRefundTooLarge: 'You cannot refund more than is left of what was charged.',
+    errorRefundFailed:
+      'The payment provider turned down the refund, so nothing was recorded. Check the card in the provider dashboard before trying again.',
     errorInvalidCredentials: 'Those details are not correct.',
     errorNetwork: 'We could not reach the server. Check your connection.',
     errorGeneric: 'Something went wrong. Please try again.',

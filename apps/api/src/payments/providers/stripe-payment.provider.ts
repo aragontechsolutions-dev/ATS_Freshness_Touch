@@ -6,7 +6,9 @@ import {
   type DepositHoldRequest,
   type PaymentProvider,
   type ProviderPayment,
+  type ProviderRefund,
   type ProviderWebhookEvent,
+  type RefundRequest,
 } from '../payments.types';
 
 export interface StripeProviderOptions {
@@ -108,6 +110,44 @@ export class StripePaymentProvider implements PaymentProvider {
     }
   }
 
+  /**
+   * Devuelve dinero ya cobrado.
+   *
+   * TRES DECISIONES QUE CONVIENE NO DESHACER:
+   *
+   *   - SE MANDA `requested_by_customer` SIEMPRE. Stripe solo admite tres
+   *     motivos enlatados, y los otros dos —`duplicate` y `fraudulent`—
+   *     tienen consecuencias: marcar una devolucion como fraude alimenta sus
+   *     modelos de riesgo y puede acabar bloqueando tarjetas de clientes que
+   *     no han hecho nada. El motivo de verdad vive en nuestra auditoria.
+   *   - EL TEXTO LIBRE NO SALE DE AQUI. Puede nombrar al cliente o contar lo
+   *     que paso en su casa, y no hay ninguna razon para que eso viaje a un
+   *     tercero.
+   *   - LA CLAVE DE IDEMPOTENCIA LA PONE QUIEN LLAMA. Es lo que impide que un
+   *     reintento de red devuelva el dinero dos veces.
+   */
+  async refund(request: RefundRequest): Promise<ProviderRefund> {
+    try {
+      const refund = await this.stripe.refunds.create(
+        {
+          payment_intent: request.providerPaymentIntentId,
+          amount: request.amountCents,
+          reason: 'requested_by_customer',
+          metadata: { bookingReference: request.bookingReference },
+        },
+        { idempotencyKey: request.idempotencyKey },
+      );
+
+      return {
+        providerRefundId: refund.id,
+        amountCents: refund.amount,
+        status: mapRefundStatus(refund.status),
+      };
+    } catch (error) {
+      throw toProviderError(error, 'No se pudo devolver el deposito');
+    }
+  }
+
   parseWebhook(rawBody: Buffer, signature: string | undefined): ProviderWebhookEvent {
     if (!signature) {
       throw new WebhookSignatureError('Falta la cabecera stripe-signature');
@@ -185,6 +225,29 @@ function mapStatus(status: Stripe.PaymentIntent.Status): PaymentStatus {
       // Estado nuevo en la API de Stripe: se marca como fallido para que
       // alguien lo revise, en vez de darlo por bueno en silencio.
       return 'FAILED';
+  }
+}
+
+/**
+ * Estado de una devolucion.
+ *
+ * `pending` CUENTA COMO HECHA: con algunas tarjetas el abono tarda dias en
+ * aparecer en el extracto, pero Stripe ya se ha comprometido a el y el dinero
+ * sale de la cuenta de la empresa igual. Tratarlo como fallo llevaria a
+ * devolverlo dos veces.
+ *
+ * Un `null` —Stripe lo admite en su tipo— se trata como pendiente por lo
+ * mismo: la peticion no fallo, asi que el dinero esta en camino.
+ */
+function mapRefundStatus(status: string | null): ProviderRefund['status'] {
+  switch (status) {
+    case 'succeeded':
+      return 'SUCCEEDED';
+    case 'failed':
+    case 'canceled':
+      return 'FAILED';
+    default:
+      return 'PENDING';
   }
 }
 

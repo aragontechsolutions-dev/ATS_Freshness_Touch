@@ -110,15 +110,20 @@ Se puede fijar una tarifa propia desde el panel, y entonces esa manda.
 
 ## 4. Zonas de servicio
 
-Tres bandas, que salen de la base de datos y se editan desde el panel
+**Dos bandas**, que salen de la base de datos y se editan desde el panel
 (`docs/17-area-de-servicio.md`).
 
 | Zona           | Distancia        | ¿Se atiende? | ¿Precio automático?      |
 | -------------- | ---------------- | ------------ | ------------------------ |
 | A              | hasta 35 millas  | Sí           | Sí                       |
-| B              | hasta 60 millas  | Sí           | Sí                       |
 | C              | hasta 325 millas | Sí           | **No**: se da en persona |
 | Fuera de rango | más allá         | No           | —                        |
+
+> **No hay zona B, y a 36 millas el cotizador ya dice «te llamamos».** La B
+> eran 60 millas con precio automático y se retiró en la etapa 2.26; su código
+> no se reutiliza porque está escrito en reservas que ya existen. El panel
+> puede volver a crear una banda intermedia cuando haga falta
+> (`docs/36-zonas-que-se-anaden-y-se-quitan.md`).
 
 **Las 35 millas de la zona A son el radio sin recargo**, y tienen que
 coincidir: la frontera que el cliente nota es «me cobras el viaje o no».

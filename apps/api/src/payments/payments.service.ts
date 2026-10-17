@@ -3,7 +3,12 @@ import { createHash } from 'node:crypto';
 import type { PaymentIntent } from '@freshness/types';
 import { PrismaService } from '../database/prisma.service';
 import type { Prisma, PrismaClient } from '../generated/prisma/client';
-import { PAYMENT_PROVIDER, type PaymentProvider, type ProviderPayment } from './payments.types';
+import {
+  PAYMENT_PROVIDER,
+  type PaymentProvider,
+  type ProviderPayment,
+  type ProviderRefund,
+} from './payments.types';
 
 /** Cliente de base de datos, sea el normal o el de dentro de una transaccion. */
 type Db = PrismaClient | Prisma.TransactionClient;
@@ -118,6 +123,53 @@ export class PaymentsService {
     return resultado;
   }
 
+  /**
+   * DEVUELVE DINERO YA COBRADO, entero o en parte.
+   *
+   * LA CLAVE DE IDEMPOTENCIA ES LA PIEZA DELICADA, y por eso se construye
+   * aqui y no en el proveedor. Tiene que cumplir dos cosas que tiran en
+   * direcciones opuestas:
+   *
+   *   - UN REINTENTO NO PUEDE DEVOLVER DOS VECES. Si la peticion llego al
+   *     proveedor y la respuesta se perdio por un fallo de red, el segundo
+   *     intento tiene que recibir la MISMA devolucion, no crear otra.
+   *   - DOS DEVOLUCIONES PARCIALES DISTINTAS SI SON DOS. Devolver 10 dolares
+   *     hoy y otros 10 manana son dos operaciones legitimas del mismo cobro,
+   *     y con una clave que solo mirase (pago, importe) la segunda se
+   *     convertiria en silencio en la primera: el cliente recibiria 10 y
+   *     nuestra tabla diria 20.
+   *
+   * Lo que las distingue es CUANTO SE HABIA DEVUELTO YA. El reintento de una
+   * misma operacion ve el mismo valor —su propia escritura aun no ha
+   * ocurrido—, y la segunda devolucion ve el acumulado de la primera. Por eso
+   * entra en la clave.
+   */
+  async refund(input: {
+    providerPaymentIntentId: string;
+    bookingReference: string;
+    amountCents: number;
+    alreadyRefundedCents: number;
+  }): Promise<ProviderRefund> {
+    const resultado = await this.provider.refund({
+      providerPaymentIntentId: input.providerPaymentIntentId,
+      bookingReference: input.bookingReference,
+      amountCents: input.amountCents,
+      idempotencyKey: refundKey(
+        input.providerPaymentIntentId,
+        input.amountCents,
+        input.alreadyRefundedCents,
+      ),
+    });
+
+    // El importe y la referencia si; el identificador del movimiento no.
+    this.logger.log(
+      `Devueltos ${input.amountCents} centavos de ${input.bookingReference} ` +
+        `(proveedor: ${this.provider.name}, estado: ${resultado.status})`,
+    );
+
+    return resultado;
+  }
+
   /** Libera la retencion sin cobrar nada: el caso normal al terminar bien. */
   async release(providerPaymentIntentId: string, reason: string): Promise<ProviderPayment> {
     const resultado = await this.provider.cancel(providerPaymentIntentId, reason);
@@ -178,4 +230,15 @@ export class PaymentsService {
  */
 function idempotencyKey(bookingId: string, amountCents: number): string {
   return createHash('sha256').update(`deposit:${bookingId}:${amountCents}`).digest('hex');
+}
+
+/** La clave de una devolucion concreta. El porque, en `refund`. */
+function refundKey(
+  providerPaymentIntentId: string,
+  amountCents: number,
+  alreadyRefundedCents: number,
+): string {
+  return createHash('sha256')
+    .update(`refund:${providerPaymentIntentId}:${amountCents}:${alreadyRefundedCents}`)
+    .digest('hex');
 }

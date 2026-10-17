@@ -235,6 +235,7 @@ export const es: TranslationResources = {
       statusChanged: 'Reserva actualizada.',
       depositCaptured: 'Depósito cobrado.',
       depositReleased: 'Retención liberada.',
+      depositRefunded: 'Devuelto. Puede tardar unos días en aparecer en el extracto.',
       teamSaved: 'Equipo guardado.',
       staffSaved: 'Ficha guardada.',
       adjustmentApplied: 'Cobrado. La reserva ya dice lo que encontró el equipo.',
@@ -283,6 +284,15 @@ export const es: TranslationResources = {
     releaseDeposit: 'Liberar la retención',
     depositHelp:
       'Cóbralo solo si el cliente canceló con el equipo ya en camino o no estaba en casa. Si no, libéralo.',
+
+    /* --- Devolver lo ya cobrado (etapa 3.21) --- */
+    refundAvailable: 'Se cobraron {{amount}} y todavía se pueden devolver.',
+    refundAmount: 'Devolver ($)',
+    refundAmountPlaceholder: 'Todo',
+    refundDeposit: 'Devolver',
+    refundTooLarge: 'Como máximo se pueden devolver {{amount}}.',
+    refundHelp:
+      'Esto devuelve dinero a la tarjeta. Deja el importe vacío para devolver todo lo que quede. No se puede deshacer, y el banco puede tardar unos días en reflejarlo.',
     action: {
       CONFIRMED: 'Marcar como confirmada',
       IN_PROGRESS: 'El equipo ha llegado',
@@ -338,6 +348,8 @@ export const es: TranslationResources = {
     payment: 'Pago',
     paymentStatus: 'Estado',
     held: 'Retenido en la tarjeta',
+    charged: 'Cobrado',
+    refunded: 'Devuelto',
     card: 'Tarjeta',
     holdExpires: 'La retención caduca',
     noPayment: 'No se llegó a crear ninguna retención para esta reserva.',
@@ -602,7 +614,16 @@ export const es: TranslationResources = {
         'Cada anillo tiene que llegar más lejos que el anterior. Cuando una zona deja de dar precio automático, las siguientes tampoco pueden darlo.',
       zoneName: 'Zona {{zone}}',
       maxMiles: 'Hasta (millas)',
-      surcharge: 'Recargo por traslado ($)',
+
+      /* --- Anadir y quitar zonas (etapa 3.20) --- */
+      addAfter: 'Añadir una zona después de la {{zone}}',
+      addBlocked:
+        'Aquí no cabe ninguna zona: o no queda letra libre entre estas dos, o no hay hueco de millas entre sus límites.',
+      remove: 'Quitar la zona {{zone}}',
+      removeBlocked:
+        'Esta se queda: tiene que haber al menos una zona, y la más cercana tiene que dar precio automático.',
+      codesKept:
+        'Quitar una zona no libera su letra. Está escrita en reservas que ya existen, así que la siguiente zona que añadas tomará la que venga después.',
       /*
        * Se dice lo que PASA si se desmarca, no el nombre del ajuste. «Precio
        * automatico» no le dice a nadie que el cotizador dejara de dar una
@@ -773,6 +794,8 @@ export const es: TranslationResources = {
         email: 'Correo',
         reason: 'Motivo',
         amountCents: 'Importe',
+        /* Una devolucion que el banco aun no ha reflejado en el extracto. */
+        pending: 'Todavía en camino',
         totalCents: 'Total de la reserva',
         service: 'Servicio',
         zone: 'Zona',
@@ -913,6 +936,7 @@ export const es: TranslationResources = {
         payment: {
           captured: 'Cobró el depósito',
           released: 'Liberó la retención',
+          refunded: 'Devolvió dinero',
         },
         staff: {
           created: 'Dio de alta a una persona',
@@ -1161,6 +1185,11 @@ export const es: TranslationResources = {
     errorPaymentNotCapturable: 'Esta reserva no tiene una retención sobre la que se pueda actuar.',
     errorHoldExpired: 'La retención en la tarjeta ha caducado y ya no se puede cobrar.',
     errorCaptureTooLarge: 'No se puede cobrar más de lo que se retuvo.',
+    errorPaymentNotRefundable:
+      'Aquí no hay nada que devolver: o el depósito no se llegó a cobrar, o ya se devolvió entero.',
+    errorRefundTooLarge: 'No se puede devolver más de lo que queda de lo cobrado.',
+    errorRefundFailed:
+      'El proveedor de pago rechazó la devolución, así que no se ha apuntado nada. Revisa la tarjeta en su panel antes de volver a intentarlo.',
     errorInvalidCredentials: 'Esos datos no son correctos.',
     errorNetwork: 'No pudimos contactar con el servidor. Revisa tu conexión.',
     errorGeneric: 'Algo salió mal. Inténtalo de nuevo.',

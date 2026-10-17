@@ -279,14 +279,18 @@ El esquema lo valida: cada zona tiene que llegar más lejos que la anterior, la
 primera tiene que dar precio automático, y una vez que una zona deja de darlo
 las siguientes tampoco pueden. Subir A de 35 a 60 cumple las tres.
 
-## 13. Lo que sigue pendiente
+## 13. Lo que quedó pendiente, y dónde se resolvió
 
-**Añadir o quitar zonas desde el panel.** El formulario solo edita las filas que
-existen —el límite y la casilla de precio automático—; no hay botón de añadir.
-Para tener tres bandas de verdad (A 35 / B 60 / C 325) hace falta otra etapa.
+Esta etapa dejó dos cosas apuntadas. **Las dos están hechas**, en
+`docs/36-zonas-que-se-anaden-y-se-quitan.md`:
 
-**El array `zones` de `packages/pricing/src/config.ts` está muerto.** Declara
-A, B y C, pero los dos únicos sitios que construyen la configuración lo
-sobrescriben siempre con `serviceArea.zoneRules()`. Es lo que hizo creer
-—durante toda una sesión de diagnóstico— que existía una zona B. Quitarlo o
-alinearlo con `DEFAULT_SERVICE_AREA` es una etapa pequeña y pendiente.
+- **Añadir o quitar zonas desde el panel** (etapa 3.20). El formulario solo
+  editaba las filas que existían. Ahora cada fila tiene un botón de añadir
+  —también **en medio**, que es la única forma de recuperar la banda
+  intermedia— y uno de quitar, con las reglas del conjunto en el contrato.
+- **El array `zones` de `packages/pricing/src/config.ts` estaba muerto**
+  (etapa 3.19). Declaraba A, B y C mientras los dos únicos sitios que
+  construyen la configuración lo sobrescriben con `serviceArea.zoneRules()`.
+  Es lo que hizo creer —durante toda una sesión de diagnóstico— que existía
+  una zona B. Ahora coincide con `DEFAULT_SERVICE_AREA` y hay una prueba que
+  falla si alguien cambia uno de los dos sin el otro.

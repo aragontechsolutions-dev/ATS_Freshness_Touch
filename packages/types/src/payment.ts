@@ -32,6 +32,41 @@ export const PaymentStatusSchema = z.enum([
 ]);
 export type PaymentStatus = z.infer<typeof PaymentStatusSchema>;
 
+/**
+ * CUANTO QUEDA POR DEVOLVER DE UN MOVIMIENTO
+ * ------------------------------------------
+ * Vive en el contrato y no en la API porque LO NECESITAN LOS DOS LADOS: el
+ * servidor para rechazar una devolucion de mas, y el panel para no ofrecer un
+ * boton que va a fallar. Escrito dos veces, acabarian discrepando y el
+ * sintoma seria un boton que no hace nada.
+ *
+ * SOLO SE DEVUELVE DINERO QUE SE COBRO. Una retencion todavia viva no se
+ * devuelve: se LIBERA, que es otra operacion y otro boton. Confundirlas le
+ * costaria al cliente ver un cargo y un abono en su extracto por un dinero
+ * que nunca llego a salir de su cuenta.
+ */
+export interface RefundableAmounts {
+  status: PaymentStatus;
+  amountCapturedCents: number;
+  amountRefundedCents: number;
+}
+
+export function refundableCents(payment: RefundableAmounts): number {
+  /*
+   * `SUCCEEDED` es el estado de una retencion YA COBRADA: es el unico en el
+   * que hay dinero de la persona en la cuenta de la empresa.
+   */
+  if (payment.status !== 'SUCCEEDED') return 0;
+
+  /*
+   * El maximo con cero no es defensivo por costumbre: si una devolucion se
+   * hiciera desde el panel del proveedor, `amountRefundedCents` podria
+   * adelantar a lo cobrado, y un numero negativo aqui se convertiria en un
+   * boton que ofrece devolver menos que nada.
+   */
+  return Math.max(0, payment.amountCapturedCents - payment.amountRefundedCents);
+}
+
 /** Lo que necesita el navegador para completar el pago. */
 export const PaymentIntentSchema = z.strictObject({
   paymentId: z.uuid(),

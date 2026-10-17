@@ -19,6 +19,7 @@ import {
   AdminAssignmentsUpdateSchema,
   AdminBookingQuerySchema,
   AdminCaptureDepositSchema,
+  AdminRefundDepositSchema,
   AdminReleaseDepositSchema,
   AdminStatusChangeSchema,
   FieldAdjustmentDecisionSchema,
@@ -27,6 +28,7 @@ import {
   type AdminBookingList,
   type AdminBookingQuery,
   type AdminCaptureDeposit,
+  type AdminRefundDeposit,
   type AdminReleaseDeposit,
   type AdminStaffList,
   type AdminStatusChange,
@@ -193,6 +195,28 @@ export class BookingActionsController {
     @Req() request: Request,
   ): Promise<AdminBookingDetail> {
     await this.actions.captureDeposit(bookingId, body, staff, request.ip ?? null);
+    return this.bookings.detail(bookingId);
+  }
+
+  /**
+   * Devuelve dinero ya cobrado, entero o en parte.
+   *
+   * SOLO ADMINISTRACION, por el mismo motivo que el cobro: mueve dinero de
+   * verdad. Que la direccion sea la contraria no lo hace inocuo —el dinero
+   * sale de la empresa— y la pregunta de dentro de tres meses es la misma:
+   * quien lo autorizo y por que.
+   */
+  @Post('payment/refund')
+  @HttpCode(HttpStatus.OK)
+  @Roles('ADMIN')
+  async refundDeposit(
+    @Param('bookingId', new ParseUUIDPipe({ version: '4' })) bookingId: string,
+    @Body(new ZodValidationPipe<AdminRefundDeposit>(AdminRefundDepositSchema))
+    body: AdminRefundDeposit,
+    @CurrentStaff() staff: AuthenticatedStaff,
+    @Req() request: Request,
+  ): Promise<AdminBookingDetail> {
+    await this.actions.refundDeposit(bookingId, body, staff, request.ip ?? null);
     return this.bookings.detail(bookingId);
   }
 

@@ -31,6 +31,42 @@ export interface DepositHoldRequest {
   idempotencyKey: string;
 }
 
+/**
+ * Peticion para devolver dinero ya cobrado.
+ *
+ * NO LLEVA EL MOTIVO QUE ESCRIBIO ADMINISTRACION, y es deliberado: ese texto
+ * es libre y puede nombrar al cliente o contar lo que paso en su casa. Se
+ * queda en nuestra auditoria. Al proveedor se le manda su motivo enlatado,
+ * que es lo unico que entiende.
+ */
+export interface RefundRequest {
+  providerPaymentIntentId: string;
+  amountCents: number;
+  /** Referencia legible de la reserva, para reconciliar desde el proveedor. */
+  bookingReference: string;
+  /**
+   * Clave de idempotencia. Protege del reintento de una MISMA devolucion
+   * —un fallo de red del que no se sabe si llego— sin impedir dos
+   * devoluciones parciales distintas del mismo cobro: ver como se construye
+   * en `PaymentsService.refund`.
+   */
+  idempotencyKey: string;
+}
+
+/**
+ * Una devolucion, tal y como la deja el proveedor.
+ *
+ * `PENDING` no es un fallo: con algunas tarjetas el abono tarda dias en
+ * aparecer en el extracto, pero el proveedor YA SE HA COMPROMETIDO a el. Por
+ * eso cuenta igual que `SUCCEEDED` para nuestro registro, y solo `FAILED`
+ * deja las cosas como estaban.
+ */
+export interface ProviderRefund {
+  providerRefundId: string;
+  amountCents: number;
+  status: 'SUCCEEDED' | 'PENDING' | 'FAILED';
+}
+
 /** Estado de un movimiento tal y como lo devuelve el proveedor. */
 export interface ProviderPayment {
   providerPaymentIntentId: string;
@@ -74,6 +110,14 @@ export interface PaymentProvider {
 
   /** Libera una retencion sin cobrar nada. */
   cancel(providerPaymentIntentId: string, reason: string): Promise<ProviderPayment>;
+
+  /**
+   * Devuelve dinero YA COBRADO, entero o en parte.
+   *
+   * Es la operacion inversa de `capture`, no de `cancel`: lo que no se ha
+   * cobrado no se devuelve, se libera.
+   */
+  refund(request: RefundRequest): Promise<ProviderRefund>;
 
   /**
    * Verifica la firma del webhook y traduce el evento.

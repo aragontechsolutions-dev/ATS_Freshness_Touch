@@ -662,21 +662,39 @@ export const defaultPricingConfig: PricingConfig = {
   },
 
   /**
-   * TRES BANDAS, NO CINCO ANILLOS.
+   * ESTE ARRAY NO ES EL QUE MANDA EN PRODUCCION, Y CONVIENE SABERLO.
    *
-   * Los cinco anillos con recargo fijo desaparecen: ahora el traslado se
-   * cobra por milla (ver `TravelRule`), asi que lo unico que tienen que
-   * decidir las zonas es hasta donde se va y hasta donde el precio sale
-   * solo.
+   * ======================================================================
+   * LO QUE COSTO NO ESCRIBIR ESTA ADVERTENCIA (etapa 3.19)
+   * ======================================================================
+   * Las zonas se editan desde el panel desde la etapa 2.18, y los DOS
+   * unicos sitios que construyen una `PricingConfig` sobrescriben este
+   * campo con lo que hay guardado:
    *
-   * Los codigos que ya no se usan —D, E— NO se borran del enumerado: estan
-   * escritos en reservas que ya existen.
+   *     zones: await this.serviceArea.zoneRules()
+   *
+   * Aqui decia A (35), B (60) y C (325), y el area guardada tiene solo A y
+   * C: la B se retiro en la etapa 2.26 porque el traslado ya se cobra por
+   * milla desde las 35 y una banda intermedia no decidia nada.
+   *
+   * Durante una sesion entera de diagnostico este array hizo creer que una
+   * casa a 47 millas recibia precio automatico. No lo recibe: cae en C y el
+   * cotizador dice «te llamamos». Leer el codigo llevaba a una conclusion
+   * falsa sobre lo que cobra el negocio.
+   *
+   * Ahora COINCIDE con `DEFAULT_SERVICE_AREA`, y hay una prueba que falla
+   * si alguien cambia uno de los dos sin el otro. Lo que sigue decidiendo
+   * es el panel; esto es el valor de partida y el ultimo recurso.
+   *
+   * `OUT_OF_RANGE` si va solo aqui: no es una zona configurable, es lo que
+   * hay mas alla de la ultima, y `zoneRules()` lo anade por su cuenta.
+   *
+   * Los codigos que ya no se usan —B, D, E— NO se borran del enumerado:
+   * estan escritos en reservas que ya existen.
    */
   zones: [
-    /** Dentro del radio sin recargo. */
+    /** Dentro del radio sin recargo. Con precio automatico. */
     { code: 'A', maxMiles: 35, serviceable: true, instantQuote: true },
-    /** Se cobra el traslado, pero el precio sigue saliendo solo. */
-    { code: 'B', maxMiles: 60, serviceable: true, instantQuote: true },
     /**
      * El resto de Georgia. Se atiende, sin precio automatico: a doscientas
      * millas el dia se va en el viaje y ninguna tarifa por milla cubre eso.

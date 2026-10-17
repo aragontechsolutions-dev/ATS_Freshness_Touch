@@ -163,6 +163,88 @@ export const DEFAULT_SERVICE_AREA: ServiceAreaSettings = {
   ],
 };
 
+/**
+ * CUANTAS MILLAS MAS LLEGA UNA ZONA NUEVA ANADIDA AL FINAL.
+ *
+ * Es solo el valor con el que nace el campo, para que no aparezca vacio ni
+ * repitiendo el limite de la anterior —que seria invalido—. Se edita.
+ */
+const SALTO_AL_ANADIR_MILLAS = 50;
+
+/**
+ * LA ZONA QUE CABE DESPUES DE LA DE `index`, o `null` si no cabe ninguna.
+ *
+ * AQUI SE DECIDE SI EL BOTON DE ANADIR SE PUEDE PULSAR, y por eso devuelve
+ * la zona entera y no un si/no: la pantalla no tiene que inventar ni el
+ * codigo ni las millas, que son justo las dos cosas que las reglas del
+ * conjunto pueden rechazar.
+ *
+ * DOS SITUACIONES DISTINTAS:
+ *
+ *   - ENTRE DOS ZONAS. Hace falta un codigo libre entre ambas —con A y C,
+ *     la B— y un hueco de millas donde quepa un limite intermedio. Entre
+ *     35 y 36 millas no cabe nada, y entre A y B tampoco hay codigo.
+ *   - AL FINAL. El codigo es el siguiente sin usar, y el limite son unas
+ *     millas mas que el de la ultima, sin pasar del tope duro.
+ *
+ * EL PRECIO AUTOMATICO LO HEREDA DE LA SIGUIENTE, o queda apagado si no hay
+ * ninguna. Nunca al reves: como una vez apagado ya no vuelve a encenderse,
+ * copiar el de la anterior podria crear un conjunto invalido en el mismo
+ * momento de pulsar el boton.
+ */
+export function zoneToAddAfter(
+  zones: readonly ServiceAreaZone[],
+  index: number,
+): ServiceAreaZone | null {
+  const actual = zones[index];
+  if (actual === undefined) return null;
+
+  const siguiente = zones[index + 1];
+  const usados = new Set(zones.map((zona) => zona.code));
+
+  const desde = ZONE_ORDER.indexOf(actual.code);
+  const hasta = siguiente === undefined ? ZONE_ORDER.length : ZONE_ORDER.indexOf(siguiente.code);
+  const code = ZONE_ORDER.slice(desde + 1, hasta).find((codigo) => !usados.has(codigo));
+  if (code === undefined) return null;
+
+  const maxMiles =
+    siguiente === undefined
+      ? Math.min(MAX_ZONE_MILES, actual.maxMiles + SALTO_AL_ANADIR_MILLAS)
+      : Math.floor((actual.maxMiles + siguiente.maxMiles) / 2);
+
+  /*
+   * Si no hay hueco de millas no se anade nada. Pasa al final cuando la
+   * ultima zona ya esta en el tope duro, y en medio cuando dos limites son
+   * consecutivos: un anillo tiene que llegar mas lejos que el anterior y
+   * menos que el siguiente, y entre 35 y 36 no hay nada que valga.
+   */
+  if (maxMiles <= actual.maxMiles) return null;
+  if (siguiente !== undefined && maxMiles >= siguiente.maxMiles) return null;
+
+  return { code, maxMiles, instantQuote: siguiente?.instantQuote ?? false };
+}
+
+/**
+ * SI SE PUEDE QUITAR LA ZONA DE `index`.
+ *
+ * Dos motivos para que no:
+ *
+ *   - ES LA UNICA. Un area sin zonas no es un area: el cotizador no sabria
+ *     ni a quien atiende ni a quien no.
+ *   - ES LA PRIMERA Y LA QUE QUEDARIA NO DA PRECIO AUTOMATICO. El sitio
+ *     pediria los datos para no dar ninguna cifra a nadie, ni siquiera a
+ *     quien vive al lado.
+ *
+ * Quitar una zona NO libera su codigo: la regla de los saltos lo impide a
+ * proposito, porque ese codigo esta escrito en reservas que ya existen.
+ */
+export function canRemoveZone(zones: readonly ServiceAreaZone[], index: number): boolean {
+  if (zones[index] === undefined) return false;
+  if (zones.length <= 1) return false;
+  if (index === 0 && zones[1]?.instantQuote !== true) return false;
+  return true;
+}
+
 /** Hasta donde se llega, en millas. Lo que hay mas alla no se atiende. */
 export function serviceRadiusMiles(area: ServiceAreaSettings): number {
   return area.zones.reduce((lejos, zona) => Math.max(lejos, zona.maxMiles), 0);

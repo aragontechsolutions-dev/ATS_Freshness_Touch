@@ -185,7 +185,73 @@ sitio ahora mismo.
 
 ---
 
-## 6. La pantalla
+## 6. Cuando la fila vigente no se puede leer
+
+> Etapa 3.11.
+
+Al añadir un campo al contrato de tarifas, **la fila que ya estaba guardada
+deja de cumplirlo**: el esquema es estricto y una fila con la forma antigua no
+pasa `safeParse`. Pasó de verdad, y estuvo diez días sin que nadie lo notara.
+
+### Por qué no se notaba, y por qué importaba igual
+
+El sitio seguía dando los precios correctos: al no poder leer la fila, el
+servicio caía en las tarifas del código, que eran justamente las que la
+empresa estaba cobrando. **Nada se veía mal.**
+
+Debajo había un segundo fallo, y ese sí costaba dinero. La lectura devolvía:
+
+```ts
+version: defaultPricingConfig.version; // «2026.09.1»
+```
+
+…que en el caso real **era la versión de la fila rota**. Cada reserva quedaba
+sellada con una versión que apunta a una fila ilegible, y la promesa que el
+modelo de datos lleva desde el primer día —_«sin esto, un presupuesto antiguo
+no se puede reproducir»_— no se cumplía para ninguna de ellas. El día que un
+cliente discuta un importe, no hay con qué recalcularlo.
+
+### Qué hace ahora
+
+`PricingRatesService.leerVigente()` llama a `recuperar()`, que:
+
+1. Deja el error en el log, con la versión que no se pudo leer.
+2. Calcula una versión nueva con `nextPricingVersion`, contando las que ya
+   existen —igual que al guardar desde el panel—, así que no choca con la rota
+   ni con otra del mismo día.
+3. **Escribe una fila nueva y válida** con las tarifas del código, que son las
+   que de verdad se están cobrando.
+4. Devuelve `source: 'fallback'` en _esta_ lectura.
+
+A partir de ahí el sistema está sano: la siguiente lectura encuentra la fila
+nueva, devuelve `source: 'table'` y cada reserva vuelve a poder reproducirse.
+
+### Tres decisiones que conviene no deshacer
+
+- **Se avisa igual.** Devolver `fallback` hace sonar la alarma de la etapa
+  3.12 una vez, y el siguiente barrido manda su «[OK] resuelto». Curarse en
+  silencio sería repetir el fallo original con otro disfraz: si la empresa
+  tenía precios propios en esa fila, **acaban de perderse**, y alguien tiene
+  que enterarse.
+- **La fila nueva no lleva autor.** El panel enseña «lo cambió Fulanita el
+  martes»; poner un nombre inventado afirmaría que una persona tocó los
+  precios cuando no lo hizo nadie. Sin autor se lee como lo que es: la puso el
+  sistema. Por lo mismo **no se audita**: `audit.record` exige un actor.
+- **Si la escritura falla** —base de solo lectura, dos instancias a la vez— se
+  sigue cotizando con las tarifas del código, pero se devuelve
+  `source: 'unreadable'` y **la versión rota**, no la del código: decir que
+  hay una versión utilizable cuando no la hay es justo el fallo que esta etapa
+  cierra. La alarma sigue sonando hasta que alguien mire.
+
+### Qué pasa con las reservas selladas con la versión rota
+
+**No se arreglan solas, y no se tocan.** Una reserva guarda la versión que
+estaba vigente cuando se hizo; reescribirla sería falsear el histórico. Lo que
+cambia es que **a partir de la reparación no se crean más**.
+
+---
+
+## 7. La pantalla
 
 **Solo ADMIN, también para leer.** Quien pueda abrirla decide cuánto factura
 la empresa; y lo que hay dentro es la estructura de costes completa, que es lo
@@ -214,7 +280,7 @@ de guardar y diga cuál de las reglas se ha roto.
 
 ---
 
-## 7. La auditoría
+## 8. La auditoría
 
 Acción propia, `pricing.updated`, y no `settings.updated`. Cambiar un precio
 mueve dinero en **cada reserva posterior**: ante una reclamación la pregunta
@@ -236,9 +302,9 @@ lee nadie.
 
 ---
 
-## 8. Qué se comprueba
+## 9. Qué se comprueba
 
-**19 pruebas contra PostgreSQL real** más **18 del contrato**. Las que
+**29 pruebas contra PostgreSQL real** más **33 del contrato**. Las que
 importan, por orden:
 
 | Prueba                                                              | Qué protege                                                                                                           |
@@ -251,6 +317,12 @@ importan, por orden:
 | Un rechazo no deja ninguna versión a medias                         | Que un 400 no ensucie el historial                                                                                    |
 | El comercial sigue sin precio automático tras guardar               | Que `applyPricingRates` no toque lo que no debe                                                                       |
 | La auditoría no incluye lo que no cambió                            | Que el registro se pueda leer                                                                                         |
+| Con una fila ilegible el cotizador **sigue dando precios**          | Etapa 3.11: tumbar la página que genera ingresos por no poder leer una tabla sería un intercambio pésimo              |
+| Se escribe una versión nueva y válida, y **la rota se conserva**    | Que no queden reservas selladas con una versión que no se puede leer, sin perder la prueba de lo que pasó             |
+| La versión vigente de después **se puede volver a leer**            | La promesa entera: un presupuesto de hace tres meses se recalcula                                                     |
+| Esa lectura devuelve `fallback`, la siguiente ya `table`            | Que la alarma suene una vez y después se resuelva sola                                                                |
+| La fila nueva se guarda **sin autor**                               | Que el panel no afirme que una persona tocó los precios                                                               |
+| No se escribe una fila nueva en cada lectura                        | Sin esto, al caducar la caché cada 30 s saldrían casi tres mil versiones al día                                       |
 
 ### Comprobado en navegador
 
@@ -263,7 +335,7 @@ a llamar a la API** y nombra el campo. Cero errores de consola.
 
 ---
 
-## 9. Si mañana hay que tocar esto
+## 10. Si mañana hay que tocar esto
 
 - **No añadas un campo al formulario sin añadirlo al contrato.** El esquema es
   estricto: un campo de más se rechaza, no se ignora.

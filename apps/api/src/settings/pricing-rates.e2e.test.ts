@@ -202,6 +202,119 @@ describe('la semilla', () => {
   });
 });
 
+describe('una fila que no se puede leer (etapa 3.11)', () => {
+  /*
+   * ========================================================================
+   * EL FALLO QUE DE VERDAD COSTO CARO
+   * ========================================================================
+   * En produccion quedo una fila guardada con la forma ANTERIOR a la etapa
+   * 3.4. El contrato la rechazaba, el servicio cotizaba con las tarifas del
+   * codigo, y funcionaba tan bien que estuvo diez dias sin que nadie lo
+   * notara: los precios que veia el cliente eran los correctos.
+   *
+   * Pero debajo habia un segundo fallo. Lo que se devolvia como version era
+   * la del codigo, que en ese caso ERA LA MISMA de la fila rota. Asi que
+   * cada reserva quedaba sellada con una version que apunta a una fila
+   * ilegible, y el presupuesto de ninguna de ellas se podia reproducir. Eso
+   * es facturacion.
+   */
+
+  /** Deja guardada una fila con la forma de antes de la etapa 3.4. */
+  async function filaRota(version = '2026.09.1'): Promise<void> {
+    await db.exec(
+      `INSERT INTO pricing_tables (version, rates, "createdAt")
+       VALUES ('${version}', '{"forma":"vieja"}'::jsonb, now())`,
+    );
+    app.get(PricingRatesService).invalidate();
+  }
+
+  it('el cotizador sigue dando precios: no se cae por una fila mala', async () => {
+    // Lo primero y lo que no se negocia. Tumbar la pagina que genera
+    // ingresos por no poder leer una tabla seria un intercambio pesimo.
+    await filaRota();
+
+    const respuesta = await leer();
+
+    expect(respuesta.status).toBe(200);
+    expect(respuesta.body.rates.depositCents).toBeGreaterThan(0);
+  });
+
+  it('SE ESCRIBE UNA VERSION NUEVA Y VALIDA, no solo una linea en el log', async () => {
+    await filaRota();
+    await leer();
+
+    const filas = await db.query<{ version: string }>(
+      `SELECT version FROM pricing_tables ORDER BY "createdAt"`,
+    );
+
+    expect(filas.rows).toHaveLength(2);
+    expect(filas.rows[1]?.version).not.toBe('2026.09.1');
+  });
+
+  it('Y ESA VERSION SE PUEDE VOLVER A LEER, que es toda la promesa', async () => {
+    /*
+     * LA PRUEBA QUE JUSTIFICA LA ETAPA. Antes, la version que se devolvia
+     * apuntaba a la fila rota: una reserva sellada con ella no se podia
+     * recalcular nunca. Ahora apunta a una fila que si se lee.
+     */
+    await filaRota();
+
+    const vigente = await app.get(PricingRatesService).current();
+    const recuperada = await app.get(PricingRatesService).atVersion(vigente.version);
+
+    expect(recuperada, 'la version vigente apunta a una fila que no se puede leer').not.toBeNull();
+    expect(vigente.version).not.toBe('2026.09.1');
+  });
+
+  it('se avisa una vez, y luego el sistema queda sano', async () => {
+    /*
+     * Curarse en silencio seria repetir el fallo original con otro disfraz:
+     * si la empresa tenia precios propios en esa fila, acaban de perderse.
+     * `fallback` enciende la alarma de la etapa 3.12 una vez; la lectura
+     * siguiente ya encuentra la fila nueva y manda su «[OK] resuelto».
+     */
+    await filaRota();
+
+    const servicio = app.get(PricingRatesService);
+
+    expect((await servicio.current()).source).toBe('fallback');
+
+    servicio.invalidate();
+    expect((await servicio.current()).source).toBe('table');
+  });
+
+  it('la fila nueva se guarda SIN AUTOR, porque no la puso nadie', async () => {
+    /*
+     * El panel ensena «lo cambio Fulanita el martes». Poner aqui un nombre
+     * afirmaria que una persona toco los precios cuando no lo hizo nadie.
+     */
+    await filaRota();
+    await leer();
+
+    const filas = await db.query<{ createdBy: string | null }>(
+      `SELECT "createdBy" FROM pricing_tables ORDER BY "createdAt" DESC LIMIT 1`,
+    );
+
+    expect(filas.rows[0]?.createdBy).toBeNull();
+  });
+
+  it('y no se escribe una fila nueva en cada lectura', async () => {
+    // Sin esto, cada vez que caduca la cache de 30 segundos se anadiria una
+    // version. En un dia serian casi tres mil.
+    await filaRota();
+
+    const servicio = app.get(PricingRatesService);
+    await servicio.current();
+    servicio.invalidate();
+    await servicio.current();
+    servicio.invalidate();
+    await servicio.current();
+
+    const filas = await db.query<{ n: string }>(`SELECT count(*)::text AS n FROM pricing_tables`);
+    expect(filas.rows[0]?.n).toBe('2');
+  });
+});
+
 describe('el cambio llega al cotizador', () => {
   /*
    * ES EL PUNTO DE TODA LA ETAPA. Si las tarifas se guardan pero el precio

@@ -295,6 +295,26 @@ export function BookingDetailPage({
               label={t('admin.held')}
               value={formatCents(booking.payment.amountAuthorizedCents, locale)}
             />
+            {/*
+             * LO COBRADO Y LO DEVUELTO, cuando los hay. Hasta la etapa 3.21
+             * esta tarjeta solo decia lo RETENIDO, asi que una reserva con el
+             * deposito ya cobrado y medio devuelto se leia igual que una que
+             * no habia movido un centimo. Las dos filas aparecen solo si hay
+             * algo que contar: en el caso normal —retencion liberada— no
+             * sobran dos ceros.
+             */}
+            {booking.payment.amountCapturedCents > 0 && (
+              <Row
+                label={t('admin.charged')}
+                value={formatCents(booking.payment.amountCapturedCents, locale)}
+              />
+            )}
+            {booking.payment.amountRefundedCents > 0 && (
+              <Row
+                label={t('admin.refunded')}
+                value={formatCents(booking.payment.amountRefundedCents, locale)}
+              />
+            )}
             {booking.payment.cardLast4 && (
               <Row
                 label={t('admin.card')}

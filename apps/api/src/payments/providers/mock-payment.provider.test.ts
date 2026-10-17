@@ -103,3 +103,46 @@ describe('firma del webhook', () => {
     expect(evento.payment).toBeNull();
   });
 });
+
+describe('devoluciones (etapa 3.21)', () => {
+  const PETICION_DEVOLUCION = {
+    providerPaymentIntentId: 'pi_mock_abc',
+    bookingReference: 'FT-2026-0001',
+    amountCents: 2000,
+    idempotencyKey: 'clave',
+  };
+
+  it('devuelve el importe pedido, con identificador propio', async () => {
+    const devolucion = await provider.refund(PETICION_DEVOLUCION);
+
+    expect(devolucion.amountCents).toBe(2000);
+    expect(devolucion.status).toBe('SUCCEEDED');
+    /*
+     * `re_` y no `pi_`: una devolucion es un movimiento distinto del cobro.
+     * El simulador imita el formato del proveedor real para que el codigo
+     * que los consume no descubra diferencias al cambiar de proveedor.
+     */
+    expect(devolucion.providerRefundId).toMatch(/^re_mock_[0-9a-f]{24}$/);
+  });
+
+  it('cada devolucion tiene su propio identificador', async () => {
+    const [uno, dos] = await Promise.all([
+      provider.refund(PETICION_DEVOLUCION),
+      provider.refund(PETICION_DEVOLUCION),
+    ]);
+
+    expect(uno.providerRefundId).not.toBe(dos.providerRefundId);
+  });
+
+  it('NO LLEVA LA CUENTA de lo que ya se devolvio, y es a proposito', async () => {
+    /*
+     * El simulador no guarda estado: la fuente de verdad de cuanto se cobro
+     * y cuanto se devolvio es la tabla `payments`. Si el limite lo pusiera
+     * este objeto, se perderia al reiniciar la API y no existiria con dos
+     * instancias desplegadas, que es justo cuando hace falta.
+     */
+    const grande = await provider.refund({ ...PETICION_DEVOLUCION, amountCents: 999_999 });
+
+    expect(grande.amountCents).toBe(999_999);
+  });
+});
