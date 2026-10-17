@@ -116,6 +116,15 @@ const ACCIONES_FIJAS = [
    * pregunta de dentro de tres meses sera «quien cobro esto y cuando».
    */
   'payment.balance_charged',
+  /**
+   * SE DEVOLVIO PARTE O TODO EL SALDO COBRADO.
+   *
+   * Accion propia y no un `payment.refunded` con una etiqueta dentro, por lo
+   * mismo que el cobro: devolver el deposito de 35 y devolver el precio del
+   * trabajo son dos cosas distintas, y a fin de mes se preguntan por
+   * separado.
+   */
+  'payment.balance_refunded',
 
   /* --- Personal -------------------------------------------------------- */
   'staff.created',

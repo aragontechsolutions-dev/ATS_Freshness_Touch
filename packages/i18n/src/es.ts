@@ -236,6 +236,7 @@ export const es: TranslationResources = {
       depositCaptured: 'Depósito cobrado.',
       depositReleased: 'Retención liberada.',
       depositRefunded: 'Devuelto. Puede tardar unos días en aparecer en el extracto.',
+      balanceRefunded: 'Saldo devuelto. Puede tardar unos días en aparecer en el extracto.',
       balanceCharged: 'Saldo cobrado.',
       teamSaved: 'Equipo guardado.',
       staffSaved: 'Ficha guardada.',
@@ -290,7 +291,8 @@ export const es: TranslationResources = {
     refundAvailable: 'Se cobraron {{amount}} y todavía se pueden devolver.',
     refundAmount: 'Devolver ($)',
     refundAmountPlaceholder: 'Todo',
-    refundDeposit: 'Devolver',
+    refundDeposit: 'Devolver el depósito',
+    refundBalance: 'Devolver el saldo',
     refundTooLarge: 'Como máximo se pueden devolver {{amount}}.',
     refundHelp:
       'Esto devuelve dinero a la tarjeta. Deja el importe vacío para devolver todo lo que quede. No se puede deshacer, y el banco puede tardar unos días en reflejarlo.',
@@ -949,6 +951,7 @@ export const es: TranslationResources = {
           released: 'Liberó la retención',
           refunded: 'Devolvió dinero',
           balance_charged: 'Cobró el saldo',
+          balance_refunded: 'Devolvió el saldo',
         },
         staff: {
           created: 'Dio de alta a una persona',
@@ -1198,7 +1201,7 @@ export const es: TranslationResources = {
     errorHoldExpired: 'La retención en la tarjeta ha caducado y ya no se puede cobrar.',
     errorCaptureTooLarge: 'No se puede cobrar más de lo que se retuvo.',
     errorPaymentNotRefundable:
-      'Aquí no hay nada que devolver: o el depósito no se llegó a cobrar, o ya se devolvió entero.',
+      'Aquí no hay nada que devolver: ese dinero no se llegó a cobrar, o ya se devolvió entero.',
     errorRefundTooLarge: 'No se puede devolver más de lo que queda de lo cobrado.',
     errorBalanceNotCompleted:
       'El saldo se cobra con el trabajo terminado. Márcalo como completado primero.',

@@ -289,7 +289,7 @@ por alto: nadie debe creer que ha pagado algo.
 
 ## 8. Devolver dinero ya cobrado
 
-> Etapa 3.21.
+> Etapas 3.21 y 3.24.
 
 ### Devolver y liberar no son lo mismo, y confundirlos se nota en el extracto
 
@@ -302,6 +302,26 @@ Son dos botones distintos y miran estados distintos: liberar exige
 `REQUIRES_CAPTURE`, devolver exige `SUCCEEDED`. Si se pudiera «devolver» una
 retención viva, el cliente vería un cargo y un abono por un dinero que nunca
 salió de su cuenta, y llamaría a preguntar — con razón.
+
+### Qué se puede devolver
+
+**Los dos cobros de una reserva**, y son dinero distinto:
+
+| Movimiento                    | Qué es                                             | Cuándo se devuelve                               |
+| ----------------------------- | -------------------------------------------------- | ------------------------------------------------ |
+| **Depósito** (`DEPOSIT_HOLD`) | Los 35 $ del viaje, cobrados porque algo salió mal | Se resolvió a favor del cliente                  |
+| **Saldo** (`FINAL_CHARGE`)    | Los 150 $ del trabajo, cobrados al terminar        | La limpieza no quedó bien, un descuento acordado |
+
+La petición lleva un `target` (`DEPOSIT` por defecto, que es lo único que se
+podía devolver antes de la etapa 3.24), y cada uno queda auditado con **su
+propia acción**: `payment.refunded` y `payment.balance_refunded`. No es
+puntillismo: «te devolvemos el viaje» y «te devolvemos la limpieza» son dos
+conversaciones distintas, y a fin de mes se preguntan por separado. Con una
+sola acción habría que leer importes para distinguirlas.
+
+Las reglas son **las mismas para los dos** —el motivo obligatorio, el límite
+contra lo que queda, que un rechazo no se apunta—, y por eso es un método y
+no dos.
 
 ### Hasta dónde se puede devolver
 
@@ -389,18 +409,21 @@ clave: `sha256("refund:" + intentId + ":" + importe + ":" + yaDevuelto)`.
 conversión del importe** (`apps/admin/src/lib/devolucion.test.ts`), **3 del
 simulador** y **11 contra PostgreSQL real** (`admin-access.e2e.test.ts`):
 
-| Prueba                                                  | Qué protege                                                         |
-| ------------------------------------------------------- | ------------------------------------------------------------------- |
-| Una retención sin cobrar no se devuelve (`409`)         | Que no aparezca un abono por un dinero que no salió                 |
-| Coordinación recibe `403`                               | Quién puede devolver dinero                                         |
-| No se puede devolver más de lo cobrado (`400`)          | Lo obvio                                                            |
-| **La segunda devolución se suma, no pisa a la primera** | El fallo que más cuesta ver: dinero devolvible dos veces            |
-| El límite se mide contra lo que queda                   | Lo mismo, por el otro lado                                          |
-| Sin importe se devuelve todo lo que quede               | El caso más habitual                                                |
-| Después ya no queda nada (`409`)                        | Que no se pueda devolver en bucle                                   |
-| La auditoría no contiene `pi_mock` ni `re_mock`         | Que una credencial no acabe en una pantalla                         |
-| La devolución **no crea filas de pago nuevas**          | Que el panel siga leyendo el depósito en `payments[0]`              |
-| «12abc» y «1,5» no se interpretan a medias              | `parseFloat` daría 12 y 1: el segundo devolvería 1 $ en vez de 1,50 |
+| Prueba                                                           | Qué protege                                                         |
+| ---------------------------------------------------------------- | ------------------------------------------------------------------- |
+| Una retención sin cobrar no se devuelve (`409`)                  | Que no aparezca un abono por un dinero que no salió                 |
+| Coordinación recibe `403`                                        | Quién puede devolver dinero                                         |
+| No se puede devolver más de lo cobrado (`400`)                   | Lo obvio                                                            |
+| **La segunda devolución se suma, no pisa a la primera**          | El fallo que más cuesta ver: dinero devolvible dos veces            |
+| El límite se mide contra lo que queda                            | Lo mismo, por el otro lado                                          |
+| Sin importe se devuelve todo lo que quede                        | El caso más habitual                                                |
+| Después ya no queda nada (`409`)                                 | Que no se pueda devolver en bucle                                   |
+| La auditoría no contiene `pi_mock` ni `re_mock`                  | Que una credencial no acabe en una pantalla                         |
+| La devolución **no crea filas de pago nuevas**                   | Que el panel siga leyendo el depósito en `payments[0]`              |
+| «12abc» y «1,5» no se interpretan a medias                       | `parseFloat` daría 12 y 1: el segundo devolvería 1 $ en vez de 1,50 |
+| **El saldo se devuelve en SU movimiento, sin tocar el depósito** | Etapa 3.24: son dos cobros distintos                                |
+| El saldo queda con su propia acción en la auditoría              | Que se puedan contar por separado                                   |
+| Un destino inventado se rechaza                                  | El contrato es estricto también aquí                                |
 
 ### Lo que NO hace
 
@@ -418,6 +441,8 @@ simulador** y **11 contra PostgreSQL real** (`admin-access.e2e.test.ts`):
 - **No se entera de una devolución hecha desde el panel del proveedor.** Si
   alguien devuelve dinero desde Stripe en vez de desde aquí, nuestra tabla no
   lo sabe. Lo que sí está cubierto es el rechazo: ver §8 bis.
+- **No devuelve una propina.** `TIP` sigue en el enumerado sin usarse: no hay
+  propinas todavía.
 
 ---
 
@@ -602,10 +627,7 @@ se queda en el registro del servidor, nunca llega al navegador.
 
 ### Lo que NO hace
 
-- **No devuelve el saldo.** La devolución de la etapa 3.21 solo mira el
-  depósito (`kind: 'DEPOSIT_HOLD'`). Devolver un cobro final hay que hacerlo
-  hoy desde el panel del proveedor; extenderlo es una etapa pequeña y
-  pendiente.
+- ~~**No devuelve el saldo.**~~ Lo hace desde la etapa 3.24: ver §8.
 - **No cobra solo.** Es un botón, a propósito (ver arriba).
 - **No reclama a quien no se le pudo cobrar.** No hay recordatorios ni
   reintentos automáticos: el saldo se queda pendiente y visible en la reserva.
@@ -635,6 +657,6 @@ Honestidad sobre el alcance de las pruebas:
 | ~~Captura desde el panel~~ — hecho                 | 2.3   |
 | ~~Devolución desde el panel~~ — hecho (§8)         | 3.21  |
 | ~~Cobro del saldo final al terminar~~ — hecho (§9) | 3.23  |
-| Devolver un cobro final, no solo el depósito       | —     |
+| ~~Devolver un cobro final~~ — hecho (§8)           | 3.24  |
 | Liberar franjas cuyo `holdExpiresAt` ya venció     | 2.3   |
 | Reintentar la retención de una reserva sin pago    | 2.3   |

@@ -267,6 +267,7 @@ export const en = {
       depositCaptured: 'Deposit charged.',
       depositReleased: 'Hold released.',
       depositRefunded: 'Refunded. It can take a few days to show on the statement.',
+      balanceRefunded: 'Balance refunded. It can take a few days to show on the statement.',
       balanceCharged: 'Balance charged.',
       teamSaved: 'Team saved.',
       staffSaved: 'Staff record saved.',
@@ -327,7 +328,8 @@ export const en = {
     refundAvailable: '{{amount}} was charged and can still be refunded.',
     refundAmount: 'Refund ($)',
     refundAmountPlaceholder: 'All of it',
-    refundDeposit: 'Refund',
+    refundDeposit: 'Refund the deposit',
+    refundBalance: 'Refund the balance',
     refundTooLarge: 'At most {{amount}} can be refunded.',
     refundHelp:
       'This sends money back to the card. Leave the amount empty to refund everything that is left. It cannot be undone, and the bank can take a few days to show it.',
@@ -997,6 +999,7 @@ export const en = {
           released: 'Hold released',
           refunded: 'Money refunded',
           balance_charged: 'Balance charged',
+          balance_refunded: 'Balance refunded',
         },
         staff: {
           created: 'Staff added',
@@ -1311,7 +1314,7 @@ export const en = {
     errorHoldExpired: 'The card hold has expired and can no longer be charged.',
     errorCaptureTooLarge: 'You cannot charge more than the amount held.',
     errorPaymentNotRefundable:
-      'There is nothing to refund here: either the deposit was never charged, or it has already been refunded in full.',
+      'There is nothing to refund here: that money was never charged, or it has already been refunded in full.',
     errorRefundTooLarge: 'You cannot refund more than is left of what was charged.',
     errorBalanceNotCompleted:
       'The balance is charged once the job is finished. Mark it as completed first.',

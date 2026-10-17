@@ -21,7 +21,7 @@ import {
   type AdminAssignment,
   type AdminBookingQueryInput,
   type AdminCaptureDepositInput,
-  type AdminRefundDepositInput,
+  type AdminRefundPaymentInput,
   type AdminReleaseDepositInput,
   type AdminBusinessSettings,
   type AdminStaffDirectory,
@@ -283,17 +283,17 @@ export function chargeBalance(bookingId: string): Promise<AdminBookingDetail> {
 /**
  * Devuelve dinero YA COBRADO, entero o en parte. Solo administracion.
  *
- * Sin `amountCents` se devuelve todo lo que quede pendiente.
+ * `target` dice que movimiento: el deposito o el saldo final. Sin
+ * `amountCents` se devuelve todo lo que quede de ese movimiento.
  */
-export function refundDeposit(
+export function refundPayment(
   bookingId: string,
-  body: AdminRefundDepositInput,
+  body: AdminRefundPaymentInput,
 ): Promise<AdminBookingDetail> {
-  return request(
-    `/admin/bookings/${bookingId}/payment/refund`,
-    parseDetail('devolucion del deposito'),
-    { method: 'POST', body },
-  );
+  return request(`/admin/bookings/${bookingId}/payment/refund`, parseDetail('devolucion'), {
+    method: 'POST',
+    body,
+  });
 }
 
 /** Libera la retencion sin cobrar. Solo administracion. */

@@ -314,6 +314,8 @@ export class BookingsAdminService {
             paymentId: saldo.id,
             status: saldo.status,
             amountCents: saldo.amountAuthorizedCents,
+            amountRefundedCents: saldo.amountRefundedCents,
+            refundFailed: saldo.lastErrorCode === 'refund_failed',
             chargedAt: saldo.capturedAt?.toISOString() ?? null,
           }
         : null,

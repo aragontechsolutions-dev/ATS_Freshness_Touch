@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { AdminRefundDepositSchema } from './admin';
+import { AdminRefundPaymentSchema } from './admin';
 import { chargeableBalanceCents, refundableCents, type RefundableAmounts } from './payment';
 
 /**
@@ -63,17 +63,44 @@ describe('refundableCents', () => {
   });
 });
 
-describe('AdminRefundDepositSchema', () => {
+describe('AdminRefundPaymentSchema', () => {
   it('sin importe significa «todo lo que quede»', () => {
-    const parsed = AdminRefundDepositSchema.safeParse({ reason: 'el equipo no llego a salir' });
+    const parsed = AdminRefundPaymentSchema.safeParse({ reason: 'el equipo no llego a salir' });
 
     expect(parsed.success).toBe(true);
     expect(parsed.data?.amountCents).toBeUndefined();
   });
 
+  /**
+   * SIN DESTINO SE DEVUELVE EL DEPOSITO, que es lo unico que se podia
+   * devolver antes de la etapa 3.24. Asi nada de lo que ya llamaba a esto
+   * cambia de significado al anadir el saldo.
+   */
+  it('sin destino se devuelve el deposito', () => {
+    const parsed = AdminRefundPaymentSchema.safeParse({ reason: 'devolucion acordada' });
+
+    expect(parsed.data?.target).toBe('DEPOSIT');
+  });
+
+  it('acepta el saldo como destino', () => {
+    const parsed = AdminRefundPaymentSchema.safeParse({
+      target: 'BALANCE',
+      reason: 'la limpieza no quedo bien',
+    });
+
+    expect(parsed.success).toBe(true);
+    expect(parsed.data?.target).toBe('BALANCE');
+  });
+
+  it('no acepta un movimiento inventado', () => {
+    expect(AdminRefundPaymentSchema.safeParse({ target: 'TIP', reason: 'inventado' }).success).toBe(
+      false,
+    );
+  });
+
   it('exige un motivo: una devolucion es dinero que sale de la empresa', () => {
-    expect(AdminRefundDepositSchema.safeParse({ amountCents: 1000 }).success).toBe(false);
-    expect(AdminRefundDepositSchema.safeParse({ amountCents: 1000, reason: 'ok' }).success).toBe(
+    expect(AdminRefundPaymentSchema.safeParse({ amountCents: 1000 }).success).toBe(false);
+    expect(AdminRefundPaymentSchema.safeParse({ amountCents: 1000, reason: 'ok' }).success).toBe(
       false,
     );
   });
@@ -81,13 +108,13 @@ describe('AdminRefundDepositSchema', () => {
   it('rechaza importes que no son dinero', () => {
     const motivo = 'devolucion acordada';
 
-    expect(AdminRefundDepositSchema.safeParse({ amountCents: 0, reason: motivo }).success).toBe(
+    expect(AdminRefundPaymentSchema.safeParse({ amountCents: 0, reason: motivo }).success).toBe(
       false,
     );
-    expect(AdminRefundDepositSchema.safeParse({ amountCents: -500, reason: motivo }).success).toBe(
+    expect(AdminRefundPaymentSchema.safeParse({ amountCents: -500, reason: motivo }).success).toBe(
       false,
     );
-    expect(AdminRefundDepositSchema.safeParse({ amountCents: 10.5, reason: motivo }).success).toBe(
+    expect(AdminRefundPaymentSchema.safeParse({ amountCents: 10.5, reason: motivo }).success).toBe(
       false,
     );
   });
@@ -95,7 +122,7 @@ describe('AdminRefundDepositSchema', () => {
   it('rechaza campos de mas', () => {
     // Estricto a proposito: un campo que se ignora en silencio es un campo
     // que alguien cree que ha guardado.
-    const parsed = AdminRefundDepositSchema.safeParse({
+    const parsed = AdminRefundPaymentSchema.safeParse({
       reason: 'devolucion acordada',
       providerRefundId: 're_inventado',
     });
