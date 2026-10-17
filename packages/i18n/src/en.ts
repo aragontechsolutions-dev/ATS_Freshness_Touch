@@ -645,7 +645,16 @@ export const en = {
         'Each ring has to reach further than the one before it. Once a zone stops giving an instant price, the ones beyond it cannot give one either.',
       zoneName: 'Zone {{zone}}',
       maxMiles: 'Up to (miles)',
-      surcharge: 'Travel surcharge ($)',
+
+      /* --- Anadir y quitar zonas (etapa 3.20) --- */
+      addAfter: 'Add a zone after {{zone}}',
+      addBlocked:
+        'No zone fits here: either there is no letter left between these two, or there is no room in miles between their limits.',
+      remove: 'Remove zone {{zone}}',
+      removeBlocked:
+        'This one stays: there has to be at least one zone, and the closest one has to give an instant price.',
+      codesKept:
+        'Removing a zone does not free its letter. It is written in bookings that already exist, so the next zone you add takes the following one.',
       /*
        * Se dice lo que PASA si se desmarca, no el nombre del ajuste. «Precio
        * automatico» no le dice a nadie que el cotizador dejara de dar una

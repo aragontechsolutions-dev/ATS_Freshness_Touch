@@ -261,17 +261,7 @@ export class PricingRatesService {
       if (!fila) return await this.sembrar();
 
       const parsed = PricingRatesSchema.safeParse(fila.rates);
-      if (!parsed.success) {
-        this.logger.error(
-          `La tabla de tarifas ${fila.version} no cumple el contrato y se ignora. ` +
-            'Se usan las tarifas del codigo.',
-        );
-        return {
-          version: defaultPricingConfig.version,
-          rates: TARIFAS_DE_PARTIDA,
-          source: 'fallback',
-        };
-      }
+      if (!parsed.success) return await this.recuperar(fila.version);
 
       return { version: fila.version, rates: parsed.data, source: 'table' };
     } catch (error) {
@@ -281,6 +271,90 @@ export class PricingRatesService {
         rates: TARIFAS_DE_PARTIDA,
         source: 'unreadable',
       };
+    }
+  }
+
+  /**
+   * LA FILA VIGENTE NO SE PUEDE LEER: SE ESCRIBE UNA QUE SI (etapa 3.11)
+   * ======================================================================
+   * Antes esto solo dejaba una linea en el log y seguia cotizando con las
+   * tarifas del codigo. Funcionaba tan bien que no se notaba —los precios
+   * que ve el cliente son los correctos— y asi estuvo diez dias.
+   *
+   * Pero habia un segundo fallo debajo, mas caro y menos visible. Lo que se
+   * devolvia era:
+   *
+   *     version: defaultPricingConfig.version      // «2026.09.1»
+   *
+   * ...que en el caso real ERA LA VERSION DE LA FILA ROTA. Asi que cada
+   * reserva quedaba sellada con una version que apunta a una fila que no se
+   * puede leer, y la promesa que el esquema lleva desde el primer dia:
+   *
+   *     /// Version de la configuracion de precios usada. Sin esto, un
+   *     /// presupuesto antiguo no se puede reproducir...
+   *
+   * no se cumplia para ninguna de ellas. Eso es facturacion: el dia que un
+   * cliente discuta un importe, no hay con que recalcularlo.
+   *
+   * Ahora se escribe una fila NUEVA y valida con las tarifas del codigo, que
+   * son las que de verdad se estan cobrando. A partir de ese momento el
+   * sistema esta sano otra vez y cada reserva se puede reproducir.
+   *
+   * SE AVISA IGUAL, Y ESO NO SE NEGOCIA. Se devuelve `fallback` en esta
+   * lectura —no `table`— para que la alarma de la etapa 3.12 suene una vez.
+   * Curarse en silencio seria repetir el fallo original con otro disfraz: si
+   * la empresa tenia precios propios en esa fila, acaban de perderse, y
+   * alguien tiene que enterarse. La siguiente lectura ya encuentra la fila
+   * nueva, devuelve `table` y la alarma manda su «[OK] resuelto».
+   *
+   * NO SE AUDITA, y hay que decirlo: `audit.record` exige un actor y aqui no
+   * hay ninguno —esto no lo hace una persona—. El rastro son el log, el
+   * campo `source` que expone la API y esta fila nueva sin autor.
+   */
+  private async recuperar(versionRota: string): Promise<TarifasVigentes> {
+    this.logger.error(
+      `La tabla de tarifas ${versionRota} no cumple el contrato y se ignora. ` +
+        'Se usan las tarifas del codigo.',
+    );
+
+    try {
+      /*
+       * La version la calcula el servidor contando las que ya existen, igual
+       * que al guardar desde el panel. Asi no puede chocar con la rota ni
+       * con otra del mismo dia.
+       */
+      const existentes = await this.prisma.db.pricingTable.findMany({ select: { version: true } });
+      const version = nextPricingVersion(
+        new Date(),
+        existentes.map((f) => f.version),
+      );
+
+      /*
+       * SIN AUTOR, a proposito. El panel ensena «lo cambio Fulanita el
+       * martes»; poner aqui un nombre inventado afirmaria que una persona
+       * toco los precios cuando no lo hizo nadie. Una fila sin autor se lee
+       * como lo que es: la puso el sistema.
+       */
+      await this.prisma.db.pricingTable.create({
+        data: { version, rates: TARIFAS_DE_PARTIDA },
+      });
+
+      this.logger.warn(
+        `Se escribio la version ${version} con las tarifas del codigo para sustituir ` +
+          `a ${versionRota}, que no se podia leer.`,
+      );
+
+      return { version, rates: TARIFAS_DE_PARTIDA, source: 'fallback' };
+    } catch (error) {
+      /*
+       * Si no se pudo escribir —base de solo lectura, dos instancias a la
+       * vez— se sigue cotizando igual. Lo que NO se hace es devolver la
+       * version del codigo: seguiria apuntando a la fila rota. `unreadable`
+       * dice la verdad —no hay una version utilizable— y la alarma sigue
+       * sonando hasta que alguien mire.
+       */
+      this.logger.error(`No se pudo escribir una version valida: ${describir(error)}`);
+      return { version: versionRota, rates: TARIFAS_DE_PARTIDA, source: 'unreadable' };
     }
   }
 

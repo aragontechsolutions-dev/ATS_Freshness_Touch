@@ -4,9 +4,10 @@ import {
   DEFAULT_COMPANY_LOCATION,
   MAX_ZONE_MILES,
   ServiceAreaSettingsSchema,
-  ZONE_ORDER,
+  canRemoveZone,
   instantQuoteRadiusMiles,
   serviceRadiusMiles,
+  zoneToAddAfter,
   type Locale,
   type ServiceAreaSettings,
   type ServiceAreaZone,
@@ -19,7 +20,7 @@ import {
 } from '../lib/api';
 import { useToast } from './ToastProvider';
 import { SkeletonFormulario } from './Skeletons';
-import { MapPinIcon, SpinnerIcon } from './Icons';
+import { CloseIcon, MapPinIcon, PlusIcon, SpinnerIcon } from './Icons';
 import { formatTimestamp } from '../lib/format';
 
 /*
@@ -166,6 +167,40 @@ export function ServiceAreaForm({ locale, onSessionLost }: ServiceAreaFormProps)
     return { zones: zonasNumericas };
   };
 
+  /*
+   * ANADIR Y QUITAR ZONAS (etapa 3.20)
+   * ----------------------------------
+   * La pantalla NO decide ni el codigo ni las millas de una zona nueva: se
+   * los pide al contrato, que es quien conoce las cuatro reglas del
+   * conjunto. Si devuelve `null` es que ahi no cabe nada, y el boton esta
+   * apagado antes de que nadie lo pulse.
+   *
+   * POR QUE SE PUEDE ANADIR EN MEDIO Y NO SOLO AL FINAL. El area tiene A y
+   * C: la B se retiro, y su codigo no se reaprovecha. Una banda intermedia
+   * nueva solo puede entrar entre las dos, asi que un boton de «anadir» al
+   * pie de la lista no serviria para recuperarla.
+   */
+  const anadir = (indice: number): void => {
+    const actual = aContrato();
+    const nueva = actual === null ? null : zoneToAddAfter(actual.zones, indice);
+    if (nueva === null) return;
+
+    setProblema(null);
+    setZonas((actuales) => [
+      ...actuales.slice(0, indice + 1),
+      { code: nueva.code, maxMiles: String(nueva.maxMiles), instantQuote: nueva.instantQuote },
+      ...actuales.slice(indice + 1),
+    ]);
+  };
+
+  const quitar = (indice: number): void => {
+    const actual = aContrato();
+    if (actual === null || !canRemoveZone(actual.zones, indice)) return;
+
+    setProblema(null);
+    setZonas((actuales) => actuales.filter((_, i) => i !== indice));
+  };
+
   const enviar = async (evento: React.FormEvent): Promise<void> => {
     evento.preventDefault();
     setProblema(null);
@@ -289,44 +324,84 @@ export function ServiceAreaForm({ locale, onSessionLost }: ServiceAreaFormProps)
         </div>
 
         <ul className="space-y-4">
-          {zonas.map((zona, indice) => (
-            <li
-              key={zona.code}
-              className="grid gap-3 border-b border-slate-100 pb-4 last:border-0 last:pb-0
+          {zonas.map((zona, indice) => {
+            /*
+             * Los dos botones se apagan desde el contrato, no desde aqui:
+             * ver `anadir` y `quitar`. Con un numero a medio teclear
+             * `enPantalla` es null y no se puede ni anadir ni quitar, que
+             * es lo correcto: no se sabe sobre que area se esta operando.
+             */
+            const puedeAnadir =
+              enPantalla !== null && zoneToAddAfter(enPantalla.zones, indice) !== null;
+            const puedeQuitar = enPantalla !== null && canRemoveZone(enPantalla.zones, indice);
+
+            return (
+              <li
+                key={zona.code}
+                className="grid gap-3 border-b border-slate-100 pb-4 last:border-0 last:pb-0
                          sm:grid-cols-[auto_1fr_1fr] sm:items-end dark:border-night-700"
-            >
-              <span className="inline-flex items-center gap-2 text-sm font-bold text-slate-900 sm:pb-2 dark:text-white">
-                <MapPinIcon className="h-4 w-4" />
-                {t('admin.serviceArea.zoneName', { zone: zona.code })}
-              </span>
+              >
+                <span className="inline-flex items-center gap-2 text-sm font-bold text-slate-900 sm:pb-2 dark:text-white">
+                  <MapPinIcon className="h-4 w-4" />
+                  {t('admin.serviceArea.zoneName', { zone: zona.code })}
+                </span>
 
-              <div>
-                <label className="ft-label" htmlFor={`zona-${zona.code}-millas`}>
-                  {t('admin.serviceArea.maxMiles')}
+                <div>
+                  <label className="ft-label" htmlFor={`zona-${zona.code}-millas`}>
+                    {t('admin.serviceArea.maxMiles')}
+                  </label>
+                  <input
+                    id={`zona-${zona.code}-millas`}
+                    className="ft-input"
+                    type="number"
+                    inputMode="numeric"
+                    min={1}
+                    max={MAX_ZONE_MILES}
+                    value={zona.maxMiles}
+                    onChange={(evento) => cambiar(indice, { maxMiles: evento.target.value })}
+                  />
+                </div>
+
+                <label className="flex items-center gap-2 text-sm text-slate-700 sm:col-span-2 dark:text-slate-300">
+                  <input
+                    type="checkbox"
+                    checked={zona.instantQuote}
+                    onChange={(evento) => cambiar(indice, { instantQuote: evento.target.checked })}
+                  />
+                  {t('admin.serviceArea.instantQuote')}
                 </label>
-                <input
-                  id={`zona-${zona.code}-millas`}
-                  className="ft-input"
-                  type="number"
-                  inputMode="numeric"
-                  min={1}
-                  max={MAX_ZONE_MILES}
-                  value={zona.maxMiles}
-                  onChange={(evento) => cambiar(indice, { maxMiles: evento.target.value })}
-                />
-              </div>
 
-              <label className="flex items-center gap-2 text-sm text-slate-700 sm:col-span-2 dark:text-slate-300">
-                <input
-                  type="checkbox"
-                  checked={zona.instantQuote}
-                  onChange={(evento) => cambiar(indice, { instantQuote: evento.target.checked })}
-                />
-                {t('admin.serviceArea.instantQuote')}
-              </label>
-            </li>
-          ))}
+                <div className="flex flex-wrap items-center gap-2 sm:col-span-3">
+                  <button
+                    type="button"
+                    className="ft-btn-ghost text-xs"
+                    disabled={!puedeAnadir}
+                    title={puedeAnadir ? undefined : t('admin.serviceArea.addBlocked')}
+                    onClick={() => anadir(indice)}
+                  >
+                    <PlusIcon className="h-4 w-4" />
+                    {t('admin.serviceArea.addAfter', { zone: zona.code })}
+                  </button>
+
+                  <button
+                    type="button"
+                    className="ft-btn-ghost text-xs"
+                    disabled={!puedeQuitar}
+                    title={puedeQuitar ? undefined : t('admin.serviceArea.removeBlocked')}
+                    onClick={() => quitar(indice)}
+                  >
+                    <CloseIcon className="h-4 w-4" />
+                    {t('admin.serviceArea.remove', { zone: zona.code })}
+                  </button>
+                </div>
+              </li>
+            );
+          })}
         </ul>
+
+        <p className="text-xs text-slate-600 dark:text-slate-400">
+          {t('admin.serviceArea.codesKept')}
+        </p>
       </section>
 
       {problema && (
@@ -356,6 +431,3 @@ export function ServiceAreaForm({ locale, onSessionLost }: ServiceAreaFormProps)
     </form>
   );
 }
-
-/** El catalogo de zonas configurables, para que la pantalla no lo invente. */
-export const ZONAS_CONFIGURABLES = ZONE_ORDER;

@@ -602,7 +602,16 @@ export const es: TranslationResources = {
         'Cada anillo tiene que llegar más lejos que el anterior. Cuando una zona deja de dar precio automático, las siguientes tampoco pueden darlo.',
       zoneName: 'Zona {{zone}}',
       maxMiles: 'Hasta (millas)',
-      surcharge: 'Recargo por traslado ($)',
+
+      /* --- Anadir y quitar zonas (etapa 3.20) --- */
+      addAfter: 'Añadir una zona después de la {{zone}}',
+      addBlocked:
+        'Aquí no cabe ninguna zona: o no queda letra libre entre estas dos, o no hay hueco de millas entre sus límites.',
+      remove: 'Quitar la zona {{zone}}',
+      removeBlocked:
+        'Esta se queda: tiene que haber al menos una zona, y la más cercana tiene que dar precio automático.',
+      codesKept:
+        'Quitar una zona no libera su letra. Está escrita en reservas que ya existen, así que la siguiente zona que añadas tomará la que venga después.',
       /*
        * Se dice lo que PASA si se desmarca, no el nombre del ajuste. «Precio
        * automatico» no le dice a nadie que el cotizador dejara de dar una

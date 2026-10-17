@@ -133,13 +133,18 @@ porque **se guarda en cada reserva**: si se pudieran crear zonas, el histórico
 acabaría lleno de códigos que ya no significan nada y ninguna consulta sobre
 el pasado sería fiable.
 
+> **Desde la etapa 3.20 sí se pueden añadir y quitar zonas desde el panel**,
+> pero solo dentro de ese conjunto fijo: lo que se crea es una zona con uno de
+> los códigos que quedan libres, y **quitar una no libera el suyo**. El
+> detalle está en `docs/36-zonas-que-se-anaden-y-se-quitan.md`.
+
 ### Las cuatro reglas del conjunto
 
 El contrato las comprueba, y cada una evita un problema concreto:
 
 | Regla                                                | Qué evita                                                                                                                                                                                          |
 | ---------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Los códigos van en orden y sin saltos                | El motor recorre la lista y se queda con la primera zona que alcanza la distancia: desordenada, diría **que el precio se da en persona cuando sale solo, o al revés**, sin fallar por ningún sitio |
+| Los códigos van en orden (con saltos permitidos)     | El motor recorre la lista y se queda con la primera zona que alcanza la distancia: desordenada, diría **que el precio se da en persona cuando sale solo, o al revés**, sin fallar por ningún sitio |
 | Cada anillo llega más lejos que el anterior          | Un tramo que nunca se alcanza: una zona configurada que no se asigna jamás                                                                                                                         |
 | El precio automático no vuelve                       | Si a 50 millas hay que dar precio en persona, a 200 también. Lo contrario deja al cotizador dando cifras más lejos de donde ya dijo que no puede                                                   |
 | La zona más cercana **siempre** da precio automático | Sin ella no habría cotizador: el sitio pediría los datos para no darle ninguna cifra a nadie, ni siquiera a quien vive al lado                                                                     |

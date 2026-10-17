@@ -4,6 +4,7 @@ import type { QuoteRequest } from '@freshness/types';
 import type { Env } from '../common/config/env';
 import type { DistanceService, ResolvedDistance } from '../distance/distance.service';
 import { buildPricingConfig } from '../common/pricing-config';
+import type { PricingConfig } from '@freshness/pricing';
 import type { PricingConfigService } from '../settings/pricing-config.service';
 import { QuotesService } from './quotes.service';
 
@@ -25,6 +26,28 @@ const fakeConfig = {
  */
 const fakePricing = {
   current: () => Promise.resolve(buildPricingConfig(fakeConfig)),
+} as unknown as PricingConfigService;
+
+/**
+ * Lo mismo, pero con una banda intermedia con precio automatico.
+ *
+ * El area de partida tiene solo A (35 millas, el radio sin recargo) y C (el
+ * resto de Georgia, a consultar), asi que CON ELLA EL RECARGO POR MILLA NO
+ * LLEGA A COBRARSE: donde hay precio automatico no hay millas de exceso.
+ * Para probar que el cotizador suma el traslado hace falta un area que el
+ * panel si puede configurar, y esta es la que habia antes de la etapa 2.26.
+ */
+const fakePricingConBandaIntermedia = {
+  current: () =>
+    Promise.resolve({
+      ...buildPricingConfig(fakeConfig),
+      zones: [
+        { code: 'A', maxMiles: 35, serviceable: true, instantQuote: true },
+        { code: 'B', maxMiles: 60, serviceable: true, instantQuote: true },
+        { code: 'C', maxMiles: 325, serviceable: true, instantQuote: false },
+        { code: 'OUT_OF_RANGE', maxMiles: null, serviceable: false, instantQuote: false },
+      ],
+    } satisfies PricingConfig),
 } as unknown as PricingConfigService;
 
 function fakeDistance(miles: number): DistanceService {
@@ -93,7 +116,7 @@ describe('QuotesService', () => {
 
   it('pasadas las 35 millas el traslado se cobra, ida y vuelta', async () => {
     // 50 millas: 15 de exceso, 30 facturables a 76 centavos = 22,80 $.
-    const service = new QuotesService(fakeDistance(50), fakePricing);
+    const service = new QuotesService(fakeDistance(50), fakePricingConBandaIntermedia);
     const quote = await service.estimate(request, new Date('2026-09-20T12:00:00Z'));
 
     expect(quote.distance.zone).toBe('B');
@@ -103,6 +126,31 @@ describe('QuotesService', () => {
     expect(quote.totals.totalCents).toBe(21_000 + 2280);
     // La garantia no crece con el viaje: sigue siendo la misma cifra fija.
     expect(quote.deposit.amountCents).toBe(3500);
+  });
+
+  /*
+   * LA MISMA DISTANCIA, CON EL AREA QUE HAY HOY. No es una repeticion de la
+   * prueba anterior: dice lo contrario, y las dos son ciertas. El area de
+   * partida no tiene banda intermedia, asi que a 50 millas no hay recargo
+   * que cobrar porque no hay precio que dar.
+   */
+  it('con el area de partida, a 50 millas no hay precio sino llamada', async () => {
+    const service = new QuotesService(fakeDistance(50), fakePricing);
+    const quote = await service.estimate(request, new Date('2026-09-20T12:00:00Z'));
+
+    expect(quote.distance.zone).toBe('C');
+    expect(quote.manualReview.reasonKeys).toContain('quote.review.farZone');
+    expect(quote.totals.totalCents).toBe(0);
+    expect(quote.totals.surchargesCents).toBe(0);
+    expect(quote.lines).toHaveLength(0);
+
+    /*
+     * EL DESGLOSE DEL TRASLADO SI VIENE, Y NO ES UNA CONTRADICCION: el
+     * motor lo calcula siempre para que quien ponga el precio a mano sepa
+     * cuantas millas se cobran. Lo que no hace es sumarlo a nada.
+     */
+    expect(quote.travel.billableMiles).toBe(30);
+    expect(quote.travel.amountCents).toBe(2280);
   });
 
   it('publica un catalogo coherente con el motor de precios', async () => {
