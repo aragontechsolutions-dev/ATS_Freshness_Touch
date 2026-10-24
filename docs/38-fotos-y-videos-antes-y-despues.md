@@ -344,14 +344,75 @@ no conoce, **se ignora la fila entera y la sección no se pinta**. Se ignora
 entera y no solo el vídeo malo a propósito: colando los válidos, la dueña
 vería la galería «casi bien» y no sabría que le falta uno.
 
+### La pantalla del panel (etapa 2.C.1)
+
+_Ajustes → Antes y después._ **Solo ADMIN, también para leer.**
+
+Para escribir, porque publicar el interior de la casa de un cliente sin su
+permiso firmado es el peor escenario legal del sistema, y eso no tiene nada
+que ver con coordinar una agenda. Para leer, porque la pantalla trae además
+quién publicó cada vídeo y cuándo; la lista a secas está en el endpoint
+público, sin sesión.
+
+Cuatro decisiones de la pantalla, y ninguna es de maquetación:
+
+1. **El aviso del permiso está arriba, en rojo y permanente.** No es una
+   casilla de «he leído»: esas se marcan sin leer. Esta pantalla se va a abrir
+   muchas veces y la primera es la única en que alguien lee algo nuevo.
+2. **Se pega la dirección de YouTube, no el identificador.** Nadie tiene a
+   mano `dQw4w9WgXcQ`; todo el mundo tiene la dirección que copia. Se aceptan
+   las seis formas (`watch?v=`, `youtu.be/`, `/embed/`, `/shorts/`, `/live/` y
+   el identificador suelto), y **lo que se guarda son solo los once
+   caracteres**. Si la pantalla exigiera el identificador suelto, se acabaría
+   pegando la dirección, el campo se pondría rojo y la conclusión sería «esto
+   no funciona».
+3. **Retirar es un botón por fila**, no una papelera escondida. Es la
+   operación que de verdad va a usarse.
+4. **Los dos idiomas del título van juntos**, uno al lado del otro, igual que
+   en los textos del sitio: separarlos es como se acaba escribiendo el inglés
+   y olvidando el español.
+
+**Se manda la galería entera, con `PUT`.** Y aquí la razón no es la simetría
+con el resto de la configuración: lo que más va a pasar es **retirar** un
+vídeo porque su propietario revocó el permiso, y retirar es una ausencia.
+Mandando el conjunto, lo que no viene es que ya no está. Con operaciones de
+borrado independientes, una petición perdida por el camino deja publicada la
+casa de alguien que pidió que la quitaran.
+
+**El rastro guarda la diferencia, no la lista.** La acción de auditoría es
+`gallery.updated` y la metadata es `{ added: [...], removed: [...] }`. La
+lista entera no responde a «cuándo se retiró el vídeo de esta casa», que es la
+única pregunta que llega tarde; la diferencia sí. Y no entra **ninguna
+dirección ni ningún dato del cliente**: son identificadores de vídeos ya
+públicos en YouTube. El cambio y su registro van en la misma transacción.
+
 ### Lo que todavía no existe
 
-- **Editarla desde el panel** (etapa 2.C). Hoy la fila solo se puede poner por
-  SQL, así que en la práctica la sección sigue invisible — que es justamente
-  lo que queremos hasta que haya permisos firmados.
-- **Las fotos** (etapa 2.C también): necesitan Supabase Storage, la subida, el
-  borrado de metadatos EXIF y los límites de tamaño.
-- **El registro de consentimientos** (etapa 2.D).
+- **Las fotos** (etapa 2.C.2): necesitan el bucket `gallery` de Supabase
+  Storage, la subida por la API, el borrado de metadatos EXIF y los límites de
+  tamaño.
+- **Las miniaturas propias de los vídeos** (`posters/` del mismo bucket). Hasta
+  que existan, la tarjeta se pinta con los colores de la marca.
+- **El registro de consentimientos** (etapa 2.D), que une el papel firmado con
+  la pieza publicada.
+
+### El bucket de Supabase Storage
+
+Nombre **`gallery`**, el mismo que la fila de configuración, el endpoint y el
+módulo de tipos. Configuración:
+
+| Ajuste             | Valor                                   | Por qué                                                                                                                                                       |
+| ------------------ | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Public bucket      | **Sí**                                  | Son imágenes hechas para que las vea todo internet. Las URLs firmadas son para las fotos **internas** de prueba del trabajo, que es otra etapa y otro bucket. |
+| File size limit    | 5 MB                                    | Una foto de móvil son 3–4 MB. Más es un vídeo disfrazado o un error.                                                                                          |
+| Allowed MIME types | `image/jpeg`, `image/png`, `image/webp` | **Nada de SVG**: un SVG es un documento que puede llevar JavaScript dentro, y servido desde un bucket público sería un hueco de seguridad real.               |
+
+**Sin políticas RLS.** La lectura es pública por ser bucket público, y la
+escritura va por la API con la `service_role`, que se salta RLS por
+definición. Una política de escritura ahí sería señal de que algo se está
+subiendo desde el navegador, que es justo lo que no queremos: la subida tiene
+que pasar por la API para poder quitar el EXIF, limitar el tamaño y auditar
+quién subió qué.
 
 ---
 

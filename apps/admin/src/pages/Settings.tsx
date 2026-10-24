@@ -18,6 +18,7 @@ import { PricingRatesForm } from '../components/PricingRatesForm';
 import { ServiceAreaForm } from '../components/ServiceAreaForm';
 import { CompanyLocationForm } from '../components/CompanyLocationForm';
 import { SiteCopyForm } from '../components/SiteCopyForm';
+import { GalleryForm } from '../components/GalleryForm';
 import { NotificationSettingsForm } from '../components/NotificationSettingsForm';
 import { StaffDirectory } from '../components/StaffDirectory';
 import { useToast } from '../components/ToastProvider';
@@ -32,6 +33,7 @@ import {
   SpinnerIcon,
   UsersIcon,
   GaugeIcon,
+  PlayIcon,
 } from '../components/Icons';
 import { formatTimestamp } from '../lib/format';
 
@@ -76,6 +78,7 @@ type Seccion =
   | 'serviceArea'
   | 'pricing'
   | 'siteCopy'
+  | 'gallery'
   | 'notifications'
   | 'staff'
   | 'systemHealth'
@@ -154,6 +157,19 @@ export function SettingsPage({ staff, locale, onSessionLost }: SettingsShellProp
         >
           {t('admin.siteCopy.title')}
         </Pestana>
+        {/*
+          LA GALERIA VA JUSTO DESPUES DE LOS TEXTOS: las dos pantallas
+          publican en la portada, y son las dos unicas desde las que se
+          cambia lo que ve un desconocido. Lo que se guarda en todas las
+          demas se queda dentro.
+        */}
+        <Pestana
+          activa={seccion === 'gallery'}
+          onClick={() => setSeccion('gallery')}
+          icono={<PlayIcon className="h-4 w-4" />}
+        >
+          {t('admin.gallery.title')}
+        </Pestana>
         <Pestana
           activa={seccion === 'notifications'}
           onClick={() => setSeccion('notifications')}
@@ -206,6 +222,8 @@ export function SettingsPage({ staff, locale, onSessionLost }: SettingsShellProp
         <PricingRatesForm locale={locale} onSessionLost={onSessionLost} />
       ) : seccion === 'siteCopy' ? (
         <SiteCopyForm locale={locale} onSessionLost={onSessionLost} />
+      ) : seccion === 'gallery' ? (
+        <GalleryForm locale={locale} onSessionLost={onSessionLost} />
       ) : seccion === 'notifications' ? (
         <NotificationSettingsForm onSessionLost={onSessionLost} />
       ) : seccion === 'staff' ? (

@@ -578,6 +578,35 @@ export const es: TranslationResources = {
       lastChangeUnknown: 'Último cambio {{when}}',
       never: 'La web está mostrando sus textos originales.',
     },
+    /* ---------------------- La galeria de antes y despues ---------------- */
+    gallery: {
+      title: 'Antes y después',
+      intro:
+        'Los vídeos que salen en la portada. Pega el enlace de YouTube y aparece en la web; quítalo y desaparece.',
+      consentWarning: 'No publiques nunca una casa sin su permiso por escrito.',
+      consentHelp:
+        'El permiso tiene que nombrar la propiedad y autorizar las imágenes del «antes». Si el cliente lo retira, quita el vídeo aquí y en minutos deja de estar en la web.',
+      empty: 'Todavía no hay vídeos. La sección de antes y después no se ve en la web.',
+      videoUrl: 'Enlace de YouTube',
+      videoUrlPlaceholder: 'https://www.youtube.com/watch?v=...',
+      titleEnglish: 'Título (inglés)',
+      titleSpanish: 'Título (español)',
+      titlePlaceholder: 'Opcional',
+      add: 'Añadir un vídeo',
+      addBlocked: 'En la sección caben {{count}} vídeos como máximo.',
+      remove: 'Quitar',
+      save: 'Guardar la galería',
+      reset: 'Deshacer los cambios',
+      saved: 'Galería guardada',
+      errVideoId:
+        'Eso no es un enlace de YouTube. Cópialo de la barra del navegador o de Compartir.',
+      errDuplicate: 'Ese vídeo ya está en la galería.',
+      errInvalid: 'Hay vídeos que todavía no valen. Mira los marcados en rojo.',
+      never: 'Nunca se cambió',
+      lastChange: 'Último cambio {{when}} por {{who}}',
+      lastChangeUnknown: 'Último cambio {{when}}',
+    },
+
     location: {
       title: 'Ubicación de la empresa',
       intro:
@@ -971,6 +1000,9 @@ export const es: TranslationResources = {
         },
         site_copy: {
           updated: 'Cambió los textos de la web',
+        },
+        gallery: {
+          updated: 'Cambió la galería de antes y después',
         },
         pricing: {
           updated: 'Cambió las tarifas',

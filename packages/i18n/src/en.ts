@@ -615,6 +615,38 @@ export const en = {
       lastChangeUnknown: 'Last changed {{when}}',
       never: 'The website is showing its original wording.',
     },
+    /* ---------------------- La galeria de antes y despues ---------------- */
+    /*
+     * Los avisos de esta pantalla son mas duros que los de cualquier otra, y
+     * a proposito: aqui se publica el interior de la casa de un cliente.
+     */
+    gallery: {
+      title: 'Before and after',
+      intro:
+        'The videos shown on the home page. Paste the YouTube link and it appears on the site; remove it and it disappears.',
+      consentWarning: 'Never publish a home without its written release.',
+      consentHelp:
+        'The release must name the property and allow the "before" footage. If the customer withdraws it, remove the video here and it is gone from the site within minutes.',
+      empty: 'No videos yet. The before-and-after section is hidden on the website.',
+      videoUrl: 'YouTube link',
+      videoUrlPlaceholder: 'https://www.youtube.com/watch?v=...',
+      titleEnglish: 'Caption (English)',
+      titleSpanish: 'Caption (Spanish)',
+      titlePlaceholder: 'Optional',
+      add: 'Add a video',
+      addBlocked: 'The section holds {{count}} videos at most.',
+      remove: 'Remove',
+      save: 'Save gallery',
+      reset: 'Undo changes',
+      saved: 'Gallery saved',
+      errVideoId: 'That is not a YouTube link. Copy it from the address bar or from Share.',
+      errDuplicate: 'That video is already in the gallery.',
+      errInvalid: 'Some videos are not valid yet. Check the ones marked in red.',
+      never: 'Never changed',
+      lastChange: 'Last changed {{when}} by {{who}}',
+      lastChangeUnknown: 'Last changed {{when}}',
+    },
+
     location: {
       title: 'Company location',
       intro:
@@ -1022,6 +1054,9 @@ export const en = {
         },
         site_copy: {
           updated: 'Website wording changed',
+        },
+        gallery: {
+          updated: 'Before-and-after gallery changed',
         },
         notifications: {
           updated: 'Alert settings changed',

@@ -193,6 +193,20 @@ export type Gallery = z.infer<typeof GallerySchema>;
  */
 export const DEFAULT_GALLERY: Gallery = { videos: [] };
 
+/**
+ * La galeria mas quien la cambio, para la pantalla de administracion.
+ *
+ * El dato publico no lleva autoria a proposito: quien puso un video es
+ * informacion interna. Aqui si, porque es la pregunta que llega tarde — «quien
+ * publico la casa de este cliente» — cuando alguien reclama.
+ */
+export const AdminGallerySchema = z.strictObject({
+  gallery: GallerySchema,
+  updatedAt: z.string().nullable(),
+  updatedBy: z.string().nullable(),
+});
+export type AdminGallery = z.infer<typeof AdminGallerySchema>;
+
 /** Si hay algo que ensenar. */
 export function hasGalleryContent(gallery: Gallery): boolean {
   return gallery.videos.length > 0;
