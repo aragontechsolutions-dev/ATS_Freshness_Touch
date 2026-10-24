@@ -5,6 +5,8 @@ import { PricingConfigService } from './pricing-config.service';
 import { PricingRatesService } from './pricing-rates.service';
 import { ServiceAreaService } from './service-area.service';
 import { CompanyLocationService } from './company-location.service';
+import { GalleryController } from './gallery.controller';
+import { GalleryService } from './gallery.service';
 import { SiteCopyController } from './site-copy.controller';
 import { SiteCopyService } from './site-copy.service';
 
@@ -14,10 +16,11 @@ import { SiteCopyService } from './site-copy.service';
  * las reservas (para el area de servicio) y el panel (para editarlo todo).
  */
 @Module({
-  controllers: [BusinessSettingsController, SiteCopyController],
+  controllers: [BusinessSettingsController, SiteCopyController, GalleryController],
   providers: [
     BusinessSettingsService,
     SiteCopyService,
+    GalleryService,
     ServiceAreaService,
     CompanyLocationService,
     PricingRatesService,
@@ -26,6 +29,7 @@ import { SiteCopyService } from './site-copy.service';
   exports: [
     BusinessSettingsService,
     SiteCopyService,
+    GalleryService,
     ServiceAreaService,
     CompanyLocationService,
     PricingRatesService,

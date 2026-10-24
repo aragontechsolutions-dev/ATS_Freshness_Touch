@@ -470,6 +470,54 @@ devuelve, así que no sirve para probar esto. Queda escrito en el propio
 proveedor, y la comprobación se hace en `distance.service.test.ts` con un
 proveedor falso que delata lo que recibe.
 
+### La sede que anuncia la web es la sede desde la que se cobra
+
+Esto se arregló después, al cambiar la frase de contacto a **«Based in
+Marietta, GA - Serving Metro Atlanta»**, y el fallo que salió a la luz merece
+quedar escrito porque no se ve mirando la página.
+
+La línea de contacto del sitio y la descripción del mapa **no leían la sede**:
+
+- `apps/landing/src/config/company.ts` tenía `city: 'Atlanta'` escrito a mano.
+- `areas.mapDescription` decía «alrededor de Atlanta» dentro de la propia
+  traducción, en los dos idiomas.
+
+Con eso, mover la sede desde el panel cambiaba **los precios y el centro del
+mapa**, pero no el texto. El sitio seguiría anunciando la ciudad vieja
+mientras el cotizador mide desde la nueva: el cliente lee «con base en X» y
+paga el traslado desde Y, a veinte millas. Es el mismo desajuste del que ya
+avisa el comentario de `baseOfOperations` en el catálogo, y no se nota al
+mirar la pantalla, porque las dos mitades se ven bien por separado.
+
+**Ahora las dos salen del catálogo**, que es el mismo sitio del que sale el
+centro del círculo:
+
+| Qué se pinta          | De dónde sale                                      |
+| --------------------- | -------------------------------------------------- |
+| «Based in {ciudad}»   | `catalog.baseOfOperations.city` / `.state`         |
+| Descripción del mapa  | `catalog.baseOfOperations.city`                    |
+| Centro de los anillos | `catalog.baseOfOperations.latitude` / `.longitude` |
+
+`config/company.ts` **sigue existiendo, pero solo como respaldo** de los
+primeros milisegundos y de que la API no responda: la página se pinta entera
+igual, que es la regla de siempre en el sitio que genera los ingresos.
+
+**«Serving Metro Atlanta» sí es texto fijo a propósito.** No dice dónde está
+la sede, dice a qué zona se da servicio, y eso no lo decide la ubicación de
+la empresa. Sin esa mitad, un cliente de otra ciudad del área metropolitana
+podría pensar que no se le atiende.
+
+Lo ata `la-sede-que-se-ensena-es-la-que-cobra.test.ts`, por los dos lados: la
+traducción tiene que dejar un **hueco** para la ciudad (`{{city}}`) y no puede
+nombrar ninguna, y quien la pinta tiene que rellenarlo con la del catálogo. El
+día que alguien vuelva a escribir el nombre de una ciudad en el texto, o
+vuelva a tirar de la constante del código, se pone roja.
+
+> **Mudarse se hace en el panel, no en el código.** Cambiar la frase no mueve
+> la sede: hay que guardar la ubicación nueva en _Ajustes → Ubicación de la
+> empresa_ (solo ADMIN), porque es de ahí de donde salen las distancias, los
+> recargos de zona, el centro del mapa y, desde ahora, el texto.
+
 ---
 
 ## 8. Variables de entorno nuevas

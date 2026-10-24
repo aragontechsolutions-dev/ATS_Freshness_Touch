@@ -103,7 +103,10 @@ export function ServiceAreas() {
               <ServiceAreaMap
                 className="ft-map"
                 centro={{ lat: base.latitude, lon: base.longitude }}
-                descripcion={t('areas.mapDescription', { miles: maxServiceableMiles })}
+                descripcion={t('areas.mapDescription', {
+                  city: base.city,
+                  miles: maxServiceableMiles,
+                })}
                 focoMillas={verCercanas ? instantMiles : maxServiceableMiles}
                 /*
                   EL RADIO SIN RECARGO, COMO ANILLO PROPIO (etapa 3.15).

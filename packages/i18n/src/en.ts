@@ -615,6 +615,38 @@ export const en = {
       lastChangeUnknown: 'Last changed {{when}}',
       never: 'The website is showing its original wording.',
     },
+    /* ---------------------- La galeria de antes y despues ---------------- */
+    /*
+     * Los avisos de esta pantalla son mas duros que los de cualquier otra, y
+     * a proposito: aqui se publica el interior de la casa de un cliente.
+     */
+    gallery: {
+      title: 'Before and after',
+      intro:
+        'The videos shown on the home page. Paste the YouTube link and it appears on the site; remove it and it disappears.',
+      consentWarning: 'Never publish a home without its written release.',
+      consentHelp:
+        'The release must name the property and allow the "before" footage. If the customer withdraws it, remove the video here and it is gone from the site within minutes.',
+      empty: 'No videos yet. The before-and-after section is hidden on the website.',
+      videoUrl: 'YouTube link',
+      videoUrlPlaceholder: 'https://www.youtube.com/watch?v=...',
+      titleEnglish: 'Caption (English)',
+      titleSpanish: 'Caption (Spanish)',
+      titlePlaceholder: 'Optional',
+      add: 'Add a video',
+      addBlocked: 'The section holds {{count}} videos at most.',
+      remove: 'Remove',
+      save: 'Save gallery',
+      reset: 'Undo changes',
+      saved: 'Gallery saved',
+      errVideoId: 'That is not a YouTube link. Copy it from the address bar or from Share.',
+      errDuplicate: 'That video is already in the gallery.',
+      errInvalid: 'Some videos are not valid yet. Check the ones marked in red.',
+      never: 'Never changed',
+      lastChange: 'Last changed {{when}} by {{who}}',
+      lastChangeUnknown: 'Last changed {{when}}',
+    },
+
     location: {
       title: 'Company location',
       intro:
@@ -1022,6 +1054,9 @@ export const en = {
         },
         site_copy: {
           updated: 'Website wording changed',
+        },
+        gallery: {
+          updated: 'Before-and-after gallery changed',
         },
         notifications: {
           updated: 'Alert settings changed',
@@ -1612,7 +1647,7 @@ export const en = {
     /* --------------------------- El mapa --------------------------- */
     /** Lo que oye quien usa lector de pantalla: un mapa sin describir no dice nada. */
     mapDescription:
-      'Map of our service area: concentric rings around Atlanta reaching up to {{miles}} miles, covering the whole State of Georgia.',
+      'Map of our service area: concentric rings around {{city}} reaching up to {{miles}} miles, covering the whole State of Georgia.',
     mapRadiusNote:
       'The rings are straight-line distances. Travel is billed by road miles, which are always longer — the quote gives you the exact figure.',
     mapZoneInstant: 'Zone {{zone}} — up to {{miles}} miles · {{amount}}',
@@ -1669,6 +1704,27 @@ export const en = {
     },
   },
 
+  /* ===================== Antes y despues ===================== */
+  /*
+   * La seccion no se pinta si no hay videos configurados, asi que estos
+   * textos pueden existir mucho antes de que haya contenido.
+   */
+  gallery: {
+    title: 'Before and after',
+    subtitle: 'Real homes we cleaned, shared with the owner’s written permission.',
+    /*
+     * EL AVISO DEL TERCERO VA ANTES DEL BOTON, NO DESPUES.
+     *
+     * Hasta que se pulsa, la pagina no pide nada a nadie. Al pulsar se carga
+     * un marco de YouTube, y esa es la unica peticion a un tercero que hace
+     * el sitio entero. El visitante tiene que poder decidirlo sabiendolo, no
+     * enterarse despues.
+     */
+    thirdPartyNote:
+      'Videos are hosted on YouTube. Nothing is requested from YouTube until you press play.',
+    play: 'Play video',
+  },
+
   contact: {
     title: 'Ready when you are',
     subtitle: 'Get your instant price online, or talk to a human — whichever you prefer.',
@@ -1690,7 +1746,7 @@ export const en = {
       6: 'Saturday',
       7: 'Sunday',
     },
-    serviceArea: 'Based in {{city}}, {{state}}',
+    serviceArea: 'Based in {{city}}, {{state}} - Serving Metro Atlanta',
   },
 
   footer: {

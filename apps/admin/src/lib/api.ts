@@ -47,10 +47,13 @@ import {
   type ServiceAreaSettings,
   type AuthenticatedStaff,
   AdminCompanyLocationSchema,
+  AdminGallerySchema,
   AdminSiteCopySchema,
   type AdminCompanyLocation,
+  type AdminGallery,
   type AdminSiteCopy,
   type CompanyLocation,
+  type Gallery,
   type SiteCopy,
 } from '@freshness/types';
 import { auth } from './supabase';
@@ -662,6 +665,50 @@ export function saveSiteCopy(copy: SiteCopy): Promise<AdminSiteCopy> {
       return parsed.data;
     },
     { method: 'PUT', body: copy },
+  );
+}
+
+/* ------------------------------------------------------------------------ */
+/*  Galeria de antes y despues. Solo administracion.                         */
+/* ------------------------------------------------------------------------ */
+
+const GALERIA = '/admin/gallery';
+
+/**
+ * Los videos que la empresa publica, mas quien los puso.
+ *
+ * Solo administracion, TAMBIEN PARA LEER. Los identificadores son publicos
+ * —estan en YouTube—, pero esta respuesta trae ademas quien los publico y
+ * cuando, que es la pregunta que llega tarde cuando un cliente revoca su
+ * permiso. Y sobre todo: quien abre esta pantalla puede publicar el interior
+ * de la casa de un cliente.
+ */
+export function fetchGallery(): Promise<AdminGallery> {
+  return request(GALERIA, (payload) => {
+    const parsed = AdminGallerySchema.safeParse(payload);
+    if (!parsed.success) throw contractError(GALERIA, parsed.error.issues);
+    return parsed.data;
+  });
+}
+
+/**
+ * Guarda la galeria entera de una vez.
+ *
+ * No por videos: lo que mas va a pasar es RETIRAR uno porque su propietario
+ * revoco el permiso, y retirar es una ausencia. Mandando el conjunto, lo que
+ * no viene es que ya no esta; con operaciones de borrado independientes, una
+ * peticion perdida por el camino deja publicada la casa de alguien que pidio
+ * que la quitaran.
+ */
+export function saveGallery(gallery: Gallery): Promise<AdminGallery> {
+  return request(
+    GALERIA,
+    (payload) => {
+      const parsed = AdminGallerySchema.safeParse(payload);
+      if (!parsed.success) throw contractError('guardado de la galeria', parsed.error.issues);
+      return parsed.data;
+    },
+    { method: 'PUT', body: gallery },
   );
 }
 

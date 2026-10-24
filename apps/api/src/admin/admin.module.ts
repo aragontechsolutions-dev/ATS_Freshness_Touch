@@ -30,6 +30,7 @@ import {
   CompanyLocationAdminController,
   ServiceAreaAdminController,
   SiteCopyAdminController,
+  GalleryAdminController,
   SettingsAdminController,
 } from './settings-admin.controller';
 import type { Env } from '../common/config/env';
@@ -46,6 +47,7 @@ import type { Env } from '../common/config/env';
     CompanyLocationAdminController,
     PricingRatesAdminController,
     SiteCopyAdminController,
+    GalleryAdminController,
     AssignmentsController,
     StaffListController,
     StaffAdminController,

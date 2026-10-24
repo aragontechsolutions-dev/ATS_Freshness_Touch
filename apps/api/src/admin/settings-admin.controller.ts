@@ -19,6 +19,9 @@ import {
   AdminSiteCopy,
   SiteCopy,
   SiteCopySchema,
+  AdminGallery,
+  Gallery,
+  GallerySchema,
 } from '@freshness/types';
 import type { Request } from 'express';
 import { ADMIN_ROUTE, CurrentStaff, Roles } from '../auth/auth.decorators';
@@ -30,6 +33,7 @@ import { PricingRatesService } from '../settings/pricing-rates.service';
 import { ServiceAreaService } from '../settings/service-area.service';
 import { CompanyLocationService } from '../settings/company-location.service';
 import { SiteCopyService } from '../settings/site-copy.service';
+import { GalleryService } from '../settings/gallery.service';
 
 /**
  * CONFIGURACION DEL NEGOCIO DESDE EL PANEL
@@ -319,5 +323,54 @@ export class SiteCopyAdminController {
     @Req() request: Request,
   ): Promise<AdminSiteCopy> {
     return this.copy.save(copy, staff, request.ip ?? null);
+  }
+}
+
+/**
+ * LA GALERIA DE ANTES Y DESPUES DESDE EL PANEL
+ * --------------------------------------------
+ * SOLO ADMINISTRACION, tambien para leer.
+ *
+ * Para escribir, por lo que se publica: el interior de la casa de un cliente.
+ * Publicar un video sin el permiso firmado de su propietario es el escenario
+ * de demanda mas probable de todo el sistema, y no tiene nada que ver con
+ * coordinar una agenda. Coordinacion coordina.
+ *
+ * Para leer, por lo que acompana al dato: los identificadores son publicos
+ * —estan en YouTube—, pero esta pantalla dice ademas quien los puso y cuando.
+ * Quien solo necesita la lista la tiene en el endpoint publico, sin sesion.
+ *
+ * El modelo del consentimiento y lo que nunca puede entrar en el encuadre
+ * estan en `docs/38-fotos-y-videos-antes-y-despues.md`.
+ */
+@SkipThrottle(SKIP_QUOTE_THROTTLER)
+@Controller(`${ADMIN_ROUTE}/gallery`)
+export class GalleryAdminController {
+  constructor(private readonly gallery: GalleryService) {}
+
+  @Get()
+  @Roles('ADMIN')
+  get(): Promise<AdminGallery> {
+    return this.gallery.getForAdmin();
+  }
+
+  /**
+   * PUT y no PATCH: se manda la galeria entera.
+   *
+   * No es por simetria con el resto. Lo que mas va a pasar aqui es RETIRAR un
+   * video porque un cliente revoco su permiso, y retirar es una ausencia. Con
+   * parches independientes habria que inventar una operacion de borrado, y
+   * una peticion de retirada perdida por el camino deja publicada la casa de
+   * alguien que pidio que la quitaran. Mandando el conjunto, lo que no viene
+   * es que ya no esta.
+   */
+  @Put()
+  @Roles('ADMIN')
+  update(
+    @Body(new ZodValidationPipe<Gallery>(GallerySchema)) gallery: Gallery,
+    @CurrentStaff() staff: AuthenticatedStaff,
+    @Req() request: Request,
+  ): Promise<AdminGallery> {
+    return this.gallery.save(gallery, staff, request.ip ?? null);
   }
 }

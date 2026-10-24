@@ -195,6 +195,19 @@ const ACCIONES_FIJAS = [
    * secreto: es texto escrito para publicarse.
    */
   'site_copy.updated',
+  /**
+   * Cambio la galeria de antes y despues: se publico o se retiro un video.
+   *
+   * ACCION PROPIA, y no «cambio la configuracion», por una razon que no es
+   * tecnica: lo que se publica ahi es el interior de la casa de un cliente,
+   * con su permiso firmado. Si ese cliente revoca el permiso o reclama, la
+   * pregunta es «quien lo publico, cuando, y cuando se retiro», y eso se
+   * responde con el registro o no se responde.
+   *
+   * La metadata guarda los identificadores de los videos que entraron y
+   * salieron. No hay nada secreto: son videos ya publicos en YouTube.
+   */
+  'gallery.updated',
 
   /* --- Lecturas de datos sensibles ------------------------------------- */
   /** Alguien abrio la ficha completa de una reserva, con datos del cliente. */

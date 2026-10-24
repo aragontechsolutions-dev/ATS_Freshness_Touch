@@ -3,6 +3,7 @@ import {
   ApiErrorSchema,
   AvailabilityResponseSchema,
   BusinessSettingsSchema,
+  GallerySchema,
   SiteCopySchema,
   BookingResponseSchema,
   CatalogResponseSchema,
@@ -12,6 +13,7 @@ import {
   type AvailabilityResponse,
   type BookingRequestInput,
   type BusinessSettings,
+  type Gallery,
   type SiteCopy,
   type BookingResponse,
   type CatalogResponse,
@@ -268,6 +270,24 @@ export function fetchBusinessSettings(signal?: AbortSignal): Promise<BusinessSet
     const parsed = BusinessSettingsSchema.safeParse(payload);
     if (!parsed.success) {
       console.error('[Freshness Touch] Configuracion del negocio inesperada:', parsed.error.issues);
+      throw new ApiClientError('BAD_CONTRACT', 'calculator.errorGeneric');
+    }
+    return parsed.data;
+  });
+}
+
+/**
+ * La galeria de antes y despues.
+ *
+ * SI VIENE MAL, LA SECCION NO SE PINTA Y LA PORTADA SIGUE. Como el resto de
+ * lo que es decorativo: perder la galeria es perder una seccion; tumbar la
+ * portada es perder las ventas del dia.
+ */
+export function fetchGallery(signal?: AbortSignal): Promise<Gallery> {
+  return request('/gallery', { method: 'GET', signal }, (payload) => {
+    const parsed = GallerySchema.safeParse(payload);
+    if (!parsed.success) {
+      console.error('[Freshness Touch] Galeria inesperada:', parsed.error.issues);
       throw new ApiClientError('BAD_CONTRACT', 'calculator.errorGeneric');
     }
     return parsed.data;
