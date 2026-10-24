@@ -4,6 +4,7 @@ import { StickyMobileCta } from './components/StickyMobileCta';
 import { Hero } from './sections/Hero';
 import { Services } from './sections/Services';
 import { ScopeOfWork } from './sections/ScopeOfWork';
+import { Gallery } from './sections/Gallery';
 import { QuoteCalculator } from './sections/QuoteCalculator';
 import { WhyUs } from './sections/WhyUs';
 import { ServiceAreas } from './sections/ServiceAreas';
@@ -33,6 +34,14 @@ export default function App() {
           <ScopeOfWork />
           <QuoteCalculator />
           <WhyUs />
+          {/*
+            El antes y despues va DESPUES de por que nosotros y antes de las
+            zonas: a esta altura el visitante ya sabe que ofrecemos y que
+            prometemos, y lo que le falta es verlo. Si estuviera arriba
+            retrasaria el cotizador, que es lo que genera los ingresos, y si
+            no hay videos configurados la seccion no se pinta.
+          */}
+          <Gallery />
           <ServiceAreas />
           <Faq />
           <Contact />

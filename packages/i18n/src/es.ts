@@ -1543,6 +1543,20 @@ export const es: TranslationResources = {
     },
   },
 
+  /* ===================== Antes y despues ===================== */
+  /*
+   * La seccion no se pinta si no hay videos configurados, asi que estos
+   * textos pueden existir mucho antes de que haya contenido.
+   */
+  gallery: {
+    title: 'Antes y después',
+    subtitle:
+      'Casas reales que limpiamos, publicadas con el permiso por escrito de su propietario.',
+    thirdPartyNote:
+      'Los vídeos están alojados en YouTube. No se le pide nada a YouTube hasta que pulsas play.',
+    play: 'Reproducir vídeo',
+  },
+
   contact: {
     title: 'Cuando tú digas',
     subtitle: 'Obtén tu precio en línea o habla con una persona: como prefieras.',

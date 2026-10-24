@@ -1669,6 +1669,27 @@ export const en = {
     },
   },
 
+  /* ===================== Antes y despues ===================== */
+  /*
+   * La seccion no se pinta si no hay videos configurados, asi que estos
+   * textos pueden existir mucho antes de que haya contenido.
+   */
+  gallery: {
+    title: 'Before and after',
+    subtitle: 'Real homes we cleaned, shared with the owner’s written permission.',
+    /*
+     * EL AVISO DEL TERCERO VA ANTES DEL BOTON, NO DESPUES.
+     *
+     * Hasta que se pulsa, la pagina no pide nada a nadie. Al pulsar se carga
+     * un marco de YouTube, y esa es la unica peticion a un tercero que hace
+     * el sitio entero. El visitante tiene que poder decidirlo sabiendolo, no
+     * enterarse despues.
+     */
+    thirdPartyNote:
+      'Videos are hosted on YouTube. Nothing is requested from YouTube until you press play.',
+    play: 'Play video',
+  },
+
   contact: {
     title: 'Ready when you are',
     subtitle: 'Get your instant price online, or talk to a human — whichever you prefer.',

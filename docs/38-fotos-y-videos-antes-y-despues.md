@@ -263,7 +263,99 @@ problema:
 
 ---
 
-## 9. Qué hace falta para seguir
+## 9. Lo que ya está construido (etapa 2.B)
+
+La sección pública de vídeos, entera, y **se puede desplegar hoy**: si no hay
+vídeos configurados no se pinta nada. Eso es deliberado — permite que el
+código esté listo mientras se firman los primeros permisos.
+
+### El contrato: se guarda el identificador, nunca una URL
+
+`packages/types/src/gallery.ts`. Un vídeo de YouTube son once caracteres de
+`[A-Za-z0-9_-]`. Se guardan esos once y **la web construye la dirección**.
+
+Guardar la URL que alguien pegue convertiría el panel en una vía para
+incrustar en la portada un marco de cualquier sitio de internet: la CSP
+permite un origen para los marcos, y si el origen saliera del dato guardado
+dejaría de ser un muro. Con el identificador, el origen lo decide el código,
+en un solo sitio. En el conjunto permitido no cabe ni una barra, ni dos
+puntos, ni un punto, así que lo guardado no puede convertirse en otra
+dirección.
+
+Las pruebas del contrato rechazan expresamente `https://evil.example/x`,
+`dQw4w9WgX/Q`, `dQw4w9WgX:Q`, `dQw4w9WgX.Q` y `../../evil11`.
+
+### La fachada: nada de Google hasta el clic
+
+`apps/landing/src/components/VideoFacade.tsx`. Hasta que el visitante pulsa,
+la tarjeta es nuestra: un botón, un triángulo y un título. No hay marco, ni
+script, ni ninguna petición a ningún tercero.
+
+**«youtube-nocookie» no bastaba.** Retiene las cookies hasta la reproducción,
+pero las pruebas independientes encuentran que el marco escribe un
+identificador en el navegador y manda la IP del visitante a Google **en cuanto
+carga**, antes de que nadie pulse play. Google dice lo contrario y no hay
+forma de comprobarlo desde el código. Así que el marco no se carga hasta que
+el visitante lo pide: entonces es su decisión, no la nuestra, y el «esta web
+no manda datos a terceros» sigue siendo verdad para quien no pulse.
+
+**No hay miniatura, y es a propósito.** La natural sería la de YouTube
+(`i.ytimg.com`), que es exactamente la misma petición por otra puerta, y
+encima en cuanto la sección entra en pantalla. La tarjeta se pinta con los
+colores de la marca hasta que existan nuestras propias imágenes, que llegan
+con las fotos.
+
+El aviso de que el vídeo lo sirve un tercero se pinta **antes** del botón, no
+después: quien pulsa tiene que poder decidirlo sabiéndolo.
+
+### La CSP
+
+`apps/landing/vercel.json`: `frame-src` gana `https://www.youtube-nocookie.com`
+y nada más. `frame-ancestors 'none'` no se toca — ampliar `frame-src` es dejar
+entrar; eso otro es que nadie nos incruste a nosotros.
+
+`el-video-no-carga-hasta-que-se-pulsa.test.ts` ata las dos mitades, que viven
+en archivos distintos: el origen que usa el código tiene que estar permitido
+por la cabecera que Vercel sirve de verdad. Es el mismo fallo que ya ocurrió
+con las teselas del mapa, donde el mapa se veía en desarrollo y no en
+producción.
+
+### El resto de las piezas
+
+| Pieza                            | Dónde                                         |
+| -------------------------------- | --------------------------------------------- |
+| Lectura pública, nunca falla     | `apps/api/src/settings/gallery.service.ts`    |
+| Endpoint `GET /api/v1/gallery`   | `apps/api/src/settings/gallery.controller.ts` |
+| La sección                       | `apps/landing/src/sections/Gallery.tsx`       |
+| Una petición para toda la página | `apps/landing/src/hooks/useGallery.ts`        |
+| Textos en los dos idiomas        | `gallery.*` en `packages/i18n`                |
+
+La galería vive en **una sola fila** de `business_settings`, como el resto de
+la configuración, y por el mismo motivo: se reordena en tandas, y un fallo a
+mitad dejaría la portada con un vídeo repetido y otro perdido.
+
+**La caché son 30 segundos en el servidor y 5 minutos en el navegador, a
+propósito corta:** un cliente puede revocar su consentimiento y la empresa
+promete retirar el material en unos días. Una caché larga alargaría esa
+promesa sin que nadie lo notara.
+
+Si la fila tiene basura, un identificador inválido o una clave que el contrato
+no conoce, **se ignora la fila entera y la sección no se pinta**. Se ignora
+entera y no solo el vídeo malo a propósito: colando los válidos, la dueña
+vería la galería «casi bien» y no sabría que le falta uno.
+
+### Lo que todavía no existe
+
+- **Editarla desde el panel** (etapa 2.C). Hoy la fila solo se puede poner por
+  SQL, así que en la práctica la sección sigue invisible — que es justamente
+  lo que queremos hasta que haya permisos firmados.
+- **Las fotos** (etapa 2.C también): necesitan Supabase Storage, la subida, el
+  borrado de metadatos EXIF y los límites de tamaño.
+- **El registro de consentimientos** (etapa 2.D).
+
+---
+
+## 10. Qué hace falta para seguir
 
 Por orden, y lo primero bloquea el resto:
 

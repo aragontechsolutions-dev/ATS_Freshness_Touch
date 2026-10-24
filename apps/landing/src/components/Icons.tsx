@@ -233,6 +233,15 @@ export function CloseIcon({ className = base }: IconProps) {
 }
 
 /** Flecha de los botones de accion, como en el manual de marca. */
+export function PlayIcon({ className = base }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden="true">
+      {/* Triangulo macizo: a tamano pequeno un contorno se pierde. */}
+      <path d="M8 5.2v13.6a1 1 0 0 0 1.52.85l11-6.8a1 1 0 0 0 0-1.7l-11-6.8A1 1 0 0 0 8 5.2Z" />
+    </svg>
+  );
+}
+
 export function ArrowRightIcon({ className = base }: IconProps) {
   return (
     <svg
