@@ -15,12 +15,21 @@ export const company = {
   name: 'Freshness Touch',
 
   /*
-   * Base de operaciones. Debe coincidir con COMPANY_BASE_* de la API, que es
-   * desde donde se calculan las distancias y los recargos por zona. No se
-   * edita desde el panel a proposito: cambiarla moveria el origen de todos
-   * los precios, y eso es una decision con consecuencias economicas, no un
-   * dato de contacto.
+   * Base de operaciones, SOLO COMO RESPALDO.
+   *
+   * La sede de verdad es la que esta guardada en el panel: es el origen del
+   * calculo de distancia y de los recargos por zona, y llega a la web dentro
+   * del catalogo (`baseOfOperations`). Lo que se pinta sale de ahi.
+   *
+   * ESTOS DOS VALORES SOLO SE USAN MIENTRAS EL CATALOGO NO HA LLEGADO o si la
+   * API no responde, para que la seccion de contacto no salga con un hueco.
+   * Antes eran la unica fuente, escrita a mano, y eso permitia que la web
+   * anunciara una ciudad mientras los precios se median desde otra: el
+   * cliente leia "con base en X" y pagaba el traslado desde Y. Si la empresa
+   * se muda, lo que hay que cambiar es el panel; esto es solo el texto que se
+   * ensena durante los primeros milisegundos, asi que conviene mantenerlo al
+   * dia, pero ya no manda.
    */
-  city: 'Atlanta',
+  city: 'Marietta',
   state: 'GA',
 } as const;

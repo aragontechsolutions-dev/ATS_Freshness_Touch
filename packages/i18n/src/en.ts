@@ -1612,7 +1612,7 @@ export const en = {
     /* --------------------------- El mapa --------------------------- */
     /** Lo que oye quien usa lector de pantalla: un mapa sin describir no dice nada. */
     mapDescription:
-      'Map of our service area: concentric rings around Atlanta reaching up to {{miles}} miles, covering the whole State of Georgia.',
+      'Map of our service area: concentric rings around {{city}} reaching up to {{miles}} miles, covering the whole State of Georgia.',
     mapRadiusNote:
       'The rings are straight-line distances. Travel is billed by road miles, which are always longer — the quote gives you the exact figure.',
     mapZoneInstant: 'Zone {{zone}} — up to {{miles}} miles · {{amount}}',
@@ -1690,7 +1690,7 @@ export const en = {
       6: 'Saturday',
       7: 'Sunday',
     },
-    serviceArea: 'Based in {{city}}, {{state}}',
+    serviceArea: 'Based in {{city}}, {{state}} - Serving Metro Atlanta',
   },
 
   footer: {

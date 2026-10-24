@@ -4,11 +4,30 @@ import { MailIcon, WhatsAppIcon, MapPinIcon } from '../components/Icons';
 import { BusinessHoursList } from '../components/BusinessHoursList';
 import { Reveal } from '../components/Reveal';
 import { useBusinessContact } from '../hooks/useBusinessSettings';
+import { useCatalog } from '../hooks/useCatalog';
 
 export function Contact() {
   const { t } = useTranslation();
   const contacto = useBusinessContact();
   const whatsapp = contacto.whatsappHref();
+
+  /*
+   * LA SEDE QUE SE ENSENA ES LA MISMA DESDE LA QUE SE COBRA.
+   *
+   * Sale del catalogo, que la trae del panel, y es el punto exacto desde el
+   * que se mide la distancia de cada presupuesto y el recargo de cada zona.
+   *
+   * ANTES ESTABA ESCRITA A MANO EN `config/company.ts`, y ese era el fallo:
+   * el dia que la empresa se mudara, la web seguiria anunciando la ciudad
+   * vieja mientras el cotizador mediria desde la nueva. El cliente leeria
+   * "con base en X" y pagaria el traslado desde Y, y nadie se enteraria
+   * hasta que uno reclamara. Igual que con el centro del mapa, el dato
+   * tiene que venir de una sola fuente.
+   *
+   * El respaldo del codigo solo se ve mientras el catalogo no ha llegado:
+   * la seccion se pinta entera aunque la API no responda.
+   */
+  const sede = useCatalog().catalog?.baseOfOperations ?? company;
 
   return (
     <section id="contact" className="py-12 sm:py-16 lg:py-20">
@@ -80,7 +99,7 @@ export function Contact() {
                     <BusinessHoursList hours={contacto.settings.hours} />
                   </dd>
                   <dd className="text-slate-600 dark:text-slate-400">
-                    {t('contact.serviceArea', { city: company.city, state: company.state })}
+                    {t('contact.serviceArea', { city: sede.city, state: sede.state })}
                   </dd>
                 </div>
               </div>

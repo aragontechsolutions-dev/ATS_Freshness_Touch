@@ -1485,7 +1485,7 @@ export const es: TranslationResources = {
     /* --------------------------- El mapa --------------------------- */
     /** Lo que oye quien usa lector de pantalla: un mapa sin describir no dice nada. */
     mapDescription:
-      'Mapa de nuestra área de servicio: anillos concéntricos alrededor de Atlanta que llegan hasta {{miles}} millas y cubren todo el estado de Georgia.',
+      'Mapa de nuestra área de servicio: anillos concéntricos alrededor de {{city}} que llegan hasta {{miles}} millas y cubren todo el estado de Georgia.',
     mapRadiusNote:
       'Los anillos son distancias en línea recta. El traslado se cobra por millas de carretera, que siempre son más: el cotizador da la cifra exacta.',
     mapZoneInstant: 'Zona {{zone}} — hasta {{miles}} millas · {{amount}}',
@@ -1559,7 +1559,7 @@ export const es: TranslationResources = {
       6: 'Sábado',
       7: 'Domingo',
     },
-    serviceArea: 'Con base en {{city}}, {{state}}',
+    serviceArea: 'Con base en {{city}}, {{state}} - Servicio en el área metropolitana de Atlanta',
   },
 
   footer: {
