@@ -1,4 +1,28 @@
 import { z } from 'zod';
+
+/*
+ * ESTE ARCHIVO ES UNA RESPUESTA QUE LEE EL NAVEGADOR, Y POR ESO NO ES ESTRICTO
+ * ============================================================================
+ * En el resto del proyecto los contratos son `strictObject`: rechazan las
+ * claves que no conocen, y eso es lo correcto para lo que se GUARDA —una
+ * clave mal escrita no se queda en la base sin salir nunca—.
+ *
+ * Aqui seria un fallo, y costo un incidente descubrirlo.
+ *
+ * La web y la API se despliegan POR SEPARADO. El dia que la API gana un campo
+ * nuevo, todo navegador que siga con la version anterior de la web recibe una
+ * respuesta con una clave que su contrato no conoce. Siendo estricto, la
+ * descarta ENTERA: no es que falte el campo nuevo, es que desaparece la
+ * seccion completa. Y encima en silencio, porque el sitio esta programado
+ * para no romperse cuando la API no responde.
+ *
+ * Paso de verdad con la galeria: la API empezo a devolver las fotos, la web
+ * desplegada solo conocia los videos, y la seccion entera dejo de pintarse
+ * —videos incluidos— sin un solo error visible.
+ *
+ * `z.object` ignora lo que no conoce. Una version vieja de la web sigue
+ * funcionando con una API nueva; simplemente no usa lo que no entiende.
+ */
 import {
   AddOnCodeSchema,
   AddOnUnitSchema,
@@ -23,12 +47,12 @@ import { QuoteTaxSchema } from './quote';
  * Sirve para comparar cadencias de un vistazo —«semanal desde 120 $,
  * quincenal desde 135 $»—; la cifra exacta la da el presupuesto.
  */
-export const CatalogRateSchema = z.strictObject({
+export const CatalogRateSchema = z.object({
   fromCents: z.int().nonnegative(),
 });
 export type CatalogRate = z.infer<typeof CatalogRateSchema>;
 
-export const CatalogServiceSchema = z.strictObject({
+export const CatalogServiceSchema = z.object({
   code: ServiceTypeSchema,
   /** false para servicios que requieren visita previa. */
   instantQuote: z.boolean(),
@@ -48,7 +72,7 @@ export const CatalogServiceSchema = z.strictObject({
 });
 export type CatalogService = z.infer<typeof CatalogServiceSchema>;
 
-export const CatalogAddOnSchema = z.strictObject({
+export const CatalogAddOnSchema = z.object({
   code: AddOnCodeSchema,
   unit: AddOnUnitSchema,
   unitAmountCents: z.int().nonnegative(),
@@ -64,12 +88,12 @@ export type CatalogAddOn = z.infer<typeof CatalogAddOnSchema>;
  * semana», no «185 menos un 35%». Lo que cuesta cada cadencia esta en
  * `rates` de cada servicio, porque depende del servicio.
  */
-export const CatalogFrequencySchema = z.strictObject({
+export const CatalogFrequencySchema = z.object({
   code: FrequencySchema,
 });
 export type CatalogFrequency = z.infer<typeof CatalogFrequencySchema>;
 
-export const CatalogZoneSchema = z.strictObject({
+export const CatalogZoneSchema = z.object({
   code: ServiceZoneSchema,
   /** Limite superior en millas; null para la zona final. */
   maxMiles: z.number().nullable(),
@@ -86,31 +110,31 @@ export const CatalogZoneSchema = z.strictObject({
 export type CatalogZone = z.infer<typeof CatalogZoneSchema>;
 
 /** El deposito: una cifra fija que se descuenta del total. */
-export const CatalogDepositSchema = z.strictObject({
+export const CatalogDepositSchema = z.object({
   amountCents: z.int().nonnegative(),
 });
 export type CatalogDeposit = z.infer<typeof CatalogDepositSchema>;
 
 /** Lo que hay que saber del traslado antes de pedir una cotizacion. */
-export const CatalogTravelSchema = z.strictObject({
+export const CatalogTravelSchema = z.object({
   freeRadiusMiles: z.number().nonnegative(),
   centsPerMile: z.number().nonnegative(),
   roundTrip: z.boolean(),
 });
 export type CatalogTravel = z.infer<typeof CatalogTravelSchema>;
 
-export const CatalogLimitsSchema = z.strictObject({
-  bedrooms: z.strictObject({ min: z.int(), max: z.int() }),
-  bathrooms: z.strictObject({ min: z.int(), max: z.int() }),
-  squareFeet: z.strictObject({ min: z.int(), max: z.int() }),
+export const CatalogLimitsSchema = z.object({
+  bedrooms: z.object({ min: z.int(), max: z.int() }),
+  bathrooms: z.object({ min: z.int(), max: z.int() }),
+  squareFeet: z.object({ min: z.int(), max: z.int() }),
   addOnsMax: z.int(),
 });
 export type CatalogLimits = z.infer<typeof CatalogLimitsSchema>;
 
-export const CatalogResponseSchema = z.strictObject({
+export const CatalogResponseSchema = z.object({
   currency: z.literal('USD'),
   /** Base de operaciones (origen del calculo de distancia). */
-  baseOfOperations: z.strictObject({
+  baseOfOperations: z.object({
     city: z.string(),
     state: z.string(),
     postalCode: z.string(),

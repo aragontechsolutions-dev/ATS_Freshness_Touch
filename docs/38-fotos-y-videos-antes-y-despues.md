@@ -554,6 +554,41 @@ lo mismo dos veces.
 Es lo contrario de las fotos de la galería, que **siempre** llevan texto
 alternativo, porque ahí la imagen _es_ el contenido.
 
+### El incidente de la sección que desapareció
+
+Al desplegar las fotos, **la sección de antes y después dejó de verse entera
+en la web** — vídeos incluidos—, sin ningún error visible. La API devolvía las
+fotos correctamente; se comprobó abriendo `/api/v1/gallery` en el navegador.
+
+**La causa: la web y la API se despliegan por separado.** Entre un despliegue
+y otro hay una ventana en la que una web vieja habla con una API nueva. En esa
+ventana la API devolvía dos claves que el contrato de la web anterior no
+conocía, `photos` y `posterUrl`. Y ese contrato era `strictObject`, así que no
+ignoró las claves nuevas: **descartó la respuesta entera**.
+
+El resultado no fue «faltan las fotos», fue «no hay galería». Y en silencio,
+porque el sitio está programado para no romperse cuando la API no responde:
+una galería vacía es un estado legítimo.
+
+**El arreglo, y la regla que queda:**
+
+| Para qué                                           | Qué contrato     | Por qué                                                                                                                                          |
+| -------------------------------------------------- | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Lo que se **guarda** y lo que el panel **escribe** | `z.strictObject` | Una clave mal escrita no puede quedarse en la base sin salir nunca en la web. Aquí el que manda es el panel, que se despliega con su propia API. |
+| Lo que el navegador **lee**                        | `z.object`       | Ignora lo que no conoce. Una web vieja sigue funcionando con una API nueva; simplemente no usa lo que no entiende.                               |
+
+Se aplicó a `PublicGallerySchema` y a **todo** `catalog.ts`, que es la otra
+respuesta que la web lee en cada visita y de la que dependen el cotizador, el
+mapa y los precios. Lo ata
+`lo-que-lee-la-web-tolera-campos-nuevos.test.ts`, que comprueba las dos
+mitades: que lo que se lee ignora los campos nuevos y que lo que se guarda
+sigue rechazándolos.
+
+> **Queda pendiente revisarlo en `BusinessSettingsSchema` y `SiteCopySchema`**,
+> que tienen el mismo riesgo pero se usan a la vez para leer desde la web y
+> para escribir desde el panel. Separarlos en dos contratos es una etapa
+> propia, no un cambio de una línea.
+
 ### Lo que todavía no existe
 
 - **Reordenar** los vídeos y las fotos arrastrando. Hoy el orden es el de
