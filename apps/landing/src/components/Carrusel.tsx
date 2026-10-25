@@ -35,14 +35,20 @@ import { ArrowRightIcon } from './Icons';
  * el salto caeria dentro de lo visible y se veria dar el tiron.
  *
  * ========================================================================
- * LAS COPIAS NO EXISTEN PARA QUIEN NO MIRA
+ * LAS COPIAS SE PULSAN, PERO NO SE LEEN NI SE TABULAN
  * ========================================================================
  * Son el mismo contenido repetido. Un lector de pantalla leeria la galeria
  * cuatro veces, y el tabulador pasaria cuatro veces por cada boton de play.
- * Por eso las copias llevan `inert`: las saca del orden de tabulacion Y del
- * arbol de accesibilidad a la vez. Marcarlas solo como ocultas dejaria los
- * botones alcanzables con el teclado pero invisibles para el lector, que es
- * peor que no hacer nada.
+ *
+ * LA PRIMERA VERSION USABA `inert` Y ESO FUE UN FALLO. `inert` saca del
+ * tabulador y del arbol de accesibilidad, si, PERO TAMBIEN QUITA EL RATON:
+ * solo se podia reproducir el video de la primera copia —la del extremo
+ * izquierdo— y en cualquier otra posicion la tarjeta parecia una foto mas.
+ *
+ * Ahora las copias llevan `aria-hidden` y sus botones salen del tabulador uno
+ * a uno. Con el raton se pulsa cualquiera; con el teclado se llega siempre a
+ * la primera, que es la de verdad, y el navegador la trae a la vista al
+ * enfocarla.
  *
  * ========================================================================
  * SE PARA MIENTRAS ALGUIEN ESTA, Y VUELVE A ARRANCAR AL IRSE
@@ -83,11 +89,25 @@ import { ArrowRightIcon } from './Icons';
 export interface PiezaDelCarrusel {
   /** Identificador estable. Se usa tambien para las copias. */
   clave: string;
-  nodo: ReactNode;
+  /**
+   * Recibe si esta copia entra en el tabulador.
+   *
+   * Es una funcion y no un nodo ya hecho porque la decision depende de la
+   * copia, y solo quien pinta la pieza sabe que elementos suyos son
+   * enfocables.
+   */
+  nodo: (enfocable: boolean) => ReactNode;
 }
 
 interface CarruselProps {
   piezas: PiezaDelCarrusel[];
+  /**
+   * Cuando es cierto, la fila se queda quieta.
+   *
+   * Lo usa la galeria mientras hay un video abierto: lo que se esta viendo
+   * no puede irse de la pantalla solo.
+   */
+  pausado?: boolean;
   /** Como se anuncia la fila a quien usa lector de pantalla. */
   etiqueta: string;
   etiquetaAnterior: string;
@@ -113,6 +133,14 @@ const PIEZAS_MINIMAS = 12;
 
 /** Lo que se queda quieto tras tocar un boton, para no pelear con el. */
 const PAUSA_TRAS_TOCAR_MS = 1200;
+
+/**
+ * Lo maximo que la fila se queda parada por un video abierto.
+ *
+ * Los videos de antes y despues duran uno o dos minutos, asi que nadie va a
+ * ver el salto mientras mira. Es la red por si alguien se va sin cerrar.
+ */
+const PAUSA_MAXIMA_MS = 5 * 60 * 1000;
 
 /**
  * Cuantas veces hay que repetir la lista en la pista.
@@ -143,13 +171,46 @@ export function vueltasQueCaben(anchoVisible: number, anchoDeUnaVuelta: number):
   return Math.ceil(anchoVisible / anchoDeUnaVuelta) + 2;
 }
 
-export function Carrusel({ piezas, etiqueta, etiquetaAnterior, etiquetaSiguiente }: CarruselProps) {
+export function Carrusel({
+  piezas,
+  pausado = false,
+  etiqueta,
+  etiquetaAnterior,
+  etiquetaSiguiente,
+}: CarruselProps) {
   const sinMovimiento = usePrefiereMenosMovimiento();
   const caja = useRef<HTMLDivElement | null>(null);
 
   const [vueltas, setVueltas] = useState(() => vueltasNecesarias(piezas.length));
   const [quieto, setQuieto] = useState(false);
   const [tocadoHace, setTocadoHace] = useState(0);
+  const [redRota, setRedRota] = useState(false);
+
+  /*
+   * LA RED DE SEGURIDAD.
+   *
+   * La fila se para mientras hay un video abierto, y quien lo abrio puede
+   * irse de la pagina sin cerrarlo. Sin esto se quedaria parada para siempre
+   * y la galeria dejaria de hacer lo unico que hace.
+   *
+   * Cinco minutos: los videos de antes y despues duran uno o dos, asi que
+   * nadie va a ver el salto mientras mira. No es un sustituto de cerrar, es
+   * lo que pasa cuando nadie cierra.
+   */
+  useEffect(() => {
+    if (!pausado) {
+      setRedRota(false);
+      return;
+    }
+
+    const id = setTimeout(() => {
+      setRedRota(true);
+    }, PAUSA_MAXIMA_MS);
+
+    return () => {
+      clearTimeout(id);
+    };
+  }, [pausado]);
 
   /*
    * MEDIR Y CORREGIR. Lo calculado a ojo no sabe de que tamano es la pantalla
@@ -192,7 +253,7 @@ export function Carrusel({ piezas, etiqueta, etiquetaAnterior, etiquetaSiguiente
     [vueltas],
   );
 
-  const detenido = sinMovimiento || quieto || Date.now() < tocadoHace;
+  const detenido = sinMovimiento || quieto || (pausado && !redRota) || Date.now() < tocadoHace;
 
   /*
    * EL SEGURO PARA QUE SIEMPRE VUELVA A ARRANCAR.
@@ -313,11 +374,14 @@ export function Carrusel({ piezas, etiqueta, etiquetaAnterior, etiquetaSiguiente
                    * El trozo que asoma es el que dice que hay mas.
                    */
                   className="w-[78vw] max-w-80 shrink-0 sm:w-80"
-                  // Las copias no existen para el teclado ni para el lector.
-                  inert={esCopia}
+                  /*
+                   * Las copias no se leen. Y sus botones salen del tabulador
+                   * uno a uno, dentro de la pieza: `aria-hidden` sobre algo
+                   * que si se puede tabular seria lo peor de los dos mundos.
+                   */
                   aria-hidden={esCopia || undefined}
                 >
-                  {pieza.nodo}
+                  {pieza.nodo(!esCopia)}
                 </li>
               );
             }),

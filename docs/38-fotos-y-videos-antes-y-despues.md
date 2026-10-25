@@ -608,16 +608,41 @@ ninguna; el trozo que asoma es el que dice que hay más.
 Un carrusel automático tiene tres formas clásicas de salir mal, y ninguna se
 ve mirando la pantalla propia:
 
-| Riesgo                                                                      | Qué se hace                                                                                                                                                                                                                                                                                                                                                                                   |
-| --------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Marea** a quien ha pedido menos movimiento                                | Se consulta el ajuste **en JavaScript** y no se mueve solo nunca. La fila sigue entera y se recorre con los botones, con el dedo o con la rueda: quien ha pedido menos movimiento no pierde contenido, solo deja de perseguirlo. Parar la animación en CSS, que era lo de antes, habría dejado la mitad fuera de la pantalla y sin forma de llegar a ella.                                    |
-| **Se escapa** justo cuando vas a pulsar, o **se queda parada para siempre** | Lo que para la fila es **estar encima**, y nada más: el ratón dentro, el foco del teclado dentro, o un momento después de tocar un botón. Un vídeo abierto **no** la para: la primera versión lo hacía y se quedaba parada para siempre, porque nada volvía a cerrarlo — no hay forma de saber cuándo termina un vídeo de YouTube sin cargar su script, que es justo lo que la fachada evita. |
-| **Se lee cuatro veces** con lector de pantalla                              | Las copias llevan `inert`, que las saca del orden de tabulación **y** del árbol de accesibilidad a la vez. Marcarlas solo como ocultas dejaría los botones alcanzables con el teclado pero invisibles para el lector, que es peor que no hacer nada.                                                                                                                                          |
+| Riesgo                                                                      | Qué se hace                                                                                                                                                                                                                                                                                                                                                |
+| --------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Marea** a quien ha pedido menos movimiento                                | Se consulta el ajuste **en JavaScript** y no se mueve solo nunca. La fila sigue entera y se recorre con los botones, con el dedo o con la rueda: quien ha pedido menos movimiento no pierde contenido, solo deja de perseguirlo. Parar la animación en CSS, que era lo de antes, habría dejado la mitad fuera de la pantalla y sin forma de llegar a ella. |
+| **Se escapa** justo cuando vas a pulsar, o **se queda parada para siempre** | Para con el ratón dentro, con el foco del teclado dentro, un momento tras tocar un botón, y **mientras hay un vídeo abierto**. Lo que se está viendo no puede irse solo. Para volver a arrancar hay una **X** en el vídeo y, por si nadie la pulsa, una red de seguridad de 5 minutos.                                                                     |
+| **Se lee cuatro veces** con lector de pantalla                              | Las copias llevan `aria-hidden` y sus botones salen del tabulador uno a uno. La primera versión usaba `inert`, que hace las dos cosas de golpe — **y también quita el ratón**: solo se podía reproducir el vídeo de la copia del extremo izquierdo, y en cualquier otra posición la tarjeta parecía una foto más.                                          |
 
 La fila va **fuera del `Reveal`** de la sección: esa animación de entrada usa
 `transform`, y los mandos van posicionados encima de las fotos — dentro de un
 elemento con `transform` se posicionarían contra él y acabarían descolocados
 mientras dura la entrada.
+
+### El vídeo abierto para la fila, y la forma de soltarla
+
+Lo que se está viendo no puede irse de la pantalla solo. Parar solo con el
+ratón encima no bastaba: en cuanto lo apartas para mirar el vídeo, se iba
+sonando.
+
+Saber **cuándo termina** un vídeo exigiría cargar el script de YouTube, que es
+justo lo que la fachada de clic evita. Así que en vez de adivinarlo:
+
+- **Una X sobre el vídeo** devuelve a la tarjeta y suelta la fila al instante.
+  Resuelve además algo que faltaba: hasta ahora, una vez abierto un vídeo no
+  había forma de volver a la portada.
+- **Una red de seguridad de 5 minutos** por si alguien se va sin cerrar. Los
+  vídeos de antes y después duran uno o dos, así que nadie ve el salto
+  mientras mira; no sustituye a cerrar, es lo que pasa cuando nadie cierra.
+
+Se **cuentan** los vídeos abiertos, no se marca un booleano: la misma pieza
+está varias veces en la fila y se puede abrir en más de una copia — con un
+booleano, cerrar una dejaría la fila andando con la otra sonando.
+
+Y el aviso sale **del estado, no del clic**, para que la limpieza del efecto
+avise también cuando la tarjeta desaparece sin que nadie haya cerrado nada (al
+recalcularse las copias, por ejemplo). Avisando solo en el clic, la fila se
+quedaría creyendo que hay un vídeo abierto que ya no existe.
 
 ### Los dos detalles que hacen que vuelva a arrancar de verdad
 
