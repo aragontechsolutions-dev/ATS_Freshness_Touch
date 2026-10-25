@@ -386,15 +386,134 @@ lista entera no responde a «cuándo se retiró el vídeo de esta casa», que es
 dirección ni ningún dato del cliente**: son identificadores de vídeos ya
 públicos en YouTube. El cambio y su registro van en la misma transacción.
 
+### Las fotos (etapa 2.C.2)
+
+Se suben desde el panel, van a Supabase Storage y salen en la misma sección,
+debajo de los vídeos.
+
+#### Lo más importante: se les quita el GPS
+
+`apps/api/src/storage/strip-image-metadata.ts`.
+
+Una foto hecha con un móvil lleva dentro, en un bloque aparte de los píxeles,
+**las coordenadas GPS del sitio donde se tomó**. También la fecha, el modelo
+del teléfono y a veces el nombre del propietario.
+
+El permiso que firma el cliente dice que no se mostrará su calle ni su número,
+y el encuadre se cuida para que no salga la placa. Y después se publicaría un
+archivo con su dirección **exacta** escrita dentro, legible con cualquier visor
+de propiedades. Es el mismo criterio que ya rige en el fichaje de los
+empleados: de su ubicación solo se guarda la distancia, nunca las coordenadas.
+
+**Se hace sin recodificar y sin ninguna dependencia nueva.** Lo habitual sería
+`sharp`, que de paso borra todo, pero es una dependencia **nativa con script
+de instalación**, y este repositorio tiene los scripts de instalación cerrados
+a propósito: abrirlos amplía la superficie de suministro y mete un binario
+nativo en el arranque de la API. Esto es TypeScript puro que reconstruye el
+contenedor dejando fuera los bloques de metadatos.
+
+| Formato | Lo que se va                                              | Lo que se queda                                          |
+| ------- | --------------------------------------------------------- | -------------------------------------------------------- |
+| JPEG    | `APP1` (EXIF y XMP), `APP13` (IPTC), `APP14`, comentarios | `APP0` (JFIF), `APP2` (perfil de color), tablas, píxeles |
+| PNG     | `eXIf`, `tEXt`, `zTXt`, `iTXt`, `tIME`                    | todo lo demás, byte a byte                               |
+| WebP    | los trozos `EXIF` y `XMP `                                | el resto, y se **apagan las dos banderas** del `VP8X`    |
+
+Tres detalles que costarían un fallo difícil de encontrar si se hicieran mal, y
+que tienen su prueba:
+
+1. **En JPEG se copia tal cual desde el inicio de los datos.** Dentro de los
+   píxeles aparecen bytes `FF` por puro azar, y un `FF E1` ahí **no** es un
+   EXIF. Un limpiador que siguiera buscando marcadores recortaría un trozo de
+   la imagen y la corrompería **solo en algunas fotos**: el peor fallo posible,
+   porque pasa las pruebas con cualquier imagen que no tenga esa combinación.
+2. **En WebP hay que apagar las banderas de EXIF y XMP del `VP8X`.** Quitar los
+   datos y dejar la bandera encendida deja un archivo que anuncia un EXIF que
+   ya no existe: carga en unos navegadores y no en otros.
+3. **En WebP hay que reescribir el tamaño declarado del RIFF**, o el archivo
+   anuncia más bytes de los que tiene.
+
+Se conservan el perfil de color y la cabecera JFIF a propósito: no dicen nada
+de nadie, y sin el perfil una foto de móvil se publica con los colores lavados.
+
+#### Por qué la subida pasa por la API y no va directa al almacén
+
+Podría ir del navegador a Supabase. No va, por tres cosas que solo se pueden
+hacer en el servidor:
+
+1. **Comprobar que los bytes son una imagen**, por los bytes y no por lo que
+   diga el cliente. Sin esto, llamar `.jpg` a un SVG colaría **un documento con
+   JavaScript dentro** en un bucket público.
+2. **Quitar los metadatos**, que es lo de arriba.
+3. **Poner el nombre.** Si lo pusiera quien sube, se acabarían subiendo
+   archivos llamados `casa-de-los-martinez.jpg`, que es publicar el apellido del
+   cliente en una dirección que cualquiera puede leer. El nombre son **32
+   caracteres hexadecimales** y nada del original sobrevive.
+
+Y una cuarta: la clave de servicio de Supabase se salta las políticas de la
+base. En el navegador sería una clave de administración repartida a todo el que
+abra el panel.
+
+#### Rutas dentro, direcciones fuera
+
+Guardada vive la **ruta** (`photos/abc….jpg`), validada contra
+`/^photos\/[0-9a-f]{32}\.(jpg|png|webp)$/`. La **dirección** la compone el
+servidor, que es el único que sabe dónde está el almacén.
+
+Mandar la ruta y que la web le pegue delante un dominio suyo pondría ese
+dominio en dos sitios que tendrían que coincidir para siempre, y ya sabemos
+cómo acaba: es exactamente el fallo de la sede. La web no compone ninguna
+dirección, y una prueba comprueba que en la sección no aparece escrito ningún
+dominio de almacén.
+
+La CSP de las dos aplicaciones gana el origen del almacén en `img-src`, y una
+prueba exige que haya **exactamente uno** y que sea `https`.
+
+#### Retirar una foto la borra de verdad
+
+Quitarla solo de la fila dejaría el archivo accesible con su dirección para
+quien la tuviera. El permiso promete **retirar el material**, no esconder el
+enlace.
+
+- **El borrado va después de la transacción, no dentro.** Dentro, un fallo
+  posterior haría retroceder la fila y dejaría las fotos ya borradas: la
+  galería apuntaría a archivos que no existen.
+- **`remove` no falla nunca**, a propósito. Lo que importa de retirar una foto
+  es que deje de verse, y eso ya pasó al guardar la fila. Un archivo huérfano
+  es un problema de limpieza; una foto que sigue publicada después de pedir que
+  la quiten es un problema legal.
+
+#### Un dato que casi se perdió
+
+La pantalla tiene **dos listas y un solo botón de guardar**, y se manda la
+galería entera: lo que no viene, se borra. La primera versión del formulario
+solo conocía los vídeos, así que guardar un vídeo habría **retirado todas las
+fotos y las habría borrado del almacén** sin que nadie lo pidiera. Lo atan dos
+pruebas: «guardar un cambio de los vídeos NO borra las fotos» y la simétrica.
+
+#### Configuración
+
+| Variable                    | Valor en producción | Qué hace                                                                                                                                    |
+| --------------------------- | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `STORAGE_PROVIDER`          | `supabase`          | Con `memory` las fotos viven en la memoria del proceso y sus direcciones no cargan nada. La API avisa por error si sigue así en producción. |
+| `GALLERY_BUCKET`            | `gallery`           | El bucket público.                                                                                                                          |
+| `SUPABASE_SERVICE_ROLE_KEY` | secreto en Render   | Nunca sale al navegador ni se escribe en un registro.                                                                                       |
+| `STORAGE_TIMEOUT_MS`        | `10000`             |                                                                                                                                             |
+
+La API **no arranca** con `STORAGE_PROVIDER=supabase` y sin clave: el fallo se
+ve en el despliegue, no la primera vez que alguien intenta publicar una foto.
+
 ### Lo que todavía no existe
 
-- **Las fotos** (etapa 2.C.2): necesitan el bucket `gallery` de Supabase
-  Storage, la subida por la API, el borrado de metadatos EXIF y los límites de
-  tamaño.
 - **Las miniaturas propias de los vídeos** (`posters/` del mismo bucket). Hasta
-  que existan, la tarjeta se pinta con los colores de la marca.
+  que existan, la tarjeta del vídeo se pinta con los colores de la marca. Ya
+  hay subida y limpieza de metadatos, así que es poco más que reutilizarlas.
+- **Reordenar** los vídeos y las fotos arrastrando. Hoy el orden es el de
+  subida; para cambiarlo hay que quitar y volver a poner.
 - **El registro de consentimientos** (etapa 2.D), que une el papel firmado con
-  la pieza publicada.
+  la pieza publicada. Mientras no exista, sirve la hoja de cálculo de la
+  sección 6.
+- **Limpieza de huérfanos**: una foto subida y nunca guardada se queda en el
+  almacén sin verse en ninguna parte. No molesta a nadie, pero ocupa.
 
 ### El bucket de Supabase Storage
 

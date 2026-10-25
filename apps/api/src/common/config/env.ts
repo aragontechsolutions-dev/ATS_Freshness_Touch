@@ -250,6 +250,28 @@ export const EnvSchema = z
      */
     SUPABASE_INVITE_REDIRECT_URL: z.string().url().optional(),
     AUTH_TIMEOUT_MS: z.coerce.number().int().min(500).default(5000),
+
+    /* --- Almacen de imagenes (galeria de antes y despues) --- */
+    /**
+     * memory | supabase. Con "memory" las fotos se guardan en la memoria del
+     * proceso y las direcciones que se devuelven NO cargan ninguna imagen:
+     * en desarrollo se ve el hueco, y eso es lo correcto. Fingir que
+     * funciona es como se despliega creyendo que las fotos estan subidas.
+     *
+     * Reutiliza SUPABASE_URL y SUPABASE_SERVICE_ROLE_KEY: es el mismo
+     * proyecto que ya autentica al personal, no un servicio aparte.
+     */
+    STORAGE_PROVIDER: z.enum(['memory', 'supabase']).default('memory'),
+    /**
+     * El bucket donde viven las fotos de la galeria. Publico de lectura: son
+     * imagenes hechas para que las vea todo internet.
+     *
+     * Las fotos INTERNAS de prueba del trabajo iran en otro bucket y con
+     * direcciones firmadas de corta duracion. No se mezclan: lo que distingue
+     * a las dos no es el tamano, es quien puede verlas.
+     */
+    GALLERY_BUCKET: z.string().min(1).default('gallery'),
+    STORAGE_TIMEOUT_MS: z.coerce.number().int().min(500).default(10_000),
     /** Secreto del proveedor local. Solo desarrollo y pruebas. */
     AUTH_LOCAL_SECRET: z.string().min(1).default('secreto-de-desarrollo-no-usar-en-produccion'),
 
@@ -326,6 +348,25 @@ export const EnvSchema = z
     message: 'SUPABASE_URL es obligatoria cuando se configura SUPABASE_SERVICE_ROLE_KEY',
     path: ['SUPABASE_URL'],
   })
+  /*
+   * UN ALMACEN A MEDIAS NO ARRANCA.
+   *
+   * Con STORAGE_PROVIDER=supabase pero sin clave, cada subida fallaria con un
+   * 503 y el panel diria «el almacen no esta configurado» sin que nadie
+   * entendiera por que. Prefiero que no arranque: el fallo se ve en el
+   * despliegue, no la primera vez que alguien intenta publicar una foto.
+   */
+  .refine(
+    (env) =>
+      env.STORAGE_PROVIDER !== 'supabase' ||
+      (Boolean(env.SUPABASE_URL) && Boolean(env.SUPABASE_SERVICE_ROLE_KEY)),
+    {
+      message:
+        'SUPABASE_URL y SUPABASE_SERVICE_ROLE_KEY son obligatorias cuando ' +
+        'STORAGE_PROVIDER=supabase',
+      path: ['STORAGE_PROVIDER'],
+    },
+  )
   /*
    * EL PROVEEDOR LOCAL NO ARRANCA EN PRODUCCION.
    *

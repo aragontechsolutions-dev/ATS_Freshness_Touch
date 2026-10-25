@@ -1,7 +1,7 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { AdminGallery, Gallery } from '@freshness/types';
+import type { AdminGallery, Gallery, GalleryPhotoUpload } from '@freshness/types';
 import '../i18n';
 
 /**
@@ -26,11 +26,17 @@ import '../i18n';
 
 const fetchGallery = vi.fn<() => Promise<AdminGallery>>();
 const saveGallery = vi.fn<(g: Gallery) => Promise<AdminGallery>>();
+const uploadGalleryPhoto = vi.fn<(f: File) => Promise<GalleryPhotoUpload>>();
 
 vi.mock('../lib/api', () => ({
   fetchGallery: () => fetchGallery(),
   saveGallery: (g: Gallery) => saveGallery(g),
-  ApiClientError: class ApiClientError extends Error {},
+  uploadGalleryPhoto: (f: File) => uploadGalleryPhoto(f),
+  ApiClientError: class ApiClientError extends Error {
+    constructor(readonly statusCode: number) {
+      super('fallo');
+    }
+  },
 }));
 
 vi.mock('./ToastProvider', () => ({
@@ -46,7 +52,15 @@ const { GalleryForm, identificadorDeYouTube } = await import('./GalleryForm');
 const UNO = 'dQw4w9WgXcQ';
 const DOS = 'aBcDeFgHiJk';
 
-const VACIA: AdminGallery = { gallery: { videos: [] }, updatedAt: null, updatedBy: null };
+const FOTO = 'photos/0123456789abcdef0123456789abcdef.jpg';
+const FOTO_URL = `https://ejemplo.supabase.co/storage/v1/object/public/gallery/${FOTO}`;
+
+const VACIA: AdminGallery = {
+  gallery: { videos: [], photos: [] },
+  photoUrls: {},
+  updatedAt: null,
+  updatedBy: null,
+};
 
 const CON_DOS: AdminGallery = {
   gallery: {
@@ -54,7 +68,20 @@ const CON_DOS: AdminGallery = {
       { videoId: UNO, title: { en: 'Kitchen', es: 'Cocina' } },
       { videoId: DOS, title: { en: null, es: null } },
     ],
+    photos: [],
   },
+  photoUrls: {},
+  updatedAt: '2026-10-20T12:00:00.000Z',
+  updatedBy: 'Ada Jefa',
+};
+
+/** Con una foto ya publicada, para las pruebas de las fotos. */
+const CON_FOTO: AdminGallery = {
+  gallery: {
+    videos: [{ videoId: UNO, title: { en: null, es: null } }],
+    photos: [{ path: FOTO, title: { en: 'Kitchen', es: 'Cocina' } }],
+  },
+  photoUrls: { [FOTO]: FOTO_URL },
   updatedAt: '2026-10-20T12:00:00.000Z',
   updatedBy: 'Ada Jefa',
 };
@@ -103,8 +130,14 @@ beforeEach(() => {
   vi.clearAllMocks();
   fetchGallery.mockResolvedValue(VACIA);
   saveGallery.mockImplementation((gallery) =>
-    Promise.resolve({ gallery, updatedAt: '2026-10-20T13:00:00.000Z', updatedBy: 'Ada Jefa' }),
+    Promise.resolve({
+      gallery,
+      photoUrls: Object.fromEntries(gallery.photos.map((p) => [p.path, FOTO_URL])),
+      updatedAt: '2026-10-20T13:00:00.000Z',
+      updatedBy: 'Ada Jefa',
+    }),
   );
+  uploadGalleryPhoto.mockResolvedValue({ path: FOTO, url: FOTO_URL });
 
   contenedor = document.createElement('div');
   document.body.append(contenedor);
@@ -178,6 +211,7 @@ describe('publicar un video', () => {
 
     expect(saveGallery).toHaveBeenCalledWith({
       videos: [{ videoId: UNO, title: { en: null, es: null } }],
+      photos: [],
     });
   });
 
@@ -232,6 +266,7 @@ describe('retirar un video', () => {
 
     expect(saveGallery).toHaveBeenCalledWith({
       videos: [{ videoId: DOS, title: { en: null, es: null } }],
+      photos: [],
     });
   });
 
@@ -243,7 +278,7 @@ describe('retirar un video', () => {
     await pulsar('Remove');
     await guardar();
 
-    expect(saveGallery).toHaveBeenCalledWith({ videos: [] });
+    expect(saveGallery).toHaveBeenCalledWith({ videos: [], photos: [] });
   });
 });
 
@@ -256,5 +291,125 @@ describe('sin cambios no hay nada que guardar', () => {
       b.textContent?.includes('Save gallery'),
     );
     expect(boton?.disabled).toBe(true);
+  });
+});
+
+describe('las fotos', () => {
+  /** El campo de archivo de la seccion de fotos. */
+  function campoArchivo(): HTMLInputElement {
+    const elemento = contenedor.querySelector<HTMLInputElement>('input[type="file"]');
+    if (!elemento) throw new Error('No encontre el campo de archivo');
+    return elemento;
+  }
+
+  async function elegir(archivo: File): Promise<void> {
+    const campo = campoArchivo();
+    Object.defineProperty(campo, 'files', { value: [archivo], configurable: true });
+    await act(async () => {
+      campo.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+  }
+
+  function imagen(bytes = 1000): File {
+    const archivo = new File(['x'], 'cocina.jpg', { type: 'image/jpeg' });
+    Object.defineProperty(archivo, 'size', { value: bytes, configurable: true });
+    return archivo;
+  }
+
+  it('ensena la vista previa de las fotos ya publicadas', async () => {
+    fetchGallery.mockResolvedValue(CON_FOTO);
+    await montar();
+
+    const img = contenedor.querySelector<HTMLImageElement>('img');
+    expect(img?.getAttribute('src')).toBe(FOTO_URL);
+  });
+
+  it('solo acepta los tres tipos de imagen', async () => {
+    // Un SVG es un documento que puede llevar JavaScript dentro. El servidor
+    // lo rechaza mirando los bytes; esto solo evita el viaje.
+    await montar();
+
+    const aceptados = campoArchivo().getAttribute('accept') ?? '';
+    expect(aceptados).toBe('image/jpeg,image/png,image/webp');
+    expect(aceptados).not.toContain('svg');
+  });
+
+  it('subir una foto la anade a la lista con su vista previa', async () => {
+    await montar();
+    await elegir(imagen());
+
+    expect(uploadGalleryPhoto).toHaveBeenCalledTimes(1);
+    expect(contenedor.querySelector('img')?.getAttribute('src')).toBe(FOTO_URL);
+  });
+
+  it('subir no publica: hay que guardar despues', async () => {
+    // Deja elegir el titulo antes de que la casa de nadie salga en la portada.
+    await montar();
+    await elegir(imagen());
+
+    expect(saveGallery).not.toHaveBeenCalled();
+  });
+
+  it('y al guardar va la ruta, nunca la direccion', async () => {
+    await montar();
+    await elegir(imagen());
+    await guardar();
+
+    expect(saveGallery).toHaveBeenCalledWith({
+      videos: [],
+      photos: [{ path: FOTO, title: { en: null, es: null } }],
+    });
+  });
+
+  /*
+   * EL AVISO DE TAMANO VA ANTES DE EMPEZAR A SUBIR.
+   *
+   * No es confiar en el navegador —el servidor lo rechaza igual—: es no hacer
+   * esperar a nadie dos minutos para un «no».
+   */
+  it('una foto demasiado grande no se llega a subir', async () => {
+    await montar();
+    await elegir(imagen(6 * 1024 * 1024));
+
+    expect(uploadGalleryPhoto).not.toHaveBeenCalled();
+    expect(contenedor.textContent).toContain('too large');
+  });
+
+  /*
+   * ESTA ES LA PRUEBA QUE EVITA UNA PERDIDA DE DATOS.
+   *
+   * La pantalla tiene dos listas y un solo boton de guardar, y se manda la
+   * galeria ENTERA: lo que no viene, se borra. Si las fotos no viajaran,
+   * tocar un video retiraria todas las fotos —y las borraria del almacen—
+   * sin que nadie lo hubiera pedido.
+   */
+  it('guardar un cambio de los videos NO borra las fotos', async () => {
+    fetchGallery.mockResolvedValue(CON_FOTO);
+    await montar();
+
+    await pulsar('Add a video');
+    escribir(campoEnlace(1), DOS);
+    await guardar();
+
+    const enviado = saveGallery.mock.calls[0]?.[0];
+    expect(enviado?.photos).toEqual([{ path: FOTO, title: { en: 'Kitchen', es: 'Cocina' } }]);
+  });
+
+  it('y retirar una foto NO borra los videos', async () => {
+    fetchGallery.mockResolvedValue(CON_FOTO);
+    await montar();
+
+    // El segundo «Remove» es el de la foto: el primero es el del video.
+    const botones = [...contenedor.querySelectorAll('button')].filter((b) =>
+      b.textContent?.includes('Remove'),
+    );
+    await act(async () => {
+      botones[1]?.click();
+    });
+    await guardar();
+
+    const enviado = saveGallery.mock.calls[0]?.[0];
+    expect(enviado?.photos).toEqual([]);
+    expect(enviado?.videos).toHaveLength(1);
   });
 });

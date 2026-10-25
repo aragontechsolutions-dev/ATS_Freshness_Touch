@@ -1,10 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_GALLERY,
+  GALLERY_PHOTOS_MAX,
+  GALLERY_PHOTO_MAX_BYTES,
+  GALLERY_PHOTO_TYPES,
   GALLERY_TITLE_MAX,
   GALLERY_VIDEOS_MAX,
   GallerySchema,
   YOUTUBE_EMBED_ORIGIN,
+  PublicGallerySchema,
+  galleryPhotoTitle,
   galleryVideoTitle,
   hasGalleryContent,
   youTubeEmbedUrl,
@@ -166,5 +171,126 @@ describe('el conjunto', () => {
   it('con un video, hay algo que ensenar', () => {
     const parsed = GallerySchema.parse({ videos: [video()] });
     expect(hasGalleryContent(parsed)).toBe(true);
+  });
+});
+
+/* ------------------------------------------------------------------------ */
+/*  Las fotos                                                                */
+/* ------------------------------------------------------------------------ */
+
+/** Una ruta con el formato que pone el servidor: 32 hexadecimales. */
+const RUTA = 'photos/0123456789abcdef0123456789abcdef.jpg';
+
+function foto(path = RUTA): unknown {
+  return { path, title: { en: null, es: null } };
+}
+
+describe('la ruta de una foto', () => {
+  it.each([
+    ['jpg', 'photos/0123456789abcdef0123456789abcdef.jpg'],
+    ['png', 'photos/0123456789abcdef0123456789abcdef.png'],
+    ['webp', 'photos/0123456789abcdef0123456789abcdef.webp'],
+  ])('acepta la que pone el servidor, en %s', (_caso, path) => {
+    expect(GallerySchema.safeParse({ photos: [foto(path)] }).success).toBe(true);
+  });
+
+  /*
+   * ESTAS SON LAS QUE IMPORTAN.
+   *
+   * Si en la fila cupiera una direccion completa, quien entrara al panel
+   * podria hacer que la portada cargara una imagen —o un rastreador de un
+   * solo pixel— desde cualquier sitio de internet. Y si cupiera un nombre
+   * libre, se acabarian subiendo archivos llamados «casa-de-los-martinez.jpg»,
+   * que es publicar el apellido del cliente en una direccion que cualquiera
+   * puede leer.
+   */
+  it.each([
+    ['una direccion completa', 'https://evil.example/pixel.gif'],
+    ['un salto de ruta', 'photos/../../secreto.jpg'],
+    ['otra carpeta', 'privado/0123456789abcdef0123456789abcdef.jpg'],
+    ['un nombre con el apellido del cliente', 'photos/casa-de-los-martinez.jpg'],
+    ['sin carpeta', '0123456789abcdef0123456789abcdef.jpg'],
+    ['un SVG', 'photos/0123456789abcdef0123456789abcdef.svg'],
+    ['hexadecimales de menos', 'photos/0123456789abcdef.jpg'],
+    ['mayusculas', 'photos/0123456789ABCDEF0123456789ABCDEF.jpg'],
+    ['una barra de mas', 'photos//0123456789abcdef0123456789abcdef.jpg'],
+  ])('rechaza %s', (_caso, path) => {
+    expect(GallerySchema.safeParse({ photos: [foto(path)] }).success).toBe(false);
+  });
+});
+
+describe('el conjunto de fotos', () => {
+  it('la galeria de partida no tiene ninguna', () => {
+    expect(DEFAULT_GALLERY.photos).toEqual([]);
+    expect(GallerySchema.safeParse(DEFAULT_GALLERY).success).toBe(true);
+  });
+
+  it('con una foto ya hay algo que ensenar, aunque no haya videos', () => {
+    const parsed = GallerySchema.parse({ photos: [foto()] });
+    expect(hasGalleryContent(parsed)).toBe(true);
+  });
+
+  it(`no caben mas de ${GALLERY_PHOTOS_MAX} fotos`, () => {
+    const muchas = Array.from({ length: GALLERY_PHOTOS_MAX + 1 }, (_, i) => ({
+      path: `photos/${String(i).padStart(32, '0')}.jpg`,
+      title: { en: null, es: null },
+    }));
+    expect(GallerySchema.safeParse({ photos: muchas }).success).toBe(false);
+  });
+
+  it('rechaza la misma foto dos veces', () => {
+    expect(GallerySchema.safeParse({ photos: [foto(), foto()] }).success).toBe(false);
+  });
+
+  /*
+   * El caso que de verdad va a pasar: la fila se guardo cuando la galeria
+   * solo tenia videos. Si el contrato la rechazara por no traer `photos`, los
+   * videos ya publicados desaparecerian de la portada en el despliegue.
+   */
+  it('una fila con videos y sin el campo de fotos se sigue leyendo', () => {
+    const parsed = GallerySchema.safeParse({ videos: [video()] });
+    expect(parsed.success).toBe(true);
+    if (parsed.success) expect(parsed.data.photos).toEqual([]);
+  });
+});
+
+describe('los limites de la subida', () => {
+  it('el tope son 5 MB, el mismo que el del bucket', () => {
+    // Si los dos numeros se separaran, subir algo entre ambos fallaria DESPUES
+    // de haberlo subido entero, y el aviso llegaria tarde y sin explicacion.
+    expect(GALLERY_PHOTO_MAX_BYTES).toBe(5 * 1024 * 1024);
+  });
+
+  it('no se admite SVG', () => {
+    // Un SVG es un documento que puede llevar JavaScript dentro, y servido
+    // desde un bucket publico seria un hueco de seguridad real.
+    expect(GALLERY_PHOTO_TYPES).toEqual(['image/jpeg', 'image/png', 'image/webp']);
+  });
+});
+
+describe('lo que recibe la web', () => {
+  it('trae direcciones, no rutas', () => {
+    const parsed = PublicGallerySchema.safeParse({
+      videos: [],
+      photos: [{ url: 'https://ejemplo.supabase.co/x.jpg', title: { en: 'Kitchen', es: null } }],
+    });
+    expect(parsed.success).toBe(true);
+  });
+
+  it('una direccion que no es una direccion se rechaza', () => {
+    expect(
+      PublicGallerySchema.safeParse({
+        videos: [],
+        photos: [{ url: 'photos/abc.jpg', title: { en: null, es: null } }],
+      }).success,
+    ).toBe(false);
+  });
+
+  it('el titulo se lee en el idioma en curso, con el otro de respaldo', () => {
+    const photo = { url: 'https://ejemplo.supabase.co/x.jpg', title: { en: 'Kitchen', es: null } };
+
+    expect(galleryPhotoTitle(photo, 'en')).toBe('Kitchen');
+    expect(galleryPhotoTitle(photo, 'es')).toBe('Kitchen');
+    expect(galleryPhotoTitle({ ...photo, title: { en: null, es: null } }, 'en')).toBeNull();
   });
 });

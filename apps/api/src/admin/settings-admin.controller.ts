@@ -1,4 +1,14 @@
-import { Body, Controller, Get, Put, Req } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  Post,
+  Put,
+  Req,
+  ServiceUnavailableException,
+  UnsupportedMediaTypeException,
+} from '@nestjs/common';
 import { SkipThrottle } from '@nestjs/throttler';
 import {
   BusinessSettingsSchema,
@@ -21,6 +31,7 @@ import {
   SiteCopySchema,
   AdminGallery,
   Gallery,
+  GalleryPhotoUpload,
   GallerySchema,
 } from '@freshness/types';
 import type { Request } from 'express';
@@ -372,5 +383,53 @@ export class GalleryAdminController {
     @Req() request: Request,
   ): Promise<AdminGallery> {
     return this.gallery.save(gallery, staff, request.ip ?? null);
+  }
+
+  /**
+   * SUBIR UNA FOTO.
+   *
+   * Recibe los bytes de la imagen tal cual, sin envoltorio de formulario: el
+   * panel manda el archivo como cuerpo y el tipo en la cabecera. Asi no hace
+   * falta ninguna libreria de multipart, que para subir un archivo de uno en
+   * uno es puro envoltorio.
+   *
+   * SUBIR NO PUBLICA. Devuelve la ruta y ahi se queda: la foto no se ve en
+   * ningun sitio hasta que esa ruta entra en la galeria con un `PUT`. Es
+   * deliberado — deja elegir el titulo y el orden antes de que la casa de
+   * nadie aparezca en la portada.
+   *
+   * 201 y no 200: se ha creado algo.
+   */
+  @Post('photos')
+  @Roles('ADMIN')
+  @HttpCode(201)
+  async uploadPhoto(@Req() request: Request): Promise<GalleryPhotoUpload> {
+    /*
+     * El lector de cuerpos solo acepta los tres tipos de imagen en esta ruta,
+     * asi que cualquier otra cosa llega aqui sin cuerpo. Se distingue de una
+     * imagen vacia a proposito: el mensaje tiene que decir que el tipo no
+     * vale, no que el archivo este roto.
+     */
+    const cuerpo: unknown = request.body;
+    if (!Buffer.isBuffer(cuerpo) || cuerpo.length === 0) {
+      throw new UnsupportedMediaTypeException('Manda una imagen JPEG, PNG o WebP');
+    }
+
+    const resultado = await this.gallery.uploadPhoto(cuerpo);
+
+    if (!resultado.ok) {
+      if (resultado.reason === 'storage') {
+        throw new ServiceUnavailableException('El almacen de imagenes no esta disponible');
+      }
+      // Tamano y «no es una imagen» son los dos un problema del archivo que
+      // se manda, asi que los dos son un 415 con su propio mensaje.
+      throw new UnsupportedMediaTypeException(
+        resultado.reason === 'tooBig'
+          ? 'La imagen pesa demasiado'
+          : 'Eso no es una imagen JPEG, PNG o WebP',
+      );
+    }
+
+    return { path: resultado.path, url: resultado.url };
   }
 }

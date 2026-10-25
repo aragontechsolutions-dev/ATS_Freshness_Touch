@@ -49,11 +49,13 @@ import {
   AdminCompanyLocationSchema,
   AdminGallerySchema,
   AdminSiteCopySchema,
+  GalleryPhotoUploadSchema,
   type AdminCompanyLocation,
   type AdminGallery,
   type AdminSiteCopy,
   type CompanyLocation,
   type Gallery,
+  type GalleryPhotoUpload,
   type SiteCopy,
 } from '@freshness/types';
 import { auth } from './supabase';
@@ -139,7 +141,19 @@ export function sessionLostReason(error: unknown): 'expired' | 'noAccess' {
 async function request<T>(
   path: string,
   parse: (payload: unknown) => T,
-  init: { method: 'GET' | 'PATCH' | 'POST' | 'PUT'; body?: unknown } = { method: 'GET' },
+  init: {
+    method: 'GET' | 'PATCH' | 'POST' | 'PUT';
+    body?: unknown;
+    /**
+     * Un cuerpo que se manda TAL CUAL, con su propio tipo.
+     *
+     * Lo usa la subida de fotos: se manda el archivo y ya esta, sin
+     * envoltorio de formulario. Asi no hace falta ninguna libreria de
+     * multipart ni en el panel ni en la API, que para subir un archivo de uno
+     * en uno es puro envoltorio.
+     */
+    raw?: { body: Blob; contentType: string };
+  } = { method: 'GET' },
 ): Promise<T> {
   if (!auth) {
     throw new ApiClientError(API_ERROR_CODES.UNAUTHORIZED, 'admin.errorNotConfigured', 401);
@@ -159,9 +173,17 @@ async function request<T>(
       headers: {
         Accept: 'application/json',
         Authorization: `Bearer ${token}`,
-        ...(init.body === undefined ? {} : { 'Content-Type': 'application/json' }),
+        ...(init.raw !== undefined
+          ? { 'Content-Type': init.raw.contentType }
+          : init.body === undefined
+            ? {}
+            : { 'Content-Type': 'application/json' }),
       },
-      ...(init.body === undefined ? {} : { body: JSON.stringify(init.body) }),
+      ...(init.raw !== undefined
+        ? { body: init.raw.body }
+        : init.body === undefined
+          ? {}
+          : { body: JSON.stringify(init.body) }),
       // La API no usa cookies de sesión: el token va en la cabecera. Enviar
       // credenciales de origen cruzado sin necesitarlas abriría la puerta a
       // ataques de petición forzada.
@@ -709,6 +731,29 @@ export function saveGallery(gallery: Gallery): Promise<AdminGallery> {
       return parsed.data;
     },
     { method: 'PUT', body: gallery },
+  );
+}
+
+/**
+ * Sube una foto y devuelve donde quedo.
+ *
+ * SUBIR NO PUBLICA NADA. La foto no se ve en ningun sitio hasta que su ruta
+ * entra en la galeria con `saveGallery`. Es deliberado: deja elegir el titulo
+ * y el orden antes de que la casa de nadie aparezca en la portada.
+ *
+ * SE MANDA EL ARCHIVO TAL CUAL, con su tipo en la cabecera. El servidor no se
+ * cree ese tipo —comprueba los bytes— y de paso le quita los metadatos, que
+ * es donde una foto de movil lleva las coordenadas GPS de la casa.
+ */
+export function uploadGalleryPhoto(file: File): Promise<GalleryPhotoUpload> {
+  return request(
+    `${GALERIA}/photos`,
+    (payload) => {
+      const parsed = GalleryPhotoUploadSchema.safeParse(payload);
+      if (!parsed.success) throw contractError('subida de la foto', parsed.error.issues);
+      return parsed.data;
+    },
+    { method: 'POST', raw: { body: file, contentType: file.type } },
   );
 }
 

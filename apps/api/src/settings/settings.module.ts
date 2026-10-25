@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { StorageModule } from '../storage/storage.module';
 import { BusinessSettingsController } from './business-settings.controller';
 import { BusinessSettingsService } from './business-settings.service';
 import { PricingConfigService } from './pricing-config.service';
@@ -16,6 +17,7 @@ import { SiteCopyService } from './site-copy.service';
  * las reservas (para el area de servicio) y el panel (para editarlo todo).
  */
 @Module({
+  imports: [StorageModule],
   controllers: [BusinessSettingsController, SiteCopyController, GalleryController],
   providers: [
     BusinessSettingsService,

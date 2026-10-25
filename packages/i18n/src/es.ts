@@ -605,6 +605,16 @@ export const es: TranslationResources = {
       never: 'Nunca se cambió',
       lastChange: 'Último cambio {{when}} por {{who}}',
       lastChangeUnknown: 'Último cambio {{when}}',
+      photos: 'Fotos',
+      photosHelp:
+        'Se suben directamente desde el móvil o el ordenador. Los datos de ubicación que lleva el archivo dentro se quitan antes de guardarlo.',
+      addPhoto: 'Añadir una foto',
+      addPhotoBlocked: 'En la sección caben {{count}} fotos como máximo.',
+      photoAlt: 'Foto de la galería',
+      uploading: 'Subiendo…',
+      errTooBig: 'Esa foto pesa demasiado. El límite son 5 MB.',
+      errNotAnImage: 'Ese archivo no es una imagen JPEG, PNG o WebP.',
+      errUpload: 'No se pudo subir la foto. Inténtalo otra vez.',
     },
 
     location: {
@@ -1587,6 +1597,7 @@ export const es: TranslationResources = {
     thirdPartyNote:
       'Los vídeos están alojados en YouTube. No se le pide nada a YouTube hasta que pulsas play.',
     play: 'Reproducir vídeo',
+    photoAlt: 'Antes y después de una casa que limpiamos',
   },
 
   contact: {
