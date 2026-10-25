@@ -320,8 +320,12 @@ describe('sin cambios no hay nada que guardar', () => {
 describe('las fotos', () => {
   /** El campo de archivo de la seccion de fotos. */
   function campoArchivo(): HTMLInputElement {
-    const elemento = contenedor.querySelector<HTMLInputElement>('input[type="file"]');
-    if (!elemento) throw new Error('No encontre el campo de archivo');
+    // Por su nombre accesible: ahora hay un campo por video ademas del de las
+    // fotos, y «el primero» dejaria de significar lo mismo al anadir videos.
+    const elemento = contenedor.querySelector<HTMLInputElement>(
+      'input[type="file"][aria-label="Add a photo"]',
+    );
+    if (!elemento) throw new Error('No encontre el campo de archivo de las fotos');
     return elemento;
   }
 
@@ -442,9 +446,9 @@ describe('las fotos', () => {
 describe('la miniatura de un video', () => {
   /** El campo de archivo de la miniatura del primer video. */
   function campoMiniatura(): HTMLInputElement {
-    const campos = [...contenedor.querySelectorAll<HTMLInputElement>('input[type="file"]')];
-    // El ultimo es el de las fotos; los anteriores, uno por video.
-    const campo = campos.find((c) => c.getAttribute('aria-label') !== null);
+    const campo = contenedor.querySelector<HTMLInputElement>(
+      'input[type="file"][aria-label="Thumbnail"]',
+    );
     if (!campo) throw new Error('No encontre el campo de la miniatura');
     return campo;
   }

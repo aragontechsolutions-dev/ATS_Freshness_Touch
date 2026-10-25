@@ -14,7 +14,7 @@ import {
 import { ApiClientError, fetchGallery, saveGallery, uploadGalleryImage } from '../lib/api';
 import { useToast } from './ToastProvider';
 import { SkeletonFormulario } from './Skeletons';
-import { AlertIcon, SpinnerIcon } from './Icons';
+import { AlertIcon, SpinnerIcon, UploadIcon } from './Icons';
 import { formatTimestamp } from '../lib/format';
 
 interface GalleryFormProps {
@@ -384,7 +384,7 @@ export function GalleryForm({ locale, onSessionLost }: GalleryFormProps) {
 
                   <button
                     type="button"
-                    className="ft-btn-outline"
+                    className="ft-btn-ghost"
                     onClick={() => quitar(indice)}
                     disabled={guardando}
                   >
@@ -445,7 +445,7 @@ export function GalleryForm({ locale, onSessionLost }: GalleryFormProps) {
                       />
                       <button
                         type="button"
-                        className="ft-btn-outline"
+                        className="ft-btn-ghost"
                         onClick={() => quitarMiniatura(indice)}
                         disabled={guardando}
                       >
@@ -453,17 +453,11 @@ export function GalleryForm({ locale, onSessionLost }: GalleryFormProps) {
                       </button>
                     </div>
                   ) : (
-                    <input
-                      type="file"
-                      className="ft-input"
-                      aria-label={t('admin.gallery.poster')}
-                      accept={GALLERY_PHOTO_TYPES.join(',')}
-                      disabled={guardando || subiendoMini !== null}
-                      onChange={(evento) => {
-                        const archivo = evento.target.files?.[0];
-                        evento.target.value = '';
-                        if (archivo) void subirMiniatura(indice, archivo);
-                      }}
+                    <SubirArchivo
+                      etiqueta={t('admin.gallery.uploadPoster')}
+                      nombreAccesible={t('admin.gallery.poster')}
+                      desactivado={guardando || subiendoMini !== null}
+                      onArchivo={(archivo) => void subirMiniatura(indice, archivo)}
                     />
                   )}
 
@@ -483,7 +477,7 @@ export function GalleryForm({ locale, onSessionLost }: GalleryFormProps) {
       <div>
         <button
           type="button"
-          className="ft-btn-outline"
+          className="ft-btn-ghost"
           onClick={anadir}
           disabled={guardando || !puedeAnadir}
           title={puedeAnadir ? undefined : t('admin.gallery.addBlocked')}
@@ -548,7 +542,7 @@ export function GalleryForm({ locale, onSessionLost }: GalleryFormProps) {
 
                 <button
                   type="button"
-                  className="ft-btn-outline"
+                  className="ft-btn-ghost"
                   onClick={() => quitarFoto(indice)}
                   disabled={guardando}
                 >
@@ -559,22 +553,12 @@ export function GalleryForm({ locale, onSessionLost }: GalleryFormProps) {
           </ul>
         )}
 
-        <label className="block">
-          <span className="ft-label">{t('admin.gallery.addPhoto')}</span>
-          <input
-            type="file"
-            className="ft-input"
-            accept={GALLERY_PHOTO_TYPES.join(',')}
-            disabled={guardando || subiendo || !puedeAnadirFoto}
-            onChange={(evento) => {
-              const archivo = evento.target.files?.[0];
-              // El campo se vacia para que subir dos veces la misma foto
-              // vuelva a disparar el cambio.
-              evento.target.value = '';
-              if (archivo) void subirFoto(archivo);
-            }}
-          />
-        </label>
+        <SubirArchivo
+          etiqueta={t('admin.gallery.addPhoto')}
+          nombreAccesible={t('admin.gallery.addPhoto')}
+          desactivado={guardando || subiendo || !puedeAnadirFoto}
+          onArchivo={(archivo) => void subirFoto(archivo)}
+        />
 
         {subiendo && (
           <p className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
@@ -610,7 +594,7 @@ export function GalleryForm({ locale, onSessionLost }: GalleryFormProps) {
         {!sinCambios && (
           <button
             type="button"
-            className="ft-btn-outline"
+            className="ft-btn-ghost"
             onClick={() => {
               // Las direcciones de vista previa no se pueden recomponer sin
               // volver a preguntar, asi que se recarga la pantalla entera.
@@ -767,4 +751,71 @@ function mismoTitulo(
   b: { en: string | null; es: string | null },
 ): boolean {
   return (a.en ?? null) === (b.en ?? null) && (a.es ?? null) === (b.es ?? null);
+}
+
+/* ------------------------------------------------------------------------ */
+
+interface SubirArchivoProps {
+  /** Lo que se lee dentro del boton. */
+  etiqueta: string;
+  /** El nombre del campo para un lector de pantalla, que puede ser mas largo. */
+  nombreAccesible: string;
+  desactivado: boolean;
+  onArchivo: (archivo: File) => void;
+}
+
+/**
+ * UN CAMPO DE ARCHIVO QUE PARECE UN BOTON
+ * ---------------------------------------
+ * El control de archivo del navegador se pinta como «Seleccionar archivo ·
+ * Ningun archivo seleccionado»: un texto gris que no parece pulsable, con un
+ * aspecto distinto en cada navegador y que no se puede dar estilo.
+ *
+ * El resultado es que nadie ve que hay que pulsar ahi. Pasa de verdad: se
+ * sube una foto, se queda el aviso de «ningun archivo» al lado, y la
+ * conclusion es que no ha funcionado.
+ *
+ * ========================================================================
+ * EL CAMPO SIGUE AHI, SOLO QUE NO SE VE
+ * ========================================================================
+ * `sr-only` lo esconde a la vista PERO NO LO QUITA: sigue existiendo, sigue
+ * recibiendo el foco con el tabulador y un lector de pantalla lo sigue
+ * anunciando como lo que es, un campo de archivo. Es la diferencia con
+ * `display: none`, que lo borraria del todo y dejaria el boton sin nada
+ * detras para quien no usa raton.
+ *
+ * El `<label>` que lo envuelve hace que pulsar el boton abra el selector, y
+ * `focus-within` dibuja el anillo de foco en el boton cuando el campo
+ * escondido lo tiene — si no, al tabular hasta aqui no se veria nada.
+ */
+function SubirArchivo({ etiqueta, nombreAccesible, desactivado, onArchivo }: SubirArchivoProps) {
+  return (
+    <label
+      className={
+        'ft-btn-ghost focus-within:ring-2 focus-within:ring-brand-400 focus-within:ring-offset-1 ' +
+        (desactivado ? 'cursor-not-allowed opacity-60' : 'cursor-pointer')
+      }
+    >
+      <UploadIcon className="h-4 w-4" />
+      {etiqueta}
+      <input
+        type="file"
+        className="sr-only"
+        aria-label={nombreAccesible}
+        accept={GALLERY_PHOTO_TYPES.join(',')}
+        disabled={desactivado}
+        onChange={(evento) => {
+          const archivo = evento.target.files?.[0];
+          /*
+           * El campo se vacia para que elegir DOS VECES el mismo archivo
+           * vuelva a disparar el cambio. Sin esto, subir una foto, quitarla y
+           * volver a elegir la misma no haria nada, y no habria forma de
+           * saber por que.
+           */
+          evento.target.value = '';
+          if (archivo) onArchivo(archivo);
+        }}
+      />
+    </label>
+  );
 }

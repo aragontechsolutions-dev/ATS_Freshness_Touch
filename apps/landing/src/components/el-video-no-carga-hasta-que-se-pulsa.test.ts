@@ -109,7 +109,9 @@ describe('antes del clic no hay ninguna peticion a Google', () => {
     // visitante no existiria.
     expect(FACHADA).toContain('useState(false)');
     expect(FACHADA).toContain('reproduciendo ?');
-    expect(FACHADA).toContain('onClick={() => setReproduciendo(true)}');
+    // El estado solo se enciende desde un `onClick`, nunca al pintar.
+    expect(FACHADA).toContain('setReproduciendo(true)');
+    expect(FACHADA_CODIGO).not.toMatch(/useState\(true\)/);
   });
 
   it('y el marco se construye con la funcion del contrato, no a mano', () => {
@@ -132,13 +134,22 @@ describe('sin videos no hay seccion', () => {
     expect(SECCION).toContain('if (!hasGalleryContent(gallery)) return null;');
   });
 
-  it('y el aviso del tercero se pinta antes del boton, no despues', () => {
-    // Quien pulsa tiene que poder decidirlo sabiendolo.
+  /*
+   * ANTES SE COMPARABA CONTRA `<VideoFacade`, y dejo de valer al pasar a
+   * carrusel: las piezas se construyen en el cuerpo de la funcion, ASI QUE EN
+   * EL ARCHIVO aparecen antes que el aviso aunque EN PANTALLA salgan despues.
+   *
+   * Lo que importa sigue siendo lo mismo —quien pulsa tiene que poder
+   * decidirlo sabiendolo—, y en el marcado eso es que el aviso este antes de
+   * la fila donde viven los botones.
+   */
+  it('y el aviso del tercero se pinta antes de la fila de botones', () => {
     const avisoAntes = SECCION.indexOf('gallery.thirdPartyNote');
-    // El uso, no el import: el import esta arriba del archivo siempre.
-    const botones = SECCION.indexOf('<VideoFacade');
+    const fila = SECCION.indexOf('<Carrusel');
+
     expect(avisoAntes).toBeGreaterThan(-1);
-    expect(avisoAntes).toBeLessThan(botones);
+    expect(fila).toBeGreaterThan(-1);
+    expect(avisoAntes).toBeLessThan(fila);
   });
 });
 

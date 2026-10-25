@@ -103,4 +103,21 @@ describe('el aviso del tercero es solo de los videos', () => {
     expect(condicion).toBeGreaterThan(-1);
     expect(aviso).toBeGreaterThan(condicion);
   });
+
+  /*
+   * ANTES SE COMPARABA CONTRA `<VideoFacade`, y dejo de valer al pasar a
+   * carrusel: las piezas se construyen en el cuerpo de la funcion, ASI QUE EN
+   * EL ARCHIVO aparecen antes que el aviso aunque EN PANTALLA salgan despues.
+   *
+   * Lo que importa sigue siendo lo mismo —quien pulsa tiene que poder
+   * decidirlo sabiendolo—, y en el marcado eso es que el aviso este antes de
+   * la fila donde viven los botones.
+   */
+  it('y se pinta antes de la fila, que es donde estan los botones', () => {
+    const aviso = SECCION.indexOf('gallery.thirdPartyNote');
+    const fila = SECCION.indexOf('<Carrusel');
+
+    expect(fila).toBeGreaterThan(-1);
+    expect(aviso).toBeLessThan(fila);
+  });
 });

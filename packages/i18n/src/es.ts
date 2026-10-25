@@ -620,6 +620,7 @@ export const es: TranslationResources = {
         'Lo que ve el visitante antes de pulsar play. Sin ella, la tarjeta sale con los colores de la marca. No usamos la miniatura de YouTube porque cargarla mandaría datos del visitante a Google antes de que pulse nada.',
       posterAlt: 'Miniatura del vídeo',
       removePoster: 'Quitar la miniatura',
+      uploadPoster: 'Subir miniatura',
     },
 
     location: {

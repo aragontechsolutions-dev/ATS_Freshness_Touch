@@ -53,7 +53,7 @@ export function ClockInsSection({ booking, locale }: ClockInsSectionProps) {
 
   return (
     <section className="ft-card p-5">
-      <h2 className="ft-h2 mb-4 flex items-center gap-2">
+      <h2 className="mb-4 flex items-center gap-2 text-lg font-bold text-slate-900 dark:text-white">
         <ClockIcon className="h-5 w-5 text-brand-700 dark:text-brand-400" />
         {t('admin.clockIns.title')}
       </h2>

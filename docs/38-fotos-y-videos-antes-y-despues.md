@@ -554,6 +554,66 @@ lo mismo dos veces.
 Es lo contrario de las fotos de la galería, que **siempre** llevan texto
 alternativo, porque ahí la imagen _es_ el contenido.
 
+### La sección es un carrusel, no una rejilla
+
+Era una rejilla de dos columnas que **crecía hacia abajo con cada pieza**: con
+seis fotos y dos vídeos empujaba las zonas de servicio y el contacto una
+pantalla entera. Ahora es **una fila que se desplaza sola** y ocupa lo mismo
+con dos piezas que con veinte. Los vídeos van primero y las fotos después.
+
+**Cómo no se ve la costura.** La lista se repite varias veces en la pista y la
+animación desplaza exactamente la fracción que ocupa una repetición. Al volver
+a cero, lo que se ve es idéntico a lo que había: el salto existe, pero no se
+nota porque los píxeles son los mismos.
+
+Se repite **más de dos veces cuando hay pocas piezas**: con dos fotos, dos
+copias no llenan una pantalla ancha y se vería un hueco cruzando la sección —
+y solo en pantallas anchas y con poco contenido, que es justo lo que nadie
+prueba. `vueltasNecesarias()` es una función aparte y probada por eso mismo.
+
+Un carrusel automático tiene tres formas clásicas de salir mal, y ninguna se
+ve mirando la pantalla propia:
+
+| Riesgo                                         | Qué se hace                                                                                                                                                                                                                                          |
+| ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Marea** a quien ha pedido menos movimiento   | Se consulta el ajuste **en JavaScript**, no solo en CSS, y se pinta otra cosa: una fila normal que se desplaza con el dedo, **sin copias**. Un carrusel parado dejaría la mitad del contenido fuera de la pantalla y sin forma de llegar a él.       |
+| **Se escapa** justo cuando vas a pulsar        | Se para al pasar el ratón, al entrar el foco con el tabulador, y **mientras se reproduce un vídeo**. Esto último hace falta aparte: en cuanto apartas el ratón para mirar el vídeo, se iría de la pantalla sonando.                                  |
+| **Se lee cuatro veces** con lector de pantalla | Las copias llevan `inert`, que las saca del orden de tabulación **y** del árbol de accesibilidad a la vez. Marcarlas solo como ocultas dejaría los botones alcanzables con el teclado pero invisibles para el lector, que es peor que no hacer nada. |
+
+La fila va **fuera del `Reveal`** de la sección: esa animación de entrada usa
+`transform`, y un elemento con `transform` crea un contexto nuevo contra el
+que se mediría el desplazamiento de la pista.
+
+### Los botones del panel parecían texto
+
+Tres clases que no existían en `styles.css`. Tailwind no avisa: el navegador
+las ignora en silencio y el elemento se pinta **sin estilo**.
+
+Un botón así no sale roto ni descolocado: sale como **texto negro suelto**. Se
+puede pulsar, hace lo que tiene que hacer, y nadie lo denuncia como fallo —
+simplemente nadie lo pulsa.
+
+- `ft-btn-outline` en seis sitios; la buena es `ft-btn-ghost`. Afectaba a
+  «Quitar», «Añadir un vídeo» y «Deshacer los cambios», este último también en
+  la pantalla de textos, donde llevaba así desde que se escribió.
+- `ft-h2` en dos secciones. Nunca ha existido.
+- `ft-btn` en el formulario de ubicación. Sobraba.
+
+Y los campos de archivo pasan a ser botones de verdad. El control del
+navegador se pinta como «Seleccionar archivo · Ningún archivo seleccionado»:
+un texto gris que no parece pulsable, distinto en cada navegador y al que no
+se puede dar estilo. **El campo sigue ahí, solo que no se ve**: `sr-only` lo
+esconde a la vista pero no lo quita, así que sigue recibiendo el foco con el
+tabulador y un lector de pantalla lo sigue anunciando como campo de archivo.
+Es la diferencia con `display: none`, que dejaría el botón sin nada detrás
+para quien no usa ratón.
+
+Lo ata `estilos-que-existen.test.ts`, uno en cada aplicación: recorre todos
+los `.tsx` y exige que cada clase `ft-` que se use esté definida en la hoja de
+estilos de esa aplicación. Busca dentro de las cadenas y parte por espacios,
+porque `left-2` **contiene** «ft-2» y a lo bruto denunciaría clases que nadie
+ha escrito.
+
 ### El incidente de la sección que desapareció
 
 Al desplegar las fotos, **la sección de antes y después dejó de verse entera
