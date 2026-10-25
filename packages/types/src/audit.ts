@@ -230,6 +230,8 @@ const ACCIONES_FIJAS = [
   'media_consent.updated',
   'media_consent.revoked',
   'media_consent.restored',
+  'media_consent.evidence_attached',
+  'media_consent.evidence_removed',
 
   /* --- Lecturas de datos sensibles ------------------------------------- */
   /** Alguien abrio la ficha completa de una reserva, con datos del cliente. */

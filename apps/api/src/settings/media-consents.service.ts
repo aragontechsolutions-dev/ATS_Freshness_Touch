@@ -1,12 +1,19 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { randomUUID } from 'node:crypto';
 import {
+  CONSENT_EVIDENCE_MAX_BYTES,
   MediaConsentSchema,
+  consentEvidenceExtension,
+  consentEvidenceType,
   type AuthenticatedStaff,
+  type ConsentEvidenceType,
   type MediaConsent,
   type StoredMediaConsent,
 } from '@freshness/types';
 import { AuditService } from '../audit/audit.service';
 import { PrismaService } from '../database/prisma.service';
+import { DOCUMENT_STORAGE, type DocumentStorage } from '../storage/document-storage.types';
+import { stripImageMetadata } from '../storage/strip-image-metadata';
 
 /**
  * EL REGISTRO DE CONSENTIMIENTOS DE IMAGEN
@@ -51,6 +58,7 @@ export class MediaConsentsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    @Inject(DOCUMENT_STORAGE) private readonly documentos: DocumentStorage,
   ) {}
 
   /** Se llama al guardar, para que lo retirado deje de verse al momento. */
@@ -238,6 +246,172 @@ export class MediaConsentsService {
     return aFicha(fila);
   }
 
+  /* ---------------------------------------------------------------------- */
+  /*  La prueba del permiso                                                  */
+  /* ---------------------------------------------------------------------- */
+
+  /**
+   * Guarda el escaneo del papel, o el PDF del correo, junto a la ficha.
+   *
+   * ========================================================================
+   * POR QUE ESTO NO VA AL ALMACEN DE LA GALERIA
+   * ========================================================================
+   * Porque aquel es PUBLICO de lectura y esto lleva el nombre del cliente, la
+   * direccion de su casa y su firma —justo lo que el permiso promete no
+   * mostrar—. Va a un bucket privado y se sirve por `leerPrueba()`, detras de
+   * la sesion del panel. No existe ninguna direccion que lo abra sin ella.
+   *
+   * SE COMPRUEBAN LOS BYTES, no lo que diga la cabecera: un archivo que dice
+   * ser un PDF y no lo es no se guarda. Y a las imagenes se les quitan los
+   * metadatos, por el mismo motivo que a las de la galeria —una foto de movil
+   * lleva coordenadas dentro— aunque aqui el archivo no se publique: el
+   * habito tiene que ser el mismo o un dia se olvida donde importa.
+   *
+   * SUSTITUIR BORRA LA ANTERIOR. Dos pruebas para un mismo permiso no es un
+   * respaldo, es no saber cual vale.
+   */
+  async attachEvidence(
+    id: string,
+    bytes: Uint8Array,
+    declarado: ConsentEvidenceType,
+    staff: AuthenticatedStaff,
+    ipAddress: string | null,
+  ): Promise<
+    | { ok: true; ficha: StoredMediaConsent }
+    | { ok: false; reason: 'tooBig' | 'notADocument' | 'storage' }
+  > {
+    const anterior = await this.exigirQueExista(id);
+
+    if (bytes.length === 0 || bytes.length > CONSENT_EVIDENCE_MAX_BYTES) {
+      return { ok: false, reason: 'tooBig' };
+    }
+    if (!this.documentos.configured) return { ok: false, reason: 'storage' };
+
+    const comprobados = revisarBytes(bytes, declarado);
+    if (comprobados === null) return { ok: false, reason: 'notADocument' };
+
+    // Treinta y dos hexadecimales: nada del nombre original sobrevive.
+    const path = `evidence/${randomUUID().replace(/-/g, '')}.${consentEvidenceExtension(
+      comprobados.tipo,
+    )}`;
+
+    const subida = await this.documentos.upload({
+      path,
+      bytes: comprobados.bytes,
+      contentType: comprobados.tipo,
+    });
+    if (!subida.ok) return { ok: false, reason: 'storage' };
+
+    const fila = await this.prisma.db.$transaction(async (tx) => {
+      const guardada = await tx.mediaConsent.update({
+        where: { id },
+        data: { evidencePath: path, updatedByStaffId: staff.staffId },
+        include: { updatedBy: { select: { firstName: true, lastName: true } } },
+      });
+
+      await this.audit.record(
+        {
+          staff,
+          surface: 'PANEL',
+          action: 'media_consent.evidence_attached',
+          entityType: 'media_consent',
+          entityId: id,
+          /*
+           * NI LA RUTA. Es el unico dato que, sumado a la clave de servicio,
+           * abre el documento; y el registro de auditoria se consulta, se
+           * exporta y se ensena. El tipo y el tamano responden a lo que se
+           * pregunta de verdad: que se guardo algo y de que clase era.
+           */
+          metadata: {
+            reference: anterior.reference,
+            evidenceType: comprobados.tipo,
+            bytes: comprobados.bytes.length,
+            replaced: anterior.evidencePath !== null,
+          },
+          ipAddress,
+        },
+        tx,
+      );
+
+      return guardada;
+    });
+
+    /*
+     * La anterior se borra DESPUES de que la nueva este guardada y escrita.
+     * Al reves, un fallo a mitad dejaria la ficha sin ninguna prueba.
+     */
+    if (anterior.evidencePath !== null) {
+      await this.documentos.remove([anterior.evidencePath]);
+    }
+
+    return { ok: true, ficha: aFicha(fila) };
+  }
+
+  /**
+   * Los bytes de la prueba, para que la API los sirva.
+   *
+   * NO SE AUDITA LEERLA. Se mira al abrir la ficha y se volveria a mirar en
+   * cada vistazo: un registro que crece con cada ojeada es un registro que
+   * nadie lee, y enterraria las lineas que si importan —quien la guardo y
+   * quien la borro—.
+   */
+  async readEvidence(
+    id: string,
+  ): Promise<{ bytes: Uint8Array; contentType: ConsentEvidenceType } | null> {
+    const fila = await this.exigirQueExista(id);
+    if (fila.evidencePath === null) return null;
+
+    const contentType = consentEvidenceType(fila.evidencePath);
+    if (contentType === null) return null;
+
+    const bytes = await this.documentos.download(fila.evidencePath);
+    return bytes === null ? null : { bytes, contentType };
+  }
+
+  /**
+   * Borra la prueba, dejando la ficha.
+   *
+   * La ficha NO se borra nunca: un permiso anotado sin su archivo sigue
+   * amparando lo que ampara, y que le falte la prueba es algo que se ve en la
+   * pantalla y se arregla volviendo a subirla.
+   */
+  async removeEvidence(
+    id: string,
+    staff: AuthenticatedStaff,
+    ipAddress: string | null,
+  ): Promise<StoredMediaConsent> {
+    const anterior = await this.exigirQueExista(id);
+
+    const fila = await this.prisma.db.$transaction(async (tx) => {
+      const guardada = await tx.mediaConsent.update({
+        where: { id },
+        data: { evidencePath: null, updatedByStaffId: staff.staffId },
+        include: { updatedBy: { select: { firstName: true, lastName: true } } },
+      });
+
+      await this.audit.record(
+        {
+          staff,
+          surface: 'PANEL',
+          action: 'media_consent.evidence_removed',
+          entityType: 'media_consent',
+          entityId: id,
+          metadata: { reference: anterior.reference },
+          ipAddress,
+        },
+        tx,
+      );
+
+      return guardada;
+    });
+
+    if (anterior.evidencePath !== null) {
+      await this.documentos.remove([anterior.evidencePath]);
+    }
+
+    return aFicha(fila);
+  }
+
   private async exigirQueExista(id: string) {
     const fila = await this.prisma.db.mediaConsent.findUnique({ where: { id } });
     if (!fila) throw new NotFoundException('Ese permiso no existe');
@@ -288,6 +462,7 @@ interface FilaConAutor {
   videoIds: string[];
   photoPaths: string[];
   notes: string | null;
+  evidencePath: string | null;
   revokedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
@@ -323,6 +498,7 @@ function aFicha(fila: FilaConAutor): StoredMediaConsent {
   return {
     id: fila.id,
     consent,
+    evidencePath: fila.evidencePath,
     revokedAt: fila.revokedAt?.toISOString() ?? null,
     createdAt: fila.createdAt.toISOString(),
     updatedAt: fila.updatedAt.toISOString(),
@@ -330,6 +506,44 @@ function aFicha(fila: FilaConAutor): StoredMediaConsent {
       ? `${fila.updatedBy.firstName} ${fila.updatedBy.lastName}`.trim()
       : null,
   };
+}
+
+/**
+ * Comprueba que los bytes son de verdad lo que dicen ser.
+ *
+ * LO QUE MANDA SON LOS BYTES, NO LA CABECERA. Quien sube elige lo que pone
+ * en `Content-Type`, asi que confiar en ella es no comprobar nada: llamar
+ * `application/pdf` a un SVG colaria un documento con JavaScript dentro.
+ *
+ * A las imagenes se les quitan ademas los metadatos. Aqui el archivo no se
+ * publica, asi que las coordenadas de dentro no se ensenarian a nadie; se
+ * quitan igual porque el habito tiene que ser el mismo en los dos almacenes
+ * o un dia se olvida en el que si publica.
+ *
+ * El PDF se guarda tal cual: no hay forma honesta de limpiarlo sin una
+ * libreria que lo entienda entero, y meter una para esto seria cambiar un
+ * riesgo pequeno por una dependencia grande. Lo que se comprueba es que
+ * EMPIEZA como un PDF, que es lo que impide colar otra cosa con ese nombre.
+ */
+function revisarBytes(
+  bytes: Uint8Array,
+  declarado: ConsentEvidenceType,
+): { tipo: ConsentEvidenceType; bytes: Uint8Array } | null {
+  if (declarado === 'application/pdf') {
+    return esPdf(bytes) ? { tipo: 'application/pdf', bytes } : null;
+  }
+
+  const limpia = stripImageMetadata(bytes);
+  if (!limpia.ok) return null;
+
+  return { tipo: `image/${limpia.format}`, bytes: limpia.bytes };
+}
+
+/** `%PDF-`, los cinco bytes con los que empieza todo PDF. */
+function esPdf(bytes: Uint8Array): boolean {
+  const firma = [0x25, 0x50, 0x44, 0x46, 0x2d];
+  if (bytes.length < firma.length) return false;
+  return firma.every((byte, i) => bytes[i] === byte);
 }
 
 /** `AAAA-MM-DD` en UTC, que es como se guardo. */

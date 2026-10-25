@@ -504,6 +504,7 @@ pruebas: «guardar un cambio de los vídeos NO borra las fotos» y la simétrica
 | --------------------------- | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
 | `STORAGE_PROVIDER`          | `supabase`          | Con `memory` las fotos viven en la memoria del proceso y sus direcciones no cargan nada. La API avisa por error si sigue así en producción. |
 | `GALLERY_BUCKET`            | `gallery`           | El bucket público.                                                                                                                          |
+| `CONSENT_EVIDENCE_BUCKET`   | `consent-evidence`  | El bucket **privado** de las pruebas de los permisos. Ver la sección 11.                                                                    |
 | `SUPABASE_SERVICE_ROLE_KEY` | secreto en Render   | Nunca sale al navegador ni se escribe en un registro.                                                                                       |
 | `STORAGE_TIMEOUT_MS`        | `10000`             |                                                                                                                                             |
 
@@ -1018,11 +1019,82 @@ habría quedado vacía — que es exactamente el accidente de la sección 9.
 El medio **sí** entra en la auditoría; el nombre y la dirección, no. Es una
 categoría de cuatro valores que no identifica a nadie.
 
-### Lo que todavía no guarda
+### La prueba guardada (etapa 2.D.4)
 
-**La prueba en sí.** Hoy se guarda la _referencia_ de la prueba, no la prueba.
-El día que haga falta demostrarlo, una referencia a un PDF que está en el
-correo de alguien no sirve. Guardar el escaneo o el PDF es la etapa siguiente,
-y tiene su propia decisión de seguridad: ese archivo lleva nombre, dirección y
-firma, así que **no puede ir al mismo almacén que las fotos de la galería**,
-que es público.
+Hasta aquí el registro guardaba la _referencia_ de la prueba, no la prueba. El
+día que haga falta demostrar un permiso, una referencia a un PDF que está en
+el correo de alguien no sirve.
+
+Desde la pantalla de permisos, cada ficha admite **un archivo**: el escaneo
+del papel, el PDF del correo o una foto del documento. Se puede descargar,
+sustituir y borrar. Sustituir borra el anterior — dos pruebas para un mismo
+permiso no es un respaldo, es no saber cuál vale.
+
+#### Por qué no va al almacén de la galería
+
+Porque aquél es **público de lectura** y esto lleva el nombre del cliente, la
+dirección de su casa y su firma: justo lo que el permiso promete no mostrar.
+
+Va a un bucket aparte, **privado**, y se sirve a través de la API detrás de la
+sesión del panel. **No existe ninguna dirección de ese bucket que funcione
+pegada en un navegador**, y tampoco se usan direcciones firmadas de corta
+duración: una dirección firmada que alguien copia sigue abriendo el documento
+desde cualquier sitio, y para tres descargas al año no compensa esa puerta.
+
+Hay una segunda defensa, y es la que de verdad cierra el fallo: **el puerto
+del almacén privado no tiene `publicUrl`**. No es un olvido. Si los dos
+almacenes compartieran interfaz, pedir la dirección pública de un documento
+firmado sería una línea igual de fácil de escribir que las demás, y nada
+avisaría. Separándolos, **ese error no se puede escribir**: el método no
+existe. Es la misma idea que separar `MyJob` del resto del modelo para que una
+cifra de dinero no pueda llegar a la pantalla de quien limpia.
+
+#### El bucket
+
+Nombre **`consent-evidence`**. Configuración:
+
+| Ajuste             | Valor                                                      | Por qué                                                                                                     |
+| ------------------ | ---------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| Public bucket      | **NO**                                                     | Es lo único que distingue este bucket del de la galería, y es todo.                                         |
+| File size limit    | 10 MB                                                      | Un escaneo de varias páginas pesa más que una foto, y aquí no hay nada que apretar.                         |
+| Allowed MIME types | `application/pdf`, `image/jpeg`, `image/png`, `image/webp` | **Nada de SVG**, por lo mismo que en la galería: un SVG es un documento que puede llevar JavaScript dentro. |
+
+**Sin políticas RLS**, igual que el otro: no hay lectura pública que permitir,
+y la escritura va por la API con la `service_role`. Una política aquí sería
+señal de que algo se está subiendo desde el navegador.
+
+#### Lo que se comprueba al guardar
+
+- **Que los bytes son lo que dicen ser.** Quien sube elige lo que pone en
+  `Content-Type`, así que confiar en la cabecera es no comprobar nada. Un PDF
+  tiene que empezar por `%PDF-`; una imagen tiene que pasar por el mismo
+  detector que las de la galería.
+- **Que a las imágenes se les quita el EXIF.** Aquí el archivo no se publica,
+  así que las coordenadas de dentro no se enseñarían a nadie. Se quitan igual
+  porque el hábito tiene que ser el mismo en los dos almacenes o un día se
+  olvida en el que sí publica.
+- **Que el nombre lo pone el servidor**: carpeta fija y 32 caracteres
+  aleatorios. Nada del nombre original sobrevive, y la restricción está
+  también en la base de datos.
+
+El PDF se guarda tal cual. No hay forma honesta de limpiarlo sin una librería
+que lo entienda entero, y meterla para esto sería cambiar un riesgo pequeño
+por una dependencia grande.
+
+#### Lo que la auditoría guarda, y lo que no
+
+Guarda quién la archivó, cuándo, de qué tipo era, cuánto pesaba y si sustituía
+a otra. **No guarda la ruta**: es el único dato que, sumado a la clave de
+servicio, abre el documento, y el registro de auditoría se consulta, se
+exporta y se enseña.
+
+**Leer la prueba no se audita.** Se mira al abrir la ficha y se volvería a
+mirar en cada vistazo: un registro que crece con cada ojeada es un registro
+que nadie lee, y enterraría las líneas que sí importan.
+
+### Lo que todavía no existe en el registro
+
+- **Capturar el permiso en la reserva** (la casilla del caso A). Hoy la ficha
+  se teclea en el panel; mientras no esté, el permiso se obtiene por correo o
+  en papel y alguien lo anota a mano.
+- **Avisar cuando vence un plazo de retirada.**

@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import {
   CONSENT_CHANNELS,
   CONSENT_EVIDENCE_KINDS,
+  CONSENT_EVIDENCE_TYPES,
   CONSENT_REMOVAL_DAYS_DEFAULT,
   MediaConsentSchema,
   type ConsentChannel,
@@ -14,9 +15,12 @@ import {
 import {
   ApiClientError,
   createMediaConsent,
+  deleteMediaConsentEvidence,
+  downloadMediaConsentEvidence,
   fetchMediaConsents,
   setMediaConsentRevoked,
   updateMediaConsent,
+  uploadMediaConsentEvidence,
 } from '../lib/api';
 import { useToast } from './ToastProvider';
 import { SkeletonFormulario } from './Skeletons';
@@ -189,6 +193,63 @@ export function MediaConsentsForm({ locale, onSessionLost }: MediaConsentsFormPr
     try {
       await setMediaConsentRevoked(ficha.id, retirar);
       toast.success(retirar ? 'admin.consents.revoked' : 'admin.consents.restored');
+      await cargar();
+    } catch (error) {
+      manejar(error);
+    } finally {
+      setGuardando(false);
+    }
+  };
+
+  /**
+   * GUARDA LA PRUEBA. Es la diferencia entre anotar que existe un papel y
+   * tenerlo: el dia que haya que ensenarlo, una referencia a un PDF que esta
+   * en el correo de alguien no sirve.
+   */
+  const subirPrueba = async (ficha: StoredMediaConsent, file: File): Promise<void> => {
+    setProblema(null);
+    setGuardando(true);
+    try {
+      await uploadMediaConsentEvidence(ficha.id, file);
+      toast.success('admin.consents.evidenceSaved');
+      await cargar();
+    } catch (error) {
+      manejar(error);
+    } finally {
+      setGuardando(false);
+    }
+  };
+
+  /**
+   * DESCARGA LA PRUEBA.
+   *
+   * La direccion temporal se revoca en cuanto el navegador se lleva el
+   * archivo: mientras existe es una direccion de este origen que abre un
+   * documento firmado, y no hay motivo para dejarla viva.
+   */
+  const verPrueba = async (ficha: StoredMediaConsent): Promise<void> => {
+    setProblema(null);
+    try {
+      const blob = await downloadMediaConsentEvidence(ficha.id);
+      const direccion = URL.createObjectURL(blob);
+      const enlace = document.createElement('a');
+      enlace.href = direccion;
+      enlace.download = `${ficha.consent.reference}${extensionDe(ficha.evidencePath)}`;
+      enlace.click();
+      URL.revokeObjectURL(direccion);
+    } catch (error) {
+      manejar(error);
+    }
+  };
+
+  const borrarPrueba = async (ficha: StoredMediaConsent): Promise<void> => {
+    if (!window.confirm(t('admin.consents.confirmEvidenceDelete'))) return;
+
+    setProblema(null);
+    setGuardando(true);
+    try {
+      await deleteMediaConsentEvidence(ficha.id);
+      toast.success('admin.consents.evidenceDeleted');
       await cargar();
     } catch (error) {
       manejar(error);
@@ -531,6 +592,49 @@ export function MediaConsentsForm({ locale, onSessionLost }: MediaConsentsFormPr
                   {ficha.updatedBy !== null && ` · ${ficha.updatedBy}`}
                 </p>
 
+                {/*
+                 * LA PRUEBA, EN SU PROPIA LINEA Y CON SU AVISO.
+                 *
+                 * Una ficha sin archivo no esta rota —ampara lo que ampara—
+                 * pero es un permiso que no se puede ensenar, y eso tiene
+                 * que verse sin abrir nada.
+                 */}
+                {ficha.evidencePath === null ? (
+                  <p className="flex flex-wrap items-center gap-2 text-xs text-amber-800 dark:text-amber-200">
+                    <AlertIcon className="h-4 w-4 shrink-0" aria-hidden="true" />
+                    {t('admin.consents.noEvidence')}
+                    <SubirPrueba
+                      etiqueta={t('admin.consents.attachEvidence')}
+                      deshabilitado={guardando}
+                      onArchivo={(file) => void subirPrueba(ficha, file)}
+                    />
+                  </p>
+                ) : (
+                  <p className="flex flex-wrap items-center gap-2 text-xs text-slate-600 dark:text-slate-400">
+                    {t('admin.consents.hasEvidence')}
+                    <button
+                      type="button"
+                      className="ft-btn-ghost"
+                      onClick={() => void verPrueba(ficha)}
+                    >
+                      {t('admin.consents.viewEvidence')}
+                    </button>
+                    <SubirPrueba
+                      etiqueta={t('admin.consents.replaceEvidence')}
+                      deshabilitado={guardando}
+                      onArchivo={(file) => void subirPrueba(ficha, file)}
+                    />
+                    <button
+                      type="button"
+                      className="ft-btn-ghost"
+                      onClick={() => void borrarPrueba(ficha)}
+                      disabled={guardando}
+                    >
+                      {t('admin.consents.deleteEvidence')}
+                    </button>
+                  </p>
+                )}
+
                 <div className="flex flex-wrap gap-2">
                   <button
                     type="button"
@@ -563,6 +667,48 @@ export function MediaConsentsForm({ locale, onSessionLost }: MediaConsentsFormPr
 }
 
 /* ------------------------------------------------------------------------ */
+
+/**
+ * UN BOTON DE VERDAD, NO UN TEXTO AZUL.
+ *
+ * Un `<input type="file">` suelto se pinta distinto en cada navegador y no
+ * parece que se pueda pulsar. Se esconde dentro de una etiqueta con aspecto
+ * de boton, que es lo que ya se hizo en la pantalla de la galeria.
+ */
+function SubirPrueba({
+  etiqueta,
+  deshabilitado,
+  onArchivo,
+}: {
+  etiqueta: string;
+  deshabilitado: boolean;
+  onArchivo: (file: File) => void;
+}) {
+  return (
+    <label className={'ft-btn-ghost' + (deshabilitado ? ' pointer-events-none opacity-60' : '')}>
+      {etiqueta}
+      <input
+        type="file"
+        className="sr-only"
+        accept={CONSENT_EVIDENCE_TYPES.join(',')}
+        disabled={deshabilitado}
+        onChange={(evento) => {
+          const file = evento.target.files?.[0];
+          // Se limpia para que elegir el MISMO archivo otra vez vuelva a
+          // disparar el cambio: si no, un segundo intento no haria nada.
+          evento.target.value = '';
+          if (file) onArchivo(file);
+        }}
+      />
+    </label>
+  );
+}
+
+/** La extension con la que se guardo, para nombrar la descarga. */
+function extensionDe(path: string | null): string {
+  const punto = path?.lastIndexOf('.') ?? -1;
+  return punto === -1 || path === null ? '' : path.slice(punto);
+}
 
 function Texto({
   etiqueta,

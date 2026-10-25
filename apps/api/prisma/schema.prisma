@@ -1085,6 +1085,12 @@ model MediaConsent {
 
   notes String?
 
+  /// La PRUEBA guardada: el escaneo del papel firmado, el PDF del correo.
+  /// Es una ruta dentro del almacen PRIVADO, no una direccion: no se abre
+  /// pegandola en un navegador. Nula mientras solo este anotada la
+  /// referencia, que es como nacieron todas las fichas anteriores.
+  evidencePath String?
+
   /// Cuando el cliente retiro el permiso. NULL mientras siga en pie.
   revokedAt DateTime? @db.Timestamptz(3)
 

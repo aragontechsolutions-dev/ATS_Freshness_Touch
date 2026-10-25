@@ -8,6 +8,7 @@ import request from 'supertest';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { StoredMediaConsentSchema } from '@freshness/types';
 import { AppModule } from '../app.module';
+import { applyBodyParsers } from '../common/body-parsers';
 import { AUTH_PROVIDER } from '../auth/auth.types';
 import type { LocalAuthProvider } from '../auth/providers/local-auth.provider';
 import { GalleryService } from './gallery.service';
@@ -151,6 +152,12 @@ beforeAll(async () => {
   const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
   app = moduleRef.createNestApplication<NestExpressApplication>({ rawBody: true });
   app.setGlobalPrefix('api/v1', { exclude: ['health', 'health/ready'] });
+  /*
+   * Los mismos lectores de cuerpo que en produccion. Sin esto la ruta de la
+   * prueba llegaria sin bytes y la prueba diria que algo esta roto cuando lo
+   * unico roto seria el montaje.
+   */
+  applyBodyParsers(app, 'api/v1');
   await app.init();
 
   provider = app.get<LocalAuthProvider>(AUTH_PROVIDER);
@@ -491,5 +498,223 @@ describe('el rastro', () => {
     ]);
     expect(JSON.stringify(metadata)).not.toContain('Marta');
     expect(JSON.stringify(metadata)).not.toContain('Evergreen');
+  });
+});
+
+/* ------------------------------------------------------------------------ */
+
+describe('la prueba del permiso', () => {
+  /** Un PDF minimo: lo que importa es que empiece por `%PDF-`. */
+  const PDF = Buffer.from('%PDF-1.4\n1 0 obj\n<<>>\nendobj\ntrailer\n<<>>\n%%EOF\n');
+
+  /** Ocho bytes reconocibles, para poder buscarlos despues. */
+  const GPS = [0x47, 0x50, 0x53, 0x5f, 0x41, 0x51, 0x55, 0x49]; // "GPS_AQUI"
+
+  /**
+   * Un JPEG minimo CON un EXIF dentro.
+   *
+   * Se construye byte a byte a proposito: un archivo binario de prueba no se
+   * puede leer en una revision, y nadie sabria si de verdad lleva un EXIF.
+   */
+  function jpegConExif(): Buffer {
+    const exif = [0x45, 0x78, 0x69, 0x66, 0x00, 0x00, ...GPS];
+    return Buffer.from([
+      0xff,
+      0xd8, //                                     SOI
+      0xff,
+      0xe1,
+      0x00,
+      exif.length + 2,
+      ...exif, //      APP1 con el GPS
+      0xff,
+      0xc0,
+      0x00,
+      0x08,
+      0x08,
+      0x00,
+      0x10,
+      0x00,
+      0x10,
+      0x01, // SOF0
+      0xff,
+      0xda,
+      0x00,
+      0x08,
+      0x01,
+      0x01,
+      0x00,
+      0x11,
+      0x22,
+      0x33, // datos
+      0xff,
+      0xd9, //                                     EOI
+    ]);
+  }
+
+  const JPEG = jpegConExif();
+
+  async function subir(id: string, bytes: Buffer, tipo: string, token?: string) {
+    return request(app.getHttpServer())
+      .post(`${RUTA}/${id}/evidence`)
+      .set('authorization', `Bearer ${token ?? (await comoAda())}`)
+      .set('content-type', tipo)
+      .send(bytes);
+  }
+
+  async function descargar(id: string, token?: string) {
+    return request(app.getHttpServer())
+      .get(`${RUTA}/${id}/evidence`)
+      .set('authorization', `Bearer ${token ?? (await comoAda())}`);
+  }
+
+  /*
+   * LA PRUEBA QUE JUSTIFICA ESTA ETAPA.
+   *
+   * Hasta ahora el registro guardaba el NUMERO del papel, no el papel. Una
+   * referencia a un PDF que esta en el correo de alguien no se le puede
+   * ensenar a nadie.
+   */
+  it('se guarda, se descarga igual y se queda atada a la ficha', async () => {
+    const ficha = await crear(papel());
+
+    const subida = await subir(ficha.body.id, PDF, 'application/pdf');
+    expect(subida.status).toBe(201);
+    expect(subida.body.evidencePath).toMatch(/^evidence\/[0-9a-f]{32}\.pdf$/);
+
+    const bajada = await descargar(ficha.body.id);
+    expect(bajada.status).toBe(200);
+    expect(bajada.headers['content-type']).toContain('application/pdf');
+    expect(Buffer.from(bajada.body as Buffer).equals(PDF)).toBe(true);
+
+    const lista = await listar();
+    expect(lista.body[0].evidencePath).toBe(subida.body.evidencePath);
+  });
+
+  /*
+   * LA RUTA NO ES UNA DIRECCION. El bucket es privado y su puerto no sabe
+   * dar direcciones publicas, asi que la unica puerta es este endpoint — y
+   * este endpoint pide una sesion de administracion.
+   */
+  it('no se descarga sin sesion, ni con una que no es de administracion', async () => {
+    const ficha = await crear(papel());
+    await subir(ficha.body.id, PDF, 'application/pdf');
+
+    const sinSesion = await request(app.getHttpServer()).get(`${RUTA}/${ficha.body.id}/evidence`);
+    expect(sinSesion.status).toBe(401);
+
+    const comoCoordinador = await descargar(ficha.body.id, await comoDiego());
+    expect(comoCoordinador.status).toBe(403);
+  });
+
+  it('se sirve como descarga y sin dejar copia en ninguna cache', async () => {
+    const ficha = await crear(papel());
+    await subir(ficha.body.id, PDF, 'application/pdf');
+
+    const bajada = await descargar(ficha.body.id);
+    expect(bajada.headers['content-disposition']).toBe('attachment');
+    expect(bajada.headers['cache-control']).toBe('no-store');
+  });
+
+  /*
+   * LO QUE MANDA SON LOS BYTES, NO LA CABECERA. Quien sube elige lo que pone
+   * en `Content-Type`: llamar `application/pdf` a un SVG colaria un
+   * documento con JavaScript dentro.
+   */
+  it('un archivo que dice ser un PDF y no lo es se rechaza', async () => {
+    const ficha = await crear(papel());
+    const svg = Buffer.from('<svg onload="alert(1)"></svg>');
+
+    expect((await subir(ficha.body.id, svg, 'application/pdf')).status).toBe(415);
+    expect((await subir(ficha.body.id, svg, 'image/png')).status).toBe(415);
+  });
+
+  it('un tipo que no esta admitido no llega ni a leerse', async () => {
+    const ficha = await crear(papel());
+    expect((await subir(ficha.body.id, PDF, 'image/svg+xml')).status).toBe(415);
+  });
+
+  it('una imagen tambien vale: hay quien fotografia el papel', async () => {
+    const ficha = await crear(papel());
+
+    const subida = await subir(ficha.body.id, JPEG, 'image/jpeg');
+    expect(subida.status).toBe(201);
+    expect(subida.body.evidencePath).toMatch(/\.jpg$/);
+  });
+
+  /*
+   * SE LE QUITAN LOS METADATOS AUNQUE NO SE PUBLIQUE.
+   *
+   * Aqui el archivo no sale a internet, asi que las coordenadas de dentro no
+   * se ensenarian a nadie. Se quitan igual porque el habito tiene que ser el
+   * mismo en los dos almacenes: el dia que alguien copie este codigo al que
+   * si publica, no puede depender de que se acuerde.
+   */
+  it('a una imagen se le quita el EXIF antes de guardarla', async () => {
+    const ficha = await crear(papel());
+    expect(JPEG.includes(Buffer.from(GPS))).toBe(true);
+
+    await subir(ficha.body.id, JPEG, 'image/jpeg');
+
+    const bajada = await descargar(ficha.body.id);
+    expect(Buffer.from(bajada.body as Buffer).includes(Buffer.from(GPS))).toBe(false);
+  });
+
+  it('sustituir deja una sola prueba, la nueva', async () => {
+    const ficha = await crear(papel());
+
+    const primera = await subir(ficha.body.id, PDF, 'application/pdf');
+    const segunda = await subir(ficha.body.id, JPEG, 'image/jpeg');
+
+    expect(segunda.status).toBe(201);
+    expect(segunda.body.evidencePath).not.toBe(primera.body.evidencePath);
+
+    const bajada = await descargar(ficha.body.id);
+    expect(bajada.headers['content-type']).toContain('image/jpeg');
+  });
+
+  /*
+   * BORRAR LA PRUEBA NO BORRA EL PERMISO. Un permiso anotado sin su archivo
+   * sigue amparando lo que ampara; que le falte la prueba se ve en la
+   * pantalla y se arregla volviendo a subirla.
+   */
+  it('borrar la prueba deja la ficha y lo que ampara', async () => {
+    const ficha = await crear(papel({ photoPaths: [FOTO] }));
+    await subir(ficha.body.id, PDF, 'application/pdf');
+    await publicarGaleria();
+
+    const borrado = await request(app.getHttpServer())
+      .delete(`${RUTA}/${ficha.body.id}/evidence`)
+      .set('authorization', `Bearer ${await comoAda()}`);
+
+    expect(borrado.status).toBe(200);
+    expect(borrado.body.evidencePath).toBeNull();
+    expect(borrado.body.consent.photoPaths).toEqual([FOTO]);
+    expect((await leerPublica()).body.photos).toHaveLength(1);
+    expect((await descargar(ficha.body.id)).status).toBe(404);
+  });
+
+  /*
+   * NI LA RUTA EN LA AUDITORIA. Es el unico dato que, sumado a la clave de
+   * servicio, abre el documento; y el registro se consulta, se exporta y se
+   * ensena.
+   */
+  it('queda registrado quien la guardo, pero no donde esta', async () => {
+    const ficha = await crear(papel());
+    const subida = await subir(ficha.body.id, PDF, 'application/pdf');
+
+    const filas = await db.query<{ action: string; metadata: Record<string, unknown> }>(
+      `SELECT action, metadata FROM audit_logs WHERE action LIKE 'media_consent.evidence%'`,
+    );
+
+    expect(filas.rows[0]?.action).toBe('media_consent.evidence_attached');
+    const metadata = JSON.stringify(filas.rows[0]?.metadata);
+    expect(metadata).not.toContain(subida.body.evidencePath);
+    expect(metadata).not.toContain('evidence/');
+    expect(metadata).toContain('application/pdf');
+  });
+
+  it('un permiso sin prueba responde que no la hay', async () => {
+    const ficha = await crear(papel());
+    expect((await descargar(ficha.body.id)).status).toBe(404);
   });
 });

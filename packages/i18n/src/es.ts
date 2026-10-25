@@ -496,6 +496,16 @@ export const es: TranslationResources = {
       signedOn: 'Firmado el {{when}}',
       revokedOn: 'Retirado el {{when}}',
       errInvalid: 'Hay algo del permiso que todavía no vale.',
+      noEvidence: 'Sin la prueba guardada: este permiso no se le puede enseñar a nadie.',
+      hasEvidence: 'Prueba guardada.',
+      attachEvidence: 'Guardar la prueba',
+      replaceEvidence: 'Sustituir',
+      viewEvidence: 'Descargar',
+      deleteEvidence: 'Borrar',
+      evidenceSaved: 'Prueba guardada',
+      evidenceDeleted: 'Prueba borrada',
+      confirmEvidenceDelete:
+        'El permiso se queda, pero su prueba se borra para siempre. Hazlo solo para sustituir una guardada por error. ¿Seguimos?',
     },
 
     notifications: {
@@ -1104,6 +1114,8 @@ export const es: TranslationResources = {
           updated: 'Corrigió un permiso de imagen',
           revoked: 'Retiró un permiso de imagen',
           restored: 'Restituyó un permiso de imagen',
+          evidence_attached: 'Guardó la prueba de un permiso',
+          evidence_removed: 'Borró la prueba de un permiso',
         },
         pricing: {
           updated: 'Cambió las tarifas',

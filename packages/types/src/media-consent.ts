@@ -76,6 +76,65 @@ export type ConsentChannel = z.infer<typeof ConsentChannelSchema>;
  * haga falta ensenarla. Un escaneo esta en el archivador; un formulario
  * web, en la fila de la reserva; un correo, en el buzon.
  */
+/**
+ * LA PRUEBA EN SI, NO SU REFERENCIA.
+ * ----------------------------------
+ * Hasta aqui el registro guardaba el NUMERO del papel, no el papel. El dia
+ * que haya que demostrar un permiso, una referencia a un PDF que esta en el
+ * correo de alguien no sirve de nada.
+ *
+ * ESTE ARCHIVO NO PUEDE VIVIR DONDE VIVEN LAS FOTOS. El almacen de la
+ * galeria es PUBLICO —son imagenes hechas para que las vea todo internet— y
+ * esto lleva el nombre del cliente, la direccion de su casa y su firma. Va a
+ * un almacen privado y se sirve a traves de la API, detras de la sesion del
+ * panel: nunca tiene una direccion que funcione sin ella.
+ *
+ * Se admite PDF porque un correo impreso y un documento firmado con una
+ * herramienta de firma electronica llegan asi. Nada de SVG, por lo mismo que
+ * en la galeria: un SVG es un documento que puede llevar JavaScript dentro.
+ */
+export const CONSENT_EVIDENCE_TYPES = [
+  'application/pdf',
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+] as const;
+export const ConsentEvidenceTypeSchema = z.enum(CONSENT_EVIDENCE_TYPES);
+export type ConsentEvidenceType = z.infer<typeof ConsentEvidenceTypeSchema>;
+
+/**
+ * Diez megas. Un escaneo de varias paginas pesa mas que una foto de movil, y
+ * aqui no hay nada que pintar en una pagina: no se gana nada apretandolo.
+ */
+export const CONSENT_EVIDENCE_MAX_BYTES = 10 * 1024 * 1024;
+
+/**
+ * La ruta dentro del almacen privado. LA COMPONE EL SERVIDOR, nunca quien
+ * sube: un nombre elegido por quien sube es un nombre que puede apuntar a
+ * otra carpeta.
+ */
+export const CONSENT_EVIDENCE_PATH_PATTERN = /^evidence\/[0-9a-f]{32}\.(pdf|jpg|png|webp)$/;
+export const ConsentEvidencePathSchema = z
+  .string()
+  .regex(CONSENT_EVIDENCE_PATH_PATTERN, 'Esa no es una ruta de prueba');
+
+/** La extension que le toca a cada tipo, para componer la ruta. */
+export function consentEvidenceExtension(tipo: ConsentEvidenceType): string {
+  if (tipo === 'application/pdf') return 'pdf';
+  if (tipo === 'image/jpeg') return 'jpg';
+  if (tipo === 'image/png') return 'png';
+  return 'webp';
+}
+
+/** Y al reves: con que tipo se devuelve lo que se guardo. */
+export function consentEvidenceType(path: string): ConsentEvidenceType | null {
+  if (path.endsWith('.pdf')) return 'application/pdf';
+  if (path.endsWith('.jpg')) return 'image/jpeg';
+  if (path.endsWith('.png')) return 'image/png';
+  if (path.endsWith('.webp')) return 'image/webp';
+  return null;
+}
+
 export const CONSENT_EVIDENCE_KINDS = [
   /** Papel firmado a mano y archivado. */
   'SIGNED_PAPER',
@@ -242,6 +301,14 @@ export type MediaConsent = z.infer<typeof MediaConsentSchema>;
 export const StoredMediaConsentSchema = z.object({
   id: z.uuid(),
   consent: MediaConsentSchema,
+  /**
+   * La prueba guardada, o `null` si solo esta anotada la referencia.
+   *
+   * Es una ruta dentro del almacen PRIVADO, no una direccion: no se puede
+   * abrir pegandola en el navegador. El panel la pide a la API con su sesion.
+   */
+  evidencePath: ConsentEvidencePathSchema.nullable().default(null),
+
   /** Cuando se retiro el permiso, o `null` si sigue en pie. */
   revokedAt: z.string().nullable(),
   createdAt: z.string(),

@@ -534,6 +534,16 @@ export const en = {
       signedOn: 'Signed {{when}}',
       revokedOn: 'Withdrawn {{when}}',
       errInvalid: 'Some of the release is not valid yet.',
+      noEvidence: 'No proof filed: this release cannot be shown to anyone.',
+      hasEvidence: 'Proof on file.',
+      attachEvidence: 'File the proof',
+      replaceEvidence: 'Replace',
+      viewEvidence: 'Download',
+      deleteEvidence: 'Delete',
+      evidenceSaved: 'Proof filed',
+      evidenceDeleted: 'Proof deleted',
+      confirmEvidenceDelete:
+        'The release stays, but its proof is deleted for good. Only do this to replace one filed by mistake. Continue?',
     },
 
     notifications: {
@@ -1159,6 +1169,8 @@ export const en = {
           updated: 'Image release corrected',
           revoked: 'Image release withdrawn',
           restored: 'Image release reinstated',
+          evidence_attached: 'Proof of a release filed',
+          evidence_removed: 'Proof of a release deleted',
         },
         notifications: {
           updated: 'Alert settings changed',
