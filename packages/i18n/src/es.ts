@@ -1604,6 +1604,8 @@ export const es: TranslationResources = {
       'Los vídeos están alojados en YouTube. No se le pide nada a YouTube hasta que pulsas play.',
     play: 'Reproducir vídeo',
     photoAlt: 'Antes y después de una casa que limpiamos',
+    previous: 'Ver anteriores',
+    next: 'Ver siguientes',
   },
 
   contact: {

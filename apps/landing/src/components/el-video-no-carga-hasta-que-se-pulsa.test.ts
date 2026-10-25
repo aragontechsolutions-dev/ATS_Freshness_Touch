@@ -183,3 +183,22 @@ describe('la miniatura es nuestra', () => {
     expect(FACHADA).toContain('alt=""');
   });
 });
+
+describe('el marco no deja avisos en la consola', () => {
+  /*
+   * Llevar `allow="...fullscreen"` Y `allowfullscreen` no rompe nada —`allow`
+   * gana— pero el navegador lo avisa en cada carga. Una consola con avisos
+   * que siempre estan ahi es una consola que nadie mira, y el dia que salga
+   * uno de verdad se perdera entre ellos.
+   */
+  it('los permisos van solo en `allow`', () => {
+    expect(FACHADA).toContain('allow="autoplay; encrypted-media; picture-in-picture; fullscreen"');
+    expect(FACHADA_CODIGO).not.toContain('allowFullScreen');
+  });
+
+  it('y se sigue mandando un referente, que YouTube exige', () => {
+    // Un marco sin ningun referente lo rechaza con su error 153. Se manda el
+    // origen, no la pagina.
+    expect(FACHADA).toContain('referrerPolicy="strict-origin-when-cross-origin"');
+  });
+});

@@ -561,28 +561,68 @@ seis fotos y dos vídeos empujaba las zonas de servicio y el contacto una
 pantalla entera. Ahora es **una fila que se desplaza sola** y ocupa lo mismo
 con dos piezas que con veinte. Los vídeos van primero y las fotos después.
 
-**Cómo no se ve la costura.** La lista se repite varias veces en la pista y la
-animación desplaza exactamente la fracción que ocupa una repetición. Al volver
-a cero, lo que se ve es idéntico a lo que había: el salto existe, pero no se
-nota porque los píxeles son los mismos.
+**Se desplaza de verdad, no con una animación.** La primera versión movía la
+pista con `transform` y una animación de CSS. Se veía igual, pero tenía un
+techo: **a una pista transformada no se la puede empujar**. No hay forma de
+que un botón la adelante ni de que el dedo la arrastre, porque el navegador no
+sabe que eso es contenido desplazable.
 
-Se repite **más de dos veces cuando hay pocas piezas**: con dos fotos, dos
-copias no llenan una pantalla ancha y se vería un hueco cruzando la sección —
-y solo en pantallas anchas y con poco contenido, que es justo lo que nadie
-prueba. `vueltasNecesarias()` es una función aparte y probada por eso mismo.
+Ahora la caja se desplaza de verdad y el movimiento automático es un bucle que
+suma unos pocos píxeles por fotograma. Se ve lo mismo y se gana todo lo demás:
+los **botones de los lados**, el arrastre con el dedo, la rueda del ratón y el
+teclado funcionan porque son lo que el navegador ya sabía hacer.
+
+Un detalle que parece menor y no lo es: la posición se lleva **en coma
+flotante aparte**. `scrollLeft` redondea, y a 45 px por segundo cada fotograma
+avanza menos de un píxel — sumando sobre el valor redondeado, el carrusel se
+quedaría parado del todo.
+
+**Cómo no se ve la costura.** La lista se repite varias veces y, al pasar de
+una repetición, la posición retrocede exactamente lo que ocupa **una**. Lo que
+se ve después del salto es idéntico a lo que había, porque los píxeles son los
+mismos.
+
+Para que eso funcione, **una repetición tiene que ser más ancha que la
+pantalla**. Con dos fotos no lo es ni de lejos, así que el número de
+repeticiones se calcula al principio (`vueltasNecesarias`) y **se corrige
+midiendo** (`vueltasQueCaben`): si lo que hay no basta para la pantalla de
+quien mira, se añaden más, y se vuelve a comprobar al girar el móvil. Sin esa
+corrección el salto caería dentro de lo visible y se vería dar el tirón — y
+solo en pantallas anchas y con poco contenido, que es justo lo que nadie
+prueba. Las dos funciones están aparte y probadas por eso mismo, incluida la
+propiedad que de verdad importa: **después de lo visible siempre sobra al
+menos una repetición entera**.
+
+**Los mandos de los lados** van fuera de la caja que se desplaza, encima de
+ella: dentro se irían con el contenido, que es exactamente lo que no tiene que
+pasar con un mando. Antes de saltar se normaliza la posición, porque un salto
+cerca del final chocaría con el borde y la fila dejaría de ser infinita justo
+cuando alguien está usando los botones para recorrerla. Y el movimiento
+automático se para un momento al tocarlos, para no pelear con el
+desplazamiento suave.
+
+**En el móvil cada tarjeta ocupa el 78 % del ancho**, hasta un tope de 320 px.
+Una tarjeta de 320 px en un teléfono de 390 deja dos a medias y no se lee
+ninguna; el trozo que asoma es el que dice que hay más.
 
 Un carrusel automático tiene tres formas clásicas de salir mal, y ninguna se
 ve mirando la pantalla propia:
 
-| Riesgo                                         | Qué se hace                                                                                                                                                                                                                                          |
-| ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Marea** a quien ha pedido menos movimiento   | Se consulta el ajuste **en JavaScript**, no solo en CSS, y se pinta otra cosa: una fila normal que se desplaza con el dedo, **sin copias**. Un carrusel parado dejaría la mitad del contenido fuera de la pantalla y sin forma de llegar a él.       |
-| **Se escapa** justo cuando vas a pulsar        | Se para al pasar el ratón, al entrar el foco con el tabulador, y **mientras se reproduce un vídeo**. Esto último hace falta aparte: en cuanto apartas el ratón para mirar el vídeo, se iría de la pantalla sonando.                                  |
-| **Se lee cuatro veces** con lector de pantalla | Las copias llevan `inert`, que las saca del orden de tabulación **y** del árbol de accesibilidad a la vez. Marcarlas solo como ocultas dejaría los botones alcanzables con el teclado pero invisibles para el lector, que es peor que no hacer nada. |
+| Riesgo                                         | Qué se hace                                                                                                                                                                                                                                                                                                                                                |
+| ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Marea** a quien ha pedido menos movimiento   | Se consulta el ajuste **en JavaScript** y no se mueve solo nunca. La fila sigue entera y se recorre con los botones, con el dedo o con la rueda: quien ha pedido menos movimiento no pierde contenido, solo deja de perseguirlo. Parar la animación en CSS, que era lo de antes, habría dejado la mitad fuera de la pantalla y sin forma de llegar a ella. |
+| **Se escapa** justo cuando vas a pulsar        | Se para al pasar el ratón, al entrar el foco con el tabulador, un momento después de tocar un botón, y **mientras se reproduce un vídeo**. Esto último hace falta aparte: en cuanto apartas el ratón para mirar el vídeo, se iría de la pantalla sonando.                                                                                                  |
+| **Se lee cuatro veces** con lector de pantalla | Las copias llevan `inert`, que las saca del orden de tabulación **y** del árbol de accesibilidad a la vez. Marcarlas solo como ocultas dejaría los botones alcanzables con el teclado pero invisibles para el lector, que es peor que no hacer nada.                                                                                                       |
 
 La fila va **fuera del `Reveal`** de la sección: esa animación de entrada usa
-`transform`, y un elemento con `transform` crea un contexto nuevo contra el
-que se mediría el desplazamiento de la pista.
+`transform`, y los mandos van posicionados encima de las fotos — dentro de un
+elemento con `transform` se posicionarían contra él y acabarían descolocados
+mientras dura la entrada.
+
+**La barra de desplazamiento se esconde, no se desactiva.** Debajo de una fila
+que ya se mueve sola no aporta nada y parte el diseño; lo que importa es que
+la caja **siga siendo** desplazable, porque de eso viven el dedo, la rueda y
+el teclado.
 
 ### Los botones del panel parecían texto
 

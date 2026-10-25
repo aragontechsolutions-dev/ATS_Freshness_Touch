@@ -87,10 +87,27 @@ export function VideoFacade({ videoId, title, posterUrl, playLabel, onPlay }: Vi
             src={youTubeEmbedUrl(videoId)}
             title={tituloDelMarco}
             className="absolute inset-0 h-full w-full border-0"
+            /*
+             * LOS PERMISOS VAN SOLO EN `allow`, NO TAMBIEN EN
+             * `allowfullscreen`.
+             *
+             * Llevar los dos no rompe nada —`allow` gana— pero el navegador
+             * lo avisa por consola en cada carga: «Allow attribute will take
+             * precedence over allowfullscreen». Una consola con avisos que
+             * siempre estan ahi es una consola que nadie mira, y el dia que
+             * salga uno de verdad se perdera entre ellos.
+             *
+             * `allowfullscreen` es el atributo veterano; `allow="fullscreen"`
+             * hace lo mismo en todos los navegadores actuales.
+             */
             allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
-            // Google no necesita saber de que pagina nuestra viene el play.
+            /*
+             * Se manda el ORIGEN, no la pagina. Google no necesita saber de
+             * que pagina nuestra viene el play, pero algo tiene que llegarle:
+             * un marco sin ningun referente lo rechaza YouTube con su error
+             * 153.
+             */
             referrerPolicy="strict-origin-when-cross-origin"
-            allowFullScreen
           />
         ) : (
           <button
