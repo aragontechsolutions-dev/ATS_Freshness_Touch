@@ -45,18 +45,39 @@ import { ArrowRightIcon } from './Icons';
  * peor que no hacer nada.
  *
  * ========================================================================
- * SE PARA SOLO CUANDO HACE FALTA
+ * SE PARA MIENTRAS ALGUIEN ESTA, Y VUELVE A ARRANCAR AL IRSE
  * ========================================================================
- *   - Con el raton encima o con el foco dentro: nadie puede pulsar algo que
- *     se esta escapando.
- *   - Mientras se reproduce un video, que lo decide quien use esto. Sin ello
- *     el video se iria de la pantalla mientras suena.
- *   - Un momento despues de tocar un boton o de arrastrar, para que el
- *     movimiento automatico no pelee con el de quien manda.
- *   - Si el sistema pide menos movimiento, NO SE MUEVE SOLO NUNCA. La fila
- *     sigue estando entera y se recorre con los botones, con el dedo o con la
- *     rueda: quien ha pedido menos movimiento no pierde contenido, solo deja
- *     de perseguirlo.
+ * Lo que para la fila es ESTAR ENCIMA, y nada mas:
+ *
+ *   - Con el raton dentro, porque nadie puede pulsar algo que se esta
+ *     escapando.
+ *   - Con el foco del TECLADO dentro, por lo mismo: el foco entraria en un
+ *     boton que ya no esta donde se ve.
+ *   - Un momento despues de tocar un boton, para que el movimiento
+ *     automatico no pelee con el desplazamiento suave.
+ *
+ * Y NADA MAS. Un video abierto NO para la fila. La primera version lo hacia
+ * y se quedaba parada para siempre, porque nada volvia a cerrarlo: no hay
+ * forma de saber desde fuera cuando termina un video de YouTube sin cargar
+ * su script, que es justo lo que la fachada existe para evitar.
+ *
+ * DOS DETALLES QUE HACEN QUE VUELVA A ARRANCAR DE VERDAD:
+ *
+ *   1. El foco solo cuenta si es DEL TECLADO (`:focus-visible`). Al pulsar
+ *      play con el raton, el foco se va dentro del marco del video y ahi se
+ *      queda: contando ese foco, la fila no volveria a arrancar jamas aunque
+ *      apartes el raton.
+ *
+ *   2. Mientras esta parada se vigila el raton en TODO el documento. Un
+ *      marco de video se traga los eventos del raton, asi que al salir desde
+ *      encima de el —o al salirse por el borde de la ventana— el aviso de
+ *      «me he ido» puede no llegar nunca. Con esa vigilancia, basta mover el
+ *      raton a cualquier otro sitio para que arranque.
+ *
+ * Si el sistema pide menos movimiento, NO SE MUEVE SOLO NUNCA. La fila sigue
+ * estando entera y se recorre con los botones, con el dedo o con la rueda:
+ * quien ha pedido menos movimiento no pierde contenido, solo deja de
+ * perseguirlo.
  */
 
 export interface PiezaDelCarrusel {
@@ -67,8 +88,6 @@ export interface PiezaDelCarrusel {
 
 interface CarruselProps {
   piezas: PiezaDelCarrusel[];
-  /** Cuando es cierto, la fila se queda quieta. */
-  pausado?: boolean;
   /** Como se anuncia la fila a quien usa lector de pantalla. */
   etiqueta: string;
   etiquetaAnterior: string;
@@ -124,13 +143,7 @@ export function vueltasQueCaben(anchoVisible: number, anchoDeUnaVuelta: number):
   return Math.ceil(anchoVisible / anchoDeUnaVuelta) + 2;
 }
 
-export function Carrusel({
-  piezas,
-  pausado = false,
-  etiqueta,
-  etiquetaAnterior,
-  etiquetaSiguiente,
-}: CarruselProps) {
+export function Carrusel({ piezas, etiqueta, etiquetaAnterior, etiquetaSiguiente }: CarruselProps) {
   const sinMovimiento = usePrefiereMenosMovimiento();
   const caja = useRef<HTMLDivElement | null>(null);
 
@@ -179,7 +192,31 @@ export function Carrusel({
     [vueltas],
   );
 
-  const detenido = sinMovimiento || pausado || quieto || Date.now() < tocadoHace;
+  const detenido = sinMovimiento || quieto || Date.now() < tocadoHace;
+
+  /*
+   * EL SEGURO PARA QUE SIEMPRE VUELVA A ARRANCAR.
+   *
+   * Un marco de video se traga los eventos del raton: al salir desde encima
+   * de el, el aviso de «me he ido» puede no llegar nunca y la fila se
+   * quedaria parada para siempre. Mientras esta parada —y solo entonces— se
+   * mira donde esta el raton en todo el documento.
+   */
+  useEffect(() => {
+    if (!quieto) return;
+
+    const alMoverse = (evento: PointerEvent): void => {
+      const elemento = caja.current;
+      if (!elemento) return;
+      if (evento.target instanceof Node && elemento.contains(evento.target)) return;
+      setQuieto(false);
+    };
+
+    document.addEventListener('pointermove', alMoverse);
+    return () => {
+      document.removeEventListener('pointermove', alMoverse);
+    };
+  }, [quieto]);
 
   useEffect(() => {
     if (detenido || piezas.length === 0) return;
@@ -250,8 +287,13 @@ export function Carrusel({
         onPointerLeave={() => {
           setQuieto(false);
         }}
-        onFocusCapture={() => {
-          setQuieto(true);
+        onFocusCapture={(evento) => {
+          /*
+           * SOLO EL FOCO DEL TECLADO. Al pulsar play con el raton, el foco se
+           * va dentro del marco del video y ahi se queda: contando ese foco,
+           * la fila no volveria a arrancar jamas aunque apartes el raton.
+           */
+          if (evento.target.matches(':focus-visible')) setQuieto(true);
         }}
         onBlurCapture={() => {
           setQuieto(false);

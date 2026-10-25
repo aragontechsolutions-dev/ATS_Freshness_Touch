@@ -57,16 +57,9 @@ interface VideoFacadeProps {
   posterUrl: string | null;
   /** Lo que lee en voz alta un lector de pantalla al llegar al boton. */
   playLabel: string;
-  /**
-   * Se avisa al pulsar play.
-   *
-   * Lo usa el carrusel para pararse: sin esto, el video que acabas de poner
-   * se iria de la pantalla mientras suena.
-   */
-  onPlay?: () => void;
 }
 
-export function VideoFacade({ videoId, title, posterUrl, playLabel, onPlay }: VideoFacadeProps) {
+export function VideoFacade({ videoId, title, posterUrl, playLabel }: VideoFacadeProps) {
   const [reproduciendo, setReproduciendo] = useState(false);
 
   /*
@@ -114,7 +107,6 @@ export function VideoFacade({ videoId, title, posterUrl, playLabel, onPlay }: Vi
             type="button"
             onClick={() => {
               setReproduciendo(true);
-              onPlay?.();
             }}
             // El titulo se pinta debajo, asi que la etiqueta del boton lo
             // repite para que quien navegue a saltos sepa que video es.

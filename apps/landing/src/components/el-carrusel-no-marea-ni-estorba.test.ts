@@ -179,8 +179,8 @@ describe('quien ha pedido menos movimiento no persigue nada', () => {
   });
 });
 
-describe('se para cuando hace falta', () => {
-  it('con el raton encima y con el foco dentro', () => {
+describe('se para mientras alguien esta, y vuelve a arrancar al irse', () => {
+  it('se para con el raton dentro y con el foco dentro', () => {
     // Nadie puede pulsar algo que se esta escapando. Con el teclado es peor:
     // el foco entraria en un boton que ya no esta donde se ve.
     expect(CARRUSEL).toContain('onPointerEnter');
@@ -189,15 +189,47 @@ describe('se para cuando hace falta', () => {
     expect(CARRUSEL).toContain('onBlurCapture');
   });
 
-  it('y mientras se reproduce un video', () => {
+  /*
+   * ========================================================================
+   * LO QUE DE VERDAD ATAN ESTAS TRES
+   * ========================================================================
+   * La primera version paraba la fila mientras hubiera un video abierto, y
+   * se quedaba parada PARA SIEMPRE: nada volvia a cerrarlo. No hay forma de
+   * saber desde fuera cuando termina un video de YouTube sin cargar su
+   * script, que es justo lo que la fachada existe para evitar.
+   *
+   * Lo que para la fila es ESTAR ENCIMA, y nada mas. Y para que «irse»
+   * funcione de verdad hacen falta los dos detalles de abajo.
+   */
+  it('un video abierto NO para la fila', () => {
+    expect(CARRUSEL).not.toContain('pausado');
+    expect(SECCION).not.toContain('videoActivo');
+    expect(FACHADA).not.toContain('onPlay');
+  });
+
+  it('el foco solo cuenta si es del teclado', () => {
     /*
-     * Pararlo al pasar el raton no basta: en cuanto apartas el raton para
-     * mirar el video, se va de la pantalla sonando.
+     * Al pulsar play con el raton, el foco se va dentro del marco del video
+     * y ahi se queda. Contando ese foco, la fila no volveria a arrancar
+     * jamas aunque apartes el raton — que es exactamente lo que pasaba.
      */
-    expect(FACHADA).toContain('onPlay?.()');
-    expect(SECCION).toContain('setVideoActivo(video.videoId)');
-    expect(SECCION).toContain('pausado={videoActivo !== null}');
-    expect(CARRUSEL).toContain('pausado ||');
+    expect(CARRUSEL).toContain("evento.target.matches(':focus-visible')");
+  });
+
+  it('y mientras esta parada se vigila el raton en todo el documento', () => {
+    /*
+     * Un marco de video se traga los eventos del raton: al salir desde
+     * encima de el, o al salirse por el borde de la ventana, el aviso de «me
+     * he ido» puede no llegar nunca. Con esta vigilancia basta mover el
+     * raton a cualquier otro sitio.
+     *
+     * Y solo mientras esta parada: un oyente en todo el documento que
+     * estuviera siempre puesto correria en cada movimiento del raton de la
+     * pagina entera.
+     */
+    expect(CARRUSEL).toContain("document.addEventListener('pointermove', alMoverse)");
+    expect(CARRUSEL).toContain('if (!quieto) return;');
+    expect(CARRUSEL).toContain("document.removeEventListener('pointermove', alMoverse)");
   });
 });
 
