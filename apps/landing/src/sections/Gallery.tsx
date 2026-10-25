@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   galleryPhotoTitle,
@@ -48,15 +47,6 @@ export function Gallery() {
   const { t, i18n } = useTranslation();
   const gallery = useGallery();
 
-  /*
-   * QUE VIDEO SE ESTA REPRODUCIENDO, PARA PARAR LA FILA.
-   *
-   * Sin esto, el video que acabas de poner se iria de la pantalla mientras
-   * suena. Pararla al pasar el raton no basta: en cuanto apartas el raton
-   * para mirarlo, se va.
-   */
-  const [videoActivo, setVideoActivo] = useState<string | null>(null);
-
   if (!hasGalleryContent(gallery)) return null;
 
   const locale = toSiteCopyLocale(i18n.language);
@@ -70,9 +60,6 @@ export function Gallery() {
           title={galleryVideoTitle(video, locale)}
           posterUrl={video.posterUrl}
           playLabel={t('gallery.play')}
-          onPlay={() => {
-            setVideoActivo(video.videoId);
-          }}
         />
       ),
     })),
@@ -147,7 +134,6 @@ export function Gallery() {
         */}
         <Carrusel
           piezas={piezas}
-          pausado={videoActivo !== null}
           etiqueta={t('gallery.title')}
           etiquetaAnterior={t('gallery.previous')}
           etiquetaSiguiente={t('gallery.next')}

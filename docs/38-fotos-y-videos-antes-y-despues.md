@@ -608,16 +608,32 @@ ninguna; el trozo que asoma es el que dice que hay más.
 Un carrusel automático tiene tres formas clásicas de salir mal, y ninguna se
 ve mirando la pantalla propia:
 
-| Riesgo                                         | Qué se hace                                                                                                                                                                                                                                                                                                                                                |
-| ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Marea** a quien ha pedido menos movimiento   | Se consulta el ajuste **en JavaScript** y no se mueve solo nunca. La fila sigue entera y se recorre con los botones, con el dedo o con la rueda: quien ha pedido menos movimiento no pierde contenido, solo deja de perseguirlo. Parar la animación en CSS, que era lo de antes, habría dejado la mitad fuera de la pantalla y sin forma de llegar a ella. |
-| **Se escapa** justo cuando vas a pulsar        | Se para al pasar el ratón, al entrar el foco con el tabulador, un momento después de tocar un botón, y **mientras se reproduce un vídeo**. Esto último hace falta aparte: en cuanto apartas el ratón para mirar el vídeo, se iría de la pantalla sonando.                                                                                                  |
-| **Se lee cuatro veces** con lector de pantalla | Las copias llevan `inert`, que las saca del orden de tabulación **y** del árbol de accesibilidad a la vez. Marcarlas solo como ocultas dejaría los botones alcanzables con el teclado pero invisibles para el lector, que es peor que no hacer nada.                                                                                                       |
+| Riesgo                                                                      | Qué se hace                                                                                                                                                                                                                                                                                                                                                                                   |
+| --------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Marea** a quien ha pedido menos movimiento                                | Se consulta el ajuste **en JavaScript** y no se mueve solo nunca. La fila sigue entera y se recorre con los botones, con el dedo o con la rueda: quien ha pedido menos movimiento no pierde contenido, solo deja de perseguirlo. Parar la animación en CSS, que era lo de antes, habría dejado la mitad fuera de la pantalla y sin forma de llegar a ella.                                    |
+| **Se escapa** justo cuando vas a pulsar, o **se queda parada para siempre** | Lo que para la fila es **estar encima**, y nada más: el ratón dentro, el foco del teclado dentro, o un momento después de tocar un botón. Un vídeo abierto **no** la para: la primera versión lo hacía y se quedaba parada para siempre, porque nada volvía a cerrarlo — no hay forma de saber cuándo termina un vídeo de YouTube sin cargar su script, que es justo lo que la fachada evita. |
+| **Se lee cuatro veces** con lector de pantalla                              | Las copias llevan `inert`, que las saca del orden de tabulación **y** del árbol de accesibilidad a la vez. Marcarlas solo como ocultas dejaría los botones alcanzables con el teclado pero invisibles para el lector, que es peor que no hacer nada.                                                                                                                                          |
 
 La fila va **fuera del `Reveal`** de la sección: esa animación de entrada usa
 `transform`, y los mandos van posicionados encima de las fotos — dentro de un
 elemento con `transform` se posicionarían contra él y acabarían descolocados
 mientras dura la entrada.
+
+### Los dos detalles que hacen que vuelva a arrancar de verdad
+
+Decir «se para con el ratón encima» es fácil; que vuelva a arrancar **siempre**
+no lo es. Dos cosas lo rompían:
+
+1. **El foco solo cuenta si es del teclado** (`:focus-visible`). Al pulsar play
+   con el ratón, el foco se va dentro del marco del vídeo y **ahí se queda**.
+   Contando ese foco, la fila no volvería a arrancar jamás aunque apartes el
+   ratón.
+2. **Mientras está parada se vigila el ratón en todo el documento.** Un marco
+   de vídeo **se traga los eventos del ratón**: al salir desde encima de él, o
+   al salirse por el borde de la ventana, el aviso de «me he ido» puede no
+   llegar nunca. Con esa vigilancia basta mover el ratón a cualquier otro
+   sitio. Y solo mientras está parada: un oyente permanente en todo el
+   documento correría en cada movimiento del ratón de la página entera.
 
 **La barra de desplazamiento se esconde, no se desactiva.** Debajo de una fila
 que ya se mueve sola no aporta nada y parte el diseño; lo que importa es que
