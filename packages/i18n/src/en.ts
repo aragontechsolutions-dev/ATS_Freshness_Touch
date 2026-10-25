@@ -488,6 +488,12 @@ export const en = {
       propertyAddress: 'Property',
       propertyAddressHelp:
         'Never shown on the website. It lives here so the item can be found again.',
+      customerEmail: 'Customer email',
+      customerEmailHelp:
+        'Optional. With it, they get a record of what they agreed to and a link that takes it down themselves, without waiting for us.',
+      customerLocale: 'Writes to them in',
+      customerLocaleHelp: 'What we send talks about publishing their home: it has to be readable.',
+      locale: { en: 'English', es: 'Spanish' },
       occupancy: 'Who lives there',
       occupiedByOthers: 'Someone other than the signer lives in the property',
       occupiedByOthersHelp:
@@ -1849,6 +1855,32 @@ export const en = {
    * La seccion no se pinta si no hay videos configurados, asi que estos
    * textos pueden existir mucho antes de que haya contenido.
    */
+  /**
+   * LA PAGINA DESDE LA QUE UN CLIENTE RETIRA SUS FOTOS.
+   *
+   * Textos cortos y sin rodeos: quien llega aqui viene de un correo a hacer
+   * una cosa. No se le pide que explique por que, no se le ofrece cambiar de
+   * idea a medias y no se le pregunta si esta seguro — pedir una razon para
+   * retirar algo es una forma educada de poner una barrera.
+   */
+  removal: {
+    title: 'Take your photos off our website',
+    intro:
+      'Press the button and the photos and videos of your home stop being published. It takes effect straight away.',
+    help: 'You do not have to tell us why. If you change your mind, just write to us.',
+    confirm: 'Yes, take them down',
+    sending: 'Taking them down\u2026',
+    done: 'Done. The photos and videos of your home are no longer published.',
+    /*
+     * MISMO TEXTO PARA UN ENLACE FALSO, UNO YA USADO Y UNO AUSENTE. Decir
+     * cual de los tres es convertiria esta pagina en una forma de averiguar
+     * que enlaces existieron.
+     */
+    invalid:
+      'This link no longer works. It may have been used already. Write to us and we will take them down ourselves.',
+    error: 'We could not reach the server. Try again in a moment.',
+  },
+
   gallery: {
     title: 'Before and after',
     subtitle: 'Real homes we cleaned, shared with the owner’s written permission.',

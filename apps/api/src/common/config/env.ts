@@ -292,6 +292,18 @@ export const EnvSchema = z
      * reloj.
      */
     REMOVAL_SWEEP_MINUTES: z.coerce.number().int().min(0).default(60),
+
+    /**
+     * La direccion del SITIO PUBLICO, para componer el enlace con el que un
+     * cliente retira sus fotos.
+     *
+     * Hace falta porque la API no sabe donde vive el sitio: se despliegan por
+     * separado y en dominios distintos. Si falta, el correo de constancia se
+     * manda SIN enlace en vez de con uno roto —un enlace que no lleva a
+     * ninguna parte es peor que no ofrecerlo, porque el cliente cree que ya
+     * lo ha retirado—.
+     */
+    PUBLIC_SITE_URL: z.string().url().optional(),
     STORAGE_TIMEOUT_MS: z.coerce.number().int().min(500).default(10_000),
     /** Secreto del proveedor local. Solo desarrollo y pruebas. */
     AUTH_LOCAL_SECRET: z.string().min(1).default('secreto-de-desarrollo-no-usar-en-produccion'),

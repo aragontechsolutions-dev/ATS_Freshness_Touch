@@ -5,6 +5,7 @@ import { SettingsModule } from '../settings/settings.module';
 import { NotificationSettingsService } from './notification-settings.service';
 import { EmailBrandingService } from './email-branding.service';
 import { NotificationsService } from './notifications.service';
+import { ConsentReceiptService } from './consent-receipt.service';
 import { ReminderSweepService } from './reminder-sweep.service';
 import { RemovalDeadlineSweepService } from './removal-deadline-sweep.service';
 import {
@@ -86,6 +87,7 @@ import { NoopTelegramProvider } from './providers/noop-telegram.provider';
     },
     NotificationSettingsService,
     NotificationsService,
+    ConsentReceiptService,
     ReminderSweepService,
     /*
      * El aviso de los plazos de retirada vive AQUI y no en `settings`, con
@@ -110,6 +112,12 @@ import { NoopTelegramProvider } from './providers/noop-telegram.provider';
   exports: [
     NotificationsService,
     NotificationSettingsService,
+    /*
+     * La constancia del permiso la disparan DOS sitios ajenos a este modulo:
+     * el panel al anotar una ficha y el flujo de reserva al crear una con la
+     * casilla marcada. Se exporta por lo mismo que `EMAIL_PROVIDER`.
+     */
+    ConsentReceiptService,
     ReminderSweepService,
     /* Se exporta para que las pruebas llamen a la pasada a mano. */
     RemovalDeadlineSweepService,

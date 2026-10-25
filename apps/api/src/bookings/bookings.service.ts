@@ -2,12 +2,15 @@ import { BadRequestException, ConflictException, Injectable, Logger } from '@nes
 import { randomUUID } from 'node:crypto';
 import { DateTime } from 'luxon';
 import { calculateQuote } from '@freshness/pricing';
+import { ConsentReceiptService } from '../notifications/consent-receipt.service';
+import { crearTestigoDeRetirada } from '../settings/removal-token';
 import {
   API_ERROR_CODES,
   CONSENT_ADDRESS_MAX,
   CONSENT_NAME_MAX,
   MediaConsentSchema,
   consentFromBooking,
+  type MediaConsent,
   type BookingRequest,
   type BookingResponse,
   type PaymentIntent,
@@ -44,6 +47,11 @@ export class BookingsService {
      * transaccion y sin esperarla: ver el final de `create`.
      */
     private readonly geocoding: GeocodingService,
+    /**
+     * Para mandarle al cliente constancia de lo que autorizo y el enlace que
+     * lo retira. Se usa FUERA de la transaccion: ver el final de `create`.
+     */
+    private readonly constancia: ConsentReceiptService,
   ) {}
 
   /**
@@ -190,7 +198,7 @@ export class BookingsService {
       signedAt: string;
       ip: string | null;
     },
-  ): Promise<void> {
+  ): Promise<{ consent: MediaConsent; token: string | null } | null> {
     const { contact, address } = datos.request;
 
     const permiso = MediaConsentSchema.safeParse(
@@ -198,6 +206,8 @@ export class BookingsService {
         marcado: datos.request.mediaConsent,
         reference: datos.reference,
         customerName: recortar(`${contact.firstName} ${contact.lastName}`, CONSENT_NAME_MAX),
+        customerEmail: contact.email,
+        customerLocale: contact.locale,
         /*
          * La direccion aqui sirve para VOLVER A ENCONTRAR la casa cuando un
          * cliente pida retirar sus fotos, no para mandarle nada: la postal
@@ -218,14 +228,24 @@ export class BookingsService {
         `La reserva ${datos.reference} marco el permiso de imagen y no se pudo anotar: ` +
           `${permiso.error.issues[0]?.message ?? 'contrato invalido'}. Hay que anotarlo a mano.`,
       );
-      return;
+      return null;
     }
+
+    /*
+     * EL TESTIGO CON EL QUE EL CLIENTE RETIRARA SUS FOTOS. Se fabrica aqui,
+     * de el solo queda el resumen en la fila, y el valor en claro sale por
+     * la devolucion para entrar en el correo de constancia y olvidarse.
+     */
+    const testigo = crearTestigoDeRetirada();
 
     const fila = await tx.mediaConsent.create({
       data: {
+        removalTokenHash: testigo.hash,
         reference: permiso.data.reference,
         evidenceKind: permiso.data.evidenceKind,
         customerName: permiso.data.customerName,
+        customerEmail: permiso.data.customerEmail,
+        customerLocale: permiso.data.customerLocale,
         propertyAddress: permiso.data.propertyAddress,
         occupiedByOthers: permiso.data.occupiedByOthers,
         occupantConsent: permiso.data.occupantConsent,
@@ -265,6 +285,8 @@ export class BookingsService {
       },
       tx,
     );
+
+    return { consent: permiso.data, token: testigo.token };
   }
 
   /** Recalcula el presupuesto con la direccion completa. */
@@ -341,6 +363,15 @@ export class BookingsService {
      * la transaccion confirme. Ver el comentario del final de este metodo.
      */
     let direccionAGeocodificar: string | null = null;
+
+    /*
+     * La constancia del permiso de imagen, para mandarla DESPUES de que la
+     * transaccion confirme. Un correo es una llamada de red, y dentro de la
+     * transaccion mantendria bloqueada la agenda del dia mientras se espera
+     * a un servidor ajeno — el mismo motivo por el que la retencion del
+     * deposito tampoco va dentro.
+     */
+    let constanciaPorMandar: { consent: MediaConsent; token: string | null } | null = null;
 
     /*
      * El tipo se anota a mano porque, al guardar el resultado en una
@@ -558,7 +589,7 @@ export class BookingsService {
          * de abajo dice CUSTOMER y SITE.
          */
         if (request.mediaConsent.granted) {
-          await this.anotarPermisoDeImagen(tx, {
+          constanciaPorMandar = await this.anotarPermisoDeImagen(tx, {
             request,
             reference: booking.reference,
             serviceDate: localDate,
@@ -611,6 +642,17 @@ export class BookingsService {
      */
     if (direccionAGeocodificar !== null) {
       void this.geocoding.resolveAndStore(direccionAGeocodificar);
+    }
+
+    /*
+     * LA CONSTANCIA DEL PERMISO, tambien fuera de la transaccion y sin
+     * esperarla. El servicio no lanza nunca hacia arriba: registra el fallo
+     * y sigue. Lo que no puede pasar es que una reserva ya pagada se caiga
+     * porque un servidor de correo ajeno tardo en responder.
+     */
+    if (constanciaPorMandar !== null) {
+      const { consent, token } = constanciaPorMandar;
+      void this.constancia.enviar(consent, token);
     }
 
     return respuesta;

@@ -8,6 +8,7 @@ import {
   MediaConsentSchema,
   removalState,
   type ConsentChannel,
+  LocaleSchema,
   type ConsentEvidenceKind,
   type Locale,
   type MediaConsent,
@@ -44,6 +45,8 @@ interface Borrador {
   reference: string;
   evidenceKind: ConsentEvidenceKind;
   customerName: string;
+  customerEmail: string;
+  customerLocale: Locale;
   propertyAddress: string;
   occupiedByOthers: boolean;
   occupantConsent: boolean;
@@ -68,6 +71,14 @@ const VACIO: Borrador = {
    */
   evidenceKind: 'SIGNED_PAPER',
   customerName: '',
+  customerEmail: '',
+  /*
+   * INGLES POR DEFECTO, que es el idioma del sitio y el que se habla en
+   * Georgia salvo que alguien diga otra cosa. Es lo que menos sorprende, y
+   * quien anota la ficha sabe perfectamente en que idioma hablo con esa
+   * persona.
+   */
+  customerLocale: 'en',
   propertyAddress: '',
   occupiedByOthers: false,
   occupantConsent: false,
@@ -395,6 +406,43 @@ export function MediaConsentsForm({ locale, onSessionLost }: MediaConsentsFormPr
                 campo('propertyAddress', v);
               }}
             />
+          </div>
+
+          {/*
+           * EL CORREO ES LO QUE LE DEVUELVE EL CONTROL AL CLIENTE.
+           *
+           * Sin el, la ficha vale igual pero retirar depende siempre de que
+           * alguien del equipo lea un mensaje. Con el, el cliente recibe
+           * constancia de lo que autorizo y un enlace que lo retira solo.
+           */}
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Texto
+              etiqueta={t('admin.consents.customerEmail')}
+              ayuda={t('admin.consents.customerEmailHelp')}
+              valor={borrador.customerEmail}
+              onCambiar={(v) => {
+                campo('customerEmail', v);
+              }}
+            />
+            <label className="block">
+              <span className="ft-label">{t('admin.consents.customerLocale')}</span>
+              <span className="mb-1 block text-xs text-slate-600 dark:text-slate-400">
+                {t('admin.consents.customerLocaleHelp')}
+              </span>
+              <select
+                className="ft-input"
+                value={borrador.customerLocale}
+                onChange={(evento) => {
+                  campo('customerLocale', evento.target.value as Locale);
+                }}
+              >
+                {LocaleSchema.options.map((idioma) => (
+                  <option key={idioma} value={idioma}>
+                    {t(`admin.consents.locale.${idioma}`)}
+                  </option>
+                ))}
+              </select>
+            </label>
           </div>
 
           {/*
@@ -991,6 +1039,13 @@ function aContrato(borrador: Borrador): unknown {
     reference: borrador.reference.trim(),
     evidenceKind: borrador.evidenceKind,
     customerName: borrador.customerName.trim(),
+    /*
+     * VACIO ES «NO HAY», NO UNA CADENA VACIA. Sin correo la ficha vale
+     * igual; lo que no tiene es salida automatica, y el contrato lo dice
+     * con un nulo.
+     */
+    customerEmail: borrador.customerEmail.trim() === '' ? null : borrador.customerEmail.trim(),
+    customerLocale: borrador.customerLocale,
     propertyAddress: borrador.propertyAddress.trim(),
     occupiedByOthers: borrador.occupiedByOthers,
     /*
@@ -1022,6 +1077,8 @@ function aBorrador(consent: MediaConsent): Borrador {
     reference: consent.reference,
     evidenceKind: consent.evidenceKind,
     customerName: consent.customerName,
+    customerEmail: consent.customerEmail ?? '',
+    customerLocale: consent.customerLocale,
     propertyAddress: consent.propertyAddress,
     occupiedByOthers: consent.occupiedByOthers,
     occupantConsent: consent.occupantConsent,

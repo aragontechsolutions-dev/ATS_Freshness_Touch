@@ -11,6 +11,7 @@ import {
   type StoredMediaConsent,
 } from '@freshness/types';
 import { AuditService } from '../audit/audit.service';
+import { crearTestigoDeRetirada, resumenDeTestigo } from './removal-token';
 import { PrismaService } from '../database/prisma.service';
 import { DOCUMENT_STORAGE, type DocumentStorage } from '../storage/document-storage.types';
 import { stripImageMetadata } from '../storage/strip-image-metadata';
@@ -138,14 +139,32 @@ export class MediaConsentsService {
     return value;
   }
 
+  /**
+   * Anota una ficha nueva.
+   *
+   * DEVUELVE EL TESTIGO, Y ES LA UNICA VEZ QUE EXISTE. Si la ficha lleva
+   * correo, se le fabrica un enlace de retirada; de el solo queda el resumen
+   * en la base, asi que este valor no se puede recuperar despues. Quien
+   * llama lo manda en el correo de constancia y lo olvida.
+   *
+   * Se devuelve en vez de mandarse desde aqui porque mandar correos exige
+   * los canales, que viven en el modulo de avisos — y ese modulo ya importa
+   * este. Pedirle la vuelta seria un ciclo entre los dos.
+   */
   async create(
     consent: MediaConsent,
     staff: AuthenticatedStaff,
     ipAddress: string | null,
-  ): Promise<StoredMediaConsent> {
+  ): Promise<{ ficha: StoredMediaConsent; removalToken: string | null }> {
+    const testigo = consent.customerEmail === null ? null : crearTestigoDeRetirada();
+
     const fila = await this.prisma.db.$transaction(async (tx) => {
       const creada = await tx.mediaConsent.create({
-        data: { ...aFila(consent), updatedByStaffId: staff.staffId },
+        data: {
+          ...aFila(consent),
+          removalTokenHash: testigo?.hash ?? null,
+          updatedByStaffId: staff.staffId,
+        },
         include: { updatedBy: { select: { firstName: true, lastName: true } } },
       });
 
@@ -166,7 +185,89 @@ export class MediaConsentsService {
     });
 
     this.invalidate();
-    return aFicha(fila);
+    return { ficha: aFicha(fila), removalToken: testigo?.token ?? null };
+  }
+
+  /* ---------------------------------------------------------------------- */
+  /*  La retirada que hace el propio cliente                                 */
+  /* ---------------------------------------------------------------------- */
+
+  /**
+   * RETIRA LAS FOTOS DE UNA FICHA CON SU TESTIGO, SIN SESION DE NADIE.
+   *
+   * Es la unica puerta publica de todo este modulo, y hace una sola cosa:
+   * despublicar. No lee la ficha, no devuelve el nombre ni la direccion, no
+   * dice de que casa era y no toca ninguna otra.
+   *
+   * ========================================================================
+   * EL TESTIGO SE GASTA
+   * ========================================================================
+   * Al usarse se borra el resumen, asi que un segundo intento con el mismo
+   * enlace ya no encuentra nada. No es por ahorro: un enlace que sigue
+   * sirviendo despues de usarse es una credencial viva en un buzon para
+   * siempre.
+   *
+   * ========================================================================
+   * UN TESTIGO QUE NO EXISTE Y UNO YA GASTADO RESPONDEN IGUAL
+   * ========================================================================
+   * Devuelven lo mismo —`desconocido`— y quien llama ensena el mismo texto.
+   * Distinguirlos convertiria esta ruta en una forma de averiguar que
+   * enlaces existieron alguna vez.
+   */
+  async retirarConTestigo(
+    token: string,
+    ipAddress: string | null,
+  ): Promise<{ retirada: string | null }> {
+    const fila = await this.prisma.db.mediaConsent.findUnique({
+      where: { removalTokenHash: resumenDeTestigo(token) },
+      select: { id: true, reference: true, revokedAt: true },
+    });
+
+    if (!fila) return { retirada: null };
+
+    await this.prisma.db.$transaction(async (tx) => {
+      await tx.mediaConsent.update({
+        where: { id: fila.id },
+        data: {
+          // Si ya estaba retirada no se mueve la fecha: la que vale es la
+          // primera, que es la que dice cuando dejo de publicarse.
+          revokedAt: fila.revokedAt ?? new Date(),
+          removalTokenHash: null,
+          /*
+           * `updatedByStaffId` se queda como estaba: aqui no hay personal
+           * que anotar, y poner el de quien creo la ficha seria atribuirle
+           * una accion que no hizo.
+           */
+        },
+      });
+
+      await this.audit.record(
+        {
+          staff: null,
+          actorType: 'CUSTOMER',
+          surface: 'SITE',
+          action: 'media_consent.revoked',
+          entityType: 'media_consent',
+          entityId: fila.id,
+          /*
+           * La referencia y nada mas. Ni el testigo —es una credencial y no
+           * se escribe en ningun registro— ni el nombre ni la direccion.
+           */
+          metadata: { reference: fila.reference, bySelfService: true },
+          ipAddress,
+        },
+        tx,
+      );
+    });
+
+    this.invalidate();
+
+    /*
+     * Devuelve la REFERENCIA, no un booleano: quien llama tiene que poder
+     * avisar a la empresa de cual se retiro, y volver a preguntarselo a la
+     * base seria pedir dos veces lo que ya se sabe.
+     */
+    return { retirada: fila.reference };
   }
 
   async update(
@@ -568,6 +669,8 @@ function aFila(consent: MediaConsent) {
     reference: consent.reference,
     evidenceKind: consent.evidenceKind,
     customerName: consent.customerName,
+    customerEmail: consent.customerEmail,
+    customerLocale: consent.customerLocale,
     propertyAddress: consent.propertyAddress,
     occupiedByOthers: consent.occupiedByOthers,
     occupantConsent: consent.occupantConsent,
@@ -590,6 +693,8 @@ interface FilaConAutor {
   reference: string;
   evidenceKind: string;
   customerName: string;
+  customerEmail: string | null;
+  customerLocale: string;
   propertyAddress: string;
   occupiedByOthers: boolean;
   occupantConsent: boolean;
@@ -604,6 +709,7 @@ interface FilaConAutor {
   photoPaths: string[];
   notes: string | null;
   evidencePath: string | null;
+  removalTokenHash: string | null;
   removalRequestedAt: Date | null;
   revokedAt: Date | null;
   createdAt: Date;
@@ -622,6 +728,8 @@ function aFicha(fila: FilaConAutor): StoredMediaConsent {
     reference: fila.reference,
     evidenceKind: fila.evidenceKind,
     customerName: fila.customerName,
+    customerEmail: fila.customerEmail,
+    customerLocale: fila.customerLocale,
     propertyAddress: fila.propertyAddress,
     occupiedByOthers: fila.occupiedByOthers,
     occupantConsent: fila.occupantConsent,
@@ -641,6 +749,13 @@ function aFicha(fila: FilaConAutor): StoredMediaConsent {
     id: fila.id,
     consent,
     evidencePath: fila.evidencePath,
+    /*
+     * SE DICE QUE HAY ENLACE, NUNCA CUAL. El panel necesita saber si este
+     * cliente tiene salida automatica —para no prometersela si no la
+     * tiene—, pero el resumen del testigo no sale de esta funcion: una
+     * pantalla que lo recibiera lo dejaria en la memoria de un navegador.
+     */
+    hasRemovalLink: fila.removalTokenHash !== null,
     removalRequestedAt:
       fila.removalRequestedAt === null ? null : soloFecha(fila.removalRequestedAt),
     revokedAt: fila.revokedAt?.toISOString() ?? null,

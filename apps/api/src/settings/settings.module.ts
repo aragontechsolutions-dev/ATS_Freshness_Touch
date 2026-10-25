@@ -7,6 +7,7 @@ import { PricingRatesService } from './pricing-rates.service';
 import { ServiceAreaService } from './service-area.service';
 import { CompanyLocationService } from './company-location.service';
 import { GalleryController } from './gallery.controller';
+import { MediaRemovalController } from './media-removal.controller';
 import { GalleryService } from './gallery.service';
 import { MediaConsentsService } from './media-consents.service';
 import { SiteCopyController } from './site-copy.controller';
@@ -19,7 +20,12 @@ import { SiteCopyService } from './site-copy.service';
  */
 @Module({
   imports: [StorageModule],
-  controllers: [BusinessSettingsController, SiteCopyController, GalleryController],
+  controllers: [
+    BusinessSettingsController,
+    SiteCopyController,
+    GalleryController,
+    MediaRemovalController,
+  ],
   providers: [
     BusinessSettingsService,
     SiteCopyService,

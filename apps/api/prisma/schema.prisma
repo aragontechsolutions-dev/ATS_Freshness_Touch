@@ -1051,6 +1051,19 @@ model MediaConsent {
   evidenceKind String @default("SIGNED_PAPER")
 
   customerName    String
+
+  /// EL CORREO DEL CLIENTE, para poder devolverle el control: constancia de
+  /// lo que autorizo y un enlace que lo retira al momento. Sin esto, retirar
+  /// depende siempre de que alguien del equipo lea un mensaje.
+  /// Nulo en las fichas de papel donde nadie lo apunto. NUNCA sale al sitio
+  /// publico ni al registro de auditoria.
+  customerEmail   String?
+
+  /// En que idioma se le escribe. Lo que se le manda habla de publicar fotos
+  /// de su casa: en un idioma que no lee, ni sirve de constancia ni se
+  /// atreve a pulsar el boton de retirar.
+  customerLocale  String  @default("en")
+
   /// La casa. NUNCA sale al sitio publico.
   propertyAddress String
 
@@ -1098,6 +1111,15 @@ model MediaConsent {
   /// empieza cuando el cliente escribe, y el hueco peligroso es el que va
   /// desde ahi hasta que alguien entra al panel.
   removalRequestedAt DateTime? @db.Date
+
+  /// EL RESUMEN del testigo con el que el cliente retira sus fotos, nunca el
+  /// testigo. Quien lo tenga puede despublicar esa ficha sin identificarse de
+  /// ninguna otra forma, asi que se guarda como se guarda una contrasena: ni
+  /// la base ni una copia de seguridad robada sirven para retirar nada.
+  /// Nulo si la ficha no tiene enlace, o si ya se uso.
+  /// UNICO para que buscar por el sea una busqueda por indice y no un
+  /// recorrido de la tabla comparando cadenas.
+  removalTokenHash String? @unique
 
   /// La ultima vez que se aviso al responsable de esta peticion pendiente.
   /// Es lo que evita repetir el aviso en cada pasada del barrido, y vive en

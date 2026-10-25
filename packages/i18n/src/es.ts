@@ -450,6 +450,12 @@ export const es: TranslationResources = {
       customerName: 'Cliente',
       propertyAddress: 'Propiedad',
       propertyAddressHelp: 'No sale nunca en la web. Está aquí para poder encontrar la pieza.',
+      customerEmail: 'Correo del cliente',
+      customerEmailHelp:
+        'Opcional. Con él recibe constancia de lo que autorizó y un enlace con el que lo retira él mismo, sin esperar a nadie.',
+      customerLocale: 'Se le escribe en',
+      customerLocaleHelp: 'Lo que se le manda habla de publicar su casa: tiene que poder leerlo.',
+      locale: { en: 'Inglés', es: 'Español' },
       occupancy: 'Quién vive allí',
       occupiedByOthers: 'En la vivienda vive alguien que no es quien firma',
       occupiedByOthersHelp:
@@ -1719,6 +1725,19 @@ export const es: TranslationResources = {
    * La seccion no se pinta si no hay videos configurados, asi que estos
    * textos pueden existir mucho antes de que haya contenido.
    */
+  removal: {
+    title: 'Retirar sus fotos de nuestra web',
+    intro:
+      'Pulse el botón y las fotos y los vídeos de su vivienda dejan de publicarse. Surte efecto al momento.',
+    help: 'No tiene que decirnos por qué. Si cambia de idea, escríbanos sin más.',
+    confirm: 'Sí, retírenlas',
+    sending: 'Retirando…',
+    done: 'Hecho. Las fotos y los vídeos de su vivienda ya no se publican.',
+    invalid:
+      'Este enlace ya no sirve. Puede que se haya usado antes. Escríbanos y las retiramos nosotros.',
+    error: 'No hemos podido contactar con el servidor. Inténtelo dentro de un momento.',
+  },
+
   gallery: {
     title: 'Antes y después',
     subtitle:
