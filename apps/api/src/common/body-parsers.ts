@@ -6,8 +6,8 @@ import { GALLERY_PHOTO_MAX_BYTES, GALLERY_PHOTO_TYPES } from '@freshness/types';
 /** Ruta del webhook de pagos, relativa al prefijo de la API. */
 export const WEBHOOK_ROUTE = 'payments/webhook';
 
-/** Ruta de subida de fotos de la galeria, relativa al prefijo de la API. */
-export const GALLERY_PHOTOS_ROUTE = 'admin/gallery/photos';
+/** Ruta de subida de imagenes de la galeria, relativa al prefijo de la API. */
+export const GALLERY_IMAGES_ROUTE = 'admin/gallery/images';
 
 /**
  * LECTURA DEL CUERPO DE LAS PETICIONES
@@ -22,7 +22,7 @@ export const GALLERY_PHOTOS_ROUTE = 'admin/gallery/photos';
  *  1. El del webhook, con un limite mas holgado. Un evento de pago trae el
  *     objeto completo del proveedor y no cabe siempre en el limite general.
  *
- *  2. El de las fotos de la galeria, que recibe los BYTES DE LA IMAGEN tal
+ *  2. El de las imagenes de la galeria, que recibe los BYTES DE LA IMAGEN tal
  *     cual, sin envoltorio de formulario. Asi no hace falta ninguna libreria
  *     de multipart: el panel manda el archivo como cuerpo y el tipo en la
  *     cabecera. El limite es el mismo que el del bucket, 5 MB, y solo acepta
@@ -46,7 +46,7 @@ export function applyBodyParsers(app: NestExpressApplication, apiPrefix: string)
    * que evita cargar 5 MB de cualquier cosa en memoria.
    */
   app.use(
-    `/${apiPrefix}/${GALLERY_PHOTOS_ROUTE}`,
+    `/${apiPrefix}/${GALLERY_IMAGES_ROUTE}`,
     raw({ type: [...GALLERY_PHOTO_TYPES], limit: GALLERY_PHOTO_MAX_BYTES }),
   );
 

@@ -55,6 +55,7 @@ import {
   type AdminSiteCopy,
   type CompanyLocation,
   type Gallery,
+  type GalleryImageKind,
   type GalleryPhotoUpload,
   type SiteCopy,
 } from '@freshness/types';
@@ -735,9 +736,10 @@ export function saveGallery(gallery: Gallery): Promise<AdminGallery> {
 }
 
 /**
- * Sube una foto y devuelve donde quedo.
+ * Sube una imagen —una foto de la galeria o la miniatura de un video— y
+ * devuelve donde quedo.
  *
- * SUBIR NO PUBLICA NADA. La foto no se ve en ningun sitio hasta que su ruta
+ * SUBIR NO PUBLICA NADA. La imagen no se ve en ningun sitio hasta que su ruta
  * entra en la galeria con `saveGallery`. Es deliberado: deja elegir el titulo
  * y el orden antes de que la casa de nadie aparezca en la portada.
  *
@@ -745,12 +747,15 @@ export function saveGallery(gallery: Gallery): Promise<AdminGallery> {
  * cree ese tipo —comprueba los bytes— y de paso le quita los metadatos, que
  * es donde una foto de movil lleva las coordenadas GPS de la casa.
  */
-export function uploadGalleryPhoto(file: File): Promise<GalleryPhotoUpload> {
+export function uploadGalleryImage(
+  file: File,
+  kind: GalleryImageKind,
+): Promise<GalleryPhotoUpload> {
   return request(
-    `${GALERIA}/photos`,
+    `${GALERIA}/images?kind=${kind}`,
     (payload) => {
       const parsed = GalleryPhotoUploadSchema.safeParse(payload);
-      if (!parsed.success) throw contractError('subida de la foto', parsed.error.issues);
+      if (!parsed.success) throw contractError('subida de la imagen', parsed.error.issues);
       return parsed.data;
     },
     { method: 'POST', raw: { body: file, contentType: file.type } },

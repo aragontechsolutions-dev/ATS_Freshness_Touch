@@ -50,6 +50,9 @@ const DOS = 'aBcDeFgHiJk';
 /** Una ruta de foto con el formato que pone el servidor. */
 const FOTO = 'photos/0123456789abcdef0123456789abcdef.jpg';
 
+/** Y una de miniatura, que vive en su propia carpeta. */
+const MINI = 'posters/fedcba9876543210fedcba9876543210.jpg';
+
 /** La marca que se busca despues: si sobrevive, el GPS tambien lo haria. */
 const GPS = [0x47, 0x50, 0x53, 0x5f, 0x41, 0x51, 0x55, 0x49]; // "GPS_AQUI"
 
@@ -436,6 +439,8 @@ describe('el rastro', () => {
       removed: [UNO],
       photosAdded: [],
       photosRemoved: [],
+      postersAdded: [],
+      postersRemoved: [],
     });
   });
 
@@ -461,6 +466,8 @@ describe('el rastro', () => {
       'added',
       'photosAdded',
       'photosRemoved',
+      'postersAdded',
+      'postersRemoved',
       'removed',
     ]);
   });
@@ -468,12 +475,12 @@ describe('el rastro', () => {
 
 /* ======================================================================== */
 
-describe('subir una foto', () => {
-  const RUTA_FOTOS = `${RUTA_ADMIN}/photos`;
+describe('subir una imagen', () => {
+  const RUTA_IMAGENES = `${RUTA_ADMIN}/images`;
 
-  async function subir(bytes: Buffer, tipo: string, token?: string) {
+  async function subir(bytes: Buffer, tipo: string, token?: string, kind = 'photo') {
     return request(app.getHttpServer())
-      .post(RUTA_FOTOS)
+      .post(`${RUTA_IMAGENES}?kind=${kind}`)
       .set('authorization', `Bearer ${token ?? (await comoAda())}`)
       .set('content-type', tipo)
       .send(bytes);
@@ -485,6 +492,38 @@ describe('subir una foto', () => {
     expect(respuesta.status).toBe(201);
     // Treinta y dos hexadecimales: nada del nombre original sobrevive.
     expect(respuesta.body.path).toMatch(/^photos\/[0-9a-f]{32}\.jpg$/);
+  });
+
+  /*
+   * CADA COSA EN SU CARPETA. Si vivieran juntas, retirar una foto de la
+   * galeria podria llevarse por delante la portada de un video —y al
+   * contrario—, y nadie entenderia por que al quitar una foto un video se
+   * quedo en gris.
+   */
+  it('una miniatura va a su propia carpeta', async () => {
+    const respuesta = await subir(jpegConExif(), 'image/jpeg', undefined, 'poster');
+
+    expect(respuesta.status).toBe(201);
+    expect(respuesta.body.path).toMatch(/^posters\/[0-9a-f]{32}\.jpg$/);
+  });
+
+  it('sin decir que carpeta, no se sube', async () => {
+    // Adivinarlo seria decidir por quien llama donde acaba su archivo.
+    const respuesta = await request(app.getHttpServer())
+      .post(RUTA_IMAGENES)
+      .set('authorization', `Bearer ${await comoAda()}`)
+      .set('content-type', 'image/jpeg')
+      .send(jpegConExif());
+
+    expect(respuesta.status).toBe(415);
+    expect(almacen.rutas).toHaveLength(0);
+  });
+
+  it('con una carpeta inventada, tampoco', async () => {
+    const respuesta = await subir(jpegConExif(), 'image/jpeg', undefined, 'privado');
+
+    expect(respuesta.status).toBe(415);
+    expect(almacen.rutas).toHaveLength(0);
   });
 
   /*
@@ -520,7 +559,7 @@ describe('subir una foto', () => {
 
   it('sin sesion no se llega', async () => {
     const respuesta = await request(app.getHttpServer())
-      .post(RUTA_FOTOS)
+      .post(`${RUTA_IMAGENES}?kind=photo`)
       .set('content-type', 'image/jpeg')
       .send(jpegConExif());
 
@@ -577,7 +616,7 @@ describe('publicar y retirar una foto', () => {
    */
   it('retirarla la borra del almacen, no solo de la fila', async () => {
     const subida = await request(app.getHttpServer())
-      .post(`${RUTA_ADMIN}/photos`)
+      .post(`${RUTA_ADMIN}/images?kind=photo`)
       .set('authorization', `Bearer ${await comoAda()}`)
       .set('content-type', 'image/jpeg')
       .send(jpegConExif());
@@ -624,5 +663,141 @@ describe('publicar y retirar una foto', () => {
     });
 
     expect(respuesta.status).toBe(400);
+  });
+});
+
+/* ======================================================================== */
+
+describe('la miniatura de un video', () => {
+  it('la galeria publica trae su direccion, no su ruta', async () => {
+    await guardar({
+      videos: [{ videoId: UNO, title: { en: null, es: null }, poster: MINI }],
+      photos: [],
+    });
+
+    const publica = await leer();
+    expect(publica.body.videos[0].posterUrl).toContain(MINI);
+    expect(publica.body.videos[0].poster).toBeUndefined();
+  });
+
+  it('un video sin miniatura sigue saliendo, con la direccion a null', async () => {
+    /*
+     * No es como una foto, que sin direccion no es nada: el video se ve
+     * igual, solo que la tarjeta se pinta con los colores de la marca.
+     */
+    await guardar({ videos: [{ videoId: UNO, title: { en: null, es: null } }], photos: [] });
+
+    const publica = await leer();
+    expect(publica.body.videos).toHaveLength(1);
+    expect(publica.body.videos[0].posterUrl).toBeNull();
+  });
+
+  it('rechaza una ruta de foto como miniatura, y al contrario', async () => {
+    // Son dos carpetas distintas a proposito; mezclarlas haria que retirar
+    // una foto se llevara por delante la portada de un video.
+    const comoMini = await guardar({
+      videos: [{ videoId: UNO, title: { en: null, es: null }, poster: FOTO }],
+      photos: [],
+    });
+    expect(comoMini.status).toBe(400);
+
+    const comoFoto = await guardar({
+      videos: [],
+      photos: [{ path: MINI, title: { en: null, es: null } }],
+    });
+    expect(comoFoto.status).toBe(400);
+  });
+
+  it('rechaza una ruta que no puso el servidor', async () => {
+    const respuesta = await guardar({
+      videos: [
+        { videoId: UNO, title: { en: null, es: null }, poster: 'posters/portada-bonita.jpg' },
+      ],
+      photos: [],
+    });
+
+    expect(respuesta.status).toBe(400);
+  });
+
+  /*
+   * SUSTITUIR UNA MINIATURA BORRA LA ANTERIOR DEL ALMACEN.
+   *
+   * Es lo que mas va a pasar con las portadas. Sin esto, cada cambio dejaria
+   * la anterior ahi para siempre, accesible con su direccion para quien la
+   * tuviera.
+   */
+  it('sustituirla borra la anterior del almacen', async () => {
+    const primera = await request(app.getHttpServer())
+      .post(`${RUTA_ADMIN}/images?kind=poster`)
+      .set('authorization', `Bearer ${await comoAda()}`)
+      .set('content-type', 'image/jpeg')
+      .send(jpegConExif());
+
+    const segunda = await request(app.getHttpServer())
+      .post(`${RUTA_ADMIN}/images?kind=poster`)
+      .set('authorization', `Bearer ${await comoAda()}`)
+      .set('content-type', 'image/jpeg')
+      .send(jpegConExif());
+
+    const vieja: string = primera.body.path;
+    const nueva: string = segunda.body.path;
+
+    await guardar({
+      videos: [{ videoId: UNO, title: { en: null, es: null }, poster: vieja }],
+      photos: [],
+    });
+    await guardar({
+      videos: [{ videoId: UNO, title: { en: null, es: null }, poster: nueva }],
+      photos: [],
+    });
+
+    expect(almacen.rutas).not.toContain(vieja);
+    expect(almacen.rutas).toContain(nueva);
+  });
+
+  it('quitar el video entero tambien borra su miniatura', async () => {
+    const subida = await request(app.getHttpServer())
+      .post(`${RUTA_ADMIN}/images?kind=poster`)
+      .set('authorization', `Bearer ${await comoAda()}`)
+      .set('content-type', 'image/jpeg')
+      .send(jpegConExif());
+
+    const path: string = subida.body.path;
+
+    await guardar({
+      videos: [{ videoId: UNO, title: { en: null, es: null }, poster: path }],
+      photos: [],
+    });
+    await guardar({ videos: [], photos: [] });
+
+    expect(almacen.rutas).not.toContain(path);
+  });
+
+  it('queda registrado que miniatura entro y cual salio', async () => {
+    await guardar({
+      videos: [{ videoId: UNO, title: { en: null, es: null }, poster: MINI }],
+      photos: [],
+    });
+    await guardar({ videos: [{ videoId: UNO, title: { en: null, es: null } }], photos: [] });
+
+    const filas = await db.query<{
+      metadata: { postersAdded: string[]; postersRemoved: string[] };
+    }>(`SELECT metadata FROM audit_logs ORDER BY "createdAt"`);
+
+    expect(filas.rows[0]?.metadata.postersAdded).toEqual([MINI]);
+    expect(filas.rows[1]?.metadata.postersRemoved).toEqual([MINI]);
+  });
+
+  it('una fila de la version anterior, sin el campo, se sigue leyendo', async () => {
+    /*
+     * El caso que de verdad va a pasar en el despliegue: los videos ya
+     * publicados no traen `poster`. Si el contrato los rechazara, la galeria
+     * apareceria vacia y nadie lo relacionaria con el cambio.
+     */
+    await guardarFilaCruda({ videos: [{ videoId: UNO, title: { en: null, es: null } }] });
+
+    const publica = await leer();
+    expect(publica.body.videos).toHaveLength(1);
+    expect(publica.body.videos[0].posterUrl).toBeNull();
   });
 });

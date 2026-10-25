@@ -299,11 +299,13 @@ forma de comprobarlo desde el código. Así que el marco no se carga hasta que
 el visitante lo pide: entonces es su decisión, no la nuestra, y el «esta web
 no manda datos a terceros» sigue siendo verdad para quien no pulse.
 
-**No hay miniatura, y es a propósito.** La natural sería la de YouTube
-(`i.ytimg.com`), que es exactamente la misma petición por otra puerta, y
-encima en cuanto la sección entra en pantalla. La tarjeta se pinta con los
-colores de la marca hasta que existan nuestras propias imágenes, que llegan
-con las fotos.
+**La miniatura es nuestra, no la de YouTube.** La natural sería la de YouTube
+(`i.ytimg.com`): gratis, automática y siempre al día. Y sería exactamente la
+misma petición a Google por otra puerta, encima en cuanto la sección entra en
+pantalla y sin que nadie pulse nada. Así que la portada se sube al almacén
+propio (etapa 2.C.3, más abajo) y se sirve desde nuestro dominio. **Sin
+miniatura la tarjeta funciona igual**, con los colores de la marca: no es un
+hueco ni un error, es el estado de partida.
 
 El aviso de que el vídeo lo sirve un tercero se pinta **antes** del botón, no
 después: quien pulsa tiene que poder decidirlo sabiéndolo.
@@ -502,11 +504,58 @@ pruebas: «guardar un cambio de los vídeos NO borra las fotos» y la simétrica
 La API **no arranca** con `STORAGE_PROVIDER=supabase` y sin clave: el fallo se
 ve en el despliegue, no la primera vez que alguien intenta publicar una foto.
 
+### Las miniaturas de los vídeos (etapa 2.C.3)
+
+Cada vídeo puede tener su propia portada, subida desde el panel igual que una
+foto. Lo que se ve antes de pulsar play deja de ser un rectángulo de color y
+pasa a ser una imagen real — **sin pedirle nada a Google**, que es todo el
+punto.
+
+#### Carpeta aparte, y no es un detalle de orden
+
+Las miniaturas van a `posters/` y las fotos a `photos/`, con su propia
+expresión de validación cada una. **Son dos cosas distintas aunque sean dos
+imágenes:** una foto es contenido de la galería; una miniatura es la portada
+de otra cosa.
+
+Si vivieran juntas, retirar una foto podría llevarse por delante la portada de
+un vídeo —y al contrario—, y nadie entendería por qué al quitar una foto un
+vídeo se quedó en gris. El contrato rechaza expresamente una ruta de `photos/`
+como miniatura y una de `posters/` como foto.
+
+#### Un endpoint, no dos
+
+`POST /api/v1/admin/gallery/images?kind=photo|poster`.
+
+Lo que cambia entre subir una foto y subir una miniatura es **una carpeta**.
+Con dos rutas habría dos sitios donde comprobar los bytes y quitar los
+metadatos, y tarde o temprano un arreglo se aplicaría a una y no a la otra.
+Sin `kind`, o con uno inventado, la subida se rechaza con un 415: adivinarlo
+sería decidir por quien llama dónde acaba su archivo.
+
+#### Sustituir una portada borra la anterior
+
+Es lo que más va a pasar con las miniaturas, y es fácil de olvidar porque no
+se parece a un borrado. Sin esto, cada cambio de portada dejaría la anterior
+en el almacén para siempre, accesible con su dirección para quien la tuviera.
+
+El borrado va al **guardar**, no al subir. Si se borrara al subir la nueva y
+luego no se guardara, el vídeo publicado se quedaría apuntando a un archivo
+que ya no existe.
+
+El rastro lo registra aparte de las fotos: `postersAdded` y `postersRemoved`.
+
+#### El texto alternativo va vacío, y es la única imagen del sitio que lo lleva
+
+La portada es **decorativa**: el botón que la contiene ya se anuncia con el
+título del vídeo. Describirla otra vez haría que un lector de pantalla leyera
+lo mismo dos veces.
+
+Es lo contrario de las fotos de la galería, que **siempre** llevan texto
+alternativo, porque ahí la imagen _es_ el contenido.
+
 ### Lo que todavía no existe
 
-- **Las miniaturas propias de los vídeos** (`posters/` del mismo bucket). Hasta
-  que existan, la tarjeta del vídeo se pinta con los colores de la marca. Ya
-  hay subida y limpieza de metadatos, así que es poco más que reutilizarlas.
 - **Reordenar** los vídeos y las fotos arrastrando. Hoy el orden es el de
   subida; para cambiarlo hay que quitar y volver a poner.
 - **El registro de consentimientos** (etapa 2.D), que une el papel firmado con

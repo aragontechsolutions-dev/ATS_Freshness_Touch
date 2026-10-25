@@ -11,7 +11,7 @@ import {
   type Gallery,
   type Locale,
 } from '@freshness/types';
-import { ApiClientError, fetchGallery, saveGallery, uploadGalleryPhoto } from '../lib/api';
+import { ApiClientError, fetchGallery, saveGallery, uploadGalleryImage } from '../lib/api';
 import { useToast } from './ToastProvider';
 import { SkeletonFormulario } from './Skeletons';
 import { AlertIcon, SpinnerIcon } from './Icons';
@@ -34,6 +34,10 @@ interface Fila {
   videoId: string;
   titleEn: string;
   titleEs: string;
+  /** La ruta de la miniatura, o `null` si no se ha subido ninguna. */
+  poster: string | null;
+  /** Su direccion, solo para la vista previa. No se manda de vuelta. */
+  posterUrl: string | null;
 }
 
 /**
@@ -88,6 +92,8 @@ export function GalleryForm({ locale, onSessionLost }: GalleryFormProps) {
   const [filas, setFilas] = useState<Fila[] | null>(null);
   const [fotos, setFotos] = useState<FilaFoto[]>([]);
   const [subiendo, setSubiendo] = useState(false);
+  /** Que video esta subiendo su miniatura ahora mismo, si alguno. */
+  const [subiendoMini, setSubiendoMini] = useState<number | null>(null);
   const [guardado, setGuardado] = useState<Gallery | null>(null);
   const [meta, setMeta] = useState<{ updatedAt: string | null; updatedBy: string | null } | null>(
     null,
@@ -101,7 +107,7 @@ export function GalleryForm({ locale, onSessionLost }: GalleryFormProps) {
 
     try {
       const datos = await fetchGallery();
-      setFilas(aFilas(datos.gallery));
+      setFilas(aFilas(datos));
       setFotos(aFilasFoto(datos));
       setGuardado(datos.gallery);
       setMeta({ updatedAt: datos.updatedAt, updatedBy: datos.updatedBy });
@@ -142,7 +148,7 @@ export function GalleryForm({ locale, onSessionLost }: GalleryFormProps) {
     setGuardando(true);
     try {
       const datos = await saveGallery(validado.data);
-      setFilas(aFilas(datos.gallery));
+      setFilas(aFilas(datos));
       setFotos(aFilasFoto(datos));
       setGuardado(datos.gallery);
       setMeta({ updatedAt: datos.updatedAt, updatedBy: datos.updatedBy });
@@ -202,7 +208,63 @@ export function GalleryForm({ locale, onSessionLost }: GalleryFormProps) {
 
   const anadir = (): void => {
     setFilas((actual) =>
-      actual === null ? actual : [...actual, { videoId: '', titleEn: '', titleEs: '' }],
+      actual === null
+        ? actual
+        : [...actual, { videoId: '', titleEn: '', titleEs: '', poster: null, posterUrl: null }],
+    );
+    setProblema(null);
+  };
+
+  /**
+   * Sube la miniatura de un video.
+   *
+   * La anterior NO se borra aqui: se borra al guardar, que es cuando el
+   * cambio es de verdad. Si se borrara ahora y luego no se guardara, el video
+   * publicado se quedaria apuntando a un archivo que ya no existe.
+   */
+  const subirMiniatura = async (indice: number, archivo: File): Promise<void> => {
+    setProblema(null);
+
+    if (archivo.size > GALLERY_PHOTO_MAX_BYTES) {
+      setProblema(t('admin.gallery.errTooBig'));
+      return;
+    }
+
+    setSubiendoMini(indice);
+    try {
+      const subida = await uploadGalleryImage(archivo, 'poster');
+      setFilas((actual) =>
+        actual === null
+          ? actual
+          : actual.map((fila, i) =>
+              i === indice ? { ...fila, poster: subida.path, posterUrl: subida.url } : fila,
+            ),
+      );
+    } catch (error) {
+      if (
+        error instanceof ApiClientError &&
+        (error.statusCode === 401 || error.statusCode === 403)
+      ) {
+        perdioSesion(error.statusCode === 403 ? 'noAccess' : 'expired');
+        return;
+      }
+      setProblema(
+        error instanceof ApiClientError && error.statusCode === 415
+          ? t('admin.gallery.errNotAnImage')
+          : t('admin.gallery.errUpload'),
+      );
+    } finally {
+      setSubiendoMini(null);
+    }
+  };
+
+  const quitarMiniatura = (indice: number): void => {
+    setFilas((actual) =>
+      actual === null
+        ? actual
+        : actual.map((fila, i) =>
+            i === indice ? { ...fila, poster: null, posterUrl: null } : fila,
+          ),
     );
     setProblema(null);
   };
@@ -236,7 +298,7 @@ export function GalleryForm({ locale, onSessionLost }: GalleryFormProps) {
 
     setSubiendo(true);
     try {
-      const subida = await uploadGalleryPhoto(archivo);
+      const subida = await uploadGalleryImage(archivo, 'photo');
       setFotos((actual) => [
         ...actual,
         { path: subida.path, url: subida.url, titleEn: '', titleEs: '' },
@@ -364,6 +426,53 @@ export function GalleryForm({ locale, onSessionLost }: GalleryFormProps) {
                       onChange={(evento) => cambiar(indice, 'titleEs', evento.target.value)}
                     />
                   </label>
+                </div>
+
+                {/* ---------------------------- La miniatura --------------------------- */}
+                <div className="border-t border-slate-200 pt-3 dark:border-night-600">
+                  <p className="ft-label">{t('admin.gallery.poster')}</p>
+                  <p className="mb-2 text-xs text-slate-600 dark:text-slate-400">
+                    {t('admin.gallery.posterHelp')}
+                  </p>
+
+                  {fila.posterUrl !== null ? (
+                    <div className="flex flex-wrap items-start gap-3">
+                      <img
+                        src={fila.posterUrl}
+                        alt={t('admin.gallery.posterAlt')}
+                        className="aspect-video w-40 rounded-lg object-cover"
+                        loading="lazy"
+                      />
+                      <button
+                        type="button"
+                        className="ft-btn-outline"
+                        onClick={() => quitarMiniatura(indice)}
+                        disabled={guardando}
+                      >
+                        {t('admin.gallery.removePoster')}
+                      </button>
+                    </div>
+                  ) : (
+                    <input
+                      type="file"
+                      className="ft-input"
+                      aria-label={t('admin.gallery.poster')}
+                      accept={GALLERY_PHOTO_TYPES.join(',')}
+                      disabled={guardando || subiendoMini !== null}
+                      onChange={(evento) => {
+                        const archivo = evento.target.files?.[0];
+                        evento.target.value = '';
+                        if (archivo) void subirMiniatura(indice, archivo);
+                      }}
+                    />
+                  )}
+
+                  {subiendoMini === indice && (
+                    <p className="mt-2 flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
+                      <SpinnerIcon className="h-4 w-4" />
+                      {t('admin.gallery.uploading')}
+                    </p>
+                  )}
                 </div>
               </li>
             );
@@ -503,7 +612,9 @@ export function GalleryForm({ locale, onSessionLost }: GalleryFormProps) {
             type="button"
             className="ft-btn-outline"
             onClick={() => {
-              setFilas(aFilas(guardado ?? { videos: [], photos: [] }));
+              // Las direcciones de vista previa no se pueden recomponer sin
+              // volver a preguntar, asi que se recarga la pantalla entera.
+              setFilas(null);
               // Las fotos vuelven a lo guardado, pero las direcciones de vista
               // previa no se pueden recomponer sin volver a preguntar, asi que
               // se recarga la pantalla entera. Es la unica forma de que lo que
@@ -576,21 +687,23 @@ export function identificadorDeYouTube(pegado: string): string {
 }
 
 /** Del contrato a los campos de las fotos, con su direccion de vista previa. */
-function aFilasFoto(datos: { gallery: Gallery; photoUrls: Record<string, string> }): FilaFoto[] {
+function aFilasFoto(datos: { gallery: Gallery; imageUrls: Record<string, string> }): FilaFoto[] {
   return datos.gallery.photos.map((photo) => ({
     path: photo.path,
-    url: datos.photoUrls[photo.path] ?? null,
+    url: datos.imageUrls[photo.path] ?? null,
     titleEn: photo.title.en ?? '',
     titleEs: photo.title.es ?? '',
   }));
 }
 
-/** Del contrato a los campos. */
-function aFilas(gallery: Gallery): Fila[] {
-  return gallery.videos.map((video) => ({
+/** Del contrato a los campos, con la direccion de la miniatura si la tiene. */
+function aFilas(datos: { gallery: Gallery; imageUrls: Record<string, string> }): Fila[] {
+  return datos.gallery.videos.map((video) => ({
     videoId: video.videoId,
     titleEn: video.title.en ?? '',
     titleEs: video.title.es ?? '',
+    poster: video.poster,
+    posterUrl: video.poster === null ? null : (datos.imageUrls[video.poster] ?? null),
   }));
 }
 
@@ -608,6 +721,7 @@ function aContrato(filas: Fila[], fotos: FilaFoto[]): Gallery {
         en: fila.titleEn.trim() === '' ? null : fila.titleEn.trim(),
         es: fila.titleEs.trim() === '' ? null : fila.titleEs.trim(),
       },
+      poster: fila.poster,
     })),
     /*
      * LAS FOTOS VIAJAN SIEMPRE, aunque esta pantalla solo haya tocado los
@@ -633,7 +747,10 @@ function igual(a: Gallery, b: Gallery): boolean {
   const mismosVideos = a.videos.every((video, i) => {
     const otro = b.videos[i];
     return (
-      otro !== undefined && video.videoId === otro.videoId && mismoTitulo(video.title, otro.title)
+      otro !== undefined &&
+      video.videoId === otro.videoId &&
+      video.poster === otro.poster &&
+      mismoTitulo(video.title, otro.title)
     );
   });
 

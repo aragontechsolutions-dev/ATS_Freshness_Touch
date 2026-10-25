@@ -32,12 +32,16 @@ import { PlayIcon } from './Icons';
  * que es lo que de verdad genera ingresos.
  *
  * ========================================================================
- * NO HAY MINIATURA, Y ES A PROPOSITO
+ * LA MINIATURA ES NUESTRA, NO LA DE YOUTUBE
  * ========================================================================
- * La miniatura natural seria la de YouTube (`i.ytimg.com`), pero pedirla es
- * exactamente la peticion a Google que esto evita. Asi que la tarjeta se
- * pinta con los colores de la marca hasta que exista donde guardar nuestras
- * propias imagenes, que llega con las fotos.
+ * La natural seria la de YouTube (`i.ytimg.com`): gratis, automatica y
+ * siempre al dia. Y seria exactamente la peticion a Google que esto evita,
+ * encima en cuanto la seccion entra en pantalla, sin que nadie pulse nada.
+ *
+ * Asi que la portada se sube al almacen propio y se sirve desde nuestro
+ * dominio. SIN MINIATURA LA TARJETA FUNCIONA IGUAL: se pinta con los colores
+ * de la marca. No es un hueco ni un error, es el estado de partida — y es lo
+ * que se ve mientras la empresa no haya subido una.
  */
 
 interface VideoFacadeProps {
@@ -45,11 +49,17 @@ interface VideoFacadeProps {
   videoId: string;
   /** El titulo, si lo tiene. */
   title: string | null;
+  /**
+   * La portada, servida desde nuestro almacen, o `null` si no hay ninguna.
+   *
+   * La direccion viene del servidor: aqui no se compone ninguna.
+   */
+  posterUrl: string | null;
   /** Lo que lee en voz alta un lector de pantalla al llegar al boton. */
   playLabel: string;
 }
 
-export function VideoFacade({ videoId, title, playLabel }: VideoFacadeProps) {
+export function VideoFacade({ videoId, title, posterUrl, playLabel }: VideoFacadeProps) {
   const [reproduciendo, setReproduciendo] = useState(false);
 
   /*
@@ -87,8 +97,26 @@ export function VideoFacade({ videoId, title, playLabel }: VideoFacadeProps) {
                        focus-visible:outline-2 focus-visible:outline-offset-2
                        focus-visible:outline-brand-300"
           >
+            {posterUrl !== null && (
+              <img
+                src={posterUrl}
+                /*
+                  VACIO A PROPOSITO, y es la unica imagen del sitio que lo
+                  lleva: es decorativa. El boton que la contiene ya se anuncia
+                  con el titulo del video, asi que describirla otra vez haria
+                  que un lector de pantalla leyera lo mismo dos veces.
+                */
+                alt=""
+                className="absolute inset-0 h-full w-full object-cover"
+                loading="lazy"
+                decoding="async"
+              />
+            )}
+
+            {/* El circulo va por encima de la portada, y con sombra para que
+                se vea sobre una imagen clara. */}
             <span
-              className="flex h-16 w-16 items-center justify-center rounded-full
+              className="relative flex h-16 w-16 items-center justify-center rounded-full
                          bg-white/95 shadow-lg transition group-hover:scale-110
                          motion-reduce:transition-none motion-reduce:group-hover:scale-100"
             >

@@ -5,9 +5,11 @@ import {
   DEFAULT_PUBLIC_GALLERY,
   GALLERY_PHOTO_MAX_BYTES,
   GallerySchema,
+  galleryImageFolder,
   type AdminGallery,
   type AuthenticatedStaff,
   type Gallery,
+  type GalleryImageKind,
   type PublicGallery,
 } from '@freshness/types';
 import { AuditService } from '../audit/audit.service';
@@ -120,12 +122,17 @@ export class GalleryService {
 
     const gallery = await this.get();
 
+    const rutas = [
+      ...gallery.photos.map((photo) => photo.path),
+      ...gallery.videos.flatMap((video) => (video.poster === null ? [] : [video.poster])),
+    ];
+
     return {
       gallery,
-      photoUrls: Object.fromEntries(
-        gallery.photos.flatMap((photo) => {
-          const url = this.storage.publicUrl(photo.path);
-          return url === null ? [] : [[photo.path, url] as const];
+      imageUrls: Object.fromEntries(
+        rutas.flatMap((ruta) => {
+          const url = this.storage.publicUrl(ruta);
+          return url === null ? [] : [[ruta, url] as const];
         }),
       ),
       updatedAt: row?.updatedAt.toISOString() ?? null,
@@ -166,7 +173,22 @@ export class GalleryService {
 
     const fotosAntes = anterior.photos.map((p) => p.path);
     const fotosDespues = gallery.photos.map((p) => p.path);
-    const fotosRetiradas = fotosAntes.filter((path) => !fotosDespues.includes(path));
+
+    /*
+     * LAS MINIATURAS RETIRADAS TAMBIEN SE BORRAN DEL ALMACEN.
+     *
+     * Y no solo al quitar un video: tambien al SUSTITUIR su miniatura por
+     * otra, que es lo que mas va a pasar. Sin esto, cada cambio de portada
+     * dejaria la anterior en el almacen para siempre, accesible con su
+     * direccion para quien la tuviera.
+     */
+    const minisAntes = anterior.videos.flatMap((v) => (v.poster === null ? [] : [v.poster]));
+    const minisDespues = gallery.videos.flatMap((v) => (v.poster === null ? [] : [v.poster]));
+
+    const retiradas = [
+      ...fotosAntes.filter((path) => !fotosDespues.includes(path)),
+      ...minisAntes.filter((path) => !minisDespues.includes(path)),
+    ];
 
     await this.prisma.db.$transaction(async (tx) => {
       await tx.businessSetting.upsert({
@@ -207,7 +229,9 @@ export class GalleryService {
              * de esta casa».
              */
             photosAdded: fotosDespues.filter((path) => !fotosAntes.includes(path)),
-            photosRemoved: fotosRetiradas,
+            photosRemoved: fotosAntes.filter((path) => !fotosDespues.includes(path)),
+            postersAdded: minisDespues.filter((path) => !minisAntes.includes(path)),
+            postersRemoved: minisAntes.filter((path) => !minisDespues.includes(path)),
           },
           ipAddress,
         },
@@ -231,7 +255,7 @@ export class GalleryService {
      * un problema de limpieza; una foto que sigue publicada despues de pedir
      * que la quiten es un problema legal.
      */
-    await this.storage.remove(fotosRetiradas);
+    await this.storage.remove(retiradas);
 
     return this.getForAdmin();
   }
@@ -262,9 +286,20 @@ export class GalleryService {
       return url === null ? [] : [{ url, title: photo.title }];
     });
 
-    if (gallery.videos.length === 0 && photos.length === 0) return DEFAULT_PUBLIC_GALLERY;
+    /*
+     * UN VIDEO SIN MINIATURA SIGUE SALIENDO. No es como una foto, que sin
+     * direccion no es nada: el video se ve igual, solo que la tarjeta se
+     * pinta con los colores de la marca.
+     */
+    const videos = gallery.videos.map((video) => ({
+      videoId: video.videoId,
+      title: video.title,
+      posterUrl: video.poster === null ? null : this.storage.publicUrl(video.poster),
+    }));
 
-    return { videos: gallery.videos, photos };
+    if (videos.length === 0 && photos.length === 0) return DEFAULT_PUBLIC_GALLERY;
+
+    return { videos, photos };
   }
 
   /* ---------------------------------------------------------------------- */
@@ -297,8 +332,9 @@ export class GalleryService {
    * en el almacen que no esta en la fila no se ve en ninguna parte. Lo que se
    * audita es PUBLICARLA, al guardar la galeria, que es cuando pasa a verse.
    */
-  async uploadPhoto(
+  async uploadImage(
     bytes: Uint8Array,
+    kind: GalleryImageKind,
   ): Promise<
     | { ok: true; path: string; url: string }
     | { ok: false; reason: 'tooBig' | 'notAnImage' | 'storage' }
@@ -316,7 +352,7 @@ export class GalleryService {
     const contentType = `image/${limpia.format}` as const;
 
     // Treinta y dos hexadecimales: nada del nombre original sobrevive.
-    const path = `photos/${randomUUID().replace(/-/g, '')}.${extension}`;
+    const path = `${galleryImageFolder(kind)}/${randomUUID().replace(/-/g, '')}.${extension}`;
 
     const subida = await this.storage.upload({ path, bytes: limpia.bytes, contentType });
     if (!subida.ok) return { ok: false, reason: 'storage' };

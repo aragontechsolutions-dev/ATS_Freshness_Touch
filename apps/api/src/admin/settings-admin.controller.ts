@@ -5,6 +5,7 @@ import {
   HttpCode,
   Post,
   Put,
+  Query,
   Req,
   ServiceUnavailableException,
   UnsupportedMediaTypeException,
@@ -31,6 +32,7 @@ import {
   SiteCopySchema,
   AdminGallery,
   Gallery,
+  GalleryImageKindSchema,
   GalleryPhotoUpload,
   GallerySchema,
 } from '@freshness/types';
@@ -386,24 +388,37 @@ export class GalleryAdminController {
   }
 
   /**
-   * SUBIR UNA FOTO.
+   * SUBIR UNA IMAGEN: una foto de la galeria o la miniatura de un video.
    *
    * Recibe los bytes de la imagen tal cual, sin envoltorio de formulario: el
    * panel manda el archivo como cuerpo y el tipo en la cabecera. Asi no hace
    * falta ninguna libreria de multipart, que para subir un archivo de uno en
    * uno es puro envoltorio.
    *
-   * SUBIR NO PUBLICA. Devuelve la ruta y ahi se queda: la foto no se ve en
+   * UN SOLO ENDPOINT CON LA CARPETA COMO PARAMETRO, y no dos rutas: lo que
+   * cambia entre una foto y una miniatura es UNA carpeta. Con dos rutas
+   * habria dos sitios donde comprobar los bytes y quitar los metadatos, y
+   * tarde o temprano un arreglo se aplicaria a una y no a la otra.
+   *
+   * SUBIR NO PUBLICA. Devuelve la ruta y ahi se queda: la imagen no se ve en
    * ningun sitio hasta que esa ruta entra en la galeria con un `PUT`. Es
    * deliberado — deja elegir el titulo y el orden antes de que la casa de
    * nadie aparezca en la portada.
    *
    * 201 y no 200: se ha creado algo.
    */
-  @Post('photos')
+  @Post('images')
   @Roles('ADMIN')
   @HttpCode(201)
-  async uploadPhoto(@Req() request: Request): Promise<GalleryPhotoUpload> {
+  async uploadImage(
+    @Query('kind') kind: unknown,
+    @Req() request: Request,
+  ): Promise<GalleryPhotoUpload> {
+    const carpeta = GalleryImageKindSchema.safeParse(kind);
+    if (!carpeta.success) {
+      throw new UnsupportedMediaTypeException('Indica si la imagen es una foto o una miniatura');
+    }
+
     /*
      * El lector de cuerpos solo acepta los tres tipos de imagen en esta ruta,
      * asi que cualquier otra cosa llega aqui sin cuerpo. Se distingue de una
@@ -415,7 +430,7 @@ export class GalleryAdminController {
       throw new UnsupportedMediaTypeException('Manda una imagen JPEG, PNG o WebP');
     }
 
-    const resultado = await this.gallery.uploadPhoto(cuerpo);
+    const resultado = await this.gallery.uploadImage(cuerpo, carpeta.data);
 
     if (!resultado.ok) {
       if (resultado.reason === 'storage') {

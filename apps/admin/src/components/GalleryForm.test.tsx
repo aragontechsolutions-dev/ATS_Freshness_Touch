@@ -26,12 +26,13 @@ import '../i18n';
 
 const fetchGallery = vi.fn<() => Promise<AdminGallery>>();
 const saveGallery = vi.fn<(g: Gallery) => Promise<AdminGallery>>();
-const uploadGalleryPhoto = vi.fn<(f: File) => Promise<GalleryPhotoUpload>>();
+const uploadGalleryImage =
+  vi.fn<(f: File, kind: 'photo' | 'poster') => Promise<GalleryPhotoUpload>>();
 
 vi.mock('../lib/api', () => ({
   fetchGallery: () => fetchGallery(),
   saveGallery: (g: Gallery) => saveGallery(g),
-  uploadGalleryPhoto: (f: File) => uploadGalleryPhoto(f),
+  uploadGalleryImage: (f: File, kind: 'photo' | 'poster') => uploadGalleryImage(f, kind),
   ApiClientError: class ApiClientError extends Error {
     constructor(readonly statusCode: number) {
       super('fallo');
@@ -54,10 +55,12 @@ const DOS = 'aBcDeFgHiJk';
 
 const FOTO = 'photos/0123456789abcdef0123456789abcdef.jpg';
 const FOTO_URL = `https://ejemplo.supabase.co/storage/v1/object/public/gallery/${FOTO}`;
+const MINI = 'posters/fedcba9876543210fedcba9876543210.jpg';
+const MINI_URL = `https://ejemplo.supabase.co/storage/v1/object/public/gallery/${MINI}`;
 
 const VACIA: AdminGallery = {
   gallery: { videos: [], photos: [] },
-  photoUrls: {},
+  imageUrls: {},
   updatedAt: null,
   updatedBy: null,
 };
@@ -65,12 +68,12 @@ const VACIA: AdminGallery = {
 const CON_DOS: AdminGallery = {
   gallery: {
     videos: [
-      { videoId: UNO, title: { en: 'Kitchen', es: 'Cocina' } },
-      { videoId: DOS, title: { en: null, es: null } },
+      { videoId: UNO, title: { en: 'Kitchen', es: 'Cocina' }, poster: null },
+      { videoId: DOS, title: { en: null, es: null }, poster: null },
     ],
     photos: [],
   },
-  photoUrls: {},
+  imageUrls: {},
   updatedAt: '2026-10-20T12:00:00.000Z',
   updatedBy: 'Ada Jefa',
 };
@@ -78,10 +81,21 @@ const CON_DOS: AdminGallery = {
 /** Con una foto ya publicada, para las pruebas de las fotos. */
 const CON_FOTO: AdminGallery = {
   gallery: {
-    videos: [{ videoId: UNO, title: { en: null, es: null } }],
+    videos: [{ videoId: UNO, title: { en: null, es: null }, poster: null }],
     photos: [{ path: FOTO, title: { en: 'Kitchen', es: 'Cocina' } }],
   },
-  photoUrls: { [FOTO]: FOTO_URL },
+  imageUrls: { [FOTO]: FOTO_URL },
+  updatedAt: '2026-10-20T12:00:00.000Z',
+  updatedBy: 'Ada Jefa',
+};
+
+/** Con un video que ya tiene su miniatura propia. */
+const CON_MINIATURA: AdminGallery = {
+  gallery: {
+    videos: [{ videoId: UNO, title: { en: null, es: null }, poster: MINI }],
+    photos: [],
+  },
+  imageUrls: { [MINI]: MINI_URL },
   updatedAt: '2026-10-20T12:00:00.000Z',
   updatedBy: 'Ada Jefa',
 };
@@ -132,12 +146,21 @@ beforeEach(() => {
   saveGallery.mockImplementation((gallery) =>
     Promise.resolve({
       gallery,
-      photoUrls: Object.fromEntries(gallery.photos.map((p) => [p.path, FOTO_URL])),
+      imageUrls: Object.fromEntries([
+        ...gallery.photos.map((p) => [p.path, FOTO_URL] as const),
+        ...gallery.videos.flatMap((v) =>
+          v.poster === null ? [] : [[v.poster, MINI_URL] as const],
+        ),
+      ]),
       updatedAt: '2026-10-20T13:00:00.000Z',
       updatedBy: 'Ada Jefa',
     }),
   );
-  uploadGalleryPhoto.mockResolvedValue({ path: FOTO, url: FOTO_URL });
+  uploadGalleryImage.mockImplementation((_archivo, kind) =>
+    Promise.resolve(
+      kind === 'poster' ? { path: MINI, url: MINI_URL } : { path: FOTO, url: FOTO_URL },
+    ),
+  );
 
   contenedor = document.createElement('div');
   document.body.append(contenedor);
@@ -210,7 +233,7 @@ describe('publicar un video', () => {
     await guardar();
 
     expect(saveGallery).toHaveBeenCalledWith({
-      videos: [{ videoId: UNO, title: { en: null, es: null } }],
+      videos: [{ videoId: UNO, title: { en: null, es: null }, poster: null }],
       photos: [],
     });
   });
@@ -265,7 +288,7 @@ describe('retirar un video', () => {
     await guardar();
 
     expect(saveGallery).toHaveBeenCalledWith({
-      videos: [{ videoId: DOS, title: { en: null, es: null } }],
+      videos: [{ videoId: DOS, title: { en: null, es: null }, poster: null }],
       photos: [],
     });
   });
@@ -338,7 +361,9 @@ describe('las fotos', () => {
     await montar();
     await elegir(imagen());
 
-    expect(uploadGalleryPhoto).toHaveBeenCalledTimes(1);
+    expect(uploadGalleryImage).toHaveBeenCalledWith(expect.anything(), 'photo');
+
+    expect(uploadGalleryImage).toHaveBeenCalledTimes(1);
     expect(contenedor.querySelector('img')?.getAttribute('src')).toBe(FOTO_URL);
   });
 
@@ -371,7 +396,7 @@ describe('las fotos', () => {
     await montar();
     await elegir(imagen(6 * 1024 * 1024));
 
-    expect(uploadGalleryPhoto).not.toHaveBeenCalled();
+    expect(uploadGalleryImage).not.toHaveBeenCalled();
     expect(contenedor.textContent).toContain('too large');
   });
 
@@ -411,5 +436,101 @@ describe('las fotos', () => {
     const enviado = saveGallery.mock.calls[0]?.[0];
     expect(enviado?.photos).toEqual([]);
     expect(enviado?.videos).toHaveLength(1);
+  });
+});
+
+describe('la miniatura de un video', () => {
+  /** El campo de archivo de la miniatura del primer video. */
+  function campoMiniatura(): HTMLInputElement {
+    const campos = [...contenedor.querySelectorAll<HTMLInputElement>('input[type="file"]')];
+    // El ultimo es el de las fotos; los anteriores, uno por video.
+    const campo = campos.find((c) => c.getAttribute('aria-label') !== null);
+    if (!campo) throw new Error('No encontre el campo de la miniatura');
+    return campo;
+  }
+
+  async function elegirMiniatura(archivo: File): Promise<void> {
+    const campo = campoMiniatura();
+    Object.defineProperty(campo, 'files', { value: [archivo], configurable: true });
+    await act(async () => {
+      campo.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+  }
+
+  function imagen(bytes = 1000): File {
+    const archivo = new File(['x'], 'portada.jpg', { type: 'image/jpeg' });
+    Object.defineProperty(archivo, 'size', { value: bytes, configurable: true });
+    return archivo;
+  }
+
+  it('un video sin miniatura ofrece subir una', async () => {
+    fetchGallery.mockResolvedValue(CON_DOS);
+    await montar();
+
+    expect(campoMiniatura()).toBeDefined();
+  });
+
+  it('subirla la guarda en la carpeta de miniaturas, no en la de fotos', async () => {
+    /*
+     * Carpeta aparte a proposito: si vivieran juntas, retirar una foto de la
+     * galeria podria llevarse por delante la portada de un video, y nadie
+     * entenderia por que al quitar una foto un video se quedo en gris.
+     */
+    fetchGallery.mockResolvedValue(CON_DOS);
+    await montar();
+    await elegirMiniatura(imagen());
+
+    expect(uploadGalleryImage).toHaveBeenCalledWith(expect.anything(), 'poster');
+  });
+
+  it('y al guardar va la ruta de la miniatura', async () => {
+    fetchGallery.mockResolvedValue(CON_DOS);
+    await montar();
+    await elegirMiniatura(imagen());
+    await guardar();
+
+    const enviado = saveGallery.mock.calls[0]?.[0];
+    expect(enviado?.videos[0]?.poster).toBe(MINI);
+  });
+
+  it('un video con miniatura ensena la vista previa en vez del campo', async () => {
+    fetchGallery.mockResolvedValue(CON_MINIATURA);
+    await montar();
+
+    const img = contenedor.querySelector<HTMLImageElement>('img');
+    expect(img?.getAttribute('src')).toBe(MINI_URL);
+  });
+
+  it('quitarla deja el video sin portada y se puede guardar', async () => {
+    fetchGallery.mockResolvedValue(CON_MINIATURA);
+    await montar();
+
+    await pulsar('Remove thumbnail');
+    await guardar();
+
+    const enviado = saveGallery.mock.calls[0]?.[0];
+    expect(enviado?.videos[0]?.poster).toBeNull();
+  });
+
+  it('una miniatura demasiado grande no se llega a subir', async () => {
+    fetchGallery.mockResolvedValue(CON_DOS);
+    await montar();
+    await elegirMiniatura(imagen(6 * 1024 * 1024));
+
+    expect(uploadGalleryImage).not.toHaveBeenCalled();
+  });
+
+  /*
+   * La miniatura es un cambio como cualquier otro: hasta que no se guarda, el
+   * video publicado sigue como estaba. Por eso tampoco se borra aqui la
+   * anterior — si no se guardara, el video quedaria apuntando a un archivo
+   * que ya no existe.
+   */
+  it('subirla no publica nada por si sola', async () => {
+    fetchGallery.mockResolvedValue(CON_DOS);
+    await montar();
+    await elegirMiniatura(imagen());
+
+    expect(saveGallery).not.toHaveBeenCalled();
   });
 });

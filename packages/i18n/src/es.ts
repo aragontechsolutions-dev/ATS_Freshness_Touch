@@ -615,6 +615,11 @@ export const es: TranslationResources = {
       errTooBig: 'Esa foto pesa demasiado. El límite son 5 MB.',
       errNotAnImage: 'Ese archivo no es una imagen JPEG, PNG o WebP.',
       errUpload: 'No se pudo subir la foto. Inténtalo otra vez.',
+      poster: 'Miniatura',
+      posterHelp:
+        'Lo que ve el visitante antes de pulsar play. Sin ella, la tarjeta sale con los colores de la marca. No usamos la miniatura de YouTube porque cargarla mandaría datos del visitante a Google antes de que pulse nada.',
+      posterAlt: 'Miniatura del vídeo',
+      removePoster: 'Quitar la miniatura',
     },
 
     location: {

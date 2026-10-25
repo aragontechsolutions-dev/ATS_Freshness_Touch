@@ -9,6 +9,7 @@ import {
   GallerySchema,
   YOUTUBE_EMBED_ORIGIN,
   PublicGallerySchema,
+  galleryImageFolder,
   galleryPhotoTitle,
   galleryVideoTitle,
   hasGalleryContent,
@@ -292,5 +293,83 @@ describe('lo que recibe la web', () => {
     expect(galleryPhotoTitle(photo, 'en')).toBe('Kitchen');
     expect(galleryPhotoTitle(photo, 'es')).toBe('Kitchen');
     expect(galleryPhotoTitle({ ...photo, title: { en: null, es: null } }, 'en')).toBeNull();
+  });
+});
+
+/* ------------------------------------------------------------------------ */
+/*  La miniatura de un video                                                 */
+/* ------------------------------------------------------------------------ */
+
+const PORTADA = 'posters/fedcba9876543210fedcba9876543210.jpg';
+
+describe('la miniatura de un video', () => {
+  it('vive en su propia carpeta', () => {
+    /*
+     * Carpeta aparte de las fotos y no una mas de la galeria: si vivieran
+     * juntas, retirar una foto podria llevarse por delante la portada de un
+     * video, y nadie entenderia por que al quitar una foto un video se quedo
+     * en gris.
+     */
+    expect(galleryImageFolder('photo')).toBe('photos');
+    expect(galleryImageFolder('poster')).toBe('posters');
+  });
+
+  it('se acepta la ruta que pone el servidor', () => {
+    expect(GallerySchema.safeParse({ videos: [video({ poster: PORTADA })] }).success).toBe(true);
+  });
+
+  it('es opcional, y por defecto no hay ninguna', () => {
+    const parsed = GallerySchema.safeParse({ videos: [{ videoId: ID }] });
+    expect(parsed.success).toBe(true);
+    if (parsed.success) expect(parsed.data.videos[0]?.poster).toBeNull();
+  });
+
+  /*
+   * EL CASO DEL DESPLIEGUE. Los videos ya publicados no traen el campo. Sin
+   * valor por defecto, el contrato los rechazaria y la galeria apareceria
+   * vacia sin que nadie hubiera borrado nada.
+   */
+  it('una fila guardada antes de que esto existiera se sigue leyendo', () => {
+    const parsed = GallerySchema.safeParse({
+      videos: [{ videoId: ID, title: { en: 'Kitchen', es: 'Cocina' } }],
+    });
+    expect(parsed.success).toBe(true);
+    if (parsed.success) expect(parsed.data.videos[0]?.poster).toBeNull();
+  });
+
+  it.each([
+    ['una ruta de foto', 'photos/0123456789abcdef0123456789abcdef.jpg'],
+    ['una direccion completa', 'https://evil.example/pixel.gif'],
+    ['un salto de ruta', 'posters/../../secreto.jpg'],
+    ['un nombre libre', 'posters/portada-bonita.jpg'],
+    ['un SVG', 'posters/fedcba9876543210fedcba9876543210.svg'],
+  ])('rechaza %s', (_caso, poster) => {
+    expect(GallerySchema.safeParse({ videos: [video({ poster })] }).success).toBe(false);
+  });
+
+  it('la web la recibe como direccion, y puede no haberla', () => {
+    const conPortada = PublicGallerySchema.safeParse({
+      videos: [
+        {
+          videoId: ID,
+          title: { en: null, es: null },
+          posterUrl: 'https://ejemplo.supabase.co/p.jpg',
+        },
+      ],
+    });
+    expect(conPortada.success).toBe(true);
+
+    const sinPortada = PublicGallerySchema.safeParse({
+      videos: [{ videoId: ID, title: { en: null, es: null }, posterUrl: null }],
+    });
+    expect(sinPortada.success).toBe(true);
+  });
+
+  it('y una ruta colada como direccion se rechaza', () => {
+    expect(
+      PublicGallerySchema.safeParse({
+        videos: [{ videoId: ID, title: { en: null, es: null }, posterUrl: PORTADA }],
+      }).success,
+    ).toBe(false);
   });
 });

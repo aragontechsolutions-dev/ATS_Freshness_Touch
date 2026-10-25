@@ -71,6 +71,7 @@ export function Gallery() {
                   <VideoFacade
                     videoId={video.videoId}
                     title={galleryVideoTitle(video, locale)}
+                    posterUrl={video.posterUrl}
                     playLabel={t('gallery.play')}
                   />
                 </li>

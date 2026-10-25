@@ -128,6 +128,45 @@ export type GalleryTitle = z.infer<typeof GalleryTitleSchema>;
 
 export const TITULO_SIN_PONER: GalleryTitle = { en: null, es: null };
 
+/**
+ * LA MINIATURA DE UN VIDEO, EN NUESTRA PROPIA CARPETA.
+ *
+ * Carpeta aparte de las fotos y no una mas de la galeria, porque no es
+ * contenido: es la portada de otra cosa. Si vivieran juntas, retirar una foto
+ * de la galeria podria llevarse por delante la portada de un video —y al
+ * contrario—, y nadie entenderia por que al quitar una foto un video se quedo
+ * en gris.
+ *
+ * ========================================================================
+ * POR QUE NUESTRA, Y NO LA DE YOUTUBE
+ * ========================================================================
+ * YouTube sirve la miniatura de cualquier video en `i.ytimg.com`. Usarla
+ * seria gratis y automatica, y seria exactamente la peticion a Google que la
+ * fachada de clic existe para evitar — y encima en cuanto la seccion entra en
+ * pantalla, sin que nadie pulse nada.
+ *
+ * Con una imagen nuestra, la pagina sigue sin pedirle nada a ningun tercero
+ * hasta que el visitante decide ver el video.
+ */
+export const GALLERY_POSTER_PATH_PATTERN = /^posters\/[0-9a-f]{32}\.(jpg|png|webp)$/;
+
+export const GalleryPosterPathSchema = z
+  .string()
+  .trim()
+  .regex(
+    GALLERY_POSTER_PATH_PATTERN,
+    'La ruta de la miniatura la pone el servidor al subirla; no se escribe a mano',
+  );
+
+/** Las dos carpetas del almacen, y lo que distingue a una de otra. */
+export const GALLERY_IMAGE_KINDS = ['photo', 'poster'] as const;
+export const GalleryImageKindSchema = z.enum(GALLERY_IMAGE_KINDS);
+export type GalleryImageKind = z.infer<typeof GalleryImageKindSchema>;
+
+export function galleryImageFolder(kind: GalleryImageKind): 'photos' | 'posters' {
+  return kind === 'photo' ? 'photos' : 'posters';
+}
+
 // ---------------------------------------------------------------------------
 // El conjunto
 // ---------------------------------------------------------------------------
@@ -141,6 +180,18 @@ export const TITULO_SIN_PONER: GalleryTitle = { en: null, es: null };
 export const GalleryVideoSchema = z.strictObject({
   videoId: YouTubeVideoIdSchema,
   title: GalleryTitleSchema.default(TITULO_SIN_PONER),
+  /**
+   * La portada que se ve antes de pulsar, si se ha subido una.
+   *
+   * `null` por defecto Y CON VALOR POR DEFECTO, que es lo que permite que las
+   * filas guardadas antes de que esto existiera se sigan leyendo. Sin el
+   * `.default`, el dia del despliegue los videos ya publicados habrian
+   * desaparecido de la portada y nadie lo habria relacionado con el cambio.
+   *
+   * Sin miniatura la tarjeta se pinta con los colores de la marca, que
+   * funciona y no pide nada a nadie.
+   */
+  poster: GalleryPosterPathSchema.nullable().default(null),
 });
 export type GalleryVideo = z.infer<typeof GalleryVideoSchema>;
 
@@ -270,7 +321,8 @@ export const DEFAULT_GALLERY: Gallery = { videos: [], photos: [] };
 export const AdminGallerySchema = z.strictObject({
   gallery: GallerySchema,
   /**
-   * La direccion de cada foto, por su ruta, SOLO PARA LA VISTA PREVIA.
+   * La direccion de cada imagen del almacen —fotos y miniaturas—, por su ruta,
+   * SOLO PARA LA VISTA PREVIA.
    *
    * Lo que el panel guarda sigue siendo la ruta: esto es un acompanamiento,
    * no parte de lo que se escribe. Va aparte y no dentro de cada foto
@@ -280,7 +332,7 @@ export const AdminGallerySchema = z.strictObject({
    * La compone el servidor, igual que para la web. El panel no construye
    * ninguna direccion.
    */
-  photoUrls: z.record(z.string(), z.string().url()).default({}),
+  imageUrls: z.record(z.string(), z.string().url()).default({}),
   updatedAt: z.string().nullable(),
   updatedBy: z.string().nullable(),
 });
@@ -298,7 +350,10 @@ export function hasGalleryContent(gallery: Gallery | PublicGallery): boolean {
  * titulo. El respaldo cruzado es a proposito: un titulo escrito solo en
  * ingles es mas util que ningun titulo, incluso leyendo en espanol.
  */
-export function galleryVideoTitle(video: GalleryVideo, locale: 'en' | 'es'): string | null {
+export function galleryVideoTitle(
+  video: GalleryVideo | PublicGalleryVideo,
+  locale: 'en' | 'es',
+): string | null {
   const otro = locale === 'en' ? 'es' : 'en';
   return video.title[locale] ?? video.title[otro] ?? null;
 }
@@ -333,8 +388,22 @@ export const PublicGalleryPhotoSchema = z.strictObject({
 });
 export type PublicGalleryPhoto = z.infer<typeof PublicGalleryPhotoSchema>;
 
+/**
+ * Un video tal y como lo recibe la web: con la DIRECCION de su miniatura.
+ *
+ * Mismo motivo que con las fotos: guardada vive la ruta, porque es lo unico
+ * que el panel puede escribir sin poder apuntar a otro sitio, y la direccion
+ * la compone el servidor.
+ */
+export const PublicGalleryVideoSchema = z.strictObject({
+  videoId: YouTubeVideoIdSchema,
+  title: GalleryTitleSchema,
+  posterUrl: z.string().url().nullable(),
+});
+export type PublicGalleryVideo = z.infer<typeof PublicGalleryVideoSchema>;
+
 export const PublicGallerySchema = z.strictObject({
-  videos: z.array(GalleryVideoSchema).default([]),
+  videos: z.array(PublicGalleryVideoSchema).default([]),
   photos: z.array(PublicGalleryPhotoSchema).default([]),
 });
 export type PublicGallery = z.infer<typeof PublicGallerySchema>;
@@ -343,7 +412,7 @@ export const DEFAULT_PUBLIC_GALLERY: PublicGallery = { videos: [], photos: [] };
 
 /** Lo que devuelve la subida de una foto: donde quedo y como se ve. */
 export const GalleryPhotoUploadSchema = z.strictObject({
-  path: GalleryPhotoPathSchema,
+  path: z.union([GalleryPhotoPathSchema, GalleryPosterPathSchema]),
   url: z.string().url(),
 });
 export type GalleryPhotoUpload = z.infer<typeof GalleryPhotoUploadSchema>;
