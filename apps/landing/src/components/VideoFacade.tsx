@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { youTubeEmbedUrl } from '@freshness/types';
-import { PlayIcon } from './Icons';
+import { CloseIcon, PlayIcon } from './Icons';
 
 /**
  * UN VIDEO QUE NO PIDE NADA A GOOGLE HASTA QUE SE PULSA
@@ -57,10 +57,51 @@ interface VideoFacadeProps {
   posterUrl: string | null;
   /** Lo que lee en voz alta un lector de pantalla al llegar al boton. */
   playLabel: string;
+  /** Lo mismo para el boton de cerrar. */
+  closeLabel: string;
+  /**
+   * Si esta tarjeta entra en el tabulador.
+   *
+   * LAS COPIAS DEL CARRUSEL NO ENTRAN. Son el mismo contenido repetido: sin
+   * esto, el tabulador pasaria cuatro veces por el mismo boton de play.
+   *
+   * Se hace asi y no con `inert`, que tambien valdria para el teclado y para
+   * el lector, porque `inert` QUITA TAMBIEN EL RATON. Con el puesto, solo se
+   * podia reproducir el video de la primera copia —la del extremo
+   * izquierdo— y en cualquier otra posicion la tarjeta parecia una foto mas.
+   */
+  enfocable?: boolean;
+  /** Se avisa mientras el video esta abierto, para que el carrusel se pare. */
+  onAbierto?: (abierto: boolean) => void;
 }
 
-export function VideoFacade({ videoId, title, posterUrl, playLabel }: VideoFacadeProps) {
+export function VideoFacade({
+  videoId,
+  title,
+  posterUrl,
+  playLabel,
+  closeLabel,
+  enfocable = true,
+  onAbierto,
+}: VideoFacadeProps) {
   const [reproduciendo, setReproduciendo] = useState(false);
+
+  /*
+   * EL AVISO SE DA DESDE EL ESTADO, NO DESDE EL CLIC.
+   *
+   * Asi la limpieza del efecto avisa tambien cuando la tarjeta desaparece sin
+   * que nadie haya cerrado nada —al recalcularse las copias del carrusel, por
+   * ejemplo—. Avisando solo en el clic, el carrusel se quedaria creyendo que
+   * hay un video abierto que ya no existe, y no volveria a moverse.
+   */
+  useEffect(() => {
+    if (!reproduciendo || !onAbierto) return;
+
+    onAbierto(true);
+    return () => {
+      onAbierto(false);
+    };
+  }, [reproduciendo, onAbierto]);
 
   /*
    * El marco entra con `title`, que no es decorativo: un lector de pantalla
@@ -74,34 +115,58 @@ export function VideoFacade({ videoId, title, posterUrl, playLabel }: VideoFacad
     <figure className="m-0">
       <div className="ft-card relative aspect-video overflow-hidden">
         {reproduciendo ? (
-          <iframe
-            // Sin la barra de direcciones del navegador, el visitante no ve a
-            // donde apunta esto; el origen lo decide el codigo, no el dato.
-            src={youTubeEmbedUrl(videoId)}
-            title={tituloDelMarco}
-            className="absolute inset-0 h-full w-full border-0"
-            /*
-             * LOS PERMISOS VAN SOLO EN `allow`, NO TAMBIEN EN
-             * `allowfullscreen`.
-             *
-             * Llevar los dos no rompe nada —`allow` gana— pero el navegador
-             * lo avisa por consola en cada carga: «Allow attribute will take
-             * precedence over allowfullscreen». Una consola con avisos que
-             * siempre estan ahi es una consola que nadie mira, y el dia que
-             * salga uno de verdad se perdera entre ellos.
-             *
-             * `allowfullscreen` es el atributo veterano; `allow="fullscreen"`
-             * hace lo mismo en todos los navegadores actuales.
-             */
-            allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
-            /*
-             * Se manda el ORIGEN, no la pagina. Google no necesita saber de
-             * que pagina nuestra viene el play, pero algo tiene que llegarle:
-             * un marco sin ningun referente lo rechaza YouTube con su error
-             * 153.
-             */
-            referrerPolicy="strict-origin-when-cross-origin"
-          />
+          <>
+            <iframe
+              // Sin la barra de direcciones del navegador, el visitante no ve a
+              // donde apunta esto; el origen lo decide el codigo, no el dato.
+              src={youTubeEmbedUrl(videoId)}
+              title={tituloDelMarco}
+              className="absolute inset-0 h-full w-full border-0"
+              /*
+               * LOS PERMISOS VAN SOLO EN `allow`, NO TAMBIEN EN
+               * `allowfullscreen`.
+               *
+               * Llevar los dos no rompe nada —`allow` gana— pero el navegador
+               * lo avisa por consola en cada carga: «Allow attribute will take
+               * precedence over allowfullscreen». Una consola con avisos que
+               * siempre estan ahi es una consola que nadie mira, y el dia que
+               * salga uno de verdad se perdera entre ellos.
+               *
+               * `allowfullscreen` es el atributo veterano; `allow="fullscreen"`
+               * hace lo mismo en todos los navegadores actuales.
+               */
+              allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
+              /*
+               * Se manda el ORIGEN, no la pagina. Google no necesita saber de
+               * que pagina nuestra viene el play, pero algo tiene que llegarle:
+               * un marco sin ningun referente lo rechaza YouTube con su error
+               * 153.
+               */
+              referrerPolicy="strict-origin-when-cross-origin"
+            />
+
+            {/*
+              LA FORMA DE VOLVER.
+              Sin esto, una vez abierto el video no habia manera de regresar a
+              la tarjeta: el marco se quedaba puesto para siempre. Y es ademas
+              lo que suelta el carrusel, que se para mientras haya un video
+              abierto.
+            */}
+            <button
+              type="button"
+              onClick={() => {
+                setReproduciendo(false);
+              }}
+              aria-label={closeLabel}
+              tabIndex={enfocable ? undefined : -1}
+              className="absolute top-2 right-2 z-10 flex h-9 w-9 items-center justify-center
+                         rounded-full bg-black/70 text-white transition hover:bg-black/90
+                         focus-visible:outline-2 focus-visible:outline-offset-2
+                         focus-visible:outline-white"
+            >
+              <CloseIcon className="h-4 w-4" />
+            </button>
+          </>
         ) : (
           <button
             type="button"
@@ -111,6 +176,7 @@ export function VideoFacade({ videoId, title, posterUrl, playLabel }: VideoFacad
             // El titulo se pinta debajo, asi que la etiqueta del boton lo
             // repite para que quien navegue a saltos sepa que video es.
             aria-label={title ? `${playLabel}: ${title}` : playLabel}
+            tabIndex={enfocable ? undefined : -1}
             className="group absolute inset-0 flex h-full w-full items-center justify-center
                        bg-gradient-to-br from-brand-700 to-brand-900
                        focus-visible:outline-2 focus-visible:outline-offset-2

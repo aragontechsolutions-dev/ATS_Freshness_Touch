@@ -1742,6 +1742,7 @@ export const en = {
     /* Lo que lee un lector de pantalla cuando la foto no tiene titulo. */
     photoAlt: 'Before and after of a home we cleaned',
     /* Los mandos de la fila. Sin texto visible, es lo unico que los nombra. */
+    close: 'Close video',
     previous: 'Show previous',
     next: 'Show next',
   },

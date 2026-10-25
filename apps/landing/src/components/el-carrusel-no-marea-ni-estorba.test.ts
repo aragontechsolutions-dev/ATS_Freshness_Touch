@@ -36,6 +36,21 @@ const FACHADA = readFileSync(join(RAIZ, 'VideoFacade.tsx'), 'utf8');
 const SECCION = readFileSync(join(RAIZ, '../sections/Gallery.tsx'), 'utf8');
 const ESTILOS = readFileSync(join(RAIZ, '../styles.css'), 'utf8');
 
+/**
+ * El codigo sin sus comentarios.
+ *
+ * Hace falta porque lo que se prohibe aqui son COSAS USADAS, y los
+ * comentarios explican precisamente por que no se usan — nombrandolas.
+ * Buscando sobre el archivo entero, la propia explicacion haria fallar la
+ * prueba, que es la peor clase de prueba: la que obliga a borrar el
+ * comentario que dice por que existe.
+ */
+function sinComentarios(fuente: string): string {
+  return fuente.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+}
+
+const CARRUSEL_CODIGO = sinComentarios(CARRUSEL);
+
 describe('cuantas veces se repite la lista', () => {
   /*
    * Dos es el minimo que permite el truco. Con pocas piezas, dos copias no
@@ -189,29 +204,11 @@ describe('se para mientras alguien esta, y vuelve a arrancar al irse', () => {
     expect(CARRUSEL).toContain('onBlurCapture');
   });
 
-  /*
-   * ========================================================================
-   * LO QUE DE VERDAD ATAN ESTAS TRES
-   * ========================================================================
-   * La primera version paraba la fila mientras hubiera un video abierto, y
-   * se quedaba parada PARA SIEMPRE: nada volvia a cerrarlo. No hay forma de
-   * saber desde fuera cuando termina un video de YouTube sin cargar su
-   * script, que es justo lo que la fachada existe para evitar.
-   *
-   * Lo que para la fila es ESTAR ENCIMA, y nada mas. Y para que «irse»
-   * funcione de verdad hacen falta los dos detalles de abajo.
-   */
-  it('un video abierto NO para la fila', () => {
-    expect(CARRUSEL).not.toContain('pausado');
-    expect(SECCION).not.toContain('videoActivo');
-    expect(FACHADA).not.toContain('onPlay');
-  });
-
   it('el foco solo cuenta si es del teclado', () => {
     /*
      * Al pulsar play con el raton, el foco se va dentro del marco del video
      * y ahi se queda. Contando ese foco, la fila no volveria a arrancar
-     * jamas aunque apartes el raton — que es exactamente lo que pasaba.
+     * jamas aunque apartes el raton.
      */
     expect(CARRUSEL).toContain("evento.target.matches(':focus-visible')");
   });
@@ -220,8 +217,7 @@ describe('se para mientras alguien esta, y vuelve a arrancar al irse', () => {
     /*
      * Un marco de video se traga los eventos del raton: al salir desde
      * encima de el, o al salirse por el borde de la ventana, el aviso de «me
-     * he ido» puede no llegar nunca. Con esta vigilancia basta mover el
-     * raton a cualquier otro sitio.
+     * he ido» puede no llegar nunca.
      *
      * Y solo mientras esta parada: un oyente en todo el documento que
      * estuviera siempre puesto correria en cada movimiento del raton de la
@@ -233,16 +229,88 @@ describe('se para mientras alguien esta, y vuelve a arrancar al irse', () => {
   });
 });
 
-describe('las copias no existen para quien no mira', () => {
+describe('un video abierto para la fila', () => {
   /*
-   * Son el mismo contenido repetido. Un lector de pantalla leeria la galeria
-   * cuatro veces y el tabulador pasaria cuatro veces por cada boton de play.
+   * Lo que se esta viendo no puede irse de la pantalla solo. Antes bastaba
+   * con pararla al pasar el raton, pero en cuanto lo apartas para mirar el
+   * video se iba sonando.
    */
-  it('llevan `inert`, que las saca del tabulador y del arbol a la vez', () => {
-    // Marcarlas solo como ocultas dejaria los botones alcanzables con el
-    // teclado pero invisibles para el lector: peor que no hacer nada.
-    expect(CARRUSEL).toContain('inert={esCopia}');
+  it('la galeria cuenta los videos abiertos y la fila se para', () => {
+    expect(SECCION).toContain('onAbierto={alAbrirse}');
+    expect(SECCION).toContain('pausado={abiertos > 0}');
+    expect(CARRUSEL).toContain('(pausado && !redRota)');
+  });
+
+  it('se cuentan, no se marcan: la misma pieza se repite', () => {
+    /*
+     * La misma pieza esta varias veces en la fila y se puede abrir en mas de
+     * una copia. Con un booleano, cerrar una dejaria la fila andando con la
+     * otra sonando.
+     */
+    expect(SECCION).toContain('cuantos + (abierto ? 1 : -1)');
+    expect(SECCION).toContain('Math.max(0, ');
+  });
+
+  it('hay una forma de volver, y es la que suelta la fila', () => {
+    // Sin esto, una vez abierto el video no habia manera de regresar a la
+    // tarjeta: el marco se quedaba puesto para siempre.
+    expect(FACHADA).toContain('closeLabel');
+    expect(FACHADA).toContain('setReproduciendo(false)');
+
+    for (const textos of [en.gallery, es.gallery]) {
+      expect(textos.close.length).toBeGreaterThan(3);
+    }
+  });
+
+  it('el aviso sale del estado, para que valga tambien si la tarjeta desaparece', () => {
+    /*
+     * Avisando solo en el clic, al recalcularse las copias del carrusel la
+     * fila se quedaria creyendo que hay un video abierto que ya no existe, y
+     * no volveria a moverse nunca.
+     */
+    const efecto = FACHADA.slice(FACHADA.indexOf('useEffect(() => {'));
+    expect(efecto).toContain('onAbierto(true)');
+    expect(efecto).toContain('onAbierto(false)');
+  });
+
+  it('y hay una red de seguridad por si nadie cierra', () => {
+    // Quien abrio el video puede irse de la pagina sin cerrarlo, y la fila
+    // se quedaria parada para siempre.
+    expect(CARRUSEL).toContain('PAUSA_MAXIMA_MS');
+    expect(CARRUSEL).toContain('const PAUSA_MAXIMA_MS = 5 * 60 * 1000;');
+  });
+});
+
+describe('las copias se pulsan, pero no se leen ni se tabulan', () => {
+  /*
+   * ========================================================================
+   * EL FALLO QUE ESTA PRUEBA IMPIDE QUE VUELVA
+   * ========================================================================
+   * La primera version marcaba las copias con `inert`. Saca del tabulador y
+   * del arbol de accesibilidad, que es justo lo que hacia falta — PERO
+   * TAMBIEN QUITA EL RATON.
+   *
+   * El resultado: solo se podia reproducir el video de la PRIMERA copia, la
+   * del extremo izquierdo. En cualquier otra posicion la tarjeta parecia una
+   * foto mas, se pulsaba y no pasaba nada. Y no se descubre mirando el
+   * codigo: se descubre pulsando un video que va por el centro de la fila.
+   */
+  it('no se usa `inert`, que tambien habria quitado el raton', () => {
+    expect(CARRUSEL_CODIGO).not.toContain('inert');
+  });
+
+  it('las copias no se leen', () => {
     expect(CARRUSEL).toContain('aria-hidden={esCopia || undefined}');
+  });
+
+  it('y sus botones salen del tabulador uno a uno, dentro de la pieza', () => {
+    /*
+     * `aria-hidden` sobre algo que si se puede tabular seria lo peor de los
+     * dos mundos: alcanzable con el teclado pero invisible para el lector.
+     * Por eso la pieza recibe si es enfocable y lo aplica a sus botones.
+     */
+    expect(CARRUSEL).toContain('{pieza.nodo(!esCopia)}');
+    expect(FACHADA).toContain('tabIndex={enfocable ? undefined : -1}');
   });
 
   it('y la primera vuelta no es copia', () => {

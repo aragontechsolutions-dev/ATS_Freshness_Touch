@@ -1,3 +1,4 @@
+import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   galleryPhotoTitle,
@@ -47,6 +48,23 @@ export function Gallery() {
   const { t, i18n } = useTranslation();
   const gallery = useGallery();
 
+  /*
+   * CUANTOS VIDEOS HAY ABIERTOS, PARA PARAR LA FILA.
+   *
+   * Un contador y no un «hay uno abierto» porque la misma pieza se repite
+   * varias veces en el carrusel y se puede abrir en mas de una copia. Con un
+   * booleano, cerrar una dejaria la fila andando con la otra sonando.
+   *
+   * Las dos funciones son estables a proposito: la fachada avisa desde un
+   * efecto, y unas funciones nuevas en cada pintado lo harian correr en
+   * bucle.
+   */
+  const [abiertos, setAbiertos] = useState(0);
+
+  const alAbrirse = useCallback((abierto: boolean) => {
+    setAbiertos((cuantos) => Math.max(0, cuantos + (abierto ? 1 : -1)));
+  }, []);
+
   if (!hasGalleryContent(gallery)) return null;
 
   const locale = toSiteCopyLocale(i18n.language);
@@ -54,12 +72,15 @@ export function Gallery() {
   const piezas: PiezaDelCarrusel[] = [
     ...gallery.videos.map((video) => ({
       clave: `video-${video.videoId}`,
-      nodo: (
+      nodo: (enfocable: boolean) => (
         <VideoFacade
           videoId={video.videoId}
           title={galleryVideoTitle(video, locale)}
           posterUrl={video.posterUrl}
           playLabel={t('gallery.play')}
+          closeLabel={t('gallery.close')}
+          enfocable={enfocable}
+          onAbierto={alAbrirse}
         />
       ),
     })),
@@ -68,7 +89,8 @@ export function Gallery() {
 
       return {
         clave: `foto-${photo.url}`,
-        nodo: (
+        // Una foto no tiene nada enfocable, asi que no usa el argumento.
+        nodo: () => (
           <figure className="m-0">
             <img
               src={photo.url}
@@ -134,6 +156,7 @@ export function Gallery() {
         */}
         <Carrusel
           piezas={piezas}
+          pausado={abiertos > 0}
           etiqueta={t('gallery.title')}
           etiquetaAnterior={t('gallery.previous')}
           etiquetaSiguiente={t('gallery.next')}
