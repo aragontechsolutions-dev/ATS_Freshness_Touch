@@ -311,45 +311,25 @@
 /* ---------------------------------------------------------------------------
  * EL CARRUSEL DE ANTES Y DESPUES
  * ---------------------------------------------------------------------------
- * La pista lleva la lista repetida varias veces y se desplaza exactamente lo
- * que ocupa UNA repeticion. Al volver a cero, lo que se ve es identico a lo
- * que habia: el salto existe, pero no se nota porque los pixeles son los
- * mismos.
+ * La caja se desplaza DE VERDAD, y el movimiento automatico lo lleva el
+ * componente sumando pixeles. La primera version lo movia con `transform` y
+ * una animacion: se veia igual, pero a una pista transformada no se la puede
+ * empujar, asi que no habia forma de poner botones ni de arrastrar con el
+ * dedo.
  *
- * Las dos variables las pone el componente, porque dependen de cuantas piezas
- * haya: la fraccion que hay que recorrer y lo que debe tardar para que la
- * velocidad sea la misma con dos fotos que con doce.
+ * LA BARRA DE DESPLAZAMIENTO SE ESCONDE, no se desactiva. Debajo de una fila
+ * que ya se mueve sola no aporta nada y parte el diseno; lo que importa es
+ * que la caja SIGA SIENDO desplazable, porque de eso viven los botones, el
+ * dedo, la rueda y el teclado.
  * --------------------------------------------------------------------------- */
-@keyframes ft-carrusel {
-  from {
-    transform: translateX(0);
-  }
-  to {
-    transform: translateX(var(--ft-carrusel-fin));
-  }
-}
-
 .ft-carrusel {
-  /* Lo que sale por los lados no se ve, que es lo que da la sensacion de
-     fila infinita en vez de lista que se acaba. */
-  overflow: hidden;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
 }
 
-.ft-carrusel-pista {
-  width: max-content;
-  animation: ft-carrusel var(--ft-carrusel-duracion) linear infinite;
-}
-
-/*
- * SE PARA AL ACERCARSE. Nadie puede pulsar algo que se esta escapando, y con
- * el teclado es peor: el foco entraria en un boton que ya no esta donde se
- * ve. `ft-quieta` es la tercera forma de pararlo, y la pone el componente
- * mientras se reproduce un video.
- */
-.ft-carrusel:hover .ft-carrusel-pista,
-.ft-carrusel:focus-within .ft-carrusel-pista,
-.ft-carrusel-pista.ft-quieta {
-  animation-play-state: paused;
+.ft-carrusel::-webkit-scrollbar {
+  display: none;
 }
 
 @keyframes ft-pulse {

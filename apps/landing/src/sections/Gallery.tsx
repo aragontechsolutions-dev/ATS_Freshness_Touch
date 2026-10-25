@@ -140,11 +140,18 @@ export function Gallery() {
 
         {/*
           FUERA DEL `Reveal` A PROPOSITO. La animacion de entrada de las
-          secciones usa `transform`, y un elemento con `transform` crea un
-          contexto nuevo: la pista del carrusel se mediria contra el, no
-          contra la pagina, y el desplazamiento saldria mal.
+          secciones usa `transform` y `opacity`, y los mandos del carrusel van
+          posicionados encima de las fotos: dentro de un elemento con
+          `transform` se posicionarian contra el, no contra la fila, y
+          acabarian descolocados mientras dura la entrada.
         */}
-        <Carrusel piezas={piezas} pausado={videoActivo !== null} etiqueta={t('gallery.title')} />
+        <Carrusel
+          piezas={piezas}
+          pausado={videoActivo !== null}
+          etiqueta={t('gallery.title')}
+          etiquetaAnterior={t('gallery.previous')}
+          etiquetaSiguiente={t('gallery.next')}
+        />
       </div>
     </section>
   );
