@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
+  GALLERY_PHOTOS_MAX,
+  GALLERY_PHOTO_MAX_BYTES,
+  GALLERY_PHOTO_TYPES,
   GALLERY_TITLE_MAX,
   GALLERY_VIDEOS_MAX,
   GallerySchema,
@@ -8,7 +11,7 @@ import {
   type Gallery,
   type Locale,
 } from '@freshness/types';
-import { ApiClientError, fetchGallery, saveGallery } from '../lib/api';
+import { ApiClientError, fetchGallery, saveGallery, uploadGalleryImage } from '../lib/api';
 import { useToast } from './ToastProvider';
 import { SkeletonFormulario } from './Skeletons';
 import { AlertIcon, SpinnerIcon } from './Icons';
@@ -29,6 +32,24 @@ interface GalleryFormProps {
  */
 interface Fila {
   videoId: string;
+  titleEn: string;
+  titleEs: string;
+  /** La ruta de la miniatura, o `null` si no se ha subido ninguna. */
+  poster: string | null;
+  /** Su direccion, solo para la vista previa. No se manda de vuelta. */
+  posterUrl: string | null;
+}
+
+/**
+ * Una foto ya subida.
+ *
+ * LA RUTA NO SE EDITA: la puso el servidor. La direccion es solo para la
+ * vista previa y tampoco se manda de vuelta. Lo unico que se escribe aqui son
+ * los dos titulos.
+ */
+interface FilaFoto {
+  path: string;
+  url: string | null;
   titleEn: string;
   titleEs: string;
 }
@@ -69,6 +90,10 @@ export function GalleryForm({ locale, onSessionLost }: GalleryFormProps) {
   const [errorKey, setErrorKey] = useState<string | null>(null);
   const [problema, setProblema] = useState<string | null>(null);
   const [filas, setFilas] = useState<Fila[] | null>(null);
+  const [fotos, setFotos] = useState<FilaFoto[]>([]);
+  const [subiendo, setSubiendo] = useState(false);
+  /** Que video esta subiendo su miniatura ahora mismo, si alguno. */
+  const [subiendoMini, setSubiendoMini] = useState<number | null>(null);
   const [guardado, setGuardado] = useState<Gallery | null>(null);
   const [meta, setMeta] = useState<{ updatedAt: string | null; updatedBy: string | null } | null>(
     null,
@@ -82,7 +107,8 @@ export function GalleryForm({ locale, onSessionLost }: GalleryFormProps) {
 
     try {
       const datos = await fetchGallery();
-      setFilas(aFilas(datos.gallery));
+      setFilas(aFilas(datos));
+      setFotos(aFilasFoto(datos));
       setGuardado(datos.gallery);
       setMeta({ updatedAt: datos.updatedAt, updatedBy: datos.updatedBy });
     } catch (error) {
@@ -108,7 +134,7 @@ export function GalleryForm({ locale, onSessionLost }: GalleryFormProps) {
     setProblema(null);
     if (filas === null) return;
 
-    const validado = GallerySchema.safeParse(aContrato(filas));
+    const validado = GallerySchema.safeParse(aContrato(filas, fotos));
 
     if (!validado.success) {
       /*
@@ -122,7 +148,8 @@ export function GalleryForm({ locale, onSessionLost }: GalleryFormProps) {
     setGuardando(true);
     try {
       const datos = await saveGallery(validado.data);
-      setFilas(aFilas(datos.gallery));
+      setFilas(aFilas(datos));
+      setFotos(aFilasFoto(datos));
       setGuardado(datos.gallery);
       setMeta({ updatedAt: datos.updatedAt, updatedBy: datos.updatedBy });
       toast.success('admin.gallery.saved');
@@ -181,13 +208,122 @@ export function GalleryForm({ locale, onSessionLost }: GalleryFormProps) {
 
   const anadir = (): void => {
     setFilas((actual) =>
-      actual === null ? actual : [...actual, { videoId: '', titleEn: '', titleEs: '' }],
+      actual === null
+        ? actual
+        : [...actual, { videoId: '', titleEn: '', titleEs: '', poster: null, posterUrl: null }],
     );
     setProblema(null);
   };
 
-  const sinCambios = guardado !== null && igual(aContrato(filas), guardado);
+  /**
+   * Sube la miniatura de un video.
+   *
+   * La anterior NO se borra aqui: se borra al guardar, que es cuando el
+   * cambio es de verdad. Si se borrara ahora y luego no se guardara, el video
+   * publicado se quedaria apuntando a un archivo que ya no existe.
+   */
+  const subirMiniatura = async (indice: number, archivo: File): Promise<void> => {
+    setProblema(null);
+
+    if (archivo.size > GALLERY_PHOTO_MAX_BYTES) {
+      setProblema(t('admin.gallery.errTooBig'));
+      return;
+    }
+
+    setSubiendoMini(indice);
+    try {
+      const subida = await uploadGalleryImage(archivo, 'poster');
+      setFilas((actual) =>
+        actual === null
+          ? actual
+          : actual.map((fila, i) =>
+              i === indice ? { ...fila, poster: subida.path, posterUrl: subida.url } : fila,
+            ),
+      );
+    } catch (error) {
+      if (
+        error instanceof ApiClientError &&
+        (error.statusCode === 401 || error.statusCode === 403)
+      ) {
+        perdioSesion(error.statusCode === 403 ? 'noAccess' : 'expired');
+        return;
+      }
+      setProblema(
+        error instanceof ApiClientError && error.statusCode === 415
+          ? t('admin.gallery.errNotAnImage')
+          : t('admin.gallery.errUpload'),
+      );
+    } finally {
+      setSubiendoMini(null);
+    }
+  };
+
+  const quitarMiniatura = (indice: number): void => {
+    setFilas((actual) =>
+      actual === null
+        ? actual
+        : actual.map((fila, i) =>
+            i === indice ? { ...fila, poster: null, posterUrl: null } : fila,
+          ),
+    );
+    setProblema(null);
+  };
+
+  const cambiarFoto = (indice: number, campo: 'titleEn' | 'titleEs', valor: string): void => {
+    setFotos((actual) =>
+      actual.map((foto, i) => (i === indice ? { ...foto, [campo]: valor } : foto)),
+    );
+    setProblema(null);
+  };
+
+  const quitarFoto = (indice: number): void => {
+    setFotos((actual) => actual.filter((_, i) => i !== indice));
+    setProblema(null);
+  };
+
+  /**
+   * Sube el archivo y lo anade a la lista.
+   *
+   * EL AVISO DE TAMANO VA ANTES DE EMPEZAR A SUBIR. No es confiar en el
+   * navegador —el servidor lo rechaza igual—: es no hacer esperar a nadie dos
+   * minutos para un «no».
+   */
+  const subirFoto = async (archivo: File): Promise<void> => {
+    setProblema(null);
+
+    if (archivo.size > GALLERY_PHOTO_MAX_BYTES) {
+      setProblema(t('admin.gallery.errTooBig'));
+      return;
+    }
+
+    setSubiendo(true);
+    try {
+      const subida = await uploadGalleryImage(archivo, 'photo');
+      setFotos((actual) => [
+        ...actual,
+        { path: subida.path, url: subida.url, titleEn: '', titleEs: '' },
+      ]);
+    } catch (error) {
+      if (
+        error instanceof ApiClientError &&
+        (error.statusCode === 401 || error.statusCode === 403)
+      ) {
+        perdioSesion(error.statusCode === 403 ? 'noAccess' : 'expired');
+        return;
+      }
+      setProblema(
+        error instanceof ApiClientError && error.statusCode === 415
+          ? t('admin.gallery.errNotAnImage')
+          : t('admin.gallery.errUpload'),
+      );
+    } finally {
+      setSubiendo(false);
+    }
+  };
+
+  const sinCambios = guardado !== null && igual(aContrato(filas, fotos), guardado);
   const puedeAnadir = filas.length < GALLERY_VIDEOS_MAX;
+  const puedeAnadirFoto = fotos.length < GALLERY_PHOTOS_MAX;
 
   return (
     <form className="space-y-6" onSubmit={(evento) => void enviar(evento)}>
@@ -291,6 +427,53 @@ export function GalleryForm({ locale, onSessionLost }: GalleryFormProps) {
                     />
                   </label>
                 </div>
+
+                {/* ---------------------------- La miniatura --------------------------- */}
+                <div className="border-t border-slate-200 pt-3 dark:border-night-600">
+                  <p className="ft-label">{t('admin.gallery.poster')}</p>
+                  <p className="mb-2 text-xs text-slate-600 dark:text-slate-400">
+                    {t('admin.gallery.posterHelp')}
+                  </p>
+
+                  {fila.posterUrl !== null ? (
+                    <div className="flex flex-wrap items-start gap-3">
+                      <img
+                        src={fila.posterUrl}
+                        alt={t('admin.gallery.posterAlt')}
+                        className="aspect-video w-40 rounded-lg object-cover"
+                        loading="lazy"
+                      />
+                      <button
+                        type="button"
+                        className="ft-btn-outline"
+                        onClick={() => quitarMiniatura(indice)}
+                        disabled={guardando}
+                      >
+                        {t('admin.gallery.removePoster')}
+                      </button>
+                    </div>
+                  ) : (
+                    <input
+                      type="file"
+                      className="ft-input"
+                      aria-label={t('admin.gallery.poster')}
+                      accept={GALLERY_PHOTO_TYPES.join(',')}
+                      disabled={guardando || subiendoMini !== null}
+                      onChange={(evento) => {
+                        const archivo = evento.target.files?.[0];
+                        evento.target.value = '';
+                        if (archivo) void subirMiniatura(indice, archivo);
+                      }}
+                    />
+                  )}
+
+                  {subiendoMini === indice && (
+                    <p className="mt-2 flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
+                      <SpinnerIcon className="h-4 w-4" />
+                      {t('admin.gallery.uploading')}
+                    </p>
+                  )}
+                </div>
               </li>
             );
           })}
@@ -313,6 +496,98 @@ export function GalleryForm({ locale, onSessionLost }: GalleryFormProps) {
           </p>
         )}
       </div>
+
+      {/* --------------------------------- Fotos -------------------------------- */}
+      <section className="space-y-4">
+        <div>
+          <h3 className="font-semibold text-slate-900 dark:text-white">
+            {t('admin.gallery.photos')}
+          </h3>
+          <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+            {t('admin.gallery.photosHelp')}
+          </p>
+        </div>
+
+        {fotos.length > 0 && (
+          <ul className="grid list-none grid-cols-1 gap-4 p-0 sm:grid-cols-2">
+            {fotos.map((foto, indice) => (
+              <li key={foto.path} className="ft-card space-y-3 p-4">
+                {foto.url !== null && (
+                  <img
+                    src={foto.url}
+                    alt={foto.titleEn || foto.titleEs || t('admin.gallery.photoAlt')}
+                    className="aspect-video w-full rounded-lg object-cover"
+                    loading="lazy"
+                  />
+                )}
+
+                <div className="grid gap-3">
+                  <label className="block">
+                    <span className="ft-label">{t('admin.gallery.titleEnglish')}</span>
+                    <input
+                      type="text"
+                      className="ft-input"
+                      maxLength={GALLERY_TITLE_MAX}
+                      value={foto.titleEn}
+                      placeholder={t('admin.gallery.titlePlaceholder')}
+                      onChange={(evento) => cambiarFoto(indice, 'titleEn', evento.target.value)}
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="ft-label">{t('admin.gallery.titleSpanish')}</span>
+                    <input
+                      type="text"
+                      className="ft-input"
+                      maxLength={GALLERY_TITLE_MAX}
+                      value={foto.titleEs}
+                      placeholder={t('admin.gallery.titlePlaceholder')}
+                      onChange={(evento) => cambiarFoto(indice, 'titleEs', evento.target.value)}
+                    />
+                  </label>
+                </div>
+
+                <button
+                  type="button"
+                  className="ft-btn-outline"
+                  onClick={() => quitarFoto(indice)}
+                  disabled={guardando}
+                >
+                  {t('admin.gallery.remove')}
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        <label className="block">
+          <span className="ft-label">{t('admin.gallery.addPhoto')}</span>
+          <input
+            type="file"
+            className="ft-input"
+            accept={GALLERY_PHOTO_TYPES.join(',')}
+            disabled={guardando || subiendo || !puedeAnadirFoto}
+            onChange={(evento) => {
+              const archivo = evento.target.files?.[0];
+              // El campo se vacia para que subir dos veces la misma foto
+              // vuelva a disparar el cambio.
+              evento.target.value = '';
+              if (archivo) void subirFoto(archivo);
+            }}
+          />
+        </label>
+
+        {subiendo && (
+          <p className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
+            <SpinnerIcon className="h-4 w-4" />
+            {t('admin.gallery.uploading')}
+          </p>
+        )}
+        {!puedeAnadirFoto && (
+          <p className="text-xs text-slate-600 dark:text-slate-400">
+            {t('admin.gallery.addPhotoBlocked', { count: GALLERY_PHOTOS_MAX })}
+          </p>
+        )}
+      </section>
 
       {problema !== null && (
         <p className="flex items-start gap-2 text-sm text-red-700 dark:text-red-300" role="alert">
@@ -337,7 +612,14 @@ export function GalleryForm({ locale, onSessionLost }: GalleryFormProps) {
             type="button"
             className="ft-btn-outline"
             onClick={() => {
-              setFilas(aFilas(guardado ?? { videos: [] }));
+              // Las direcciones de vista previa no se pueden recomponer sin
+              // volver a preguntar, asi que se recarga la pantalla entera.
+              setFilas(null);
+              // Las fotos vuelven a lo guardado, pero las direcciones de vista
+              // previa no se pueden recomponer sin volver a preguntar, asi que
+              // se recarga la pantalla entera. Es la unica forma de que lo que
+              // se ve siga siendo lo que hay.
+              void cargar();
               setProblema(null);
             }}
             disabled={guardando}
@@ -404,12 +686,24 @@ export function identificadorDeYouTube(pegado: string): string {
   return texto;
 }
 
-/** Del contrato a los campos. */
-function aFilas(gallery: Gallery): Fila[] {
-  return gallery.videos.map((video) => ({
+/** Del contrato a los campos de las fotos, con su direccion de vista previa. */
+function aFilasFoto(datos: { gallery: Gallery; imageUrls: Record<string, string> }): FilaFoto[] {
+  return datos.gallery.photos.map((photo) => ({
+    path: photo.path,
+    url: datos.imageUrls[photo.path] ?? null,
+    titleEn: photo.title.en ?? '',
+    titleEs: photo.title.es ?? '',
+  }));
+}
+
+/** Del contrato a los campos, con la direccion de la miniatura si la tiene. */
+function aFilas(datos: { gallery: Gallery; imageUrls: Record<string, string> }): Fila[] {
+  return datos.gallery.videos.map((video) => ({
     videoId: video.videoId,
     titleEn: video.title.en ?? '',
     titleEs: video.title.es ?? '',
+    poster: video.poster,
+    posterUrl: video.poster === null ? null : (datos.imageUrls[video.poster] ?? null),
   }));
 }
 
@@ -419,13 +713,27 @@ function aFilas(gallery: Gallery): Fila[] {
  * Aqui es donde el campo vacio pasa a ser `null`: una sola vez, y en un solo
  * sitio.
  */
-function aContrato(filas: Fila[]): Gallery {
+function aContrato(filas: Fila[], fotos: FilaFoto[]): Gallery {
   return {
     videos: filas.map((fila) => ({
       videoId: fila.videoId.trim(),
       title: {
         en: fila.titleEn.trim() === '' ? null : fila.titleEn.trim(),
         es: fila.titleEs.trim() === '' ? null : fila.titleEs.trim(),
+      },
+      poster: fila.poster,
+    })),
+    /*
+     * LAS FOTOS VIAJAN SIEMPRE, aunque esta pantalla solo haya tocado los
+     * videos. Se manda la galeria entera y lo que no viene se borra: si aqui
+     * se devolviera una lista vacia, guardar un video retiraria todas las
+     * fotos —y las borraria del almacen— sin que nadie lo hubiera pedido.
+     */
+    photos: fotos.map((foto) => ({
+      path: foto.path,
+      title: {
+        en: foto.titleEn.trim() === '' ? null : foto.titleEn.trim(),
+        es: foto.titleEs.trim() === '' ? null : foto.titleEs.trim(),
       },
     })),
   };
@@ -434,14 +742,29 @@ function aContrato(filas: Fila[]): Gallery {
 /** Si dos galerias dicen lo mismo, para saber si hay algo que guardar. */
 function igual(a: Gallery, b: Gallery): boolean {
   if (a.videos.length !== b.videos.length) return false;
+  if (a.photos.length !== b.photos.length) return false;
 
-  return a.videos.every((video, i) => {
+  const mismosVideos = a.videos.every((video, i) => {
     const otro = b.videos[i];
     return (
       otro !== undefined &&
       video.videoId === otro.videoId &&
-      (video.title.en ?? null) === (otro.title.en ?? null) &&
-      (video.title.es ?? null) === (otro.title.es ?? null)
+      video.poster === otro.poster &&
+      mismoTitulo(video.title, otro.title)
     );
   });
+
+  const mismasFotos = a.photos.every((foto, i) => {
+    const otra = b.photos[i];
+    return otra !== undefined && foto.path === otra.path && mismoTitulo(foto.title, otra.title);
+  });
+
+  return mismosVideos && mismasFotos;
+}
+
+function mismoTitulo(
+  a: { en: string | null; es: string | null },
+  b: { en: string | null; es: string | null },
+): boolean {
+  return (a.en ?? null) === (b.en ?? null) && (a.es ?? null) === (b.es ?? null);
 }

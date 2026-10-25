@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { DEFAULT_GALLERY, type Gallery } from '@freshness/types';
+import { DEFAULT_PUBLIC_GALLERY, type PublicGallery } from '@freshness/types';
 import { fetchGallery } from '../lib/api';
 
 /**
@@ -17,21 +17,21 @@ import { fetchGallery } from '../lib/api';
  * vacia y la seccion no existe; cuando llega, aparece. Un esqueleto gris que
  * a veces no se rellena nunca es peor que una seccion que aparece.
  */
-let galleryPromise: Promise<Gallery> | null = null;
+let galleryPromise: Promise<PublicGallery> | null = null;
 
-function loadGallery(): Promise<Gallery> {
+function loadGallery(): Promise<PublicGallery> {
   if (!galleryPromise) {
     galleryPromise = fetchGallery().catch(() => {
       // Se descarta la promesa para poder reintentar en otra visita.
       galleryPromise = null;
-      return DEFAULT_GALLERY;
+      return DEFAULT_PUBLIC_GALLERY;
     });
   }
   return galleryPromise;
 }
 
-export function useGallery(): Gallery {
-  const [gallery, setGallery] = useState<Gallery>(DEFAULT_GALLERY);
+export function useGallery(): PublicGallery {
+  const [gallery, setGallery] = useState<PublicGallery>(DEFAULT_PUBLIC_GALLERY);
 
   useEffect(() => {
     let active = true;

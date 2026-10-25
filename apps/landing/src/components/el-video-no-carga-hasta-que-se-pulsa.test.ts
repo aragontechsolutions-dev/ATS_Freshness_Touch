@@ -141,3 +141,34 @@ describe('sin videos no hay seccion', () => {
     expect(avisoAntes).toBeLessThan(botones);
   });
 });
+
+describe('la miniatura es nuestra', () => {
+  /*
+   * La natural seria la de YouTube: gratis, automatica y siempre al dia. Y
+   * seria exactamente la peticion a Google que la fachada evita, encima en
+   * cuanto la seccion entra en pantalla y sin que nadie pulse nada. Asi que
+   * la portada se sube a nuestro almacen.
+   */
+  it('la fachada pinta la direccion que recibe, no una que construya', () => {
+    expect(FACHADA).toContain('src={posterUrl}');
+    expect(FACHADA_CODIGO).not.toContain('supabase');
+    expect(FACHADA_CODIGO).not.toContain('storage/v1');
+  });
+
+  it('sin miniatura la tarjeta sigue funcionando, con los colores de la marca', () => {
+    // No es un hueco ni un error: es el estado de partida, y es lo que se ve
+    // mientras la empresa no haya subido ninguna.
+    expect(FACHADA).toContain('posterUrl !== null &&');
+    expect(FACHADA).toContain('from-brand-700');
+  });
+
+  it('la portada es decorativa: texto alternativo vacio', () => {
+    /*
+     * Es la unica imagen del sitio que lo lleva vacio, y a proposito: el
+     * boton que la contiene ya se anuncia con el titulo del video, asi que
+     * describirla otra vez haria que un lector de pantalla leyera lo mismo
+     * dos veces.
+     */
+    expect(FACHADA).toContain('alt=""');
+  });
+});

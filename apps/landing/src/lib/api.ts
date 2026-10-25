@@ -3,7 +3,7 @@ import {
   ApiErrorSchema,
   AvailabilityResponseSchema,
   BusinessSettingsSchema,
-  GallerySchema,
+  PublicGallerySchema,
   SiteCopySchema,
   BookingResponseSchema,
   CatalogResponseSchema,
@@ -13,7 +13,7 @@ import {
   type AvailabilityResponse,
   type BookingRequestInput,
   type BusinessSettings,
-  type Gallery,
+  type PublicGallery,
   type SiteCopy,
   type BookingResponse,
   type CatalogResponse,
@@ -283,9 +283,9 @@ export function fetchBusinessSettings(signal?: AbortSignal): Promise<BusinessSet
  * lo que es decorativo: perder la galeria es perder una seccion; tumbar la
  * portada es perder las ventas del dia.
  */
-export function fetchGallery(signal?: AbortSignal): Promise<Gallery> {
+export function fetchGallery(signal?: AbortSignal): Promise<PublicGallery> {
   return request('/gallery', { method: 'GET', signal }, (payload) => {
-    const parsed = GallerySchema.safeParse(payload);
+    const parsed = PublicGallerySchema.safeParse(payload);
     if (!parsed.success) {
       console.error('[Freshness Touch] Galeria inesperada:', parsed.error.issues);
       throw new ApiClientError('BAD_CONTRACT', 'calculator.errorGeneric');

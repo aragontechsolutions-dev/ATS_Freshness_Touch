@@ -299,11 +299,13 @@ forma de comprobarlo desde el código. Así que el marco no se carga hasta que
 el visitante lo pide: entonces es su decisión, no la nuestra, y el «esta web
 no manda datos a terceros» sigue siendo verdad para quien no pulse.
 
-**No hay miniatura, y es a propósito.** La natural sería la de YouTube
-(`i.ytimg.com`), que es exactamente la misma petición por otra puerta, y
-encima en cuanto la sección entra en pantalla. La tarjeta se pinta con los
-colores de la marca hasta que existan nuestras propias imágenes, que llegan
-con las fotos.
+**La miniatura es nuestra, no la de YouTube.** La natural sería la de YouTube
+(`i.ytimg.com`): gratis, automática y siempre al día. Y sería exactamente la
+misma petición a Google por otra puerta, encima en cuanto la sección entra en
+pantalla y sin que nadie pulse nada. Así que la portada se sube al almacén
+propio (etapa 2.C.3, más abajo) y se sirve desde nuestro dominio. **Sin
+miniatura la tarjeta funciona igual**, con los colores de la marca: no es un
+hueco ni un error, es el estado de partida.
 
 El aviso de que el vídeo lo sirve un tercero se pinta **antes** del botón, no
 después: quien pulsa tiene que poder decidirlo sabiéndolo.
@@ -386,15 +388,181 @@ lista entera no responde a «cuándo se retiró el vídeo de esta casa», que es
 dirección ni ningún dato del cliente**: son identificadores de vídeos ya
 públicos en YouTube. El cambio y su registro van en la misma transacción.
 
+### Las fotos (etapa 2.C.2)
+
+Se suben desde el panel, van a Supabase Storage y salen en la misma sección,
+debajo de los vídeos.
+
+#### Lo más importante: se les quita el GPS
+
+`apps/api/src/storage/strip-image-metadata.ts`.
+
+Una foto hecha con un móvil lleva dentro, en un bloque aparte de los píxeles,
+**las coordenadas GPS del sitio donde se tomó**. También la fecha, el modelo
+del teléfono y a veces el nombre del propietario.
+
+El permiso que firma el cliente dice que no se mostrará su calle ni su número,
+y el encuadre se cuida para que no salga la placa. Y después se publicaría un
+archivo con su dirección **exacta** escrita dentro, legible con cualquier visor
+de propiedades. Es el mismo criterio que ya rige en el fichaje de los
+empleados: de su ubicación solo se guarda la distancia, nunca las coordenadas.
+
+**Se hace sin recodificar y sin ninguna dependencia nueva.** Lo habitual sería
+`sharp`, que de paso borra todo, pero es una dependencia **nativa con script
+de instalación**, y este repositorio tiene los scripts de instalación cerrados
+a propósito: abrirlos amplía la superficie de suministro y mete un binario
+nativo en el arranque de la API. Esto es TypeScript puro que reconstruye el
+contenedor dejando fuera los bloques de metadatos.
+
+| Formato | Lo que se va                                              | Lo que se queda                                          |
+| ------- | --------------------------------------------------------- | -------------------------------------------------------- |
+| JPEG    | `APP1` (EXIF y XMP), `APP13` (IPTC), `APP14`, comentarios | `APP0` (JFIF), `APP2` (perfil de color), tablas, píxeles |
+| PNG     | `eXIf`, `tEXt`, `zTXt`, `iTXt`, `tIME`                    | todo lo demás, byte a byte                               |
+| WebP    | los trozos `EXIF` y `XMP `                                | el resto, y se **apagan las dos banderas** del `VP8X`    |
+
+Tres detalles que costarían un fallo difícil de encontrar si se hicieran mal, y
+que tienen su prueba:
+
+1. **En JPEG se copia tal cual desde el inicio de los datos.** Dentro de los
+   píxeles aparecen bytes `FF` por puro azar, y un `FF E1` ahí **no** es un
+   EXIF. Un limpiador que siguiera buscando marcadores recortaría un trozo de
+   la imagen y la corrompería **solo en algunas fotos**: el peor fallo posible,
+   porque pasa las pruebas con cualquier imagen que no tenga esa combinación.
+2. **En WebP hay que apagar las banderas de EXIF y XMP del `VP8X`.** Quitar los
+   datos y dejar la bandera encendida deja un archivo que anuncia un EXIF que
+   ya no existe: carga en unos navegadores y no en otros.
+3. **En WebP hay que reescribir el tamaño declarado del RIFF**, o el archivo
+   anuncia más bytes de los que tiene.
+
+Se conservan el perfil de color y la cabecera JFIF a propósito: no dicen nada
+de nadie, y sin el perfil una foto de móvil se publica con los colores lavados.
+
+#### Por qué la subida pasa por la API y no va directa al almacén
+
+Podría ir del navegador a Supabase. No va, por tres cosas que solo se pueden
+hacer en el servidor:
+
+1. **Comprobar que los bytes son una imagen**, por los bytes y no por lo que
+   diga el cliente. Sin esto, llamar `.jpg` a un SVG colaría **un documento con
+   JavaScript dentro** en un bucket público.
+2. **Quitar los metadatos**, que es lo de arriba.
+3. **Poner el nombre.** Si lo pusiera quien sube, se acabarían subiendo
+   archivos llamados `casa-de-los-martinez.jpg`, que es publicar el apellido del
+   cliente en una dirección que cualquiera puede leer. El nombre son **32
+   caracteres hexadecimales** y nada del original sobrevive.
+
+Y una cuarta: la clave de servicio de Supabase se salta las políticas de la
+base. En el navegador sería una clave de administración repartida a todo el que
+abra el panel.
+
+#### Rutas dentro, direcciones fuera
+
+Guardada vive la **ruta** (`photos/abc….jpg`), validada contra
+`/^photos\/[0-9a-f]{32}\.(jpg|png|webp)$/`. La **dirección** la compone el
+servidor, que es el único que sabe dónde está el almacén.
+
+Mandar la ruta y que la web le pegue delante un dominio suyo pondría ese
+dominio en dos sitios que tendrían que coincidir para siempre, y ya sabemos
+cómo acaba: es exactamente el fallo de la sede. La web no compone ninguna
+dirección, y una prueba comprueba que en la sección no aparece escrito ningún
+dominio de almacén.
+
+La CSP de las dos aplicaciones gana el origen del almacén en `img-src`, y una
+prueba exige que haya **exactamente uno** y que sea `https`.
+
+#### Retirar una foto la borra de verdad
+
+Quitarla solo de la fila dejaría el archivo accesible con su dirección para
+quien la tuviera. El permiso promete **retirar el material**, no esconder el
+enlace.
+
+- **El borrado va después de la transacción, no dentro.** Dentro, un fallo
+  posterior haría retroceder la fila y dejaría las fotos ya borradas: la
+  galería apuntaría a archivos que no existen.
+- **`remove` no falla nunca**, a propósito. Lo que importa de retirar una foto
+  es que deje de verse, y eso ya pasó al guardar la fila. Un archivo huérfano
+  es un problema de limpieza; una foto que sigue publicada después de pedir que
+  la quiten es un problema legal.
+
+#### Un dato que casi se perdió
+
+La pantalla tiene **dos listas y un solo botón de guardar**, y se manda la
+galería entera: lo que no viene, se borra. La primera versión del formulario
+solo conocía los vídeos, así que guardar un vídeo habría **retirado todas las
+fotos y las habría borrado del almacén** sin que nadie lo pidiera. Lo atan dos
+pruebas: «guardar un cambio de los vídeos NO borra las fotos» y la simétrica.
+
+#### Configuración
+
+| Variable                    | Valor en producción | Qué hace                                                                                                                                    |
+| --------------------------- | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `STORAGE_PROVIDER`          | `supabase`          | Con `memory` las fotos viven en la memoria del proceso y sus direcciones no cargan nada. La API avisa por error si sigue así en producción. |
+| `GALLERY_BUCKET`            | `gallery`           | El bucket público.                                                                                                                          |
+| `SUPABASE_SERVICE_ROLE_KEY` | secreto en Render   | Nunca sale al navegador ni se escribe en un registro.                                                                                       |
+| `STORAGE_TIMEOUT_MS`        | `10000`             |                                                                                                                                             |
+
+La API **no arranca** con `STORAGE_PROVIDER=supabase` y sin clave: el fallo se
+ve en el despliegue, no la primera vez que alguien intenta publicar una foto.
+
+### Las miniaturas de los vídeos (etapa 2.C.3)
+
+Cada vídeo puede tener su propia portada, subida desde el panel igual que una
+foto. Lo que se ve antes de pulsar play deja de ser un rectángulo de color y
+pasa a ser una imagen real — **sin pedirle nada a Google**, que es todo el
+punto.
+
+#### Carpeta aparte, y no es un detalle de orden
+
+Las miniaturas van a `posters/` y las fotos a `photos/`, con su propia
+expresión de validación cada una. **Son dos cosas distintas aunque sean dos
+imágenes:** una foto es contenido de la galería; una miniatura es la portada
+de otra cosa.
+
+Si vivieran juntas, retirar una foto podría llevarse por delante la portada de
+un vídeo —y al contrario—, y nadie entendería por qué al quitar una foto un
+vídeo se quedó en gris. El contrato rechaza expresamente una ruta de `photos/`
+como miniatura y una de `posters/` como foto.
+
+#### Un endpoint, no dos
+
+`POST /api/v1/admin/gallery/images?kind=photo|poster`.
+
+Lo que cambia entre subir una foto y subir una miniatura es **una carpeta**.
+Con dos rutas habría dos sitios donde comprobar los bytes y quitar los
+metadatos, y tarde o temprano un arreglo se aplicaría a una y no a la otra.
+Sin `kind`, o con uno inventado, la subida se rechaza con un 415: adivinarlo
+sería decidir por quien llama dónde acaba su archivo.
+
+#### Sustituir una portada borra la anterior
+
+Es lo que más va a pasar con las miniaturas, y es fácil de olvidar porque no
+se parece a un borrado. Sin esto, cada cambio de portada dejaría la anterior
+en el almacén para siempre, accesible con su dirección para quien la tuviera.
+
+El borrado va al **guardar**, no al subir. Si se borrara al subir la nueva y
+luego no se guardara, el vídeo publicado se quedaría apuntando a un archivo
+que ya no existe.
+
+El rastro lo registra aparte de las fotos: `postersAdded` y `postersRemoved`.
+
+#### El texto alternativo va vacío, y es la única imagen del sitio que lo lleva
+
+La portada es **decorativa**: el botón que la contiene ya se anuncia con el
+título del vídeo. Describirla otra vez haría que un lector de pantalla leyera
+lo mismo dos veces.
+
+Es lo contrario de las fotos de la galería, que **siempre** llevan texto
+alternativo, porque ahí la imagen _es_ el contenido.
+
 ### Lo que todavía no existe
 
-- **Las fotos** (etapa 2.C.2): necesitan el bucket `gallery` de Supabase
-  Storage, la subida por la API, el borrado de metadatos EXIF y los límites de
-  tamaño.
-- **Las miniaturas propias de los vídeos** (`posters/` del mismo bucket). Hasta
-  que existan, la tarjeta se pinta con los colores de la marca.
+- **Reordenar** los vídeos y las fotos arrastrando. Hoy el orden es el de
+  subida; para cambiarlo hay que quitar y volver a poner.
 - **El registro de consentimientos** (etapa 2.D), que une el papel firmado con
-  la pieza publicada.
+  la pieza publicada. Mientras no exista, sirve la hoja de cálculo de la
+  sección 6.
+- **Limpieza de huérfanos**: una foto subida y nunca guardada se queda en el
+  almacén sin verse en ninguna parte. No molesta a nadie, pero ocupa.
 
 ### El bucket de Supabase Storage
 

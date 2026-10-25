@@ -645,6 +645,21 @@ export const en = {
       never: 'Never changed',
       lastChange: 'Last changed {{when}} by {{who}}',
       lastChangeUnknown: 'Last changed {{when}}',
+      photos: 'Photos',
+      photosHelp:
+        'Uploaded straight from your phone or computer. The location data inside the file is removed before it is stored.',
+      addPhoto: 'Add a photo',
+      addPhotoBlocked: 'The section holds {{count}} photos at most.',
+      photoAlt: 'Gallery photo',
+      uploading: 'Uploading…',
+      errTooBig: 'That photo is too large. The limit is 5 MB.',
+      errNotAnImage: 'That file is not a JPEG, PNG or WebP image.',
+      errUpload: 'The photo could not be uploaded. Try again.',
+      poster: 'Thumbnail',
+      posterHelp:
+        'What visitors see before they press play. Without one, the card shows our brand colours. We do not use YouTube’s own thumbnail, because loading it would send visitor data to Google before anyone presses anything.',
+      posterAlt: 'Video thumbnail',
+      removePoster: 'Remove thumbnail',
     },
 
     location: {
@@ -1723,6 +1738,8 @@ export const en = {
     thirdPartyNote:
       'Videos are hosted on YouTube. Nothing is requested from YouTube until you press play.',
     play: 'Play video',
+    /* Lo que lee un lector de pantalla cuando la foto no tiene titulo. */
+    photoAlt: 'Before and after of a home we cleaned',
   },
 
   contact: {

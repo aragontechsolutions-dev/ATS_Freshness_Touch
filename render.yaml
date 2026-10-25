@@ -92,6 +92,26 @@ services:
         sync: false
       - key: AUTH_TIMEOUT_MS
         value: '5000'
+      # Secreto: se introduce a mano en el panel, nunca en el repositorio.
+      # SUPABASE_SERVICE_ROLE_KEY: la clave de servicio del proyecto.
+      #
+      # Se salta las politicas de la base, asi que NUNCA sale al navegador: el
+      # panel llama a esta API y esta API llama a Supabase. La usan dar de alta
+      # personal y subir las fotos de la galeria.
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+
+      # --- Almacen de imagenes (galeria de antes y despues) ---
+      # memory | supabase. Con "memory" las fotos se guardan en la memoria del
+      # proceso, se pierden al reiniciar y sus direcciones no cargan nada; la
+      # API avisa por error en los registros mientras siga asi en produccion.
+      - key: STORAGE_PROVIDER
+        value: supabase
+      # El bucket, publico de lectura. Las fotos INTERNAS de prueba del trabajo
+      # iran en otro distinto y con direcciones firmadas: lo que distingue a
+      # las dos no es el tamano, es quien puede verlas.
+      - key: GALLERY_BUCKET
+        value: gallery
 
       # --- Pagos ---
       # mock | stripe. Con "mock" los depositos se SIMULAN: no se retiene

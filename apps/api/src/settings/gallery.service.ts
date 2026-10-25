@@ -1,13 +1,21 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
+import { randomUUID } from 'node:crypto';
 import {
   DEFAULT_GALLERY,
+  DEFAULT_PUBLIC_GALLERY,
+  GALLERY_PHOTO_MAX_BYTES,
   GallerySchema,
+  galleryImageFolder,
   type AdminGallery,
   type AuthenticatedStaff,
   type Gallery,
+  type GalleryImageKind,
+  type PublicGallery,
 } from '@freshness/types';
 import { AuditService } from '../audit/audit.service';
 import { PrismaService } from '../database/prisma.service';
+import { stripImageMetadata } from '../storage/strip-image-metadata';
+import { IMAGE_STORAGE, type ImageStorage } from '../storage/storage.types';
 
 /**
  * LA GALERIA DE ANTES Y DESPUES
@@ -44,6 +52,7 @@ export class GalleryService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    @Inject(IMAGE_STORAGE) private readonly storage: ImageStorage,
   ) {}
 
   /** La galeria vigente. */
@@ -111,8 +120,21 @@ export class GalleryService {
       select: { updatedAt: true, updatedBy: true },
     });
 
+    const gallery = await this.get();
+
+    const rutas = [
+      ...gallery.photos.map((photo) => photo.path),
+      ...gallery.videos.flatMap((video) => (video.poster === null ? [] : [video.poster])),
+    ];
+
     return {
-      gallery: await this.get(),
+      gallery,
+      imageUrls: Object.fromEntries(
+        rutas.flatMap((ruta) => {
+          const url = this.storage.publicUrl(ruta);
+          return url === null ? [] : [[ruta, url] as const];
+        }),
+      ),
       updatedAt: row?.updatedAt.toISOString() ?? null,
       updatedBy: await this.staffName(row?.updatedBy ?? null),
     };
@@ -149,6 +171,25 @@ export class GalleryService {
     const antes = anterior.videos.map((v) => v.videoId);
     const despues = gallery.videos.map((v) => v.videoId);
 
+    const fotosAntes = anterior.photos.map((p) => p.path);
+    const fotosDespues = gallery.photos.map((p) => p.path);
+
+    /*
+     * LAS MINIATURAS RETIRADAS TAMBIEN SE BORRAN DEL ALMACEN.
+     *
+     * Y no solo al quitar un video: tambien al SUSTITUIR su miniatura por
+     * otra, que es lo que mas va a pasar. Sin esto, cada cambio de portada
+     * dejaria la anterior en el almacen para siempre, accesible con su
+     * direccion para quien la tuviera.
+     */
+    const minisAntes = anterior.videos.flatMap((v) => (v.poster === null ? [] : [v.poster]));
+    const minisDespues = gallery.videos.flatMap((v) => (v.poster === null ? [] : [v.poster]));
+
+    const retiradas = [
+      ...fotosAntes.filter((path) => !fotosDespues.includes(path)),
+      ...minisAntes.filter((path) => !minisDespues.includes(path)),
+    ];
+
     await this.prisma.db.$transaction(async (tx) => {
       await tx.businessSetting.upsert({
         where: { key: SETTINGS_KEY },
@@ -181,6 +222,16 @@ export class GalleryService {
           metadata: {
             added: despues.filter((id) => !antes.includes(id)),
             removed: antes.filter((id) => !despues.includes(id)),
+            /*
+             * Las rutas de las fotos son nombres que puso el servidor:
+             * treinta y dos hexadecimales. No dicen nada de nadie, y son lo
+             * unico con lo que se puede responder a «cuando se retiro la foto
+             * de esta casa».
+             */
+            photosAdded: fotosDespues.filter((path) => !fotosAntes.includes(path)),
+            photosRemoved: fotosAntes.filter((path) => !fotosDespues.includes(path)),
+            postersAdded: minisDespues.filter((path) => !minisAntes.includes(path)),
+            postersRemoved: minisAntes.filter((path) => !minisDespues.includes(path)),
           },
           ipAddress,
         },
@@ -189,6 +240,132 @@ export class GalleryService {
     });
 
     this.invalidate();
+
+    /*
+     * EL BORRADO VA DESPUES DE LA TRANSACCION, NO DENTRO.
+     *
+     * Dentro, un fallo posterior haria retroceder la fila y dejaria las fotos
+     * ya borradas del almacen: la galeria apuntaria a archivos que no
+     * existen. Fuera, el peor caso es un archivo huerfano, que no se ve en
+     * ninguna parte.
+     *
+     * Y no se espera a que termine bien: `remove` no falla nunca a proposito.
+     * Lo que importa de retirar una foto es que DEJE DE VERSE —el cliente
+     * revoco su permiso—, y eso ya pasó al guardar la fila. Un huerfano es
+     * un problema de limpieza; una foto que sigue publicada despues de pedir
+     * que la quiten es un problema legal.
+     */
+    await this.storage.remove(retiradas);
+
     return this.getForAdmin();
+  }
+
+  /* ---------------------------------------------------------------------- */
+  /*  Lo que ve el sitio publico                                            */
+  /* ---------------------------------------------------------------------- */
+
+  /**
+   * La galeria con DIRECCIONES en vez de rutas.
+   *
+   * La direccion la compone el servidor, que es el unico que sabe donde esta
+   * el almacen. La web no construye ninguna: usa la que recibe. Mandar la
+   * ruta y que la web le pegue delante un dominio suyo pondria ese dominio en
+   * dos sitios que tendrian que coincidir para siempre, y es exactamente el
+   * fallo de la sede, donde la web anunciaba una ciudad y el cotizador medía
+   * desde otra.
+   *
+   * UNA FOTO CUYA DIRECCION NO SE PUEDE COMPONER NO SALE. Pasa si no hay
+   * almacen configurado, y entonces es mejor una seccion sin esa foto que una
+   * portada con un icono de imagen rota.
+   */
+  async getPublic(): Promise<PublicGallery> {
+    const gallery = await this.get();
+
+    const photos = gallery.photos.flatMap((photo) => {
+      const url = this.storage.publicUrl(photo.path);
+      return url === null ? [] : [{ url, title: photo.title }];
+    });
+
+    /*
+     * UN VIDEO SIN MINIATURA SIGUE SALIENDO. No es como una foto, que sin
+     * direccion no es nada: el video se ve igual, solo que la tarjeta se
+     * pinta con los colores de la marca.
+     */
+    const videos = gallery.videos.map((video) => ({
+      videoId: video.videoId,
+      title: video.title,
+      posterUrl: video.poster === null ? null : this.storage.publicUrl(video.poster),
+    }));
+
+    if (videos.length === 0 && photos.length === 0) return DEFAULT_PUBLIC_GALLERY;
+
+    return { videos, photos };
+  }
+
+  /* ---------------------------------------------------------------------- */
+  /*  Subir una foto                                                        */
+  /* ---------------------------------------------------------------------- */
+
+  /**
+   * Guarda una imagen en el almacen y devuelve su ruta.
+   *
+   * ========================================================================
+   * TRES COSAS PASAN AQUI, Y LAS TRES SON EL MOTIVO DE QUE LA SUBIDA NO VAYA
+   * DIRECTA DEL NAVEGADOR AL ALMACEN
+   * ========================================================================
+   *
+   *   1. SE COMPRUEBA QUE LOS BYTES SON UNA IMAGEN, por los bytes y no por lo
+   *      que diga el cliente. Sin esto, llamar `.jpg` a un SVG colaria un
+   *      documento con JavaScript dentro en un bucket publico.
+   *
+   *   2. SE QUITAN LOS METADATOS. Una foto de movil lleva dentro las
+   *      COORDENADAS GPS de la casa. El permiso que firma el cliente dice que
+   *      no se mostrara su calle; publicar su direccion exacta escrita dentro
+   *      del archivo deja ese cuidado en nada.
+   *
+   *   3. EL NOMBRE LO PONE EL SERVIDOR. Si lo pusiera quien sube, se
+   *      acabarian subiendo archivos llamados «casa-de-los-martinez.jpg», que
+   *      es publicar el apellido del cliente en una direccion que cualquiera
+   *      puede leer.
+   *
+   * NO SE AUDITA LA SUBIDA, y es deliberado: subir no publica nada. Una foto
+   * en el almacen que no esta en la fila no se ve en ninguna parte. Lo que se
+   * audita es PUBLICARLA, al guardar la galeria, que es cuando pasa a verse.
+   */
+  async uploadImage(
+    bytes: Uint8Array,
+    kind: GalleryImageKind,
+  ): Promise<
+    | { ok: true; path: string; url: string }
+    | { ok: false; reason: 'tooBig' | 'notAnImage' | 'storage' }
+  > {
+    if (bytes.length === 0 || bytes.length > GALLERY_PHOTO_MAX_BYTES) {
+      return { ok: false, reason: 'tooBig' };
+    }
+
+    if (!this.storage.configured) return { ok: false, reason: 'storage' };
+
+    const limpia = stripImageMetadata(bytes);
+    if (!limpia.ok) return { ok: false, reason: 'notAnImage' };
+
+    const extension = limpia.format === 'jpeg' ? 'jpg' : limpia.format;
+    const contentType = `image/${limpia.format}` as const;
+
+    // Treinta y dos hexadecimales: nada del nombre original sobrevive.
+    const path = `${galleryImageFolder(kind)}/${randomUUID().replace(/-/g, '')}.${extension}`;
+
+    const subida = await this.storage.upload({ path, bytes: limpia.bytes, contentType });
+    if (!subida.ok) return { ok: false, reason: 'storage' };
+
+    /*
+     * Se devuelve tambien la direccion para que el panel pueda ensenar la
+     * vista previa al momento. Sin ella habria que recargar la pantalla
+     * entera para ver la foto que acabas de subir, y el orden y los titulos
+     * se eligen MIRANDO las fotos.
+     */
+    const url = this.storage.publicUrl(path);
+    if (url === null) return { ok: false, reason: 'storage' };
+
+    return { ok: true, path, url };
   }
 }

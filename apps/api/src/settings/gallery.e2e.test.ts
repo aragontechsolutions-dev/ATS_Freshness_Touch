@@ -3,13 +3,16 @@ import { join } from 'node:path';
 import { PGlite } from '@electric-sql/pglite';
 import { PGLiteSocketServer } from '@electric-sql/pglite-socket';
 import { Test } from '@nestjs/testing';
-import type { INestApplication } from '@nestjs/common';
+import type { NestExpressApplication } from '@nestjs/platform-express';
 import request from 'supertest';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { AdminGallerySchema, GallerySchema } from '@freshness/types';
+import { AdminGallerySchema, PublicGallerySchema } from '@freshness/types';
 import { AppModule } from '../app.module';
+import { applyBodyParsers } from '../common/body-parsers';
 import { AUTH_PROVIDER } from '../auth/auth.types';
 import type { LocalAuthProvider } from '../auth/providers/local-auth.provider';
+import { IMAGE_STORAGE } from '../storage/storage.types';
+import type { MemoryImageStorageProvider } from '../storage/providers/memory-image-storage.provider';
 import { GalleryService } from './gallery.service';
 
 vi.hoisted(() => {
@@ -44,6 +47,56 @@ const RUTA_ADMIN = '/api/v1/admin/gallery';
 const UNO = 'dQw4w9WgXcQ';
 const DOS = 'aBcDeFgHiJk';
 
+/** Una ruta de foto con el formato que pone el servidor. */
+const FOTO = 'photos/0123456789abcdef0123456789abcdef.jpg';
+
+/** Y una de miniatura, que vive en su propia carpeta. */
+const MINI = 'posters/fedcba9876543210fedcba9876543210.jpg';
+
+/** La marca que se busca despues: si sobrevive, el GPS tambien lo haria. */
+const GPS = [0x47, 0x50, 0x53, 0x5f, 0x41, 0x51, 0x55, 0x49]; // "GPS_AQUI"
+
+/**
+ * Un JPEG minimo con un EXIF dentro.
+ *
+ * Se construye byte a byte a proposito: un archivo binario de prueba no se
+ * puede leer en una revision, y nadie sabria si de verdad lleva un EXIF.
+ */
+function jpegConExif(): Buffer {
+  const exif = [0x45, 0x78, 0x69, 0x66, 0x00, 0x00, ...GPS];
+  return Buffer.from([
+    0xff,
+    0xd8, //                                 SOI
+    0xff,
+    0xe1,
+    0x00,
+    exif.length + 2,
+    ...exif, //  APP1 con el GPS
+    0xff,
+    0xc0,
+    0x00,
+    0x08,
+    0x08,
+    0x00,
+    0x10,
+    0x00,
+    0x10,
+    0x01, // SOF0
+    0xff,
+    0xda,
+    0x00,
+    0x08,
+    0x01,
+    0x01,
+    0x00,
+    0x11,
+    0x22,
+    0x33, // datos
+    0xff,
+    0xd9, //                                 EOI
+  ]);
+}
+
 const ADA = 'aaa94000-0000-4000-8000-000000000001';
 const DIEGO = 'ddd94000-0000-4000-8000-000000000002';
 const ADA_AUTH = 'auth-ada-galeria';
@@ -51,8 +104,9 @@ const DIEGO_AUTH = 'auth-diego-galeria';
 
 let db: PGlite;
 let socket: PGLiteSocketServer;
-let app: INestApplication;
+let app: NestExpressApplication;
 let provider: LocalAuthProvider;
+let almacen: MemoryImageStorageProvider;
 
 const comoAda = (): Promise<string> => provider.issue(ADA_AUTH, 'ada@example.com', 3600);
 const comoDiego = (): Promise<string> => provider.issue(DIEGO_AUTH, 'diego@example.com', 3600);
@@ -111,11 +165,19 @@ beforeAll(async () => {
   process.env.DATABASE_URL = `postgresql://postgres:postgres@127.0.0.1:${PUERTO}/postgres`;
 
   const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
-  app = moduleRef.createNestApplication();
+  app = moduleRef.createNestApplication<NestExpressApplication>({ rawBody: true });
   app.setGlobalPrefix('api/v1', { exclude: ['health', 'health/ready'] });
+  /*
+   * Los mismos lectores de cuerpo que en produccion. Sin esto, la ruta de
+   * subida no leeria los bytes de la imagen y la prueba comprobaria una
+   * aplicacion que no es la que corre de verdad — que es exactamente el
+   * motivo de que los lectores vivan en su propio archivo.
+   */
+  applyBodyParsers(app, 'api/v1');
   await app.init();
 
   provider = app.get<LocalAuthProvider>(AUTH_PROVIDER);
+  almacen = app.get<MemoryImageStorageProvider>(IMAGE_STORAGE);
 }, 120_000);
 
 afterAll(async () => {
@@ -126,6 +188,8 @@ afterAll(async () => {
 
 beforeEach(async () => {
   await db.exec(`DELETE FROM audit_logs; DELETE FROM business_settings;`);
+  // El almacen de desarrollo vive en memoria y sobrevive entre pruebas.
+  await almacen.remove(almacen.rutas);
   app.get(GalleryService).invalidate();
 });
 
@@ -136,11 +200,11 @@ describe('la galeria publica', () => {
     const respuesta = await leer();
 
     expect(respuesta.status).toBe(200);
-    expect(GallerySchema.safeParse(respuesta.body).success).toBe(true);
+    expect(PublicGallerySchema.safeParse(respuesta.body).success).toBe(true);
   });
 
   it('sin nada configurado viene vacia, y entonces la seccion no se pinta', async () => {
-    expect((await leer()).body).toEqual({ videos: [] });
+    expect((await leer()).body).toEqual({ videos: [], photos: [] });
   });
 
   it('devuelve los videos guardados, en el orden en que estan', async () => {
@@ -175,7 +239,7 @@ describe('cuando la fila esta mal', () => {
 
     const respuesta = await leer();
     expect(respuesta.status).toBe(200);
-    expect(respuesta.body).toEqual({ videos: [] });
+    expect(respuesta.body).toEqual({ videos: [], photos: [] });
   });
 
   it('con un identificador que no es de YouTube, se ignora la fila entera', async () => {
@@ -184,13 +248,36 @@ describe('cuando la fila esta mal', () => {
     // sabria que le falta uno.
     await guardarFilaCruda({ videos: [{ videoId: 'https://evil.example/x', title: null }] });
 
-    expect((await leer()).body).toEqual({ videos: [] });
+    expect((await leer()).body).toEqual({ videos: [], photos: [] });
+  });
+
+  /*
+   * LA RUTA DE UNA FOTO LA PONE EL SERVIDOR, y el contrato lo exige. Si en la
+   * fila hubiera una direccion completa, la portada cargaria una imagen —o un
+   * rastreador de un solo pixel— desde cualquier sitio de internet.
+   */
+  it('con una direccion completa en vez de una ruta de foto, tambien', async () => {
+    await guardarFilaCruda({
+      videos: [],
+      photos: [{ path: 'https://evil.example/pixel.gif', title: { en: null, es: null } }],
+    });
+
+    expect((await leer()).body).toEqual({ videos: [], photos: [] });
+  });
+
+  it('con un salto de ruta en el nombre de la foto, tambien', async () => {
+    await guardarFilaCruda({
+      videos: [],
+      photos: [{ path: 'photos/../../secreto.jpg', title: { en: null, es: null } }],
+    });
+
+    expect((await leer()).body).toEqual({ videos: [], photos: [] });
   });
 
   it('con una clave que el contrato no conoce, tambien', async () => {
-    await guardarFilaCruda({ videos: [], fotos: ['cocina.jpg'] });
+    await guardarFilaCruda({ videos: [], retratos: ['cocina.jpg'] });
 
-    expect((await leer()).body).toEqual({ videos: [] });
+    expect((await leer()).body).toEqual({ videos: [], photos: [] });
   });
 
   /*
@@ -206,7 +293,21 @@ describe('cuando la fila esta mal', () => {
 
     const respuesta = await leer();
     expect(respuesta.status).toBe(200);
-    expect(respuesta.body).toEqual({ videos: [] });
+    expect(respuesta.body).toEqual({ videos: [], photos: [] });
+  });
+
+  /*
+   * EL CASO QUE DE VERDAD VA A PASAR: la fila se guardo con la version
+   * anterior, cuando la galeria solo tenia videos. Si el contrato la
+   * rechazara por no traer `photos`, los videos ya publicados desaparecerian
+   * de la portada en el despliegue y nadie lo relacionaria con el cambio.
+   */
+  it('una fila de la version anterior, con videos y sin fotos, sigue valiendo', async () => {
+    await guardarFilaCruda({ videos: [{ videoId: UNO, title: { en: null, es: null } }] });
+
+    const respuesta = await leer();
+    expect(respuesta.body.videos).toHaveLength(1);
+    expect(respuesta.body.photos).toEqual([]);
   });
 });
 
@@ -218,7 +319,7 @@ describe('quien puede ver y cambiar la galeria', () => {
 
     expect(respuesta.status).toBe(200);
     expect(AdminGallerySchema.safeParse(respuesta.body).success).toBe(true);
-    expect(respuesta.body.gallery).toEqual({ videos: [] });
+    expect(respuesta.body.gallery).toEqual({ videos: [], photos: [] });
     expect(respuesta.body.updatedAt).toBeNull();
   });
 
@@ -290,7 +391,7 @@ describe('publicar y retirar', () => {
     await guardar({ videos: [{ videoId: UNO, title: { en: null, es: null } }] });
     await guardar({ videos: [] });
 
-    expect((await leer()).body).toEqual({ videos: [] });
+    expect((await leer()).body).toEqual({ videos: [], photos: [] });
   });
 
   it('rechaza un identificador que no es de YouTube, con 400 y sin guardar nada', async () => {
@@ -301,7 +402,7 @@ describe('publicar y retirar', () => {
     });
 
     expect(respuesta.status).toBe(400);
-    expect((await leer()).body).toEqual({ videos: [] });
+    expect((await leer()).body).toEqual({ videos: [], photos: [] });
   });
 
   it('rechaza el mismo video dos veces', async () => {
@@ -333,7 +434,14 @@ describe('el rastro', () => {
     expect(filas.rows.map((f) => f.action)).toEqual(['gallery.updated', 'gallery.updated']);
     expect(filas.rows[1]?.actorId).toBe(ADA);
     // La diferencia, que es lo que responde a «cuando se retiro este video».
-    expect(filas.rows[1]?.metadata).toEqual({ added: [DOS], removed: [UNO] });
+    expect(filas.rows[1]?.metadata).toEqual({
+      added: [DOS],
+      removed: [UNO],
+      photosAdded: [],
+      photosRemoved: [],
+      postersAdded: [],
+      postersRemoved: [],
+    });
   });
 
   it('un rechazo no deja rastro, porque no cambio nada', async () => {
@@ -354,6 +462,342 @@ describe('el rastro', () => {
     await guardar({ videos: [{ videoId: UNO, title: { en: 'Kitchen', es: 'Cocina' } }] });
 
     const filas = await db.query<{ metadata: unknown }>(`SELECT metadata FROM audit_logs`);
-    expect(Object.keys(filas.rows[0]?.metadata as object).sort()).toEqual(['added', 'removed']);
+    expect(Object.keys(filas.rows[0]?.metadata as object).sort()).toEqual([
+      'added',
+      'photosAdded',
+      'photosRemoved',
+      'postersAdded',
+      'postersRemoved',
+      'removed',
+    ]);
+  });
+});
+
+/* ======================================================================== */
+
+describe('subir una imagen', () => {
+  const RUTA_IMAGENES = `${RUTA_ADMIN}/images`;
+
+  async function subir(bytes: Buffer, tipo: string, token?: string, kind = 'photo') {
+    return request(app.getHttpServer())
+      .post(`${RUTA_IMAGENES}?kind=${kind}`)
+      .set('authorization', `Bearer ${token ?? (await comoAda())}`)
+      .set('content-type', tipo)
+      .send(bytes);
+  }
+
+  it('devuelve una ruta con el nombre que pone el servidor', async () => {
+    const respuesta = await subir(jpegConExif(), 'image/jpeg');
+
+    expect(respuesta.status).toBe(201);
+    // Treinta y dos hexadecimales: nada del nombre original sobrevive.
+    expect(respuesta.body.path).toMatch(/^photos\/[0-9a-f]{32}\.jpg$/);
+  });
+
+  /*
+   * CADA COSA EN SU CARPETA. Si vivieran juntas, retirar una foto de la
+   * galeria podria llevarse por delante la portada de un video —y al
+   * contrario—, y nadie entenderia por que al quitar una foto un video se
+   * quedo en gris.
+   */
+  it('una miniatura va a su propia carpeta', async () => {
+    const respuesta = await subir(jpegConExif(), 'image/jpeg', undefined, 'poster');
+
+    expect(respuesta.status).toBe(201);
+    expect(respuesta.body.path).toMatch(/^posters\/[0-9a-f]{32}\.jpg$/);
+  });
+
+  it('sin decir que carpeta, no se sube', async () => {
+    // Adivinarlo seria decidir por quien llama donde acaba su archivo.
+    const respuesta = await request(app.getHttpServer())
+      .post(RUTA_IMAGENES)
+      .set('authorization', `Bearer ${await comoAda()}`)
+      .set('content-type', 'image/jpeg')
+      .send(jpegConExif());
+
+    expect(respuesta.status).toBe(415);
+    expect(almacen.rutas).toHaveLength(0);
+  });
+
+  it('con una carpeta inventada, tampoco', async () => {
+    const respuesta = await subir(jpegConExif(), 'image/jpeg', undefined, 'privado');
+
+    expect(respuesta.status).toBe(415);
+    expect(almacen.rutas).toHaveLength(0);
+  });
+
+  /*
+   * ESTA ES LA PRUEBA QUE IMPORTA DE TODA LA ETAPA.
+   *
+   * Una foto de movil lleva dentro las coordenadas GPS de la casa. El permiso
+   * que firma el cliente dice que no se mostrara su calle, y el encuadre se
+   * cuida para que no salga la placa. Publicar el archivo con su direccion
+   * exacta escrita dentro deja todo ese cuidado en nada.
+   */
+  it('lo que llega al almacen ya no lleva el GPS', async () => {
+    const original = jpegConExif();
+    expect([...original].join(',')).toContain(GPS.join(','));
+
+    const respuesta = await subir(original, 'image/jpeg');
+    const guardada = almacen.contenido(respuesta.body.path);
+
+    expect(guardada).toBeDefined();
+    expect([...(guardada ?? [])].join(',')).not.toContain(GPS.join(','));
+  });
+
+  it('subir no publica nada: la galeria sigue vacia', async () => {
+    // Deja elegir el titulo y el orden antes de que la casa de nadie salga en
+    // la portada.
+    await subir(jpegConExif(), 'image/jpeg');
+
+    expect((await leer()).body).toEqual({ videos: [], photos: [] });
+  });
+
+  it('coordinacion no puede subir', async () => {
+    expect((await subir(jpegConExif(), 'image/jpeg', await comoDiego())).status).toBe(403);
+  });
+
+  it('sin sesion no se llega', async () => {
+    const respuesta = await request(app.getHttpServer())
+      .post(`${RUTA_IMAGENES}?kind=photo`)
+      .set('content-type', 'image/jpeg')
+      .send(jpegConExif());
+
+    expect(respuesta.status).toBe(401);
+  });
+
+  /*
+   * UN SVG ES UN DOCUMENTO QUE PUEDE LLEVAR JAVASCRIPT DENTRO. Servido desde
+   * un bucket publico seria un hueco de seguridad real, asi que no basta con
+   * no listarlo: hay que comprobar los BYTES, porque el tipo que declara
+   * quien sube no se puede creer.
+   */
+  it('un SVG disfrazado de JPEG no pasa', async () => {
+    const svg = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"><script/></svg>');
+    const respuesta = await subir(svg, 'image/jpeg');
+
+    expect(respuesta.status).toBe(415);
+    expect(almacen.rutas).toHaveLength(0);
+  });
+
+  it('un tipo que no es imagen no pasa', async () => {
+    const respuesta = await subir(Buffer.from('%PDF-1.7'), 'application/pdf');
+
+    expect(respuesta.status).toBe(415);
+    expect(almacen.rutas).toHaveLength(0);
+  });
+
+  it('un cuerpo vacio no pasa', async () => {
+    const respuesta = await subir(Buffer.alloc(0), 'image/jpeg');
+
+    expect(respuesta.status).toBe(415);
+  });
+});
+
+describe('publicar y retirar una foto', () => {
+  it('la galeria publica trae la direccion, no la ruta', async () => {
+    // La compone el servidor, que es el unico que sabe donde esta el almacen.
+    // La web no construye ninguna direccion: usa la que recibe.
+    await guardar({ videos: [], photos: [{ path: FOTO, title: { en: 'Kitchen', es: 'Cocina' } }] });
+
+    const publica = await leer();
+    expect(publica.body.photos).toHaveLength(1);
+    expect(publica.body.photos[0].url).toContain(FOTO);
+    expect(publica.body.photos[0].path).toBeUndefined();
+    expect(publica.body.photos[0].title).toEqual({ en: 'Kitchen', es: 'Cocina' });
+  });
+
+  /*
+   * RETIRAR UNA FOTO LA BORRA DEL ALMACEN DE VERDAD.
+   *
+   * Quitarla solo de la fila dejaria el archivo accesible con su direccion
+   * para quien la tuviera. El permiso promete retirar el material, no
+   * esconder el enlace.
+   */
+  it('retirarla la borra del almacen, no solo de la fila', async () => {
+    const subida = await request(app.getHttpServer())
+      .post(`${RUTA_ADMIN}/images?kind=photo`)
+      .set('authorization', `Bearer ${await comoAda()}`)
+      .set('content-type', 'image/jpeg')
+      .send(jpegConExif());
+
+    const path: string = subida.body.path;
+    await guardar({ videos: [], photos: [{ path, title: { en: null, es: null } }] });
+    expect(almacen.rutas).toContain(path);
+
+    await guardar({ videos: [], photos: [] });
+
+    expect(almacen.rutas).not.toContain(path);
+    expect((await leer()).body.photos).toEqual([]);
+  });
+
+  it('queda registrado que foto entro y cual salio', async () => {
+    await guardar({ videos: [], photos: [{ path: FOTO, title: { en: null, es: null } }] });
+    await guardar({ videos: [], photos: [] });
+
+    const filas = await db.query<{ metadata: { photosAdded: string[]; photosRemoved: string[] } }>(
+      `SELECT metadata FROM audit_logs ORDER BY "createdAt"`,
+    );
+
+    expect(filas.rows[0]?.metadata.photosAdded).toEqual([FOTO]);
+    expect(filas.rows[1]?.metadata.photosRemoved).toEqual([FOTO]);
+  });
+
+  it('rechaza una ruta que no puso el servidor, con 400 y sin guardar nada', async () => {
+    const respuesta = await guardar({
+      videos: [],
+      photos: [{ path: 'photos/casa-de-los-martinez.jpg', title: { en: null, es: null } }],
+    });
+
+    expect(respuesta.status).toBe(400);
+    expect((await leer()).body.photos).toEqual([]);
+  });
+
+  it('rechaza la misma foto dos veces', async () => {
+    const respuesta = await guardar({
+      videos: [],
+      photos: [
+        { path: FOTO, title: { en: null, es: null } },
+        { path: FOTO, title: { en: null, es: null } },
+      ],
+    });
+
+    expect(respuesta.status).toBe(400);
+  });
+});
+
+/* ======================================================================== */
+
+describe('la miniatura de un video', () => {
+  it('la galeria publica trae su direccion, no su ruta', async () => {
+    await guardar({
+      videos: [{ videoId: UNO, title: { en: null, es: null }, poster: MINI }],
+      photos: [],
+    });
+
+    const publica = await leer();
+    expect(publica.body.videos[0].posterUrl).toContain(MINI);
+    expect(publica.body.videos[0].poster).toBeUndefined();
+  });
+
+  it('un video sin miniatura sigue saliendo, con la direccion a null', async () => {
+    /*
+     * No es como una foto, que sin direccion no es nada: el video se ve
+     * igual, solo que la tarjeta se pinta con los colores de la marca.
+     */
+    await guardar({ videos: [{ videoId: UNO, title: { en: null, es: null } }], photos: [] });
+
+    const publica = await leer();
+    expect(publica.body.videos).toHaveLength(1);
+    expect(publica.body.videos[0].posterUrl).toBeNull();
+  });
+
+  it('rechaza una ruta de foto como miniatura, y al contrario', async () => {
+    // Son dos carpetas distintas a proposito; mezclarlas haria que retirar
+    // una foto se llevara por delante la portada de un video.
+    const comoMini = await guardar({
+      videos: [{ videoId: UNO, title: { en: null, es: null }, poster: FOTO }],
+      photos: [],
+    });
+    expect(comoMini.status).toBe(400);
+
+    const comoFoto = await guardar({
+      videos: [],
+      photos: [{ path: MINI, title: { en: null, es: null } }],
+    });
+    expect(comoFoto.status).toBe(400);
+  });
+
+  it('rechaza una ruta que no puso el servidor', async () => {
+    const respuesta = await guardar({
+      videos: [
+        { videoId: UNO, title: { en: null, es: null }, poster: 'posters/portada-bonita.jpg' },
+      ],
+      photos: [],
+    });
+
+    expect(respuesta.status).toBe(400);
+  });
+
+  /*
+   * SUSTITUIR UNA MINIATURA BORRA LA ANTERIOR DEL ALMACEN.
+   *
+   * Es lo que mas va a pasar con las portadas. Sin esto, cada cambio dejaria
+   * la anterior ahi para siempre, accesible con su direccion para quien la
+   * tuviera.
+   */
+  it('sustituirla borra la anterior del almacen', async () => {
+    const primera = await request(app.getHttpServer())
+      .post(`${RUTA_ADMIN}/images?kind=poster`)
+      .set('authorization', `Bearer ${await comoAda()}`)
+      .set('content-type', 'image/jpeg')
+      .send(jpegConExif());
+
+    const segunda = await request(app.getHttpServer())
+      .post(`${RUTA_ADMIN}/images?kind=poster`)
+      .set('authorization', `Bearer ${await comoAda()}`)
+      .set('content-type', 'image/jpeg')
+      .send(jpegConExif());
+
+    const vieja: string = primera.body.path;
+    const nueva: string = segunda.body.path;
+
+    await guardar({
+      videos: [{ videoId: UNO, title: { en: null, es: null }, poster: vieja }],
+      photos: [],
+    });
+    await guardar({
+      videos: [{ videoId: UNO, title: { en: null, es: null }, poster: nueva }],
+      photos: [],
+    });
+
+    expect(almacen.rutas).not.toContain(vieja);
+    expect(almacen.rutas).toContain(nueva);
+  });
+
+  it('quitar el video entero tambien borra su miniatura', async () => {
+    const subida = await request(app.getHttpServer())
+      .post(`${RUTA_ADMIN}/images?kind=poster`)
+      .set('authorization', `Bearer ${await comoAda()}`)
+      .set('content-type', 'image/jpeg')
+      .send(jpegConExif());
+
+    const path: string = subida.body.path;
+
+    await guardar({
+      videos: [{ videoId: UNO, title: { en: null, es: null }, poster: path }],
+      photos: [],
+    });
+    await guardar({ videos: [], photos: [] });
+
+    expect(almacen.rutas).not.toContain(path);
+  });
+
+  it('queda registrado que miniatura entro y cual salio', async () => {
+    await guardar({
+      videos: [{ videoId: UNO, title: { en: null, es: null }, poster: MINI }],
+      photos: [],
+    });
+    await guardar({ videos: [{ videoId: UNO, title: { en: null, es: null } }], photos: [] });
+
+    const filas = await db.query<{
+      metadata: { postersAdded: string[]; postersRemoved: string[] };
+    }>(`SELECT metadata FROM audit_logs ORDER BY "createdAt"`);
+
+    expect(filas.rows[0]?.metadata.postersAdded).toEqual([MINI]);
+    expect(filas.rows[1]?.metadata.postersRemoved).toEqual([MINI]);
+  });
+
+  it('una fila de la version anterior, sin el campo, se sigue leyendo', async () => {
+    /*
+     * El caso que de verdad va a pasar en el despliegue: los videos ya
+     * publicados no traen `poster`. Si el contrato los rechazara, la galeria
+     * apareceria vacia y nadie lo relacionaria con el cambio.
+     */
+    await guardarFilaCruda({ videos: [{ videoId: UNO, title: { en: null, es: null } }] });
+
+    const publica = await leer();
+    expect(publica.body.videos).toHaveLength(1);
+    expect(publica.body.videos[0].posterUrl).toBeNull();
   });
 });
