@@ -185,6 +185,88 @@ Se usa la conexión **directa** (puerto 5432) y no la agrupada (6543) porque el
 agrupador en modo transacción no admite las sentencias preparadas que necesita
 Prisma Migrate.
 
+## Cuando una migración queda marcada como fallida (P3009)
+
+```
+Error: P3009
+migrate found failed migrations in the target database
+The `20261017180000_...` migration started at ... failed
+```
+
+**Qué significa.** Prisma guarda en la tabla `_prisma_migrations` una fila por
+migración. Si una se intenta y da error, la fila queda con `finished_at` nulo y
+un `logs` con el fallo. A partir de ahí `prisma migrate deploy` **se niega a
+seguir**: no sabe cuánto de aquella migración entró, así que no quiere aplicar
+las siguientes encima de una base en estado desconocido.
+
+Esto detiene también los despliegues de Render, porque el comando
+pre-despliegue es el mismo `db:deploy`.
+
+**La causa habitual aquí.** Ejecutar el SQL de una migración a mano en el editor
+SQL de Supabase. El cambio entra, pero `_prisma_migrations` no se entera de
+nada; cuando después se lanza `db:deploy`, Prisma intenta el mismo SQL y
+Postgres contesta que la columna o la tabla ya existe (`42701`,
+`column ... already exists`). La migración queda como fallida aunque el cambio
+que pedía **sí está** en la base.
+
+> **Por eso el SQL de una migración no se ejecuta nunca a mano.** Se aplica solo
+> con `pnpm db:deploy`, que es lo único que deja constancia.
+
+**Cómo se arregla.** Nunca se edita el archivo de la migración: Prisma guarda su
+_checksum_ en `_prisma_migrations` y cambiar el archivo provoca un error nuevo
+(migración modificada). Lo que se corrige es la fila.
+
+1. **Averiguar si el cambio está o no está.** En el editor SQL de Supabase, con
+   el nombre de la tabla y la columna de esa migración:
+
+   ```sql
+   select column_name
+   from information_schema.columns
+   where table_name = 'payments'
+     and column_name = 'providerPaymentMethodId';
+   ```
+
+   Y ver el estado de la fila:
+
+   ```sql
+   select migration_name, started_at, finished_at, rolled_back_at
+   from _prisma_migrations
+   order by started_at desc
+   limit 10;
+   ```
+
+2. **Si el cambio SÍ está** (la consulta devuelve la columna), la migración está
+   hecha de facto: se marca como aplicada y se continúa.
+
+   ```powershell
+   cd apps\api
+   $env:DIRECT_URL = "postgresql://USUARIO:CONTRASENA@HOST:5432/postgres"
+   pnpm exec prisma migrate resolve --applied 20261017180000_tarjeta_para_el_saldo
+   pnpm db:status
+   pnpm db:deploy
+   ```
+
+3. **Si el cambio NO está**, se marca como revertida para que `deploy` vuelva a
+   intentarla:
+
+   ```powershell
+   pnpm exec prisma migrate resolve --rolled-back 20261017180000_tarjeta_para_el_saldo
+   pnpm db:deploy
+   ```
+
+   Esto es seguro **solo** cuando la migración se puede repetir entera sin dejar
+   restos. Si hizo varias cosas y entraron unas y no otras, hay que dejar la
+   base en el estado de antes a mano y entonces marcarla revertida.
+
+4. `pnpm db:status` antes y después. Si hay **más de una** fila fallida, se
+   resuelve una a una, de la más antigua a la más reciente, en el mismo orden en
+   que aparecen en `prisma/migrations`.
+
+`resolve` **no toca la base de datos**: solo corrige el registro de
+migraciones. Decirle `--applied` a una migración cuyo cambio no entró deja la
+base desalineada con el esquema, y eso no lo avisa nadie hasta que algo falla en
+producción. De ahí el paso 1.
+
 ## La base de datos es opcional
 
 `PrismaService` no hereda de `PrismaClient`: lo envuelve. Así la instancia

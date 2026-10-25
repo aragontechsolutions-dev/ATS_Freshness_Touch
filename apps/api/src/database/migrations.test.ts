@@ -66,6 +66,7 @@ describe('migraciones', () => {
       'bookings',
       'business_settings',
       'customers',
+      'media_consents',
       'notifications',
       'payments',
       'pricing_tables',

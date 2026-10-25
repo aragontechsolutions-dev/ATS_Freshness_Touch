@@ -14,6 +14,7 @@ import {
 } from '@freshness/types';
 import { AuditService } from '../audit/audit.service';
 import { PrismaService } from '../database/prisma.service';
+import { MediaConsentsService } from './media-consents.service';
 import { stripImageMetadata } from '../storage/strip-image-metadata';
 import { IMAGE_STORAGE, type ImageStorage } from '../storage/storage.types';
 
@@ -53,6 +54,7 @@ export class GalleryService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     @Inject(IMAGE_STORAGE) private readonly storage: ImageStorage,
+    private readonly consentimientos: MediaConsentsService,
   ) {}
 
   /** La galeria vigente. */
@@ -127,8 +129,24 @@ export class GalleryService {
       ...gallery.videos.flatMap((video) => (video.poster === null ? [] : [video.poster])),
     ];
 
+    /*
+     * QUE HAY GUARDADO PERO NO SE PUBLICA, para que la pantalla pueda
+     * decirlo. Sin esto el modo estricto seria una trampa: se sube una foto,
+     * se guarda, se ve aqui y no aparece en la web, y no hay forma de saber
+     * por que.
+     */
+    const publicables = await this.consentimientos.piezasPublicables();
+
     return {
       gallery,
+      uncovered: {
+        videoIds: gallery.videos
+          .map((video) => video.videoId)
+          .filter((id) => !publicables.videoIds.has(id)),
+        photoPaths: gallery.photos
+          .map((photo) => photo.path)
+          .filter((path) => !publicables.photoPaths.has(path)),
+      },
       imageUrls: Object.fromEntries(
         rutas.flatMap((ruta) => {
           const url = this.storage.publicUrl(ruta);
@@ -281,21 +299,46 @@ export class GalleryService {
   async getPublic(): Promise<PublicGallery> {
     const gallery = await this.get();
 
-    const photos = gallery.photos.flatMap((photo) => {
-      const url = this.storage.publicUrl(photo.path);
-      return url === null ? [] : [{ url, title: photo.title }];
-    });
+    /*
+     * SIN PAPEL NO SE PUBLICA, Y ESO SE COMPRUEBA AQUI.
+     *
+     * Es una lista BLANCA, no negra: solo sale lo que tiene un permiso
+     * firmado y en pie. Con una lista negra —quitar lo revocado— una foto
+     * que nadie anoto se publicaria igual, y publicar la casa de alguien sin
+     * su permiso es el escenario que todo este modulo existe para evitar.
+     *
+     * Se comprueba AL LEER y no al guardar. Comprobandolo al guardar,
+     * revocar un permiso dependeria de que alguien se acordara despues de
+     * editar la galeria; asi, retirar es un boton y surte efecto en la
+     * siguiente visita.
+     *
+     * SI ESTO FALLA, NO SE PUBLICA NADA. Es lo contrario de la regla general
+     * del sitio —que nunca deja de pintarse— y es deliberado: servir una
+     * foto sin permiso es un problema legal; una seccion vacia un minuto,
+     * no. Y cuando la base no responde la galeria ya sale vacia de todas
+     * formas, asi que no cambia nada mas.
+     */
+    const publicables = await this.consentimientos.piezasPublicables();
+
+    const photos = gallery.photos
+      .filter((photo) => publicables.photoPaths.has(photo.path))
+      .flatMap((photo) => {
+        const url = this.storage.publicUrl(photo.path);
+        return url === null ? [] : [{ url, title: photo.title }];
+      });
 
     /*
      * UN VIDEO SIN MINIATURA SIGUE SALIENDO. No es como una foto, que sin
      * direccion no es nada: el video se ve igual, solo que la tarjeta se
      * pinta con los colores de la marca.
      */
-    const videos = gallery.videos.map((video) => ({
-      videoId: video.videoId,
-      title: video.title,
-      posterUrl: video.poster === null ? null : this.storage.publicUrl(video.poster),
-    }));
+    const videos = gallery.videos
+      .filter((video) => publicables.videoIds.has(video.videoId))
+      .map((video) => ({
+        videoId: video.videoId,
+        title: video.title,
+        posterUrl: video.poster === null ? null : this.storage.publicUrl(video.poster),
+      }));
 
     if (videos.length === 0 && photos.length === 0) return DEFAULT_PUBLIC_GALLERY;
 

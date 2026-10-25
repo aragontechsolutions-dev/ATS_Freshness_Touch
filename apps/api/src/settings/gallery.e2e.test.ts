@@ -14,6 +14,7 @@ import type { LocalAuthProvider } from '../auth/providers/local-auth.provider';
 import { IMAGE_STORAGE } from '../storage/storage.types';
 import type { MemoryImageStorageProvider } from '../storage/providers/memory-image-storage.provider';
 import { GalleryService } from './gallery.service';
+import { MediaConsentsService } from './media-consents.service';
 
 vi.hoisted(() => {
   process.env.NODE_ENV = 'test';
@@ -144,6 +145,35 @@ function leer() {
   return request(app.getHttpServer()).get(RUTA);
 }
 
+/**
+ * Anota un permiso firmado que ampara las piezas que se le pasen.
+ *
+ * HACE FALTA EN CASI TODAS LAS PRUEBAS porque la galeria publica funciona en
+ * MODO ESTRICTO: sin un permiso en pie, una pieza no se publica. Lo que se
+ * prueba en este archivo es la galeria, no el registro de permisos, asi que
+ * el papel se mete por SQL y se da por hecho — su propio comportamiento se
+ * prueba en `media-consents.e2e.test.ts`.
+ */
+async function amparar(
+  piezas: { videoIds?: string[]; photoPaths?: string[] },
+  revocado = false,
+): Promise<void> {
+  const videos = piezas.videoIds ?? [];
+  const fotos = piezas.photoPaths ?? [];
+
+  await db.query(
+    `INSERT INTO media_consents
+       (reference, "customerName", "propertyAddress", "serviceDate", "signedAt",
+        "coversInterior", "coversExterior", "allowsBefore", channels, "removalDays",
+        "videoIds", "photoPaths", "revokedAt", "updatedAt")
+     VALUES ('FT-PRUEBA', 'Cliente', 'Una calle', DATE '2026-10-20', DATE '2026-10-18',
+             true, false, true, ARRAY['WEBSITE'], 5, $1::text[], $2::text[], $3, now())`,
+    [videos, fotos, revocado ? new Date() : null],
+  );
+
+  app.get(MediaConsentsService).invalidate();
+}
+
 beforeAll(async () => {
   db = await PGlite.create();
   socket = new PGLiteSocketServer({ db, port: PUERTO, host: '127.0.0.1', maxConnections: 10 });
@@ -187,10 +217,19 @@ afterAll(async () => {
 });
 
 beforeEach(async () => {
-  await db.exec(`DELETE FROM audit_logs; DELETE FROM business_settings;`);
+  await db.exec(
+    `DELETE FROM audit_logs; DELETE FROM media_consents; DELETE FROM business_settings;`,
+  );
   // El almacen de desarrollo vive en memoria y sobrevive entre pruebas.
   await almacen.remove(almacen.rutas);
   app.get(GalleryService).invalidate();
+  app.get(MediaConsentsService).invalidate();
+
+  /*
+   * Un permiso que ampara todo lo que usan estas pruebas. Sin el, la galeria
+   * publica no serviria nada: sin papel no se publica.
+   */
+  await amparar({ videoIds: [UNO, DOS], photoPaths: [FOTO] });
 });
 
 /* ======================================================================== */
@@ -799,5 +838,89 @@ describe('la miniatura de un video', () => {
     const publica = await leer();
     expect(publica.body.videos).toHaveLength(1);
     expect(publica.body.videos[0].posterUrl).toBeNull();
+  });
+});
+
+/* ======================================================================== */
+
+describe('sin papel no se publica', () => {
+  /*
+   * ========================================================================
+   * MODO ESTRICTO: LISTA BLANCA, NO LISTA NEGRA
+   * ========================================================================
+   * Solo sale lo que tiene un permiso firmado y en pie. Con una lista negra
+   * —quitar lo revocado— una foto que nadie anoto se publicaria igual, y
+   * publicar la casa de alguien sin su permiso es el escenario que todo este
+   * modulo existe para evitar.
+   *
+   * Olvidar anotar un papel tiene ahora una consecuencia VISIBLE —la foto no
+   * sale— en vez de una invisible —la foto sale sin permiso—. De las dos,
+   * esta es la que se arregla, porque se nota.
+   */
+  it('una foto sin permiso anotado no sale, aunque este guardada', async () => {
+    await db.exec(`DELETE FROM media_consents;`);
+    app.get(MediaConsentsService).invalidate();
+
+    await guardar({
+      videos: [],
+      photos: [{ path: FOTO, title: { en: null, es: null } }],
+    });
+
+    expect((await leer()).body.photos).toEqual([]);
+  });
+
+  it('un video sin permiso anotado tampoco', async () => {
+    await db.exec(`DELETE FROM media_consents;`);
+    app.get(MediaConsentsService).invalidate();
+
+    await guardar({ videos: [{ videoId: UNO, title: { en: null, es: null } }], photos: [] });
+
+    expect((await leer()).body.videos).toEqual([]);
+  });
+
+  it('pero el panel SI la ve, y dice que no se esta publicando', async () => {
+    /*
+     * Sin esto el modo estricto seria una trampa: se sube una foto, se
+     * guarda, se ve en el panel y no aparece en la web, y no hay forma de
+     * saber por que.
+     */
+    await db.exec(`DELETE FROM media_consents;`);
+    app.get(MediaConsentsService).invalidate();
+
+    await guardar({
+      videos: [{ videoId: UNO, title: { en: null, es: null } }],
+      photos: [{ path: FOTO, title: { en: null, es: null } }],
+    });
+
+    const panel = await leerComoAdmin();
+    expect(panel.body.gallery.photos).toHaveLength(1);
+    expect(panel.body.uncovered.photoPaths).toEqual([FOTO]);
+    expect(panel.body.uncovered.videoIds).toEqual([UNO]);
+  });
+
+  it('con el permiso anotado, el panel ya no avisa de nada', async () => {
+    await guardar({
+      videos: [{ videoId: UNO, title: { en: null, es: null } }],
+      photos: [{ path: FOTO, title: { en: null, es: null } }],
+    });
+
+    const panel = await leerComoAdmin();
+    expect(panel.body.uncovered).toEqual({ videoIds: [], photoPaths: [] });
+  });
+
+  /*
+   * UNA PIEZA CON UN PERMISO REVOCADO NO SE PUBLICA AUNQUE OTRO LA AMPARE.
+   * No deberia pasar —una pieza es de una casa— pero si pasara, lo que manda
+   * es la voluntad de quien dijo que no.
+   */
+  it('un permiso revocado gana a otro que si ampare la misma pieza', async () => {
+    await amparar({ photoPaths: [FOTO] }, true);
+
+    await guardar({
+      videos: [],
+      photos: [{ path: FOTO, title: { en: null, es: null } }],
+    });
+
+    expect((await leer()).body.photos).toEqual([]);
   });
 });

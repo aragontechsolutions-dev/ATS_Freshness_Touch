@@ -94,6 +94,16 @@ export function GalleryForm({ locale, onSessionLost }: GalleryFormProps) {
   const [subiendo, setSubiendo] = useState(false);
   /** Que video esta subiendo su miniatura ahora mismo, si alguno. */
   const [subiendoMini, setSubiendoMini] = useState<number | null>(null);
+  /**
+   * Lo que esta guardado pero NO se esta publicando por no tener permiso.
+   *
+   * Sin esto el modo estricto seria una trampa: se sube una foto, se guarda,
+   * se ve aqui y no aparece en la web, y no hay forma de saber por que.
+   */
+  const [sinPermiso, setSinPermiso] = useState<{ videoIds: string[]; photoPaths: string[] }>({
+    videoIds: [],
+    photoPaths: [],
+  });
   const [guardado, setGuardado] = useState<Gallery | null>(null);
   const [meta, setMeta] = useState<{ updatedAt: string | null; updatedBy: string | null } | null>(
     null,
@@ -108,6 +118,7 @@ export function GalleryForm({ locale, onSessionLost }: GalleryFormProps) {
     try {
       const datos = await fetchGallery();
       setFilas(aFilas(datos));
+      setSinPermiso(datos.uncovered);
       setFotos(aFilasFoto(datos));
       setGuardado(datos.gallery);
       setMeta({ updatedAt: datos.updatedAt, updatedBy: datos.updatedBy });
@@ -149,6 +160,7 @@ export function GalleryForm({ locale, onSessionLost }: GalleryFormProps) {
     try {
       const datos = await saveGallery(validado.data);
       setFilas(aFilas(datos));
+      setSinPermiso(datos.uncovered);
       setFotos(aFilasFoto(datos));
       setGuardado(datos.gallery);
       setMeta({ updatedAt: datos.updatedAt, updatedBy: datos.updatedBy });
@@ -352,6 +364,25 @@ export function GalleryForm({ locale, onSessionLost }: GalleryFormProps) {
             {t('admin.gallery.consentHelp')}
           </span>
         </p>
+
+        {sinPermiso.videoIds.length + sinPermiso.photoPaths.length > 0 && (
+          <p
+            className="mt-3 flex items-start gap-2 rounded-lg border border-sun-600/40 bg-sun-50
+                       p-3 text-sm text-slate-800 dark:border-sun-300/30 dark:bg-night-700
+                       dark:text-slate-200"
+            role="alert"
+          >
+            <AlertIcon className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>
+              <strong className="font-semibold">
+                {t('admin.gallery.uncovered', {
+                  count: sinPermiso.videoIds.length + sinPermiso.photoPaths.length,
+                })}
+              </strong>{' '}
+              {t('admin.gallery.uncoveredHelp')}
+            </span>
+          </p>
+        )}
       </header>
 
       {filas.length === 0 ? (
@@ -400,6 +431,11 @@ export function GalleryForm({ locale, onSessionLost }: GalleryFormProps) {
                 {repetido && (
                   <p className="text-xs font-semibold text-red-700 dark:text-red-300" role="alert">
                     {t('admin.gallery.errDuplicate')}
+                  </p>
+                )}
+                {sinPermiso.videoIds.includes(fila.videoId) && (
+                  <p className="text-xs font-semibold text-amber-700 dark:text-amber-300">
+                    {t('admin.gallery.notPublished')}
                   </p>
                 )}
 
@@ -539,6 +575,12 @@ export function GalleryForm({ locale, onSessionLost }: GalleryFormProps) {
                     />
                   </label>
                 </div>
+
+                {sinPermiso.photoPaths.includes(foto.path) && (
+                  <p className="text-xs font-semibold text-amber-700 dark:text-amber-300">
+                    {t('admin.gallery.notPublished')}
+                  </p>
+                )}
 
                 <button
                   type="button"

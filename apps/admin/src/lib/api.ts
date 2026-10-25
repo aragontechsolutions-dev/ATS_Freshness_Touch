@@ -1,3 +1,4 @@
+import { z } from 'zod';
 import {
   SystemHealthSchema,
   type SystemHealth,
@@ -49,6 +50,7 @@ import {
   AdminCompanyLocationSchema,
   AdminGallerySchema,
   AdminSiteCopySchema,
+  StoredMediaConsentSchema,
   GalleryPhotoUploadSchema,
   type AdminCompanyLocation,
   type AdminGallery,
@@ -57,6 +59,8 @@ import {
   type Gallery,
   type GalleryImageKind,
   type GalleryPhotoUpload,
+  type MediaConsent,
+  type StoredMediaConsent,
   type SiteCopy,
 } from '@freshness/types';
 import { auth } from './supabase';
@@ -760,6 +764,61 @@ export function uploadGalleryImage(
     },
     { method: 'POST', raw: { body: file, contentType: file.type } },
   );
+}
+
+/* ------------------------------------------------------------------------ */
+/*  Permisos de imagen. Solo administracion, tambien para leer.              */
+/* ------------------------------------------------------------------------ */
+
+const PERMISOS = '/admin/media-consents';
+
+const ListaDePermisosSchema = z.array(StoredMediaConsentSchema);
+
+/**
+ * Los permisos firmados que amparan lo que se publica.
+ *
+ * SOLO ADMINISTRACION, Y AQUI NO ADMITE DISCUSION: cada ficha lleva el
+ * nombre de un cliente y la direccion de su casa, que es justo lo que el
+ * permiso promete no mostrar.
+ */
+export function fetchMediaConsents(): Promise<StoredMediaConsent[]> {
+  return request(PERMISOS, (payload) => {
+    const parsed = ListaDePermisosSchema.safeParse(payload);
+    if (!parsed.success) throw contractError(PERMISOS, parsed.error.issues);
+    return parsed.data;
+  });
+}
+
+function unPermiso(donde: string) {
+  return (payload: unknown): StoredMediaConsent => {
+    const parsed = StoredMediaConsentSchema.safeParse(payload);
+    if (!parsed.success) throw contractError(donde, parsed.error.issues);
+    return parsed.data;
+  };
+}
+
+export function createMediaConsent(consent: MediaConsent): Promise<StoredMediaConsent> {
+  return request(PERMISOS, unPermiso('alta del permiso'), { method: 'POST', body: consent });
+}
+
+export function updateMediaConsent(id: string, consent: MediaConsent): Promise<StoredMediaConsent> {
+  return request(`${PERMISOS}/${id}`, unPermiso('cambio del permiso'), {
+    method: 'PUT',
+    body: consent,
+  });
+}
+
+/**
+ * Retira un permiso, o lo restituye.
+ *
+ * RETIRAR DESPUBLICA AL MOMENTO las piezas que amparaba. No borra la ficha:
+ * un permiso retirado es exactamente lo que hay que poder demostrar.
+ */
+export function setMediaConsentRevoked(id: string, revocado: boolean): Promise<StoredMediaConsent> {
+  const accion = revocado ? 'revoke' : 'restore';
+  return request(`${PERMISOS}/${id}/${accion}`, unPermiso('retirada del permiso'), {
+    method: 'POST',
+  });
 }
 
 /* ------------------------------------------------------------------------ */

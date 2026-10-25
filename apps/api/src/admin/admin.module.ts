@@ -31,6 +31,7 @@ import {
   ServiceAreaAdminController,
   SiteCopyAdminController,
   GalleryAdminController,
+  MediaConsentsAdminController,
   SettingsAdminController,
 } from './settings-admin.controller';
 import type { Env } from '../common/config/env';
@@ -48,6 +49,7 @@ import type { Env } from '../common/config/env';
     PricingRatesAdminController,
     SiteCopyAdminController,
     GalleryAdminController,
+    MediaConsentsAdminController,
     AssignmentsController,
     StaffListController,
     StaffAdminController,

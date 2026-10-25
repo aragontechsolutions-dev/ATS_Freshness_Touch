@@ -651,6 +651,7 @@ model Staff {
   /// Los ajustes de campo que ha propuesto y los que ha resuelto.
   adjustmentsProposed BookingFieldAdjustment[] @relation("AjustePropuestoPor")
   adjustmentsResolved BookingFieldAdjustment[] @relation("AjusteResueltoPor")
+  mediaConsents       MediaConsent[]           @relation("ConsentimientoAnotadoPor")
   createdAt           DateTime                 @default(now()) @db.Timestamptz(3)
   updatedAt           DateTime                 @updatedAt @db.Timestamptz(3)
 
@@ -1019,4 +1020,72 @@ model BookingFieldAdjustment {
   /// primero». Ademas hay dos CHECK en la migracion que Prisma no ve.
   @@index([bookingId, proposedAt(sort: Desc)])
   @@map("booking_field_adjustments")
+}
+
+/// EL REGISTRO DE CONSENTIMIENTOS DE IMAGEN
+///
+/// El papel que firma un cliente autorizando que se publique el interior de
+/// su casa, atado a las piezas que ampara.
+///
+/// TABLA PROPIA Y NO UN CAMPO EN LA GALERIA, por dos razones que van juntas:
+/// la fila de la galeria SE SIRVE AL PUBLICO, y esto lleva el nombre del
+/// cliente y la direccion de su casa — justo lo que el permiso promete no
+/// mostrar. Y ademas esto no es configuracion: es un registro con vida
+/// propia, que se firma, se archiva y se puede revocar.
+///
+/// NO SE BORRA AL REVOCAR. Un permiso retirado es exactamente lo que hay que
+/// poder demostrar: que existio, que amparaba estas piezas y cuando dejo de
+/// hacerlo. Borrarlo dejaria el registro contando solo la mitad buena.
+model MediaConsent {
+  id String @id @default(uuid(4)) @db.Uuid
+
+  /// Lo que va escrito en el papel, para emparejar el escaneo. No es unico a
+  /// proposito: quien archiva puede repetir un numero sin querer, y
+  /// rechazarselo en ese momento le haria perder la ficha que estaba
+  /// escribiendo. El panel avisa; la base no estorba.
+  reference String
+
+  customerName    String
+  /// La casa. NUNCA sale al sitio publico.
+  propertyAddress String
+
+  /// Fechas sin hora: es lo que hay escrito en un papel.
+  serviceDate DateTime @db.Date
+  signedAt    DateTime @db.Date
+
+  coversInterior Boolean
+  coversExterior Boolean
+  /// La parte sensible: el «antes» es la casa sucia de una persona concreta.
+  allowsBefore   Boolean
+
+  /// Los sitios que el papel enumera. Se guardan todos aunque solo
+  /// publiquemos en la web: lo que se firmo es lo que vale.
+  channels String[]
+
+  /// El plazo de retirada que promete el papel, en dias.
+  removalDays Int
+
+  /// Las piezas que ampara. Es lo que convierte esto en algo util: al
+  /// revocar, dejan de servirse solas.
+  videoIds   String[]
+  photoPaths String[]
+
+  notes String?
+
+  /// Cuando el cliente retiro el permiso. NULL mientras siga en pie.
+  revokedAt DateTime? @db.Timestamptz(3)
+
+  /// RESTRICT, como los fichajes: es el registro de un permiso firmado y no
+  /// debe borrarse porque se de de baja a quien lo anoto.
+  updatedByStaffId String? @db.Uuid
+  updatedBy        Staff?  @relation("ConsentimientoAnotadoPor", fields: [updatedByStaffId], references: [id], onDelete: Restrict)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @default(now()) @updatedAt @db.Timestamptz(3)
+
+  /// La consulta de la galeria publica es «dame los revocados», y la del
+  /// panel «dame todos, el mas reciente primero».
+  @@index([revokedAt])
+  @@index([createdAt(sort: Desc)])
+  @@map("media_consents")
 }

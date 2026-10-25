@@ -209,6 +209,28 @@ const ACCIONES_FIJAS = [
    */
   'gallery.updated',
 
+  /* --- El registro de consentimientos de imagen ------------------------ */
+  /**
+   * Se anoto, se corrigio, se retiro o se restituyo el permiso de un cliente
+   * para publicar imagenes de su casa.
+   *
+   * ACCIONES PROPIAS Y SEPARADAS DE LA GALERIA, y la que de verdad importa
+   * es `revoked`: el permiso promete retirar el material en un plazo, y
+   * demostrar que se cumplio es poder decir CUANDO se pulso. Mezclado con
+   * «cambio la galeria» esa pregunta no se responde.
+   *
+   * `restored` existe porque revocar por error tiene que poder deshacerse, y
+   * deshacerlo en silencio seria peor que el error.
+   *
+   * LA METADATA NO LLEVA NI EL NOMBRE NI LA DIRECCION. El registro se
+   * consulta, se exporta y se ensena; lo que guarda es la referencia del
+   * papel y cuantas piezas ampara.
+   */
+  'media_consent.created',
+  'media_consent.updated',
+  'media_consent.revoked',
+  'media_consent.restored',
+
   /* --- Lecturas de datos sensibles ------------------------------------- */
   /** Alguien abrio la ficha completa de una reserva, con datos del cliente. */
   'booking.viewed',
@@ -268,6 +290,16 @@ export const AuditEntityTypeSchema = z.enum([
   'audit',
   /** Una sesion del panel. */
   'session',
+  /**
+   * Un permiso firmado para publicar imagenes de la casa de un cliente.
+   *
+   * ENTIDAD PROPIA y no `business_settings`, aunque se edite desde la misma
+   * pantalla de ajustes: esto no es configuracion, es un papel firmado con
+   * su propia vida — se anota, se corrige, se retira y se puede restituir—.
+   * Filtrar el registro por «los permisos» tiene sentido; mezclado con los
+   * cambios de telefono, no.
+   */
+  'media_consent',
 ]);
 export type AuditEntityType = z.infer<typeof AuditEntityTypeSchema>;
 

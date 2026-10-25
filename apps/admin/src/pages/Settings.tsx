@@ -19,6 +19,7 @@ import { ServiceAreaForm } from '../components/ServiceAreaForm';
 import { CompanyLocationForm } from '../components/CompanyLocationForm';
 import { SiteCopyForm } from '../components/SiteCopyForm';
 import { GalleryForm } from '../components/GalleryForm';
+import { MediaConsentsForm } from '../components/MediaConsentsForm';
 import { NotificationSettingsForm } from '../components/NotificationSettingsForm';
 import { StaffDirectory } from '../components/StaffDirectory';
 import { useToast } from '../components/ToastProvider';
@@ -79,6 +80,7 @@ type Seccion =
   | 'pricing'
   | 'siteCopy'
   | 'gallery'
+  | 'consents'
   | 'notifications'
   | 'staff'
   | 'systemHealth'
@@ -170,6 +172,19 @@ export function SettingsPage({ staff, locale, onSessionLost }: SettingsShellProp
         >
           {t('admin.gallery.title')}
         </Pestana>
+        {/*
+          LOS PERMISOS VAN PEGADOS A LA GALERIA, y el orden cuenta una
+          historia: primero lo que se publica, despues el papel que lo
+          permite. Separados, el papel pareceria papeleo; juntos se ve que
+          sin el no sale nada.
+        */}
+        <Pestana
+          activa={seccion === 'consents'}
+          onClick={() => setSeccion('consents')}
+          icono={<ShieldIcon className="h-4 w-4" />}
+        >
+          {t('admin.consents.title')}
+        </Pestana>
         <Pestana
           activa={seccion === 'notifications'}
           onClick={() => setSeccion('notifications')}
@@ -224,6 +239,8 @@ export function SettingsPage({ staff, locale, onSessionLost }: SettingsShellProp
         <SiteCopyForm locale={locale} onSessionLost={onSessionLost} />
       ) : seccion === 'gallery' ? (
         <GalleryForm locale={locale} onSessionLost={onSessionLost} />
+      ) : seccion === 'consents' ? (
+        <MediaConsentsForm locale={locale} onSessionLost={onSessionLost} />
       ) : seccion === 'notifications' ? (
         <NotificationSettingsForm onSessionLost={onSessionLost} />
       ) : seccion === 'staff' ? (

@@ -462,6 +462,62 @@ export const en = {
       unknownAuthor: 'someone no longer on the team',
     },
     /* -------------------------- Avisos ----------------------------- */
+    /* ---------------------- Los permisos de imagen ------------------------ */
+    consents: {
+      title: 'Image releases',
+      intro:
+        'The signed paper that lets us publish a customer\u2019s home, linked to the items it covers. Withdrawing it unpublishes them straight away.',
+      strictNotice:
+        'Nothing is published without a release on file. An item with no release stays saved but does not appear on the website.',
+      add: 'Record a release',
+      empty:
+        'No releases recorded yet. Until one is, nothing from the gallery appears on the website.',
+      reference: 'Reference',
+      referenceHelp: 'The one written on the paper, so the scan can be matched to it.',
+      customerName: 'Customer',
+      propertyAddress: 'Property',
+      propertyAddressHelp:
+        'Never shown on the website. It lives here so the item can be found again.',
+      serviceDate: 'Service date',
+      signedAt: 'Signed on',
+      removalDays: 'Removal deadline (days)',
+      covers: 'What was filmed',
+      coversInterior: 'Interior',
+      coversExterior: 'Exterior',
+      allowsBefore: 'The "before" footage may be published',
+      allowsBeforeHelp:
+        'The sensitive one: the "before" is that person\u2019s home, unclean. Only tick it if the paper says so.',
+      channels: 'Where it may be published',
+      channelsHelp:
+        'As listed on the paper. The website must be ticked for an item to appear here.',
+      channel: {
+        WEBSITE: 'Website',
+        FACEBOOK: 'Facebook',
+        INSTAGRAM: 'Instagram',
+        YOUTUBE: 'YouTube',
+      },
+      videoIds: 'Videos it covers',
+      photoPaths: 'Photos it covers',
+      piecesHelp: 'One per line, copied from the gallery screen.',
+      notes: 'Notes',
+      save: 'Save release',
+      cancel: 'Cancel',
+      saved: 'Release saved',
+      edit: 'Edit',
+      revoke: 'Withdraw',
+      restore: 'Reinstate',
+      revoked: 'Release withdrawn. Its items are off the website.',
+      restored: 'Release reinstated',
+      revokedChip: 'Withdrawn',
+      beforeChip: 'Covers "before"',
+      confirmRevoke:
+        'Withdrawing this release takes its photos and videos off the website straight away. Continue?',
+      summary: '{{videos}} video(s) and {{photos}} photo(s) \u00b7 removal within {{days}} days',
+      signedOn: 'Signed {{when}}',
+      revokedOn: 'Withdrawn {{when}}',
+      errInvalid: 'Some of the release is not valid yet.',
+    },
+
     notifications: {
       title: 'Notifications',
       intro: 'What we send, and where it goes.',
@@ -661,6 +717,11 @@ export const en = {
       posterAlt: 'Video thumbnail',
       removePoster: 'Remove thumbnail',
       uploadPoster: 'Upload thumbnail',
+      uncovered_one: '{{count}} item is saved but not published.',
+      uncovered_other: '{{count}} items are saved but not published.',
+      uncoveredHelp:
+        'Nothing goes on the website without a signed release on file. Record it under Image releases and link it to the item.',
+      notPublished: 'Not on the website: no release on file',
     },
 
     location: {
@@ -1008,6 +1069,7 @@ export const en = {
         business_settings: 'Settings',
         audit: 'Activity log',
         session: 'Session',
+        media_consent: 'Image release',
       },
 
       /*
@@ -1073,6 +1135,12 @@ export const en = {
         },
         gallery: {
           updated: 'Before-and-after gallery changed',
+        },
+        media_consent: {
+          created: 'Image release recorded',
+          updated: 'Image release corrected',
+          revoked: 'Image release withdrawn',
+          restored: 'Image release reinstated',
         },
         notifications: {
           updated: 'Alert settings changed',

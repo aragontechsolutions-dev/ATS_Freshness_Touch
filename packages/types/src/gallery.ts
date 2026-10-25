@@ -333,6 +333,20 @@ export const AdminGallerySchema = z.strictObject({
    * ninguna direccion.
    */
   imageUrls: z.record(z.string(), z.string().url()).default({}),
+  /**
+   * Las piezas que ESTAN GUARDADAS PERO NO SE PUBLICAN por no tener un
+   * permiso firmado y en pie.
+   *
+   * SIN ESTO EL MODO ESTRICTO SERIA UNA TRAMPA: se sube una foto, se guarda,
+   * se ve en el panel y no aparece en la web — y no hay forma de saber por
+   * que. Con esto, la pantalla lo dice en la propia tarjeta.
+   */
+  uncovered: z
+    .object({
+      videoIds: z.array(z.string()).default([]),
+      photoPaths: z.array(z.string()).default([]),
+    })
+    .default({ videoIds: [], photoPaths: [] }),
   updatedAt: z.string().nullable(),
   updatedBy: z.string().nullable(),
 });
