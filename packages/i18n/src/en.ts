@@ -473,13 +473,31 @@ export const en = {
       empty:
         'No releases recorded yet. Until one is, nothing from the gallery appears on the website.',
       reference: 'Reference',
-      referenceHelp: 'The one written on the paper, so the scan can be matched to it.',
+      referenceHelp:
+        'The paper\u2019s number, the booking reference, or whatever identifies the message. It is how the proof is found again.',
+      evidenceKind: 'How it was given',
+      evidenceKindHelp:
+        'All four count. This says where the proof is kept, for the day it has to be shown.',
+      evidence: {
+        SIGNED_PAPER: 'Paper, signed by hand',
+        WEB_FORM: 'Ticked when booking',
+        EMAIL: 'By email',
+        MESSAGE: 'By written message',
+      },
       customerName: 'Customer',
       propertyAddress: 'Property',
       propertyAddressHelp:
         'Never shown on the website. It lives here so the item can be found again.',
+      occupancy: 'Who lives there',
+      occupiedByOthers: 'Someone other than the signer lives in the property',
+      occupiedByOthersHelp:
+        'A landlord may let us film their property, but the furniture and belongings in shot are the tenant\u2019s. Nobody can give a release over someone else\u2019s private life.',
+      occupantConsent: 'Whoever lives there has given a release too',
+      occupantBlocked:
+        'Until both releases are on file, this one cannot cover any photo or video. Record it anyway so the missing half is visible.',
       serviceDate: 'Service date',
-      signedAt: 'Signed on',
+      signedAt: 'Given on',
+      signedAtHelp: 'The day it was signed, ticked or written.',
       removalDays: 'Removal deadline (days)',
       covers: 'What was filmed',
       coversInterior: 'Interior',

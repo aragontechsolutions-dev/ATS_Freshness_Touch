@@ -49,8 +49,11 @@ const FOTO = 'photos/0123456789abcdef0123456789abcdef.jpg';
 
 const PAPEL: MediaConsent = {
   reference: 'FT-2026-001',
+  evidenceKind: 'SIGNED_PAPER',
   customerName: 'Marta Jimenez',
   propertyAddress: '742 Evergreen Terrace',
+  occupiedByOthers: false,
+  occupantConsent: false,
   serviceDate: '2026-10-20',
   signedAt: '2026-10-18',
   coversInterior: true,
@@ -108,6 +111,21 @@ function escribir(etiqueta: string, valor: string): void {
       : window.HTMLInputElement.prototype;
   Object.getOwnPropertyDescriptor(prototipo, 'value')?.set?.call(campo, valor);
   campo.dispatchEvent(new Event('input', { bubbles: true }));
+}
+
+/** Elige un valor en el desplegable cuya etiqueta contenga ese texto. */
+function elegir(etiqueta: string, valor: string): void {
+  const label = [...contenedor.querySelectorAll('label')].find((l) =>
+    l.textContent?.includes(etiqueta),
+  );
+  const select = label?.querySelector<HTMLSelectElement>('select');
+  if (!select) throw new Error(`No encontre el desplegable «${etiqueta}»`);
+
+  Object.getOwnPropertyDescriptor(window.HTMLSelectElement.prototype, 'value')?.set?.call(
+    select,
+    valor,
+  );
+  select.dispatchEvent(new Event('change', { bubbles: true }));
 }
 
 function marcar(etiqueta: string, marcada: boolean): void {
@@ -175,7 +193,7 @@ describe('anotar un permiso', () => {
     escribir('Customer', 'Marta Jimenez');
     escribir('Property', '742 Evergreen Terrace');
     escribir('Service date', '2026-10-20');
-    escribir('Signed on', '2026-10-18');
+    escribir('Given on', '2026-10-18');
     escribir('Photos it covers', FOTO);
     await guardar();
 
@@ -185,6 +203,88 @@ describe('anotar un permiso', () => {
     expect(enviado?.photoPaths).toEqual([FOTO]);
   });
 
+  /*
+   * EL MEDIO ES UN DESPLEGABLE, NO UNA SUPOSICION. El registro nacio dando
+   * por hecho que habia un papel; el caso normal es que no lo haya, porque
+   * el cliente no esta en casa el dia del servicio.
+   */
+  it('el medio por el que llego el permiso viaja al contrato', async () => {
+    await abrirFormulario();
+
+    escribir('Reference', 'FT-2026-007');
+    escribir('Customer', 'Marta');
+    escribir('Property', 'Una calle');
+    escribir('Service date', '2026-10-20');
+    escribir('Given on', '2026-10-18');
+    elegir('How it was given', 'WEB_FORM');
+    await guardar();
+
+    expect(createMediaConsent.mock.calls[0]?.[0].evidenceKind).toBe('WEB_FORM');
+  });
+
+  it('por defecto propone el papel firmado y cinco dias de plazo', async () => {
+    await abrirFormulario();
+
+    escribir('Reference', 'FT-2026-007');
+    escribir('Customer', 'Marta');
+    escribir('Property', 'Una calle');
+    escribir('Service date', '2026-10-20');
+    escribir('Given on', '2026-10-18');
+    await guardar();
+
+    const enviado = createMediaConsent.mock.calls[0]?.[0];
+    expect(enviado?.evidenceKind).toBe('SIGNED_PAPER');
+    expect(enviado?.removalDays).toBe(5);
+  });
+
+  /*
+   * LA SEGUNDA CASILLA NO ESTA HASTA QUE HACE FALTA. Ensenarla siempre
+   * invita a marcarla sin pensar, y lo que levanta es la unica proteccion
+   * que tiene alguien que no esta en la conversacion: el inquilino.
+   */
+  it('la casilla del segundo permiso solo aparece si vive alli alguien mas', async () => {
+    await abrirFormulario();
+
+    expect(contenedor.textContent).not.toContain('has given a release too');
+
+    marcar('Someone other than the signer lives in the property', true);
+    expect(contenedor.textContent).toContain('has given a release too');
+  });
+
+  it('sin el permiso del inquilino, avisa de que no amparara nada', async () => {
+    await abrirFormulario();
+    marcar('Someone other than the signer lives in the property', true);
+
+    expect(contenedor.textContent).toContain('cannot cover any photo or video');
+
+    marcar('Whoever lives there has given a release too', true);
+    expect(contenedor.textContent).not.toContain('cannot cover any photo or video');
+  });
+
+  /*
+   * UNA CASILLA QUE NO SE VE NO PUEDE LEVANTAR UNA RESTRICCION. Si se marca
+   * el segundo permiso y despues se dice que alli no vive nadie mas, lo que
+   * sale tiene que ser falso y no el `true` que quedo escondido.
+   */
+  it('si se desmarca que vive alli alguien mas, el segundo permiso sale en falso', async () => {
+    await abrirFormulario();
+
+    escribir('Reference', 'FT-2026-007');
+    escribir('Customer', 'Marta');
+    escribir('Property', 'Una calle');
+    escribir('Service date', '2026-10-20');
+    escribir('Given on', '2026-10-18');
+
+    marcar('Someone other than the signer lives in the property', true);
+    marcar('Whoever lives there has given a release too', true);
+    marcar('Someone other than the signer lives in the property', false);
+    await guardar();
+
+    const enviado = createMediaConsent.mock.calls[0]?.[0];
+    expect(enviado?.occupiedByOthers).toBe(false);
+    expect(enviado?.occupantConsent).toBe(false);
+  });
+
   it('las piezas se teclean una por linea', async () => {
     await abrirFormulario();
 
@@ -192,7 +292,7 @@ describe('anotar un permiso', () => {
     escribir('Customer', 'Marta');
     escribir('Property', 'Una calle');
     escribir('Service date', '2026-10-20');
-    escribir('Signed on', '2026-10-18');
+    escribir('Given on', '2026-10-18');
     escribir('Videos it covers', 'dQw4w9WgXcQ\naBcDeFgHiJk\n\n');
     await guardar();
 
@@ -210,7 +310,7 @@ describe('anotar un permiso', () => {
     escribir('Customer', 'Marta');
     escribir('Property', 'Una calle');
     escribir('Service date', '2026-10-20');
-    escribir('Signed on', '2026-10-18');
+    escribir('Given on', '2026-10-18');
     escribir('Photos it covers', FOTO);
     marcar('Website', false);
     marcar('Instagram', true);
@@ -232,7 +332,7 @@ describe('anotar un permiso', () => {
     escribir('Customer', 'Marta');
     escribir('Property', 'Una calle');
     escribir('Service date', '2026-10-20');
-    escribir('Signed on', '2026-10-18');
+    escribir('Given on', '2026-10-18');
     marcar('Interior', false);
     await guardar();
 

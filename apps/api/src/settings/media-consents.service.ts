@@ -251,8 +251,11 @@ export class MediaConsentsService {
 function aFila(consent: MediaConsent) {
   return {
     reference: consent.reference,
+    evidenceKind: consent.evidenceKind,
     customerName: consent.customerName,
     propertyAddress: consent.propertyAddress,
+    occupiedByOthers: consent.occupiedByOthers,
+    occupantConsent: consent.occupantConsent,
     // Las fechas van sin hora: es lo que hay escrito en un papel.
     serviceDate: new Date(`${consent.serviceDate}T00:00:00Z`),
     signedAt: new Date(`${consent.signedAt}T00:00:00Z`),
@@ -270,8 +273,11 @@ function aFila(consent: MediaConsent) {
 interface FilaConAutor {
   id: string;
   reference: string;
+  evidenceKind: string;
   customerName: string;
   propertyAddress: string;
+  occupiedByOthers: boolean;
+  occupantConsent: boolean;
   serviceDate: Date;
   signedAt: Date;
   coversInterior: boolean;
@@ -297,8 +303,11 @@ function aFicha(fila: FilaConAutor): StoredMediaConsent {
    */
   const consent = MediaConsentSchema.parse({
     reference: fila.reference,
+    evidenceKind: fila.evidenceKind,
     customerName: fila.customerName,
     propertyAddress: fila.propertyAddress,
+    occupiedByOthers: fila.occupiedByOthers,
+    occupantConsent: fila.occupantConsent,
     serviceDate: soloFecha(fila.serviceDate),
     signedAt: soloFecha(fila.signedAt),
     coversInterior: fila.coversInterior,
@@ -338,6 +347,7 @@ function soloFecha(fecha: Date): string {
 function resumen(consent: MediaConsent) {
   return {
     reference: consent.reference,
+    evidenceKind: consent.evidenceKind,
     videos: consent.videoIds.length,
     photos: consent.photoPaths.length,
     allowsBefore: consent.allowsBefore,

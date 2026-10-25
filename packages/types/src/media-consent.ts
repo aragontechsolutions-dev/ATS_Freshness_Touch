@@ -54,6 +54,42 @@ export const ConsentChannelSchema = z.enum(CONSENT_CHANNELS);
 export type ConsentChannel = z.infer<typeof ConsentChannelSchema>;
 
 // ---------------------------------------------------------------------------
+// Como se obtuvo
+// ---------------------------------------------------------------------------
+
+/**
+ * POR QUE EL MEDIO ES UN DATO Y NO UN DETALLE.
+ *
+ * El modelo nacio suponiendo un papel firmado en la casa, y ese supuesto no
+ * aguanta el caso NORMAL: en una limpieza de mudanza la casa esta vacia, en
+ * una recurrente el cliente esta trabajando, y hay clientes que contratan
+ * desde otro estado. Si el permiso solo se puede obtener en el salon, no se
+ * obtiene casi nunca.
+ *
+ * Una firma electronica es una firma —lo dicen la E-SIGN Act federal y la
+ * UETA de Georgia— siempre que se pueda acreditar quien, que y cuando. Lo
+ * que no vale es lo que no se puede demostrar: una llamada de telefono, el
+ * silencio de quien no contesta, una casilla premarcada.
+ *
+ * Por eso aqui se anota POR QUE VIA llego, y no para distinguir «bueno» de
+ * «malo»: los cuatro valen. Es para saber DONDE ESTA LA PRUEBA el dia que
+ * haga falta ensenarla. Un escaneo esta en el archivador; un formulario
+ * web, en la fila de la reserva; un correo, en el buzon.
+ */
+export const CONSENT_EVIDENCE_KINDS = [
+  /** Papel firmado a mano y archivado. */
+  'SIGNED_PAPER',
+  /** Casilla marcada en el formulario de reserva. */
+  'WEB_FORM',
+  /** Correo del cliente diciendo que si, por escrito. */
+  'EMAIL',
+  /** Mensaje escrito: WhatsApp, SMS. */
+  'MESSAGE',
+] as const;
+export const ConsentEvidenceKindSchema = z.enum(CONSENT_EVIDENCE_KINDS);
+export type ConsentEvidenceKind = z.infer<typeof ConsentEvidenceKindSchema>;
+
+// ---------------------------------------------------------------------------
 // El papel
 // ---------------------------------------------------------------------------
 
@@ -82,6 +118,14 @@ export const CONSENT_NOTES_MAX = 500;
 export const CONSENT_REMOVAL_DAYS_MIN = 1;
 export const CONSENT_REMOVAL_DAYS_MAX = 30;
 
+/**
+ * Lo que la duena decidio y lo que el panel propone al crear una ficha.
+ *
+ * No es un tope ni una regla: un papel concreto puede prometer otra cosa y
+ * se teclea. Es el valor que evita que cada ficha lo invente.
+ */
+export const CONSENT_REMOVAL_DAYS_DEFAULT = 5;
+
 export const MediaConsentSchema = z
   .strictObject({
     /**
@@ -91,10 +135,36 @@ export const MediaConsentSchema = z
      * el que de verdad esta impreso en la hoja que hay en el cajon.
      */
     reference: texto(CONSENT_REFERENCE_MAX),
+
+    /**
+     * Por que via llego el permiso, para saber donde esta la prueba.
+     *
+     * Con valor por defecto porque las fichas anotadas antes de que esto
+     * existiera son todas de papel firmado: es lo unico que el panel
+     * permitia anotar entonces.
+     */
+    evidenceKind: ConsentEvidenceKindSchema.default('SIGNED_PAPER'),
+
     customerName: texto(CONSENT_NAME_MAX),
     /** La casa. NUNCA sale al sitio publico. */
     propertyAddress: texto(CONSENT_ADDRESS_MAX),
+
+    /**
+     * Si en la vivienda vive alguien que no es quien firma.
+     *
+     * El caso del dueno ausente que alquila: el dueno puede autorizar su
+     * propiedad, pero en las imagenes salen los muebles, la ropa y los
+     * objetos del INQUILINO, y sobre la vida privada de otro no se puede dar
+     * permiso. Lo mismo que ya se exige para los empleados que salen en un
+     * video: hacen falta los dos permisos, o no se publica.
+     */
+    occupiedByOthers: z.boolean().default(false),
+
+    /** Si el permiso de quien habita la vivienda tambien esta obtenido. */
+    occupantConsent: z.boolean().default(false),
+
     serviceDate: FechaSchema,
+    /** Cuando se dio el permiso: se firmo, se marco la casilla o se escribio. */
     signedAt: FechaSchema,
 
     /** Que se autorizo grabar. Al menos una de las dos. */
@@ -134,6 +204,24 @@ export const MediaConsentSchema = z
     {
       message: 'Para publicar en la web, el permiso tiene que autorizar la web',
       path: ['channels'],
+    },
+  )
+  /*
+   * SI VIVE ALLI UN TERCERO Y NO HA DADO SU PERMISO, ESTE NO AMPARA NADA.
+   *
+   * La ficha se puede anotar igual —es util saber que existe y que falta la
+   * otra mitad— pero no puede llevar piezas atadas, y sin piezas atadas el
+   * modo estricto no publica ninguna. La regla se cumple sola en vez de
+   * depender de que alguien se acuerde.
+   */
+  .refine(
+    (c) =>
+      !c.occupiedByOthers ||
+      c.occupantConsent ||
+      (c.videoIds.length === 0 && c.photoPaths.length === 0),
+    {
+      message: 'Si vive alli alguien mas, hace falta tambien su permiso',
+      path: ['occupantConsent'],
     },
   );
 

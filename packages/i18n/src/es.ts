@@ -436,12 +436,30 @@ export const es: TranslationResources = {
       empty:
         'Todavía no hay permisos anotados. Hasta que haya uno, nada de la galería sale en la web.',
       reference: 'Referencia',
-      referenceHelp: 'La que va escrita en el papel, para poder emparejar el escaneo.',
+      referenceHelp:
+        'El número del papel, la referencia de la reserva o lo que identifique el mensaje. Es por donde se vuelve a encontrar la prueba.',
+      evidenceKind: 'Cómo se obtuvo',
+      evidenceKindHelp:
+        'Los cuatro valen. Esto dice dónde está guardada la prueba, para el día que haya que enseñarla.',
+      evidence: {
+        SIGNED_PAPER: 'Papel firmado a mano',
+        WEB_FORM: 'Casilla marcada al reservar',
+        EMAIL: 'Por correo',
+        MESSAGE: 'Por mensaje escrito',
+      },
       customerName: 'Cliente',
       propertyAddress: 'Propiedad',
       propertyAddressHelp: 'No sale nunca en la web. Está aquí para poder encontrar la pieza.',
+      occupancy: 'Quién vive allí',
+      occupiedByOthers: 'En la vivienda vive alguien que no es quien firma',
+      occupiedByOthersHelp:
+        'Un dueño puede autorizar su propiedad, pero los muebles y los objetos que salen en el plano son del inquilino. Sobre la vida privada de otro no se puede dar permiso.',
+      occupantConsent: 'Quien vive allí también ha dado su permiso',
+      occupantBlocked:
+        'Mientras falte uno de los dos permisos, este no puede amparar ninguna foto ni ningún vídeo. Anótalo igual, para que se vea que falta la otra mitad.',
       serviceDate: 'Fecha del servicio',
-      signedAt: 'Fecha de la firma',
+      signedAt: 'Fecha en que se dio',
+      signedAtHelp: 'El día en que se firmó, se marcó la casilla o se escribió.',
       removalDays: 'Plazo de retirada (días)',
       covers: 'Qué se grabó',
       coversInterior: 'Interior',

@@ -243,8 +243,114 @@ describe('lo que el contrato no deja pasar', () => {
     ['sin referencia del papel', { reference: '' }],
     ['una ruta de foto inventada', { photoPaths: ['photos/casa-de-marta.jpg'] }],
     ['un identificador de video inventado', { videoIds: ['https://evil.example/x'] }],
+    ['un medio que no existe', { evidenceKind: 'LLAMADA' }],
   ])('rechaza %s', async (_caso, extra) => {
     expect((await crear(papel(extra))).status).toBe(400);
+  });
+});
+
+/* ------------------------------------------------------------------------ */
+
+describe('como se obtuvo el permiso', () => {
+  /*
+   * EL SUPUESTO QUE NO AGUANTABA EL CASO NORMAL.
+   *
+   * El registro nacio suponiendo un papel firmado en el salon. Pero en una
+   * limpieza de mudanza la casa esta vacia, en una recurrente el cliente esta
+   * trabajando, y hay clientes que contratan desde otro estado. Si el permiso
+   * solo se puede obtener en persona, no se obtiene — y con el modo estricto,
+   * lo que no se obtiene no se publica.
+   */
+  it.each(['SIGNED_PAPER', 'WEB_FORM', 'EMAIL', 'MESSAGE'])(
+    'un permiso dado por %s vale igual',
+    async (medio) => {
+      const ficha = await crear(papel({ evidenceKind: medio, photoPaths: [FOTO] }));
+
+      expect(ficha.status).toBe(201);
+      expect(ficha.body.consent.evidenceKind).toBe(medio);
+
+      await publicarGaleria();
+      expect((await leerPublica()).body.photos).toHaveLength(1);
+    },
+  );
+
+  /*
+   * Las fichas anotadas antes de que esto existiera son todas de papel: era
+   * lo unico que el panel permitia. Sin este valor por defecto, el dia del
+   * despliegue dejarian de validarse y la galeria entera se quedaria vacia.
+   */
+  it('una ficha que no dice el medio se lee como papel firmado', async () => {
+    const sinMedio = papel();
+    delete sinMedio.evidenceKind;
+
+    const ficha = await crear(sinMedio);
+
+    expect(ficha.status).toBe(201);
+    expect(ficha.body.consent.evidenceKind).toBe('SIGNED_PAPER');
+  });
+
+  it('el medio queda en la auditoria, pero el nombre y la direccion no', async () => {
+    await crear(papel({ evidenceKind: 'WEB_FORM' }));
+
+    const fila = await db.query<{ metadata: unknown }>(
+      `SELECT metadata FROM audit_logs WHERE action = 'media_consent.created'`,
+    );
+    const metadata = JSON.stringify(fila.rows[0]?.metadata);
+
+    expect(metadata).toContain('WEB_FORM');
+    expect(metadata).not.toContain('Marta');
+    expect(metadata).not.toContain('Evergreen');
+  });
+});
+
+/* ------------------------------------------------------------------------ */
+
+describe('cuando en la casa vive alguien que no firma', () => {
+  /*
+   * EL CASO QUE SE CUELA SIN QUE NADIE LO NOTE.
+   *
+   * El dueno contrata, el dueno firma, y en las imagenes salen los muebles,
+   * la ropa y los objetos de OTRA persona que no ha dicho nada. Sobre la vida
+   * privada de un tercero no se puede dar permiso.
+   */
+  it('su permiso no puede amparar ninguna pieza mientras falte el del inquilino', async () => {
+    const conFoto = await crear(
+      papel({ occupiedByOthers: true, occupantConsent: false, photoPaths: [FOTO] }),
+    );
+    expect(conFoto.status).toBe(400);
+
+    const conVideo = await crear(
+      papel({ occupiedByOthers: true, occupantConsent: false, videoIds: [VIDEO] }),
+    );
+    expect(conVideo.status).toBe(400);
+  });
+
+  /*
+   * La ficha SI se puede anotar. Es util saber que existe y que falta la otra
+   * mitad; lo que no puede es llevar piezas, y sin piezas el modo estricto no
+   * publica ninguna. La regla se cumple sola.
+   */
+  it('pero la ficha se anota igual, sin piezas', async () => {
+    const ficha = await crear(papel({ occupiedByOthers: true, occupantConsent: false }));
+
+    expect(ficha.status).toBe(201);
+    expect(ficha.body.consent.occupiedByOthers).toBe(true);
+    expect(ficha.body.consent.occupantConsent).toBe(false);
+  });
+
+  it('con los dos permisos, ampara como cualquier otra', async () => {
+    const ficha = await crear(
+      papel({ occupiedByOthers: true, occupantConsent: true, photoPaths: [FOTO] }),
+    );
+    expect(ficha.status).toBe(201);
+
+    await publicarGaleria();
+    expect((await leerPublica()).body.photos).toHaveLength(1);
+  });
+
+  it('si solo vive quien firma, no hace falta nada mas', async () => {
+    const ficha = await crear(papel({ occupiedByOthers: false, photoPaths: [FOTO] }));
+    expect(ficha.status).toBe(201);
   });
 });
 
@@ -363,8 +469,10 @@ describe('el rastro', () => {
 
   /*
    * NI EL NOMBRE NI LA DIRECCION EN LA METADATA. El registro se consulta, se
-   * exporta y se ensena; de ahi vendria el problema. La referencia del papel
-   * y cuantas piezas ampara bastan para responder a lo que se pregunta.
+   * exporta y se ensena; de ahi vendria el problema. La referencia del papel,
+   * por que via llego y cuantas piezas ampara bastan para responder a lo que
+   * se pregunta. El medio es una categoria de cuatro valores: no identifica a
+   * nadie, y es lo que dice donde buscar la prueba.
    */
   it('la metadata no lleva nada del cliente', async () => {
     await crear(papel({ photoPaths: [FOTO] }));
@@ -374,7 +482,13 @@ describe('el rastro', () => {
     );
     const metadata = filas.rows[0]?.metadata ?? {};
 
-    expect(Object.keys(metadata).sort()).toEqual(['allowsBefore', 'photos', 'reference', 'videos']);
+    expect(Object.keys(metadata).sort()).toEqual([
+      'allowsBefore',
+      'evidenceKind',
+      'photos',
+      'reference',
+      'videos',
+    ]);
     expect(JSON.stringify(metadata)).not.toContain('Marta');
     expect(JSON.stringify(metadata)).not.toContain('Evergreen');
   });

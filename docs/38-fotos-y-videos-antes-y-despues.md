@@ -902,3 +902,127 @@ Mientras no haya permisos anotados, **la sección se puede construir pero no
 enseña nada**: el modo estricto no publica lo que no tiene papel, así que una
 galería llena de fotos sin ficha se ve vacía desde fuera. Es la consecuencia
 buscada.
+
+---
+
+## 11. Cómo se obtiene el permiso cuando el cliente no está en casa
+
+Esta sección existe porque el modelo nació con un supuesto que no aguanta el
+caso normal: **que alguien firma un papel en el salón**. En una limpieza de
+mudanza la casa está vacía, en una recurrente el cliente está trabajando, y
+hay clientes que contratan desde otro estado. Si el permiso solo se puede
+obtener en persona, no se obtiene casi nunca — y con el modo estricto, lo que
+no se obtiene no se publica.
+
+### El requisito no es «papel», es «demostrable»
+
+La sección 2 ya lo dice sin saberlo:
+
+> «Un permiso verbal no vale. **No porque sea inválido en todos los casos,
+> sino porque no se puede demostrar**, y el día que haga falta es precisamente
+> el día en que el cliente dice que no lo dio.»
+
+Una firma electrónica es una firma. La **E-SIGN Act** federal y la **UETA** de
+Georgia dan a un registro electrónico el mismo valor que al papel, siempre que
+se pueda acreditar **quién lo hizo, qué aceptó y cuándo**. De hecho es más
+demostrable que el papel: un PDF escaneado en una carpeta no lleva sello de
+tiempo.
+
+> **Lo que esta sección no es.** Es el diseño operativo, no un dictamen legal.
+> Si una fórmula concreta basta para este uso concreto en Georgia lo dice un
+> abogado colegiado allí, y esa revisión sigue pendiente (sección 10).
+
+### El momento correcto es la reserva, no la casa
+
+Pedirlo al confirmar la reserva resuelve el problema en vez de sortearlo: da
+igual que el día del servicio no haya nadie, y da igual que el cliente viva en
+otro estado. Y es además el momento en que el permiso es más libre, porque
+después de limpiar, pedirlo delante de la casa recién limpia pone al cliente
+en una situación en la que se siente obligado a decir que sí.
+
+El contrato **ya admite un permiso sin piezas**: la regla que exige autorizar
+la web solo se aplica si la ficha ampara algo. Es decir, se puede anotar el
+permiso al reservar, cuando el vídeo todavía no existe, y atarle las piezas
+después. No se diseñó para esto, pero encaja tal cual.
+
+### Los cuatro casos
+
+| Situación                                       | Cómo se obtiene                                                                                                                                  |
+| ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **A.** El cliente contrata y no estará en casa  | Casilla en la reserva: **separada**, **desmarcada**, **opcional**. Rechazarla no cambia el precio ni el servicio, y eso tiene que estar escrito. |
+| **B.** El cliente está fuera / es dueño ausente | Por correo o en la reserva. **Pero ojo a quién puede autorizar**, abajo.                                                                         |
+| **C.** Casa vacía (mudanza, obra, entrega)      | El caso más fácil y el mejor material: no hay objetos personales en el plano. El permiso sigue haciendo falta porque la casa es de alguien.      |
+| **D.** Se graba y se pregunta después           | **Se guarda, no se publica.** El modo estricto ya lo garantiza. Luego se le enseña al cliente la pieza concreta y se pide el permiso sobre ella. |
+
+El caso D da, de hecho, el permiso **más sólido** de los cuatro: autorizó
+_eso_, no _algo_.
+
+### Quién puede autorizar
+
+Es la trampa del caso B, y no es técnica:
+
+| Situación                         | Quién puede autorizar                                                                                                        |
+| --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| Dueño que vive allí, de viaje     | Él. Sin más.                                                                                                                 |
+| Dueño que **alquila** la vivienda | **Hacen falta los dos.** El dueño autoriza su propiedad, pero en las imágenes salen los muebles y la ropa del **inquilino**. |
+| Gestor o agencia                  | Solo con mandato escrito. Y sigue sin cubrir al inquilino.                                                                   |
+| Empresa, para su local            | Quien firme tiene que poder obligar a la empresa.                                                                            |
+
+**Sobre la vida privada de un tercero no se puede dar permiso.** Es el mismo
+criterio que la sección 4 ya aplica a los empleados que salen en un vídeo.
+
+Esto no se deja a la memoria de nadie: la ficha tiene las casillas
+`occupiedByOthers` y `occupantConsent`, y mientras falte la segunda **el
+permiso no puede llevar piezas atadas**. La ficha se anota igual —es útil
+saber que existe y que falta la otra mitad— pero sin piezas el modo estricto
+no publica ninguna. La restricción está también en la base de datos, no solo
+en el contrato.
+
+### Lo que no vale
+
+- **Una llamada de teléfono.** Es verbal.
+- **«Quien no conteste, consiente.»** El silencio no es permiso.
+- **Una casilla premarcada**, o metida dentro de los términos generales.
+- **Condicionar el servicio o el precio** a que acepte.
+- **Un permiso genérico «para todo lo que hagamos en su casa»**, sin fecha de
+  servicio. El permiso es de _esa casa y ese trabajo_; por eso `serviceDate`
+  es obligatorio.
+
+Hay una asimetría deliberada: **para revocar basta un WhatsApp** (sección 2),
+pero para conceder hace falta algo más formal. Retirar tiene que ser fácil;
+conceder tiene que ser consciente.
+
+### Lo que guarda el sistema (etapa 2.D.3)
+
+La ficha anota **por qué vía llegó** el permiso, en `evidenceKind`:
+
+| Valor          | Dónde está la prueba      |
+| -------------- | ------------------------- |
+| `SIGNED_PAPER` | El archivador             |
+| `WEB_FORM`     | La fila de la reserva     |
+| `EMAIL`        | El buzón de correo        |
+| `MESSAGE`      | El hilo de WhatsApp o SMS |
+
+**Los cuatro valen igual.** El campo no distingue permisos buenos de malos:
+dice dónde buscar la prueba el día que haya que enseñarla. Por eso
+`reference` ya no es «el número del papel» sino lo que identifique la prueba,
+sea cual sea: el número impreso, la referencia de la reserva o el
+identificador del mensaje.
+
+Por defecto es `SIGNED_PAPER`, y tiene valor por defecto también en la base de
+datos: las fichas anotadas antes de que esto existiera son todas de papel,
+porque era lo único que el panel permitía anotar. Sin ese valor por defecto,
+el día del despliegue habrían dejado de validarse y la galería entera se
+habría quedado vacía — que es exactamente el accidente de la sección 9.
+
+El medio **sí** entra en la auditoría; el nombre y la dirección, no. Es una
+categoría de cuatro valores que no identifica a nadie.
+
+### Lo que todavía no guarda
+
+**La prueba en sí.** Hoy se guarda la _referencia_ de la prueba, no la prueba.
+El día que haga falta demostrarlo, una referencia a un PDF que está en el
+correo de alguien no sirve. Guardar el escaneo o el PDF es la etapa siguiente,
+y tiene su propia decisión de seguridad: ese archivo lleva nombre, dirección y
+firma, así que **no puede ir al mismo almacén que las fotos de la galería**,
+que es público.

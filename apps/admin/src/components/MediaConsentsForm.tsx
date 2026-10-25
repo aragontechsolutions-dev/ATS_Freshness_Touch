@@ -2,8 +2,11 @@ import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   CONSENT_CHANNELS,
+  CONSENT_EVIDENCE_KINDS,
+  CONSENT_REMOVAL_DAYS_DEFAULT,
   MediaConsentSchema,
   type ConsentChannel,
+  type ConsentEvidenceKind,
   type Locale,
   type MediaConsent,
   type StoredMediaConsent,
@@ -33,8 +36,11 @@ interface MediaConsentsFormProps {
  */
 interface Borrador {
   reference: string;
+  evidenceKind: ConsentEvidenceKind;
   customerName: string;
   propertyAddress: string;
+  occupiedByOthers: boolean;
+  occupantConsent: boolean;
   serviceDate: string;
   signedAt: string;
   coversInterior: boolean;
@@ -49,15 +55,23 @@ interface Borrador {
 
 const VACIO: Borrador = {
   reference: '',
+  /*
+   * EL PAPEL SIGUE SIENDO LO PRIMERO QUE PROPONE, aunque ya no sea lo unico
+   * que vale: es lo que hay en el archivador, y quien abre esta pantalla
+   * suele venir con una hoja en la mano. Lo demas esta a un clic.
+   */
+  evidenceKind: 'SIGNED_PAPER',
   customerName: '',
   propertyAddress: '',
+  occupiedByOthers: false,
+  occupantConsent: false,
   serviceDate: '',
   signedAt: '',
   coversInterior: true,
   coversExterior: false,
   allowsBefore: false,
   channels: ['WEBSITE'],
-  removalDays: '5',
+  removalDays: String(CONSENT_REMOVAL_DAYS_DEFAULT),
   videoIds: '',
   photoPaths: '',
   notes: '',
@@ -244,6 +258,28 @@ export function MediaConsentsForm({ locale, onSessionLost }: MediaConsentsFormPr
                 campo('reference', v);
               }}
             />
+            <label className="block">
+              <span className="ft-label">{t('admin.consents.evidenceKind')}</span>
+              <span className="mb-1 block text-xs text-slate-600 dark:text-slate-400">
+                {t('admin.consents.evidenceKindHelp')}
+              </span>
+              <select
+                className="ft-input"
+                value={borrador.evidenceKind}
+                onChange={(evento) => {
+                  campo('evidenceKind', evento.target.value as ConsentEvidenceKind);
+                }}
+              >
+                {CONSENT_EVIDENCE_KINDS.map((medio) => (
+                  <option key={medio} value={medio}>
+                    {t(`admin.consents.evidence.${medio}`)}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2">
             <Texto
               etiqueta={t('admin.consents.customerName')}
               valor={borrador.customerName}
@@ -251,16 +287,52 @@ export function MediaConsentsForm({ locale, onSessionLost }: MediaConsentsFormPr
                 campo('customerName', v);
               }}
             />
+            <Texto
+              etiqueta={t('admin.consents.propertyAddress')}
+              ayuda={t('admin.consents.propertyAddressHelp')}
+              valor={borrador.propertyAddress}
+              onCambiar={(v) => {
+                campo('propertyAddress', v);
+              }}
+            />
           </div>
 
-          <Texto
-            etiqueta={t('admin.consents.propertyAddress')}
-            ayuda={t('admin.consents.propertyAddressHelp')}
-            valor={borrador.propertyAddress}
-            onCambiar={(v) => {
-              campo('propertyAddress', v);
-            }}
-          />
+          {/*
+           * QUIEN VIVE ALLI, EN SU PROPIO RECUADRO.
+           *
+           * Mismo tratamiento que la casilla del «antes»: es una decision con
+           * consecuencias para una persona que no esta en la conversacion —el
+           * inquilino— y perdida entre los demas campos se marcaria sin leer.
+           */}
+          <fieldset className="rounded-lg border border-amber-300 bg-amber-50 p-3 dark:border-amber-700/60 dark:bg-amber-950/30">
+            <legend className="ft-label px-1">{t('admin.consents.occupancy')}</legend>
+            <Casilla
+              etiqueta={t('admin.consents.occupiedByOthers')}
+              marcada={borrador.occupiedByOthers}
+              onCambiar={(v) => {
+                campo('occupiedByOthers', v);
+              }}
+            />
+            <p className="mt-1 text-xs text-slate-700 dark:text-slate-300">
+              {t('admin.consents.occupiedByOthersHelp')}
+            </p>
+            {borrador.occupiedByOthers && (
+              <div className="mt-3 space-y-1">
+                <Casilla
+                  etiqueta={t('admin.consents.occupantConsent')}
+                  marcada={borrador.occupantConsent}
+                  onCambiar={(v) => {
+                    campo('occupantConsent', v);
+                  }}
+                />
+                {!borrador.occupantConsent && (
+                  <p className="text-xs font-medium text-amber-900 dark:text-amber-200">
+                    {t('admin.consents.occupantBlocked')}
+                  </p>
+                )}
+              </div>
+            )}
+          </fieldset>
 
           <div className="grid gap-3 sm:grid-cols-3">
             <Texto
@@ -273,6 +345,7 @@ export function MediaConsentsForm({ locale, onSessionLost }: MediaConsentsFormPr
             />
             <Texto
               etiqueta={t('admin.consents.signedAt')}
+              ayuda={t('admin.consents.signedAtHelp')}
               tipo="date"
               valor={borrador.signedAt}
               onCambiar={(v) => {
@@ -587,8 +660,16 @@ function porLineas(texto: string): string[] {
 function aContrato(borrador: Borrador): unknown {
   return {
     reference: borrador.reference.trim(),
+    evidenceKind: borrador.evidenceKind,
     customerName: borrador.customerName.trim(),
     propertyAddress: borrador.propertyAddress.trim(),
+    occupiedByOthers: borrador.occupiedByOthers,
+    /*
+     * Si no vive alli nadie mas, la casilla del segundo permiso no se ensena
+     * y se manda en falso. Dejar pasar un `true` escondido convertiria una
+     * casilla invisible en la que levanta la restriccion.
+     */
+    occupantConsent: borrador.occupiedByOthers && borrador.occupantConsent,
     serviceDate: borrador.serviceDate,
     signedAt: borrador.signedAt,
     coversInterior: borrador.coversInterior,
@@ -610,8 +691,11 @@ function aContrato(borrador: Borrador): unknown {
 function aBorrador(consent: MediaConsent): Borrador {
   return {
     reference: consent.reference,
+    evidenceKind: consent.evidenceKind,
     customerName: consent.customerName,
     propertyAddress: consent.propertyAddress,
+    occupiedByOthers: consent.occupiedByOthers,
+    occupantConsent: consent.occupantConsent,
     serviceDate: consent.serviceDate,
     signedAt: consent.signedAt,
     coversInterior: consent.coversInterior,
