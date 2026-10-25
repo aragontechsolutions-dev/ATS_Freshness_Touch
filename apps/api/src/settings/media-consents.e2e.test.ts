@@ -8,6 +8,7 @@ import request from 'supertest';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { StoredMediaConsentSchema } from '@freshness/types';
 import { AppModule } from '../app.module';
+import { applyBodyParsers } from '../common/body-parsers';
 import { AUTH_PROVIDER } from '../auth/auth.types';
 import type { LocalAuthProvider } from '../auth/providers/local-auth.provider';
 import { GalleryService } from './gallery.service';
@@ -151,6 +152,12 @@ beforeAll(async () => {
   const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
   app = moduleRef.createNestApplication<NestExpressApplication>({ rawBody: true });
   app.setGlobalPrefix('api/v1', { exclude: ['health', 'health/ready'] });
+  /*
+   * Los mismos lectores de cuerpo que en produccion. Sin esto la ruta de la
+   * prueba llegaria sin bytes y la prueba diria que algo esta roto cuando lo
+   * unico roto seria el montaje.
+   */
+  applyBodyParsers(app, 'api/v1');
   await app.init();
 
   provider = app.get<LocalAuthProvider>(AUTH_PROVIDER);
@@ -243,8 +250,114 @@ describe('lo que el contrato no deja pasar', () => {
     ['sin referencia del papel', { reference: '' }],
     ['una ruta de foto inventada', { photoPaths: ['photos/casa-de-marta.jpg'] }],
     ['un identificador de video inventado', { videoIds: ['https://evil.example/x'] }],
+    ['un medio que no existe', { evidenceKind: 'LLAMADA' }],
   ])('rechaza %s', async (_caso, extra) => {
     expect((await crear(papel(extra))).status).toBe(400);
+  });
+});
+
+/* ------------------------------------------------------------------------ */
+
+describe('como se obtuvo el permiso', () => {
+  /*
+   * EL SUPUESTO QUE NO AGUANTABA EL CASO NORMAL.
+   *
+   * El registro nacio suponiendo un papel firmado en el salon. Pero en una
+   * limpieza de mudanza la casa esta vacia, en una recurrente el cliente esta
+   * trabajando, y hay clientes que contratan desde otro estado. Si el permiso
+   * solo se puede obtener en persona, no se obtiene — y con el modo estricto,
+   * lo que no se obtiene no se publica.
+   */
+  it.each(['SIGNED_PAPER', 'WEB_FORM', 'EMAIL', 'MESSAGE'])(
+    'un permiso dado por %s vale igual',
+    async (medio) => {
+      const ficha = await crear(papel({ evidenceKind: medio, photoPaths: [FOTO] }));
+
+      expect(ficha.status).toBe(201);
+      expect(ficha.body.consent.evidenceKind).toBe(medio);
+
+      await publicarGaleria();
+      expect((await leerPublica()).body.photos).toHaveLength(1);
+    },
+  );
+
+  /*
+   * Las fichas anotadas antes de que esto existiera son todas de papel: era
+   * lo unico que el panel permitia. Sin este valor por defecto, el dia del
+   * despliegue dejarian de validarse y la galeria entera se quedaria vacia.
+   */
+  it('una ficha que no dice el medio se lee como papel firmado', async () => {
+    const sinMedio = papel();
+    delete sinMedio.evidenceKind;
+
+    const ficha = await crear(sinMedio);
+
+    expect(ficha.status).toBe(201);
+    expect(ficha.body.consent.evidenceKind).toBe('SIGNED_PAPER');
+  });
+
+  it('el medio queda en la auditoria, pero el nombre y la direccion no', async () => {
+    await crear(papel({ evidenceKind: 'WEB_FORM' }));
+
+    const fila = await db.query<{ metadata: unknown }>(
+      `SELECT metadata FROM audit_logs WHERE action = 'media_consent.created'`,
+    );
+    const metadata = JSON.stringify(fila.rows[0]?.metadata);
+
+    expect(metadata).toContain('WEB_FORM');
+    expect(metadata).not.toContain('Marta');
+    expect(metadata).not.toContain('Evergreen');
+  });
+});
+
+/* ------------------------------------------------------------------------ */
+
+describe('cuando en la casa vive alguien que no firma', () => {
+  /*
+   * EL CASO QUE SE CUELA SIN QUE NADIE LO NOTE.
+   *
+   * El dueno contrata, el dueno firma, y en las imagenes salen los muebles,
+   * la ropa y los objetos de OTRA persona que no ha dicho nada. Sobre la vida
+   * privada de un tercero no se puede dar permiso.
+   */
+  it('su permiso no puede amparar ninguna pieza mientras falte el del inquilino', async () => {
+    const conFoto = await crear(
+      papel({ occupiedByOthers: true, occupantConsent: false, photoPaths: [FOTO] }),
+    );
+    expect(conFoto.status).toBe(400);
+
+    const conVideo = await crear(
+      papel({ occupiedByOthers: true, occupantConsent: false, videoIds: [VIDEO] }),
+    );
+    expect(conVideo.status).toBe(400);
+  });
+
+  /*
+   * La ficha SI se puede anotar. Es util saber que existe y que falta la otra
+   * mitad; lo que no puede es llevar piezas, y sin piezas el modo estricto no
+   * publica ninguna. La regla se cumple sola.
+   */
+  it('pero la ficha se anota igual, sin piezas', async () => {
+    const ficha = await crear(papel({ occupiedByOthers: true, occupantConsent: false }));
+
+    expect(ficha.status).toBe(201);
+    expect(ficha.body.consent.occupiedByOthers).toBe(true);
+    expect(ficha.body.consent.occupantConsent).toBe(false);
+  });
+
+  it('con los dos permisos, ampara como cualquier otra', async () => {
+    const ficha = await crear(
+      papel({ occupiedByOthers: true, occupantConsent: true, photoPaths: [FOTO] }),
+    );
+    expect(ficha.status).toBe(201);
+
+    await publicarGaleria();
+    expect((await leerPublica()).body.photos).toHaveLength(1);
+  });
+
+  it('si solo vive quien firma, no hace falta nada mas', async () => {
+    const ficha = await crear(papel({ occupiedByOthers: false, photoPaths: [FOTO] }));
+    expect(ficha.status).toBe(201);
   });
 });
 
@@ -363,8 +476,10 @@ describe('el rastro', () => {
 
   /*
    * NI EL NOMBRE NI LA DIRECCION EN LA METADATA. El registro se consulta, se
-   * exporta y se ensena; de ahi vendria el problema. La referencia del papel
-   * y cuantas piezas ampara bastan para responder a lo que se pregunta.
+   * exporta y se ensena; de ahi vendria el problema. La referencia del papel,
+   * por que via llego y cuantas piezas ampara bastan para responder a lo que
+   * se pregunta. El medio es una categoria de cuatro valores: no identifica a
+   * nadie, y es lo que dice donde buscar la prueba.
    */
   it('la metadata no lleva nada del cliente', async () => {
     await crear(papel({ photoPaths: [FOTO] }));
@@ -374,8 +489,232 @@ describe('el rastro', () => {
     );
     const metadata = filas.rows[0]?.metadata ?? {};
 
-    expect(Object.keys(metadata).sort()).toEqual(['allowsBefore', 'photos', 'reference', 'videos']);
+    expect(Object.keys(metadata).sort()).toEqual([
+      'allowsBefore',
+      'evidenceKind',
+      'photos',
+      'reference',
+      'videos',
+    ]);
     expect(JSON.stringify(metadata)).not.toContain('Marta');
     expect(JSON.stringify(metadata)).not.toContain('Evergreen');
+  });
+});
+
+/* ------------------------------------------------------------------------ */
+
+describe('la prueba del permiso', () => {
+  /** Un PDF minimo: lo que importa es que empiece por `%PDF-`. */
+  const PDF = Buffer.from('%PDF-1.4\n1 0 obj\n<<>>\nendobj\ntrailer\n<<>>\n%%EOF\n');
+
+  /** Ocho bytes reconocibles, para poder buscarlos despues. */
+  const GPS = [0x47, 0x50, 0x53, 0x5f, 0x41, 0x51, 0x55, 0x49]; // "GPS_AQUI"
+
+  /**
+   * Un JPEG minimo CON un EXIF dentro.
+   *
+   * Se construye byte a byte a proposito: un archivo binario de prueba no se
+   * puede leer en una revision, y nadie sabria si de verdad lleva un EXIF.
+   */
+  function jpegConExif(): Buffer {
+    const exif = [0x45, 0x78, 0x69, 0x66, 0x00, 0x00, ...GPS];
+    return Buffer.from([
+      0xff,
+      0xd8, //                                     SOI
+      0xff,
+      0xe1,
+      0x00,
+      exif.length + 2,
+      ...exif, //      APP1 con el GPS
+      0xff,
+      0xc0,
+      0x00,
+      0x08,
+      0x08,
+      0x00,
+      0x10,
+      0x00,
+      0x10,
+      0x01, // SOF0
+      0xff,
+      0xda,
+      0x00,
+      0x08,
+      0x01,
+      0x01,
+      0x00,
+      0x11,
+      0x22,
+      0x33, // datos
+      0xff,
+      0xd9, //                                     EOI
+    ]);
+  }
+
+  const JPEG = jpegConExif();
+
+  async function subir(id: string, bytes: Buffer, tipo: string, token?: string) {
+    return request(app.getHttpServer())
+      .post(`${RUTA}/${id}/evidence`)
+      .set('authorization', `Bearer ${token ?? (await comoAda())}`)
+      .set('content-type', tipo)
+      .send(bytes);
+  }
+
+  async function descargar(id: string, token?: string) {
+    return request(app.getHttpServer())
+      .get(`${RUTA}/${id}/evidence`)
+      .set('authorization', `Bearer ${token ?? (await comoAda())}`);
+  }
+
+  /*
+   * LA PRUEBA QUE JUSTIFICA ESTA ETAPA.
+   *
+   * Hasta ahora el registro guardaba el NUMERO del papel, no el papel. Una
+   * referencia a un PDF que esta en el correo de alguien no se le puede
+   * ensenar a nadie.
+   */
+  it('se guarda, se descarga igual y se queda atada a la ficha', async () => {
+    const ficha = await crear(papel());
+
+    const subida = await subir(ficha.body.id, PDF, 'application/pdf');
+    expect(subida.status).toBe(201);
+    expect(subida.body.evidencePath).toMatch(/^evidence\/[0-9a-f]{32}\.pdf$/);
+
+    const bajada = await descargar(ficha.body.id);
+    expect(bajada.status).toBe(200);
+    expect(bajada.headers['content-type']).toContain('application/pdf');
+    expect(Buffer.from(bajada.body as Buffer).equals(PDF)).toBe(true);
+
+    const lista = await listar();
+    expect(lista.body[0].evidencePath).toBe(subida.body.evidencePath);
+  });
+
+  /*
+   * LA RUTA NO ES UNA DIRECCION. El bucket es privado y su puerto no sabe
+   * dar direcciones publicas, asi que la unica puerta es este endpoint — y
+   * este endpoint pide una sesion de administracion.
+   */
+  it('no se descarga sin sesion, ni con una que no es de administracion', async () => {
+    const ficha = await crear(papel());
+    await subir(ficha.body.id, PDF, 'application/pdf');
+
+    const sinSesion = await request(app.getHttpServer()).get(`${RUTA}/${ficha.body.id}/evidence`);
+    expect(sinSesion.status).toBe(401);
+
+    const comoCoordinador = await descargar(ficha.body.id, await comoDiego());
+    expect(comoCoordinador.status).toBe(403);
+  });
+
+  it('se sirve como descarga y sin dejar copia en ninguna cache', async () => {
+    const ficha = await crear(papel());
+    await subir(ficha.body.id, PDF, 'application/pdf');
+
+    const bajada = await descargar(ficha.body.id);
+    expect(bajada.headers['content-disposition']).toBe('attachment');
+    expect(bajada.headers['cache-control']).toBe('no-store');
+  });
+
+  /*
+   * LO QUE MANDA SON LOS BYTES, NO LA CABECERA. Quien sube elige lo que pone
+   * en `Content-Type`: llamar `application/pdf` a un SVG colaria un
+   * documento con JavaScript dentro.
+   */
+  it('un archivo que dice ser un PDF y no lo es se rechaza', async () => {
+    const ficha = await crear(papel());
+    const svg = Buffer.from('<svg onload="alert(1)"></svg>');
+
+    expect((await subir(ficha.body.id, svg, 'application/pdf')).status).toBe(415);
+    expect((await subir(ficha.body.id, svg, 'image/png')).status).toBe(415);
+  });
+
+  it('un tipo que no esta admitido no llega ni a leerse', async () => {
+    const ficha = await crear(papel());
+    expect((await subir(ficha.body.id, PDF, 'image/svg+xml')).status).toBe(415);
+  });
+
+  it('una imagen tambien vale: hay quien fotografia el papel', async () => {
+    const ficha = await crear(papel());
+
+    const subida = await subir(ficha.body.id, JPEG, 'image/jpeg');
+    expect(subida.status).toBe(201);
+    expect(subida.body.evidencePath).toMatch(/\.jpg$/);
+  });
+
+  /*
+   * SE LE QUITAN LOS METADATOS AUNQUE NO SE PUBLIQUE.
+   *
+   * Aqui el archivo no sale a internet, asi que las coordenadas de dentro no
+   * se ensenarian a nadie. Se quitan igual porque el habito tiene que ser el
+   * mismo en los dos almacenes: el dia que alguien copie este codigo al que
+   * si publica, no puede depender de que se acuerde.
+   */
+  it('a una imagen se le quita el EXIF antes de guardarla', async () => {
+    const ficha = await crear(papel());
+    expect(JPEG.includes(Buffer.from(GPS))).toBe(true);
+
+    await subir(ficha.body.id, JPEG, 'image/jpeg');
+
+    const bajada = await descargar(ficha.body.id);
+    expect(Buffer.from(bajada.body as Buffer).includes(Buffer.from(GPS))).toBe(false);
+  });
+
+  it('sustituir deja una sola prueba, la nueva', async () => {
+    const ficha = await crear(papel());
+
+    const primera = await subir(ficha.body.id, PDF, 'application/pdf');
+    const segunda = await subir(ficha.body.id, JPEG, 'image/jpeg');
+
+    expect(segunda.status).toBe(201);
+    expect(segunda.body.evidencePath).not.toBe(primera.body.evidencePath);
+
+    const bajada = await descargar(ficha.body.id);
+    expect(bajada.headers['content-type']).toContain('image/jpeg');
+  });
+
+  /*
+   * BORRAR LA PRUEBA NO BORRA EL PERMISO. Un permiso anotado sin su archivo
+   * sigue amparando lo que ampara; que le falte la prueba se ve en la
+   * pantalla y se arregla volviendo a subirla.
+   */
+  it('borrar la prueba deja la ficha y lo que ampara', async () => {
+    const ficha = await crear(papel({ photoPaths: [FOTO] }));
+    await subir(ficha.body.id, PDF, 'application/pdf');
+    await publicarGaleria();
+
+    const borrado = await request(app.getHttpServer())
+      .delete(`${RUTA}/${ficha.body.id}/evidence`)
+      .set('authorization', `Bearer ${await comoAda()}`);
+
+    expect(borrado.status).toBe(200);
+    expect(borrado.body.evidencePath).toBeNull();
+    expect(borrado.body.consent.photoPaths).toEqual([FOTO]);
+    expect((await leerPublica()).body.photos).toHaveLength(1);
+    expect((await descargar(ficha.body.id)).status).toBe(404);
+  });
+
+  /*
+   * NI LA RUTA EN LA AUDITORIA. Es el unico dato que, sumado a la clave de
+   * servicio, abre el documento; y el registro se consulta, se exporta y se
+   * ensena.
+   */
+  it('queda registrado quien la guardo, pero no donde esta', async () => {
+    const ficha = await crear(papel());
+    const subida = await subir(ficha.body.id, PDF, 'application/pdf');
+
+    const filas = await db.query<{ action: string; metadata: Record<string, unknown> }>(
+      `SELECT action, metadata FROM audit_logs WHERE action LIKE 'media_consent.evidence%'`,
+    );
+
+    expect(filas.rows[0]?.action).toBe('media_consent.evidence_attached');
+    const metadata = JSON.stringify(filas.rows[0]?.metadata);
+    expect(metadata).not.toContain(subida.body.evidencePath);
+    expect(metadata).not.toContain('evidence/');
+    expect(metadata).toContain('application/pdf');
+  });
+
+  it('un permiso sin prueba responde que no la hay', async () => {
+    const ficha = await crear(papel());
+    expect((await descargar(ficha.body.id)).status).toBe(404);
   });
 });

@@ -1045,12 +1045,25 @@ model MediaConsent {
   /// escribiendo. El panel avisa; la base no estorba.
   reference String
 
+  /// Por que via llego el permiso: papel firmado, casilla del formulario de
+  /// reserva, correo o mensaje escrito. Los cuatro valen; esto dice DONDE
+  /// ESTA LA PRUEBA. Por defecto el papel, que es lo unico que existia antes.
+  evidenceKind String @default("SIGNED_PAPER")
+
   customerName    String
   /// La casa. NUNCA sale al sitio publico.
   propertyAddress String
 
+  /// Si vive alli alguien que no es quien firma —el caso del dueno que
+  /// alquila—. Entonces hacen falta los dos permisos, porque en las imagenes
+  /// salen los objetos del inquilino.
+  occupiedByOthers Boolean @default(false)
+  /// Si el permiso de quien habita la vivienda tambien esta obtenido.
+  occupantConsent  Boolean @default(false)
+
   /// Fechas sin hora: es lo que hay escrito en un papel.
   serviceDate DateTime @db.Date
+  /// Cuando se dio: se firmo, se marco la casilla o se escribio.
   signedAt    DateTime @db.Date
 
   coversInterior Boolean
@@ -1071,6 +1084,12 @@ model MediaConsent {
   photoPaths String[]
 
   notes String?
+
+  /// La PRUEBA guardada: el escaneo del papel firmado, el PDF del correo.
+  /// Es una ruta dentro del almacen PRIVADO, no una direccion: no se abre
+  /// pegandola en un navegador. Nula mientras solo este anotada la
+  /// referencia, que es como nacieron todas las fichas anteriores.
+  evidencePath String?
 
   /// Cuando el cliente retiro el permiso. NULL mientras siga en pie.
   revokedAt DateTime? @db.Timestamptz(3)

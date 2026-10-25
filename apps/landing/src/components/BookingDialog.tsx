@@ -187,6 +187,16 @@ export function BookingDialog({ open, job, quote, locale, onClose }: BookingDial
            * distancia sale del codigo postal.
            */
           ...(details.doorPin ? { doorPin: details.doorPin } : {}),
+          /*
+           * EL PERMISO DE IMAGEN. Las otras dos casillas solo cuentan si la
+           * primera esta marcada: si se marca «sale el antes» y despues se
+           * desmarca el permiso, lo que tiene que salir es un no.
+           */
+          mediaConsent: {
+            granted: details.mediaConsent,
+            allowsBefore: details.mediaConsent && details.mediaConsentBefore,
+            occupiedByOthers: details.mediaConsent && details.mediaConsentTenant,
+          },
         },
         controller.signal,
       );

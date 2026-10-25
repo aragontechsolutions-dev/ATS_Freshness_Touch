@@ -473,13 +473,31 @@ export const en = {
       empty:
         'No releases recorded yet. Until one is, nothing from the gallery appears on the website.',
       reference: 'Reference',
-      referenceHelp: 'The one written on the paper, so the scan can be matched to it.',
+      referenceHelp:
+        'The paper\u2019s number, the booking reference, or whatever identifies the message. It is how the proof is found again.',
+      evidenceKind: 'How it was given',
+      evidenceKindHelp:
+        'All four count. This says where the proof is kept, for the day it has to be shown.',
+      evidence: {
+        SIGNED_PAPER: 'Paper, signed by hand',
+        WEB_FORM: 'Ticked when booking',
+        EMAIL: 'By email',
+        MESSAGE: 'By written message',
+      },
       customerName: 'Customer',
       propertyAddress: 'Property',
       propertyAddressHelp:
         'Never shown on the website. It lives here so the item can be found again.',
+      occupancy: 'Who lives there',
+      occupiedByOthers: 'Someone other than the signer lives in the property',
+      occupiedByOthersHelp:
+        'A landlord may let us film their property, but the furniture and belongings in shot are the tenant\u2019s. Nobody can give a release over someone else\u2019s private life.',
+      occupantConsent: 'Whoever lives there has given a release too',
+      occupantBlocked:
+        'Until both releases are on file, this one cannot cover any photo or video. Record it anyway so the missing half is visible.',
       serviceDate: 'Service date',
-      signedAt: 'Signed on',
+      signedAt: 'Given on',
+      signedAtHelp: 'The day it was signed, ticked or written.',
       removalDays: 'Removal deadline (days)',
       covers: 'What was filmed',
       coversInterior: 'Interior',
@@ -516,6 +534,16 @@ export const en = {
       signedOn: 'Signed {{when}}',
       revokedOn: 'Withdrawn {{when}}',
       errInvalid: 'Some of the release is not valid yet.',
+      noEvidence: 'No proof filed: this release cannot be shown to anyone.',
+      hasEvidence: 'Proof on file.',
+      attachEvidence: 'File the proof',
+      replaceEvidence: 'Replace',
+      viewEvidence: 'Download',
+      deleteEvidence: 'Delete',
+      evidenceSaved: 'Proof filed',
+      evidenceDeleted: 'Proof deleted',
+      confirmEvidenceDelete:
+        'The release stays, but its proof is deleted for good. Only do this to replace one filed by mistake. Continue?',
     },
 
     notifications: {
@@ -1141,6 +1169,8 @@ export const en = {
           updated: 'Image release corrected',
           revoked: 'Image release withdrawn',
           restored: 'Image release reinstated',
+          evidence_attached: 'Proof of a release filed',
+          evidence_removed: 'Proof of a release deleted',
         },
         notifications: {
           updated: 'Alert settings changed',
@@ -1522,6 +1552,15 @@ export const en = {
       doorPinRetention: 'We delete this pin the day after your cleaning.',
       customerNotes: 'Anything else we should know? (optional)',
       marketingOptIn: 'Send me occasional offers and cleaning tips.',
+
+      mediaConsentTitle: 'Before-and-after photos',
+      mediaConsent: 'You may photograph and film this home and publish it on your website.',
+      mediaConsentHelp:
+        'Entirely optional: it changes neither the price nor the service. We never show the street number, and you can ask us to take it down at any time \u2014 by email or a message \u2014 and it is off the website within 5 days.',
+      mediaConsentBefore: 'You may also publish the "before" footage.',
+      mediaConsentTenant: 'Someone other than me lives in this home.',
+      mediaConsentTenantHelp:
+        'Then we also need their release before anything is published: the belongings in shot are theirs, and we will be in touch about it.',
       priceNotice:
         'Your final price is confirmed with the full address, so it may differ slightly from the estimate.',
     },

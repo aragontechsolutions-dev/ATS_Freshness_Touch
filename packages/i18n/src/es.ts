@@ -436,12 +436,30 @@ export const es: TranslationResources = {
       empty:
         'Todavía no hay permisos anotados. Hasta que haya uno, nada de la galería sale en la web.',
       reference: 'Referencia',
-      referenceHelp: 'La que va escrita en el papel, para poder emparejar el escaneo.',
+      referenceHelp:
+        'El número del papel, la referencia de la reserva o lo que identifique el mensaje. Es por donde se vuelve a encontrar la prueba.',
+      evidenceKind: 'Cómo se obtuvo',
+      evidenceKindHelp:
+        'Los cuatro valen. Esto dice dónde está guardada la prueba, para el día que haya que enseñarla.',
+      evidence: {
+        SIGNED_PAPER: 'Papel firmado a mano',
+        WEB_FORM: 'Casilla marcada al reservar',
+        EMAIL: 'Por correo',
+        MESSAGE: 'Por mensaje escrito',
+      },
       customerName: 'Cliente',
       propertyAddress: 'Propiedad',
       propertyAddressHelp: 'No sale nunca en la web. Está aquí para poder encontrar la pieza.',
+      occupancy: 'Quién vive allí',
+      occupiedByOthers: 'En la vivienda vive alguien que no es quien firma',
+      occupiedByOthersHelp:
+        'Un dueño puede autorizar su propiedad, pero los muebles y los objetos que salen en el plano son del inquilino. Sobre la vida privada de otro no se puede dar permiso.',
+      occupantConsent: 'Quien vive allí también ha dado su permiso',
+      occupantBlocked:
+        'Mientras falte uno de los dos permisos, este no puede amparar ninguna foto ni ningún vídeo. Anótalo igual, para que se vea que falta la otra mitad.',
       serviceDate: 'Fecha del servicio',
-      signedAt: 'Fecha de la firma',
+      signedAt: 'Fecha en que se dio',
+      signedAtHelp: 'El día en que se firmó, se marcó la casilla o se escribió.',
       removalDays: 'Plazo de retirada (días)',
       covers: 'Qué se grabó',
       coversInterior: 'Interior',
@@ -478,6 +496,16 @@ export const es: TranslationResources = {
       signedOn: 'Firmado el {{when}}',
       revokedOn: 'Retirado el {{when}}',
       errInvalid: 'Hay algo del permiso que todavía no vale.',
+      noEvidence: 'Sin la prueba guardada: este permiso no se le puede enseñar a nadie.',
+      hasEvidence: 'Prueba guardada.',
+      attachEvidence: 'Guardar la prueba',
+      replaceEvidence: 'Sustituir',
+      viewEvidence: 'Descargar',
+      deleteEvidence: 'Borrar',
+      evidenceSaved: 'Prueba guardada',
+      evidenceDeleted: 'Prueba borrada',
+      confirmEvidenceDelete:
+        'El permiso se queda, pero su prueba se borra para siempre. Hazlo solo para sustituir una guardada por error. ¿Seguimos?',
     },
 
     notifications: {
@@ -1086,6 +1114,8 @@ export const es: TranslationResources = {
           updated: 'Corrigió un permiso de imagen',
           revoked: 'Retiró un permiso de imagen',
           restored: 'Restituyó un permiso de imagen',
+          evidence_attached: 'Guardó la prueba de un permiso',
+          evidence_removed: 'Borró la prueba de un permiso',
         },
         pricing: {
           updated: 'Cambió las tarifas',
@@ -1396,6 +1426,15 @@ export const es: TranslationResources = {
       doorPinRetention: 'Este pin lo borramos al día siguiente de tu limpieza.',
       customerNotes: '¿Algo más que debamos saber? (opcional)',
       marketingOptIn: 'Quiero recibir ofertas y consejos de limpieza de vez en cuando.',
+
+      mediaConsentTitle: 'Fotos del antes y el después',
+      mediaConsent: 'Pueden fotografiar y grabar esta vivienda y publicarlo en su página web.',
+      mediaConsentHelp:
+        'Es totalmente opcional: no cambia el precio ni el servicio. Nunca mostramos el número de la calle, y puede pedirnos que lo retiremos cuando quiera —por correo o por un mensaje—; lo quitamos de la web en 5 días.',
+      mediaConsentBefore: 'También pueden publicar las imágenes del «antes».',
+      mediaConsentTenant: 'En esta vivienda vive alguien que no soy yo.',
+      mediaConsentTenantHelp:
+        'Entonces necesitamos también su permiso antes de publicar nada: los objetos que salen en el plano son suyos. Nos pondremos en contacto para eso.',
       priceNotice:
         'El precio final se confirma con la dirección completa, así que puede variar ligeramente respecto a la estimación.',
     },

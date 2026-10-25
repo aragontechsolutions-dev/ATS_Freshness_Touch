@@ -147,7 +147,7 @@ async function request<T>(
   path: string,
   parse: (payload: unknown) => T,
   init: {
-    method: 'GET' | 'PATCH' | 'POST' | 'PUT';
+    method: 'DELETE' | 'GET' | 'PATCH' | 'POST' | 'PUT';
     body?: unknown;
     /**
      * Un cuerpo que se manda TAL CUAL, con su propio tipo.
@@ -819,6 +819,68 @@ export function setMediaConsentRevoked(id: string, revocado: boolean): Promise<S
   return request(`${PERMISOS}/${id}/${accion}`, unPermiso('retirada del permiso'), {
     method: 'POST',
   });
+}
+
+/**
+ * Guarda la PRUEBA del permiso: el escaneo del papel, el PDF del correo.
+ *
+ * Va a un almacen privado, no al de la galeria. Aqui se manda igual que una
+ * foto —el archivo tal cual, el tipo en la cabecera— pero lo que ocurre al
+ * otro lado es distinto: el documento no recibe ninguna direccion publica.
+ */
+export function uploadMediaConsentEvidence(id: string, file: File): Promise<StoredMediaConsent> {
+  return request(`${PERMISOS}/${id}/evidence`, unPermiso('prueba del permiso'), {
+    method: 'POST',
+    raw: { body: file, contentType: file.type },
+  });
+}
+
+export function deleteMediaConsentEvidence(id: string): Promise<StoredMediaConsent> {
+  return request(`${PERMISOS}/${id}/evidence`, unPermiso('prueba del permiso'), {
+    method: 'DELETE',
+  });
+}
+
+/**
+ * Descarga la prueba.
+ *
+ * NO PASA POR `request` porque lo que vuelve no es JSON, son bytes. Es la
+ * unica puerta que tiene ese documento: el bucket es privado y la API solo
+ * lo entrega a una sesion de administracion, asi que no hay ninguna
+ * direccion que se pueda copiar y abrir desde fuera.
+ */
+export async function downloadMediaConsentEvidence(id: string): Promise<Blob> {
+  if (!auth) {
+    throw new ApiClientError(API_ERROR_CODES.UNAUTHORIZED, 'admin.errorNotConfigured', 401);
+  }
+
+  const { data } = await auth.getSession();
+  const token = data.session?.access_token;
+  if (!token) {
+    throw new ApiClientError(API_ERROR_CODES.UNAUTHORIZED, 'admin.errorSessionExpired', 401);
+  }
+
+  let response: Response;
+  try {
+    response = await fetch(`${BASE_URL}${PERMISOS}/${id}/evidence`, {
+      method: 'GET',
+      headers: { Authorization: `Bearer ${token}` },
+      credentials: 'omit',
+      referrerPolicy: 'no-referrer',
+    });
+  } catch {
+    throw new ApiClientError('NETWORK_ERROR', 'admin.errorNetwork', 0);
+  }
+
+  if (!response.ok) {
+    throw new ApiClientError(
+      response.status === 401 ? API_ERROR_CODES.UNAUTHORIZED : API_ERROR_CODES.INTERNAL_ERROR,
+      response.status === 401 ? 'admin.errorSessionExpired' : 'admin.errorGeneric',
+      response.status,
+    );
+  }
+
+  return response.blob();
 }
 
 /* ------------------------------------------------------------------------ */

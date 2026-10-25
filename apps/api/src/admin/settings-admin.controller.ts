@@ -1,14 +1,17 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
+  NotFoundException,
   Param,
   ParseUUIDPipe,
   Post,
   Put,
   Query,
   Req,
+  Res,
   ServiceUnavailableException,
   UnsupportedMediaTypeException,
 } from '@nestjs/common';
@@ -34,6 +37,7 @@ import {
   SiteCopySchema,
   AdminGallery,
   Gallery,
+  ConsentEvidenceTypeSchema,
   MediaConsentSchema,
   type MediaConsent,
   type StoredMediaConsent,
@@ -41,7 +45,7 @@ import {
   GalleryPhotoUpload,
   GallerySchema,
 } from '@freshness/types';
-import type { Request } from 'express';
+import type { Request, Response } from 'express';
 import { ADMIN_ROUTE, CurrentStaff, Roles } from '../auth/auth.decorators';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
 import { SKIP_QUOTE_THROTTLER } from '../common/throttling';
@@ -532,5 +536,110 @@ export class MediaConsentsAdminController {
     @Req() request: Request,
   ): Promise<StoredMediaConsent> {
     return this.consentimientos.setRevoked(id, false, staff, request.ip ?? null);
+  }
+
+  /* -------------------------------------------------------------------- */
+  /*  La prueba: el escaneo del papel, el PDF del correo                   */
+  /* -------------------------------------------------------------------- */
+
+  /**
+   * GUARDA LA PRUEBA JUNTO A LA FICHA.
+   *
+   * Hasta aqui el registro guardaba el numero del papel, no el papel. El dia
+   * que haya que demostrar un permiso, una referencia a un PDF que esta en el
+   * correo de alguien no sirve.
+   *
+   * Va a un almacen PRIVADO, no al de la galeria: lleva el nombre del
+   * cliente, la direccion de su casa y su firma.
+   */
+  @Post(':id/evidence')
+  @Roles('ADMIN')
+  @HttpCode(201)
+  async attachEvidence(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentStaff() staff: AuthenticatedStaff,
+    @Req() request: Request,
+  ): Promise<StoredMediaConsent> {
+    /*
+     * El lector de cuerpos solo acepta los cuatro tipos en esta ruta, asi que
+     * cualquier otra cosa llega sin cuerpo. Se distingue de un archivo vacio
+     * a proposito: el mensaje tiene que decir que el tipo no vale.
+     */
+    const cuerpo: unknown = request.body;
+    if (!Buffer.isBuffer(cuerpo) || cuerpo.length === 0) {
+      throw new UnsupportedMediaTypeException('Manda un PDF o una imagen JPEG, PNG o WebP');
+    }
+
+    const declarado = ConsentEvidenceTypeSchema.safeParse(
+      request.header('content-type')?.split(';')[0]?.trim(),
+    );
+    if (!declarado.success) {
+      throw new UnsupportedMediaTypeException('Manda un PDF o una imagen JPEG, PNG o WebP');
+    }
+
+    const resultado = await this.consentimientos.attachEvidence(
+      id,
+      cuerpo,
+      declarado.data,
+      staff,
+      request.ip ?? null,
+    );
+
+    if (!resultado.ok) {
+      if (resultado.reason === 'storage') {
+        throw new ServiceUnavailableException('El almacen de pruebas no esta disponible');
+      }
+      throw new UnsupportedMediaTypeException(
+        resultado.reason === 'tooBig'
+          ? 'El archivo pesa demasiado'
+          : 'Eso no es un PDF ni una imagen JPEG, PNG o WebP',
+      );
+    }
+
+    return resultado.ficha;
+  }
+
+  /**
+   * DEVUELVE LOS BYTES DE LA PRUEBA.
+   *
+   * ESTA ES LA UNICA PUERTA. El bucket es privado y su puerto no sabe dar
+   * direcciones publicas, asi que para ver este documento hay que pasar por
+   * aqui — y aqui hay una sesion de administracion. Ninguna direccion
+   * copiada abre nada desde fuera.
+   *
+   * `Content-Disposition: attachment` para que el navegador lo descargue en
+   * vez de intentar pintarlo: un PDF abierto dentro de la pagina del panel
+   * es contenido de un archivo corriendo en el origen del panel.
+   */
+  @Get(':id/evidence')
+  @Roles('ADMIN')
+  async readEvidence(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Res() response: Response,
+  ): Promise<void> {
+    const prueba = await this.consentimientos.readEvidence(id);
+    if (prueba === null) throw new NotFoundException('Ese permiso no tiene prueba guardada');
+
+    response
+      .status(200)
+      .setHeader('Content-Type', prueba.contentType)
+      .setHeader('Content-Disposition', 'attachment')
+      /*
+       * Que no se quede en ninguna cache intermedia ni en el disco del
+       * navegador: es un documento firmado con la direccion de una casa.
+       */
+      .setHeader('Cache-Control', 'no-store')
+      .send(Buffer.from(prueba.bytes));
+  }
+
+  /** Borra la prueba y deja la ficha. Queda registrado quien la borro. */
+  @Delete(':id/evidence')
+  @Roles('ADMIN')
+  removeEvidence(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentStaff() staff: AuthenticatedStaff,
+    @Req() request: Request,
+  ): Promise<StoredMediaConsent> {
+    return this.consentimientos.removeEvidence(id, staff, request.ip ?? null);
   }
 }

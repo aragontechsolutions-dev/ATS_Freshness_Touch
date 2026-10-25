@@ -113,6 +113,15 @@ services:
       - key: GALLERY_BUCKET
         value: gallery
 
+      # El bucket de las PRUEBAS de los permisos: el escaneo del papel
+      # firmado, el PDF del correo. PRIVADO, y esa es toda la diferencia con
+      # el anterior: lleva el nombre del cliente, la direccion de su casa y
+      # su firma, que es justo lo que el permiso promete no mostrar. No
+      # tiene ninguna direccion publica; los bytes los sirve la API detras de
+      # la sesion del panel.
+      - key: CONSENT_EVIDENCE_BUCKET
+        value: consent-evidence
+
       # --- Pagos ---
       # mock | stripe. Con "mock" los depositos se SIMULAN: no se retiene
       # dinero real. Sirve para desplegar y probar el flujo completo antes de

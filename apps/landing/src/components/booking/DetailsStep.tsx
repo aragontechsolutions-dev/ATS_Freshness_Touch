@@ -238,6 +238,73 @@ export function DetailsStep({ form, errors, onChange }: DetailsStepProps) {
         {t('booking.details.marketingOptIn')}
       </label>
 
+      {/*
+       * EL PERMISO DE IMAGEN.
+       *
+       * EN SU PROPIO RECUADRO Y NO SUELTO ENTRE LAS DEMAS CASILLAS. No es
+       * una preferencia de correo: es autorizar que se publique el interior
+       * de su casa, y una decision asi marcada de pasada no es un permiso.
+       *
+       * Las dos preguntas de dentro solo aparecen si se dice que si. Verlas
+       * antes invita a marcarlas sin leer, y una de ellas —el «antes»— es la
+       * parte sensible del permiso.
+       */}
+      <fieldset
+        className="rounded-lg border border-slate-300 bg-slate-50 p-3
+                   dark:border-night-600 dark:bg-night-800/50"
+      >
+        <legend className="px-1 text-sm font-semibold text-slate-900 dark:text-white">
+          {t('booking.details.mediaConsentTitle')}
+        </legend>
+
+        <label className="flex items-start gap-2 text-sm text-slate-700 dark:text-slate-300">
+          <input
+            type="checkbox"
+            className="mt-0.5 h-4 w-4 rounded border-slate-400 text-brand-700 focus:ring-brand-600
+                       dark:border-night-600"
+            checked={form.mediaConsent}
+            onChange={(event) => set('mediaConsent', event.target.checked)}
+          />
+          {t('booking.details.mediaConsent')}
+        </label>
+
+        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+          {t('booking.details.mediaConsentHelp')}
+        </p>
+
+        {form.mediaConsent && (
+          <div className="mt-3 space-y-2 border-t border-slate-200 pt-3 dark:border-night-700">
+            <label className="flex items-start gap-2 text-sm text-slate-700 dark:text-slate-300">
+              <input
+                type="checkbox"
+                className="mt-0.5 h-4 w-4 rounded border-slate-400 text-brand-700
+                           focus:ring-brand-600 dark:border-night-600"
+                checked={form.mediaConsentBefore}
+                onChange={(event) => set('mediaConsentBefore', event.target.checked)}
+              />
+              {t('booking.details.mediaConsentBefore')}
+            </label>
+
+            <label className="flex items-start gap-2 text-sm text-slate-700 dark:text-slate-300">
+              <input
+                type="checkbox"
+                className="mt-0.5 h-4 w-4 rounded border-slate-400 text-brand-700
+                           focus:ring-brand-600 dark:border-night-600"
+                checked={form.mediaConsentTenant}
+                onChange={(event) => set('mediaConsentTenant', event.target.checked)}
+              />
+              {t('booking.details.mediaConsentTenant')}
+            </label>
+
+            {form.mediaConsentTenant && (
+              <p className="text-xs text-slate-600 dark:text-slate-400">
+                {t('booking.details.mediaConsentTenantHelp')}
+              </p>
+            )}
+          </div>
+        )}
+      </fieldset>
+
       <p className="text-xs text-slate-500 dark:text-slate-400">
         {t('booking.details.priceNotice')}
       </p>

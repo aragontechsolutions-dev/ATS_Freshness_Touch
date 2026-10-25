@@ -271,6 +271,17 @@ export const EnvSchema = z
      * a las dos no es el tamano, es quien puede verlas.
      */
     GALLERY_BUCKET: z.string().min(1).default('gallery'),
+    /**
+     * El bucket donde vive la PRUEBA de cada permiso de imagen: el escaneo
+     * del papel firmado, el PDF del correo.
+     *
+     * PRIVADO, y esa es toda la diferencia con el anterior. Lleva el nombre
+     * del cliente, la direccion de su casa y su firma —justo lo que el
+     * permiso promete no mostrar—, asi que no tiene ninguna direccion que
+     * funcione en un navegador: los bytes los sirve la API detras de la
+     * sesion del panel.
+     */
+    CONSENT_EVIDENCE_BUCKET: z.string().min(1).default('consent-evidence'),
     STORAGE_TIMEOUT_MS: z.coerce.number().int().min(500).default(10_000),
     /** Secreto del proveedor local. Solo desarrollo y pruebas. */
     AUTH_LOCAL_SECRET: z.string().min(1).default('secreto-de-desarrollo-no-usar-en-produccion'),

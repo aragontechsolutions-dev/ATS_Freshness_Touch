@@ -137,15 +137,17 @@ para recibir el servicio de limpieza.
 Firma: ______________________________  Fecha: _________________
 ```
 
-### Dos decisiones que faltan en el modelo
+### Las dos decisiones, ya tomadas
 
-1. **El plazo de retirada** (los `____ días`). Recomendado: **5 días
-   laborables.** Prometer «inmediatamente» es prometer algo que no se puede
-   cumplir un domingo.
-2. **Si el permiso se pide antes o después del servicio.** Recomendado:
-   **antes**, al confirmar la reserva. Después de limpiar, pedirlo delante de
-   la casa recién limpia es una situación en la que el cliente se siente
-   obligado a decir sí, y eso debilita el permiso.
+1. **El plazo de retirada son 5 días.** Prometer «inmediatamente» es prometer
+   algo que no se puede cumplir un domingo. Es el valor que el panel propone
+   solo al crear una ficha; se puede cambiar ficha a ficha dentro del margen
+   de 1 a 30 días, por si un papel concreto dice otra cosa.
+2. **El permiso se pide antes del servicio**, al confirmar la reserva. Después
+   de limpiar, pedirlo delante de la casa recién limpia es una situación en la
+   que el cliente se siente obligado a decir sí, y eso debilita el permiso.
+   Además resuelve el caso normal: que el día del servicio no haya nadie en
+   casa. La sección 11 desarrolla cómo se obtiene en cada situación.
 
 ---
 
@@ -220,8 +222,9 @@ igualmente, porque el sistema guarda la anotación pero no el papel:
 - **La grabación original, guardada aparte.** Si un día YouTube quita el
   vídeo, el material no se pierde.
 
-Cuando montemos el registro dentro del sistema esto pasa a ser automático,
-pero la hoja de cálculo vale desde el primer día y no depende de mí.
+De las tres, la primera ya la hace el sistema; las otras dos siguen siendo
+trabajo de archivo, porque el sistema guarda la anotación del papel y no el
+papel.
 
 ---
 
@@ -501,6 +504,7 @@ pruebas: «guardar un cambio de los vídeos NO borra las fotos» y la simétrica
 | --------------------------- | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
 | `STORAGE_PROVIDER`          | `supabase`          | Con `memory` las fotos viven en la memoria del proceso y sus direcciones no cargan nada. La API avisa por error si sigue así en producción. |
 | `GALLERY_BUCKET`            | `gallery`           | El bucket público.                                                                                                                          |
+| `CONSENT_EVIDENCE_BUCKET`   | `consent-evidence`  | El bucket **privado** de las pruebas de los permisos. Ver la sección 11.                                                                    |
 | `SUPABASE_SERVICE_ROLE_KEY` | secreto en Render   | Nunca sale al navegador ni se escribe en un registro.                                                                                       |
 | `STORAGE_TIMEOUT_MS`        | `10000`             |                                                                                                                                             |
 
@@ -856,11 +860,11 @@ piezas— y en cada tarjeta afectada —cuál—.
 
 - **Reordenar** los vídeos y las fotos arrastrando. Hoy el orden es el de
   subida; para cambiarlo hay que quitar y volver a poner.
-- **El registro de consentimientos** (etapa 2.D), que une el papel firmado con
-  la pieza publicada. Mientras no exista, sirve la hoja de cálculo de la
-  sección 6.
 - **Limpieza de huérfanos**: una foto subida y nunca guardada se queda en el
   almacén sin verse en ninguna parte. No molesta a nadie, pero ocupa.
+- **Avisar cuando vence un plazo de retirada.** Hoy el plazo se promete en el
+  papel y se cumple pulsando un botón, pero si nadie entra al panel, nadie
+  avisa de que el reloj corre.
 
 ### El bucket de Supabase Storage
 
@@ -884,16 +888,280 @@ quién subió qué.
 
 ## 10. Qué hace falta para seguir
 
-Por orden, y lo primero bloquea el resto:
+El código de las etapas 2.B, 2.C y 2.D **ya está construido y desplegado**:
+la galería, la subida desde el panel, el registro de consentimientos y el modo
+estricto. Lo que queda no es código, salvo lo anotado arriba:
 
 1. **Un abogado de Georgia revisa el modelo** de la sección 2, junto con el
-   dossier.
-2. **La dueña decide** el plazo de retirada y si el permiso se pide antes o
-   después del servicio.
-3. **Se firman los primeros permisos** y se graban 3–5 piezas cortas.
-4. Con eso ya en la mano, se monta el código: la galería y la sección de
-   vídeos (etapa 2.B), la subida desde el panel (2.C) y el registro de
-   consentimientos (2.D).
+   dossier. Es lo único que sigue bloqueando lo demás.
+2. **Se firman los primeros permisos** y se graban 3–5 piezas cortas.
 
-Mientras no haya permisos firmados, **la sección se puede construir pero no se
-puede publicar con material real.**
+Decidido ya por la dueña: el plazo de retirada es de **5 días**, y el permiso
+se pide **antes del servicio**, al confirmar la reserva (sección 11).
+
+Mientras no haya permisos anotados, **la sección se puede construir pero no
+enseña nada**: el modo estricto no publica lo que no tiene papel, así que una
+galería llena de fotos sin ficha se ve vacía desde fuera. Es la consecuencia
+buscada.
+
+---
+
+## 11. Cómo se obtiene el permiso cuando el cliente no está en casa
+
+Esta sección existe porque el modelo nació con un supuesto que no aguanta el
+caso normal: **que alguien firma un papel en el salón**. En una limpieza de
+mudanza la casa está vacía, en una recurrente el cliente está trabajando, y
+hay clientes que contratan desde otro estado. Si el permiso solo se puede
+obtener en persona, no se obtiene casi nunca — y con el modo estricto, lo que
+no se obtiene no se publica.
+
+### El requisito no es «papel», es «demostrable»
+
+La sección 2 ya lo dice sin saberlo:
+
+> «Un permiso verbal no vale. **No porque sea inválido en todos los casos,
+> sino porque no se puede demostrar**, y el día que haga falta es precisamente
+> el día en que el cliente dice que no lo dio.»
+
+Una firma electrónica es una firma. La **E-SIGN Act** federal y la **UETA** de
+Georgia dan a un registro electrónico el mismo valor que al papel, siempre que
+se pueda acreditar **quién lo hizo, qué aceptó y cuándo**. De hecho es más
+demostrable que el papel: un PDF escaneado en una carpeta no lleva sello de
+tiempo.
+
+> **Lo que esta sección no es.** Es el diseño operativo, no un dictamen legal.
+> Si una fórmula concreta basta para este uso concreto en Georgia lo dice un
+> abogado colegiado allí, y esa revisión sigue pendiente (sección 10).
+
+### El momento correcto es la reserva, no la casa
+
+Pedirlo al confirmar la reserva resuelve el problema en vez de sortearlo: da
+igual que el día del servicio no haya nadie, y da igual que el cliente viva en
+otro estado. Y es además el momento en que el permiso es más libre, porque
+después de limpiar, pedirlo delante de la casa recién limpia pone al cliente
+en una situación en la que se siente obligado a decir que sí.
+
+El contrato **ya admite un permiso sin piezas**: la regla que exige autorizar
+la web solo se aplica si la ficha ampara algo. Es decir, se puede anotar el
+permiso al reservar, cuando el vídeo todavía no existe, y atarle las piezas
+después. No se diseñó para esto, pero encaja tal cual.
+
+### Los cuatro casos
+
+| Situación                                       | Cómo se obtiene                                                                                                                                  |
+| ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **A.** El cliente contrata y no estará en casa  | Casilla en la reserva: **separada**, **desmarcada**, **opcional**. Rechazarla no cambia el precio ni el servicio, y eso tiene que estar escrito. |
+| **B.** El cliente está fuera / es dueño ausente | Por correo o en la reserva. **Pero ojo a quién puede autorizar**, abajo.                                                                         |
+| **C.** Casa vacía (mudanza, obra, entrega)      | El caso más fácil y el mejor material: no hay objetos personales en el plano. El permiso sigue haciendo falta porque la casa es de alguien.      |
+| **D.** Se graba y se pregunta después           | **Se guarda, no se publica.** El modo estricto ya lo garantiza. Luego se le enseña al cliente la pieza concreta y se pide el permiso sobre ella. |
+
+El caso D da, de hecho, el permiso **más sólido** de los cuatro: autorizó
+_eso_, no _algo_.
+
+### Quién puede autorizar
+
+Es la trampa del caso B, y no es técnica:
+
+| Situación                         | Quién puede autorizar                                                                                                        |
+| --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| Dueño que vive allí, de viaje     | Él. Sin más.                                                                                                                 |
+| Dueño que **alquila** la vivienda | **Hacen falta los dos.** El dueño autoriza su propiedad, pero en las imágenes salen los muebles y la ropa del **inquilino**. |
+| Gestor o agencia                  | Solo con mandato escrito. Y sigue sin cubrir al inquilino.                                                                   |
+| Empresa, para su local            | Quien firme tiene que poder obligar a la empresa.                                                                            |
+
+**Sobre la vida privada de un tercero no se puede dar permiso.** Es el mismo
+criterio que la sección 4 ya aplica a los empleados que salen en un vídeo.
+
+Esto no se deja a la memoria de nadie: la ficha tiene las casillas
+`occupiedByOthers` y `occupantConsent`, y mientras falte la segunda **el
+permiso no puede llevar piezas atadas**. La ficha se anota igual —es útil
+saber que existe y que falta la otra mitad— pero sin piezas el modo estricto
+no publica ninguna. La restricción está también en la base de datos, no solo
+en el contrato.
+
+### Lo que no vale
+
+- **Una llamada de teléfono.** Es verbal.
+- **«Quien no conteste, consiente.»** El silencio no es permiso.
+- **Una casilla premarcada**, o metida dentro de los términos generales.
+- **Condicionar el servicio o el precio** a que acepte.
+- **Un permiso genérico «para todo lo que hagamos en su casa»**, sin fecha de
+  servicio. El permiso es de _esa casa y ese trabajo_; por eso `serviceDate`
+  es obligatorio.
+
+Hay una asimetría deliberada: **para revocar basta un WhatsApp** (sección 2),
+pero para conceder hace falta algo más formal. Retirar tiene que ser fácil;
+conceder tiene que ser consciente.
+
+### Lo que guarda el sistema (etapa 2.D.3)
+
+La ficha anota **por qué vía llegó** el permiso, en `evidenceKind`:
+
+| Valor          | Dónde está la prueba      |
+| -------------- | ------------------------- |
+| `SIGNED_PAPER` | El archivador             |
+| `WEB_FORM`     | La fila de la reserva     |
+| `EMAIL`        | El buzón de correo        |
+| `MESSAGE`      | El hilo de WhatsApp o SMS |
+
+**Los cuatro valen igual.** El campo no distingue permisos buenos de malos:
+dice dónde buscar la prueba el día que haya que enseñarla. Por eso
+`reference` ya no es «el número del papel» sino lo que identifique la prueba,
+sea cual sea: el número impreso, la referencia de la reserva o el
+identificador del mensaje.
+
+Por defecto es `SIGNED_PAPER`, y tiene valor por defecto también en la base de
+datos: las fichas anotadas antes de que esto existiera son todas de papel,
+porque era lo único que el panel permitía anotar. Sin ese valor por defecto,
+el día del despliegue habrían dejado de validarse y la galería entera se
+habría quedado vacía — que es exactamente el accidente de la sección 9.
+
+El medio **sí** entra en la auditoría; el nombre y la dirección, no. Es una
+categoría de cuatro valores que no identifica a nadie.
+
+### La prueba guardada (etapa 2.D.4)
+
+Hasta aquí el registro guardaba la _referencia_ de la prueba, no la prueba. El
+día que haga falta demostrar un permiso, una referencia a un PDF que está en
+el correo de alguien no sirve.
+
+Desde la pantalla de permisos, cada ficha admite **un archivo**: el escaneo
+del papel, el PDF del correo o una foto del documento. Se puede descargar,
+sustituir y borrar. Sustituir borra el anterior — dos pruebas para un mismo
+permiso no es un respaldo, es no saber cuál vale.
+
+#### Por qué no va al almacén de la galería
+
+Porque aquél es **público de lectura** y esto lleva el nombre del cliente, la
+dirección de su casa y su firma: justo lo que el permiso promete no mostrar.
+
+Va a un bucket aparte, **privado**, y se sirve a través de la API detrás de la
+sesión del panel. **No existe ninguna dirección de ese bucket que funcione
+pegada en un navegador**, y tampoco se usan direcciones firmadas de corta
+duración: una dirección firmada que alguien copia sigue abriendo el documento
+desde cualquier sitio, y para tres descargas al año no compensa esa puerta.
+
+Hay una segunda defensa, y es la que de verdad cierra el fallo: **el puerto
+del almacén privado no tiene `publicUrl`**. No es un olvido. Si los dos
+almacenes compartieran interfaz, pedir la dirección pública de un documento
+firmado sería una línea igual de fácil de escribir que las demás, y nada
+avisaría. Separándolos, **ese error no se puede escribir**: el método no
+existe. Es la misma idea que separar `MyJob` del resto del modelo para que una
+cifra de dinero no pueda llegar a la pantalla de quien limpia.
+
+#### El bucket
+
+Nombre **`consent-evidence`**. Configuración:
+
+| Ajuste             | Valor                                                      | Por qué                                                                                                     |
+| ------------------ | ---------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| Public bucket      | **NO**                                                     | Es lo único que distingue este bucket del de la galería, y es todo.                                         |
+| File size limit    | 10 MB                                                      | Un escaneo de varias páginas pesa más que una foto, y aquí no hay nada que apretar.                         |
+| Allowed MIME types | `application/pdf`, `image/jpeg`, `image/png`, `image/webp` | **Nada de SVG**, por lo mismo que en la galería: un SVG es un documento que puede llevar JavaScript dentro. |
+
+**Sin políticas RLS**, igual que el otro: no hay lectura pública que permitir,
+y la escritura va por la API con la `service_role`. Una política aquí sería
+señal de que algo se está subiendo desde el navegador.
+
+#### Lo que se comprueba al guardar
+
+- **Que los bytes son lo que dicen ser.** Quien sube elige lo que pone en
+  `Content-Type`, así que confiar en la cabecera es no comprobar nada. Un PDF
+  tiene que empezar por `%PDF-`; una imagen tiene que pasar por el mismo
+  detector que las de la galería.
+- **Que a las imágenes se les quita el EXIF.** Aquí el archivo no se publica,
+  así que las coordenadas de dentro no se enseñarían a nadie. Se quitan igual
+  porque el hábito tiene que ser el mismo en los dos almacenes o un día se
+  olvida en el que sí publica.
+- **Que el nombre lo pone el servidor**: carpeta fija y 32 caracteres
+  aleatorios. Nada del nombre original sobrevive, y la restricción está
+  también en la base de datos.
+
+El PDF se guarda tal cual. No hay forma honesta de limpiarlo sin una librería
+que lo entienda entero, y meterla para esto sería cambiar un riesgo pequeño
+por una dependencia grande.
+
+#### Lo que la auditoría guarda, y lo que no
+
+Guarda quién la archivó, cuándo, de qué tipo era, cuánto pesaba y si sustituía
+a otra. **No guarda la ruta**: es el único dato que, sumado a la clave de
+servicio, abre el documento, y el registro de auditoría se consulta, se
+exporta y se enseña.
+
+**Leer la prueba no se audita.** Se mira al abrir la ficha y se volvería a
+mirar en cada vistazo: un registro que crece con cada ojeada es un registro
+que nadie lee, y enterraría las líneas que sí importan.
+
+### El permiso se pide al reservar (etapa 2.D.5)
+
+Es el caso A, y es el que hace que el resto funcione: **si el permiso solo se
+puede obtener en persona, no se obtiene casi nunca**, y con el modo estricto
+lo que no se obtiene no se publica.
+
+En el último paso del formulario de reserva, en su propio recuadro, hay
+**tres casillas**, todas desmarcadas:
+
+1. **«Pueden fotografiar y grabar esta vivienda y publicarlo en su web.»** Sin
+   esto no hay nada.
+2. **«También pueden publicar las imágenes del "antes".»** Sólo aparece si se
+   marca la primera. Es la parte sensible —el «antes» es su casa sucia— y por
+   eso va aparte, igual que en el panel.
+3. **«En esta vivienda vive alguien que no soy yo.»** También sólo si se marca
+   la primera. Es el caso del dueño que alquila.
+
+El texto de ayuda dice lo que tiene que decir: que es **opcional**, que **no
+cambia el precio ni el servicio**, que nunca se muestra el número de la calle,
+y que se puede pedir la retirada por correo o por un mensaje, con el plazo de
+**5 días** escrito.
+
+#### Lo que queda anotado
+
+La ficha se crea sola, **dentro de la misma transacción que la reserva**: o
+quedan las dos o no queda ninguna. Un permiso anotado para una reserva que no
+llegó a existir sería un papel sin casa.
+
+| Campo                             | De dónde sale                                     |
+| --------------------------------- | ------------------------------------------------- |
+| `reference`                       | La referencia de la reserva                       |
+| `evidenceKind`                    | `WEB_FORM`                                        |
+| `customerName`, `propertyAddress` | De la reserva, recortados a lo que cabe           |
+| `serviceDate`                     | El día de la cita                                 |
+| `signedAt`                        | El día en que se reservó                          |
+| `coversInterior/Exterior`         | Los dos, porque el texto habla de «esta vivienda» |
+| `channels`                        | **Sólo `WEBSITE`**                                |
+| `removalDays`                     | 5                                                 |
+| `videoIds`, `photoPaths`          | Vacíos                                            |
+| `notes`                           | `Formulario de reserva, texto v1`                 |
+
+Cuatro decisiones que conviene no perder:
+
+- **Sólo la web.** El texto autoriza la página, no las redes sociales.
+  Publicar en Facebook con un permiso que no las nombra es publicar sin
+  permiso. Añadirlas exige cambiar el texto **y subir la versión**.
+- **Nace sin piezas**, porque el vídeo todavía no existe. Se le atan después
+  desde el panel. El contrato lo admite: la regla que exige autorizar la web
+  sólo se aplica a las fichas que amparan algo.
+- **La versión del texto queda escrita.** Un permiso vale por lo que decía el
+  texto que la persona leyó, no por lo que diga hoy la página. Si se
+  reescribe, los permisos de ayer siguen amparando lo de ayer y hay que poder
+  saber cuál de los dos se aceptó.
+- **Si dice que allí vive otra persona**, la ficha se anota con
+  `occupantConsent` en falso, así que **no podrá llevar piezas atadas** hasta
+  que alguien registre también el permiso del inquilino. La regla se cumple
+  sola.
+
+#### Un fallo aquí no puede tumbar la reserva
+
+Los campos del permiso son más cortos que los de una reserva: un nombre
+compuesto largo o una dirección con dos líneas pueden no caber. Se recortan,
+y aun así, si algo no encajara, **se registra un error con la referencia y la
+reserva sigue adelante**.
+
+Va en esta dirección y no en la otra a propósito: la reserva es el dinero del
+cliente y no se pierde por un permiso que se puede volver a anotar a mano. Y
+el fallo se registra como **error** y no como aviso porque dejarlo pasar en
+silencio sería perder la única señal de que hay que anotarlo.
+
+### Lo que todavía no existe en el registro
+
+- **Avisar cuando vence un plazo de retirada.**
