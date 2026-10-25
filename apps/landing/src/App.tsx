@@ -1,3 +1,5 @@
+import { REMOVAL_LINK_PATH } from '@freshness/types';
+import { RetirarFotos } from './components/RetirarFotos';
 import { Header } from './components/Header';
 import { Footer } from './components/Footer';
 import { StickyMobileCta } from './components/StickyMobileCta';
@@ -13,7 +15,23 @@ import { Contact } from './sections/Contact';
 import { BusinessSettingsProvider } from './hooks/useBusinessSettings';
 import { SiteCopyProvider } from './hooks/useSiteCopy';
 
+/**
+ * LA PAGINA DE RETIRADA NO ES UNA SECCION DEL SITIO, ES OTRA PANTALLA.
+ *
+ * Quien llega aqui viene de un enlace de su correo para hacer UNA cosa, y
+ * pintarle debajo el cotizador, los precios y el formulario de reserva seria
+ * intentar venderle mientras retira sus fotos. Se le ensena lo que vino a
+ * hacer y nada mas.
+ *
+ * SIN LIBRERIA DE RUTAS. Es la unica ruta aparte que tiene este sitio: meter
+ * un enrutador entero —y su peso— para una comparacion de cadenas seria
+ * pagar por un problema que no existe. El dia que haya tres, se mete.
+ */
 export default function App() {
+  if (window.location.pathname.replace(/\/$/, '') === REMOVAL_LINK_PATH) {
+    return <RetirarFotos />;
+  }
+
   return (
     /*
      * El telefono, el correo y el horario se leen una sola vez al abrir y se

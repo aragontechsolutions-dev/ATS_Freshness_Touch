@@ -43,5 +43,11 @@
         }
       ]
     }
+  ],
+  "rewrites": [
+    {
+      "source": "/retirar-fotos",
+      "destination": "/index.html"
+    }
   ]
 }

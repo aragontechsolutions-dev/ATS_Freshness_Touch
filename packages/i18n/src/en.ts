@@ -488,6 +488,12 @@ export const en = {
       propertyAddress: 'Property',
       propertyAddressHelp:
         'Never shown on the website. It lives here so the item can be found again.',
+      customerEmail: 'Customer email',
+      customerEmailHelp:
+        'Optional. With it, they get a record of what they agreed to and a link that takes it down themselves, without waiting for us.',
+      customerLocale: 'Writes to them in',
+      customerLocaleHelp: 'What we send talks about publishing their home: it has to be readable.',
+      locale: { en: 'English', es: 'Spanish' },
       occupancy: 'Who lives there',
       occupiedByOthers: 'Someone other than the signer lives in the property',
       occupiedByOthersHelp:
@@ -534,6 +540,21 @@ export const en = {
       signedOn: 'Signed {{when}}',
       revokedOn: 'Withdrawn {{when}}',
       errInvalid: 'Some of the release is not valid yet.',
+      removalTitle: 'Takedown requested',
+      removalAsk: 'The customer asked for a takedown',
+      removalAskHelp:
+        'The date on their email or message, not today\u2019s: the clock runs from when they asked, not from when we read it.',
+      removalPending_one: 'Asked on {{when}} \u2014 1 day left, until {{deadline}}.',
+      removalPending_other: 'Asked on {{when}} \u2014 {{count}} days left, until {{deadline}}.',
+      removalToday: 'Asked on {{when}} \u2014 the deadline is today, {{deadline}}.',
+      removalOverdue_one: 'Asked on {{when}} \u2014 1 day past the {{deadline}} deadline.',
+      removalOverdue_other:
+        'Asked on {{when}} \u2014 {{count}} days past the {{deadline}} deadline.',
+      removalDone: 'Asked on {{when}}, taken down on {{fulfilled}}.',
+      removalCancel: 'It was a mistake',
+      removalSaved: 'Takedown request recorded',
+      removalCancelled: 'Takedown request withdrawn',
+      removalStillPublished: 'Its photos and videos are still on the website.',
       noEvidence: 'No proof filed: this release cannot be shown to anyone.',
       hasEvidence: 'Proof on file.',
       attachEvidence: 'File the proof',
@@ -1171,6 +1192,8 @@ export const en = {
           restored: 'Image release reinstated',
           evidence_attached: 'Proof of a release filed',
           evidence_removed: 'Proof of a release deleted',
+          removal_requested: 'Customer asked for a takedown',
+          removal_request_cancelled: 'Takedown request withdrawn',
         },
         notifications: {
           updated: 'Alert settings changed',
@@ -1832,6 +1855,32 @@ export const en = {
    * La seccion no se pinta si no hay videos configurados, asi que estos
    * textos pueden existir mucho antes de que haya contenido.
    */
+  /**
+   * LA PAGINA DESDE LA QUE UN CLIENTE RETIRA SUS FOTOS.
+   *
+   * Textos cortos y sin rodeos: quien llega aqui viene de un correo a hacer
+   * una cosa. No se le pide que explique por que, no se le ofrece cambiar de
+   * idea a medias y no se le pregunta si esta seguro — pedir una razon para
+   * retirar algo es una forma educada de poner una barrera.
+   */
+  removal: {
+    title: 'Take your photos off our website',
+    intro:
+      'Press the button and the photos and videos of your home stop being published. It takes effect straight away.',
+    help: 'You do not have to tell us why. If you change your mind, just write to us.',
+    confirm: 'Yes, take them down',
+    sending: 'Taking them down\u2026',
+    done: 'Done. The photos and videos of your home are no longer published.',
+    /*
+     * MISMO TEXTO PARA UN ENLACE FALSO, UNO YA USADO Y UNO AUSENTE. Decir
+     * cual de los tres es convertiria esta pagina en una forma de averiguar
+     * que enlaces existieron.
+     */
+    invalid:
+      'This link no longer works. It may have been used already. Write to us and we will take them down ourselves.',
+    error: 'We could not reach the server. Try again in a moment.',
+  },
+
   gallery: {
     title: 'Before and after',
     subtitle: 'Real homes we cleaned, shared with the owner’s written permission.',

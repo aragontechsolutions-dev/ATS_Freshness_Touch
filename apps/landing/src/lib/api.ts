@@ -23,6 +23,7 @@ import {
   type QuoteRequestInput,
   type QuoteResponse,
   type ServiceType,
+  RemovalLinkResultSchema,
 } from '@freshness/types';
 
 /** Prefijo de version que sirve la API. */
@@ -312,4 +313,35 @@ export function fetchSiteCopy(signal?: AbortSignal): Promise<SiteCopy> {
     }
     return parsed.data;
   });
+}
+
+/**
+ * RETIRA LAS FOTOS DE UNA VIVIENDA CON EL TESTIGO DEL CORREO.
+ *
+ * ES UN POST, Y NO POR CAPRICHO REST. Si fuera un enlace que retira al
+ * abrirse, el antivirus de correo del cliente —que abre todos los enlaces
+ * para comprobar si son peligrosos— le despublicaria las fotos sin que el
+ * hiciera nada. Los escaneres abren paginas; no mandan peticiones.
+ *
+ * EL TESTIGO VA EN EL CUERPO, nunca en la direccion: en la direccion
+ * quedaria en los registros del servidor y en el historial del navegador.
+ */
+export function retirarFotos(token: string): Promise<{ done: boolean }> {
+  return request(
+    '/media-removal',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token }),
+    },
+    (payload) => {
+      const parsed = RemovalLinkResultSchema.safeParse(payload);
+      /*
+       * Si la respuesta no encaja, se trata como NO hecho. Decirle a alguien
+       * que sus fotos ya no se publican cuando no se sabe es la unica
+       * mentira que esta pagina no se puede permitir.
+       */
+      return parsed.success ? parsed.data : { done: false };
+    },
+  );
 }

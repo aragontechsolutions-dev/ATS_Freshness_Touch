@@ -176,6 +176,29 @@ services:
       - key: REMINDER_SWEEP_MINUTES
         value: '15'
 
+      # Cada cuantos minutos se repasan los plazos de retirada de fotos
+      # pendientes. Una hora basta: el plazo que promete el permiso se mide en
+      # DIAS, asi que mirarlo cada minuto no adelanta nada — y mirarlo una vez
+      # al dia dejaria el aviso a merced de que el proceso este vivo en ese
+      # instante exacto. Cero lo apaga.
+      - key: REMOVAL_SWEEP_MINUTES
+        value: '60'
+
+      # La direccion del SITIO PUBLICO, para componer el enlace con el que un
+      # cliente retira sus fotos el solo. La API no lo sabe por su cuenta: se
+      # despliegan por separado y en dominios distintos.
+      #
+      # Si falta, la constancia sale SIN enlace y diciendo a donde escribir.
+      # Un boton que no lleva a ninguna parte es peor que no ofrecerlo: el
+      # cliente creeria haberlo retirado.
+      #
+      # `sync: false` como CORS_ORIGINS, y por lo mismo: el dominio todavia
+      # esta en tramite (ver docs/15) y mientras tanto el sitio vive en una
+      # direccion de Vercel. Escribirlo aqui obligaria a un commit para
+      # cambiarlo el dia que el dominio entre.
+      - key: PUBLIC_SITE_URL
+        sync: false
+
       # ALARMA DE ESTADO (etapa 3.12, ver docs/30).
       # Dos caidas reales estuvieron escritas en el log horas y dias sin que
       # nadie las leyera. Esto es lo que convierte ese log en un aviso al

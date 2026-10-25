@@ -40,7 +40,13 @@ import { Injectable } from '@nestjs/common';
  */
 
 /** Los barridos que hay. Si se anade uno nuevo, se anade aqui. */
-export const BARRIDOS = ['doorPin', 'reminders', 'geocoding', 'auditPurge'] as const;
+export const BARRIDOS = [
+  'doorPin',
+  'reminders',
+  'geocoding',
+  'auditPurge',
+  'removalDeadlines',
+] as const;
 export type Barrido = (typeof BARRIDOS)[number];
 
 /**

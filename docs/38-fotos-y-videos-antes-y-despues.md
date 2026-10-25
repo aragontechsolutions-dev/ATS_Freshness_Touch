@@ -222,9 +222,13 @@ igualmente, porque el sistema guarda la anotación pero no el papel:
 - **La grabación original, guardada aparte.** Si un día YouTube quita el
   vídeo, el material no se pierde.
 
-De las tres, la primera ya la hace el sistema; las otras dos siguen siendo
-trabajo de archivo, porque el sistema guarda la anotación del papel y no el
-papel.
+De las tres, las dos primeras ya las hace el sistema desde las etapas 2.D y
+2.D.4: el registro ata cada pieza a su permiso, y la prueba firmada se guarda
+junto a la ficha. La grabación original sigue siendo trabajo de archivo.
+
+Y desde la etapa 2.D.6 **el plazo tampoco depende de que alguien se acuerde**:
+se anota el día en que el cliente lo pidió y el sistema avisa todos los días
+hasta que se cumple. Ver la sección 11.
 
 ---
 
@@ -1162,6 +1166,169 @@ cliente y no se pierde por un permiso que se puede volver a anotar a mano. Y
 el fallo se registra como **error** y no como aviso porque dejarlo pasar en
 silencio sería perder la única señal de que hay que anotarlo.
 
-### Lo que todavía no existe en el registro
+### El plazo de retirada se vigila solo (etapa 2.D.6)
 
-- **Avisar cuando vence un plazo de retirada.**
+El sistema ya cumplía **media promesa**: retirar es un botón y despublica al
+momento. Pero ese botón hay que pulsarlo, y el hueco peligroso va **desde que
+llega el correo del cliente hasta que alguien entra al panel**. Ahí es donde
+una promesa de cinco días se incumple sin que nadie se entere.
+
+#### El reloj no empieza cuando alguien pulsa
+
+Mirando solo `revokedAt`, el plazo se cumple **siempre**: parece que se tardó
+cero. Por eso la ficha anota aparte **el día en que el cliente lo pidió**
+(`removalRequestedAt`), y ese día **lo teclea quien anota, no lo pone el
+servidor**: el correo del cliente puede llevar dos días en el buzón, y poner
+«hoy» automáticamente regalaría esos dos días.
+
+Anotar la petición **no retira nada**. Son dos acciones separadas a propósito:
+juntarlas parece cómodo hasta el día en que alguien anota una petición de hace
+tres días para dejar constancia y despublica sin querer.
+
+#### El aviso
+
+Un barrido pasa cada hora y manda **un aviso al día**, al buzón interno y al
+chat de operaciones, mientras haya peticiones abiertas.
+
+- **Todos los días, no solo al final.** Avisar «cuando queden dos días» deja
+  tres días de silencio, y si ese aviso se pierde —spam, servidor caído— ya no
+  hay otro. Son pocas: un cliente que pide retirar sus fotos es raro, y el día
+  que pase, lo caro es olvidarla.
+- **Una vez al día, y la cuenta vive en la base.** En memoria, cada despliegue
+  a media mañana volvería a avisar de todo. Un aviso que se repite es un aviso
+  que se deja de leer.
+- **Un fallo al avisar no marca la ficha como avisada**, así que vuelve a
+  entrar en la siguiente pasada. Es lo contrario del barrido de recordatorios
+  de reserva, y la diferencia está en lo que cuesta equivocarse: un
+  recordatorio de cita que no llega es una molestia; un plazo legal que nadie
+  recuerda es una promesa incumplida.
+- **Sin ningún canal configurado tampoco se marca**, y se registra un aviso en
+  el servidor. Que el sistema sepa que hay una promesa venciendo y no tenga a
+  quién decírselo es un problema, no una configuración válida.
+
+#### Ni un nombre ni una dirección salen de ahí
+
+El correo y el mensaje de Telegram llevan **la referencia del permiso y el
+plazo, y nada más**. Son los dos canales menos controlados del sistema: se
+reenvían, se quedan en el móvil de quien los lee y en un buzón para siempre.
+Con la referencia se abre la ficha en el panel, que es donde ese dato puede
+verse y donde hace falta estar identificado para verlo.
+
+Por lo mismo tampoco llevan un enlace directo a la ficha: una dirección en un
+correo invita a pulsarla desde cualquier sitio.
+
+#### El borde de la cuenta
+
+**El día del vencimiento todavía no está vencido.** Prometer «en cinco días»
+incluye el quinto; se pasa al sexto. Es una resta de dos líneas, y por eso
+está escrita **una sola vez** —la usan el panel, el barrido y las pruebas— y
+tiene su propia prueba: las cuentas de dos líneas son las que se escriben de
+memoria y se escriben al revés.
+
+#### En el panel
+
+Cada ficha con petición abierta se pinta como una alarma y no como un dato
+más: **en ámbar** mientras el plazo corre, **en rojo** si se pasó, con los días
+que quedan o los de retraso. Una vez retirada queda en gris, diciendo qué día
+se pidió y qué día se cumplió — que es lo que hay que poder demostrar.
+
+| Variable                | Valor | Qué hace                                                                       |
+| ----------------------- | ----- | ------------------------------------------------------------------------------ |
+| `REMOVAL_SWEEP_MINUTES` | `60`  | Cada cuánto se repasa. Una hora basta: el plazo se mide en días. `0` lo apaga. |
+
+### El cliente retira sus fotos él mismo (etapa 2.D.7)
+
+Las etapas anteriores impedían que una petición se olvidara. Esta quita el
+intermediario: **el cliente no tiene que escribirle a nadie ni esperar a que
+alguien lea su mensaje.**
+
+#### Cómo funciona
+
+1. Al anotarse el permiso —desde el panel o desde la reserva— el cliente
+   recibe **una constancia por correo** de lo que autorizó: qué puede
+   publicarse, si incluye el «antes», y que nunca se muestra el número de su
+   calle.
+2. Ese correo lleva un botón: **«Retirar mis fotos ahora»**.
+3. El botón abre una página del sitio que pregunta una vez y, al confirmar,
+   **despublica al momento**.
+4. La empresa recibe aviso de que ha ocurrido.
+
+Hasta ahora el cliente marcaba una casilla al reservar y **no recibía nada**:
+ni constancia, ni instrucciones, ni forma de deshacerlo.
+
+#### El detalle que lo hundiría si se hace de la forma obvia
+
+**El enlace no puede retirar al abrirse.** Outlook Safe Links, los antivirus
+de correo y los previsualizadores de WhatsApp o Slack **abren
+automáticamente** los enlaces de un correo para comprobar si son peligrosos.
+
+> Con un enlace que retira al abrirse, **el filtro de spam del cliente le
+> despublicaría las fotos sin que él hiciera nada** — y nadie entendería por
+> qué.
+
+Por eso el enlace lleva a una **página con un botón**, y el botón hace un
+`POST`. Los escáneres abren páginas; no pulsan botones.
+
+#### El testigo es una credencial
+
+Quien lo tenga puede despublicar esa ficha sin identificarse de ninguna otra
+forma. Se trata como tal:
+
+- **No se guarda.** De él solo queda su resumen criptográfico en la fila,
+  igual que con una contraseña. Ni la base de datos ni una copia de seguridad
+  robada sirven para retirar nada.
+- **No se escribe en ningún registro**, ni del servidor ni de auditoría. Es la
+  misma regla que ya rige para los enlaces de invitación al panel.
+- **Viaja en el fragmento** (`#t=…`), no en la ruta: lo que va detrás de la
+  almohadilla **no llega al servidor**, así que no aparece en sus registros ni
+  en la cabecera `Referer`. Mismo criterio que el enlace de contraseña del
+  panel.
+- **Se gasta al usarse.** Un enlace que sigue sirviendo después es una
+  credencial viva en un buzón para siempre.
+- La página **lo borra de la barra de direcciones** en cuanto lo lee, y
+  sustituye la entrada del historial para que el botón de atrás no lo
+  recupere.
+
+#### Qué puede hacer quien robe un enlace
+
+**Despublicar unas fotos. Nada más.** No lee la ficha, no ve el nombre ni la
+dirección, no dice de qué casa era, no publica nada y no toca ninguna otra. Y
+**es reversible** desde el panel con el botón de restituir.
+
+Es la dirección de fallo que se eligió a propósito. Un enlace que
+**publicara** habría sido lo contrario: irreversible y en el sentido malo.
+
+#### Lo que no se distingue, a propósito
+
+Un testigo que nunca existió, uno ya gastado y uno ausente **responden lo
+mismo** y la página enseña el mismo texto. Distinguirlos convertiría esta ruta
+en una forma de averiguar qué enlaces existieron; devolver un `404`
+convertiría los registros del servidor en un contador de aciertos.
+
+#### Cinco intentos por cuarto de hora
+
+La ruta está limitada igual que la recuperación de contraseña. No es por
+carga: un testigo es un secreto de 32 bytes y la única forma de atacarlo es
+probar muchos. Cinco intentos cada quince minutos convierten esa idea en
+varios miles de millones de años, y no estorban a nadie — un cliente pulsa una
+vez.
+
+#### Por qué esto no sustituye al aviso de plazos
+
+Habrá clientes que llamen por teléfono, escriban por WhatsApp o lo digan en la
+puerta al equipo. **El enlace cubre a quien lo use; el barrido cubre a todos
+los demás**, y para quien perdió el correo el camino manual sigue ahí.
+
+#### Y por qué refuerza el propio permiso
+
+Un permiso que se puede retirar con un clic es **más defendible** que uno que
+exige escribir y esperar: demuestra que la retirada es real y no una promesa
+impresa. El día que alguien discuta el consentimiento, «podía retirarlo en
+cualquier momento desde un enlace en su correo» pesa más que «podía
+escribirnos».
+
+| Variable          | Valor                | Qué hace                                                                                         |
+| ----------------- | -------------------- | ------------------------------------------------------------------------------------------------ |
+| `PUBLIC_SITE_URL` | el dominio del sitio | Para componer el enlace. **Si falta, la constancia sale sin botón** y diciendo a dónde escribir. |
+
+#### Lo que todavía no existe en el registro

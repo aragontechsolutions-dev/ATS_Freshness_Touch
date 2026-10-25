@@ -5,7 +5,9 @@ import { SettingsModule } from '../settings/settings.module';
 import { NotificationSettingsService } from './notification-settings.service';
 import { EmailBrandingService } from './email-branding.service';
 import { NotificationsService } from './notifications.service';
+import { ConsentReceiptService } from './consent-receipt.service';
 import { ReminderSweepService } from './reminder-sweep.service';
+import { RemovalDeadlineSweepService } from './removal-deadline-sweep.service';
 import {
   EMAIL_PROVIDER,
   TELEGRAM_PROVIDER,
@@ -85,7 +87,18 @@ import { NoopTelegramProvider } from './providers/noop-telegram.provider';
     },
     NotificationSettingsService,
     NotificationsService,
+    ConsentReceiptService,
     ReminderSweepService,
+    /*
+     * El aviso de los plazos de retirada vive AQUI y no en `settings`, con
+     * el resto del registro de permisos, por una razon de dependencias: este
+     * modulo ya importa aquel —los avisos necesitan los ajustes del
+     * negocio—, asi que ponerlo alli habria exigido el camino de vuelta y un
+     * ciclo entre los dos modulos.
+     *
+     * Y encaja: lo que hace es avisar, que es de lo que va este modulo.
+     */
+    RemovalDeadlineSweepService,
   ],
   /*
    * EMAIL_PROVIDER se exporta porque la invitacion al panel manda su propio
@@ -99,7 +112,15 @@ import { NoopTelegramProvider } from './providers/noop-telegram.provider';
   exports: [
     NotificationsService,
     NotificationSettingsService,
+    /*
+     * La constancia del permiso la disparan DOS sitios ajenos a este modulo:
+     * el panel al anotar una ficha y el flujo de reserva al crear una con la
+     * casilla marcada. Se exporta por lo mismo que `EMAIL_PROVIDER`.
+     */
+    ConsentReceiptService,
     ReminderSweepService,
+    /* Se exporta para que las pruebas llamen a la pasada a mano. */
+    RemovalDeadlineSweepService,
     EMAIL_PROVIDER,
     /*
      * El canal de Telegram se exporta para la ALARMA DE ESTADO, que vive en

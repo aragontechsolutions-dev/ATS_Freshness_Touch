@@ -11,6 +11,10 @@ import { AppModule } from '../app.module';
 import { applyBodyParsers } from '../common/body-parsers';
 import { AUTH_PROVIDER } from '../auth/auth.types';
 import type { LocalAuthProvider } from '../auth/providers/local-auth.provider';
+import { EMAIL_PROVIDER } from '../notifications/notifications.types';
+import type { LogEmailProvider } from '../notifications/providers/log-email.provider';
+import { NotificationSettingsService } from '../notifications/notification-settings.service';
+import { RemovalDeadlineSweepService } from '../notifications/removal-deadline-sweep.service';
 import { GalleryService } from './gallery.service';
 import { MediaConsentsService } from './media-consents.service';
 
@@ -21,6 +25,10 @@ vi.hoisted(() => {
   process.env.AUTH_LOCAL_SECRET = 'secreto-de-pruebas-de-los-permisos';
   process.env.EMAIL_PROVIDER = 'log';
   process.env.REMINDER_SWEEP_MINUTES = '0';
+  /* El barrido de plazos, a mano: una prueba no puede depender del reloj. */
+  process.env.REMOVAL_SWEEP_MINUTES = '0';
+  /* Sin esto el correo de constancia saldria sin enlace de retirada. */
+  process.env.PUBLIC_SITE_URL = 'https://freshnesstouch.example';
   process.env.AUDIT_PURGE_HOURS = '0';
   process.env.RATE_LIMIT_MAX = '2000';
   process.env.QUOTE_RATE_LIMIT_MAX = '2000';
@@ -716,5 +724,402 @@ describe('la prueba del permiso', () => {
   it('un permiso sin prueba responde que no la hay', async () => {
     const ficha = await crear(papel());
     expect((await descargar(ficha.body.id)).status).toBe(404);
+  });
+});
+
+/* ------------------------------------------------------------------------ */
+
+describe('el plazo de retirada', () => {
+  const BUZON = 'operaciones@example.com';
+
+  /** El dia de hoy y el de hace `dias` dias, en el formato del papel. */
+  function haceDias(dias: number): string {
+    const fecha = new Date();
+    fecha.setUTCDate(fecha.getUTCDate() - dias);
+    return fecha.toISOString().slice(0, 10);
+  }
+
+  async function pedirRetirada(id: string, requestedAt: string) {
+    return request(app.getHttpServer())
+      .post(`${RUTA}/${id}/removal-request`)
+      .set('authorization', `Bearer ${await comoAda()}`)
+      .send({ requestedAt });
+  }
+
+  async function anularPeticion(id: string) {
+    return request(app.getHttpServer())
+      .post(`${RUTA}/${id}/removal-request/cancel`)
+      .set('authorization', `Bearer ${await comoAda()}`)
+      .send();
+  }
+
+  function correos(): LogEmailProvider {
+    return app.get<LogEmailProvider>(EMAIL_PROVIDER);
+  }
+
+  async function buzonInterno(destino: string | null): Promise<void> {
+    const ajustes = app.get(NotificationSettingsService);
+    const actuales = await ajustes.get();
+    await ajustes.update(
+      { ...actuales, internalEmail: destino },
+      { staffId: ADA, role: 'ADMIN', email: 'ada@example.com', firstName: 'Ada' },
+      null,
+    );
+  }
+
+  const conBuzonInterno = () => buzonInterno(BUZON);
+
+  async function barrer(): Promise<void> {
+    await app.get(RemovalDeadlineSweepService).pasada();
+  }
+
+  beforeEach(() => {
+    correos().sent.length = 0;
+  });
+
+  /*
+   * ANOTAR NO RETIRA. Son dos acciones distintas a proposito: anotar una
+   * peticion de hace tres dias para dejar constancia no puede despublicar
+   * sin querer.
+   */
+  it('anotar la peticion arranca el reloj pero no despublica nada', async () => {
+    const ficha = await crear(papel({ photoPaths: [FOTO] }));
+    await publicarGaleria();
+
+    const anotada = await pedirRetirada(ficha.body.id, haceDias(1));
+
+    expect(anotada.status).toBe(201);
+    expect(anotada.body.removalRequestedAt).toBe(haceDias(1));
+    expect(anotada.body.revokedAt).toBeNull();
+    expect((await leerPublica()).body.photos).toHaveLength(1);
+  });
+
+  it('no admite una fecha que no es una fecha', async () => {
+    const ficha = await crear(papel());
+    expect((await pedirRetirada(ficha.body.id, '20/10/2026')).status).toBe(400);
+  });
+
+  it('se puede anular si se anoto por error', async () => {
+    const ficha = await crear(papel());
+    await pedirRetirada(ficha.body.id, haceDias(1));
+
+    const anulada = await anularPeticion(ficha.body.id);
+    expect(anulada.body.removalRequestedAt).toBeNull();
+  });
+
+  /*
+   * LA PRUEBA QUE JUSTIFICA LA ETAPA: hasta ahora, si nadie entraba al
+   * panel, el plazo se incumplia en silencio.
+   */
+  it('el barrido avisa al buzon interno de lo que sigue pendiente', async () => {
+    const ficha = await crear(papel());
+    await pedirRetirada(ficha.body.id, haceDias(1));
+    await conBuzonInterno();
+
+    await barrer();
+
+    expect(correos().sent).toHaveLength(1);
+    expect(correos().sent[0]?.to).toBe(BUZON);
+    expect(correos().sent[0]?.text).toContain('FT-2026-001');
+  });
+
+  /*
+   * NI UN NOMBRE NI UNA DIRECCION EN EL CORREO. Es el canal menos controlado
+   * que tiene el sistema: se reenvia, se queda en un movil y en un buzon
+   * para siempre. Y lo que el permiso promete no exponer es justo eso.
+   */
+  it('y el correo no lleva el nombre del cliente ni su direccion', async () => {
+    const ficha = await crear(papel());
+    await pedirRetirada(ficha.body.id, haceDias(1));
+    await conBuzonInterno();
+
+    await barrer();
+
+    const enviado = correos().sent[0];
+    for (const cuerpo of [enviado?.text ?? '', enviado?.html ?? '', enviado?.subject ?? '']) {
+      expect(cuerpo).not.toContain('Marta');
+      expect(cuerpo).not.toContain('Evergreen');
+    }
+  });
+
+  /*
+   * UNA VEZ AL DIA Y NO EN CADA PASADA. El barrido corre cada hora; un aviso
+   * que se repite cada hora es un aviso que se deja de leer.
+   */
+  it('no repite el aviso en la siguiente pasada del mismo dia', async () => {
+    const ficha = await crear(papel());
+    await pedirRetirada(ficha.body.id, haceDias(1));
+    await conBuzonInterno();
+
+    await barrer();
+    await barrer();
+
+    expect(correos().sent).toHaveLength(1);
+  });
+
+  it('retirarla la saca de los avisos', async () => {
+    const ficha = await crear(papel());
+    await pedirRetirada(ficha.body.id, haceDias(1));
+    await conBuzonInterno();
+    await revocar(ficha.body.id);
+
+    await barrer();
+
+    expect(correos().sent).toHaveLength(0);
+  });
+
+  it('sin peticiones abiertas no manda nada', async () => {
+    await crear(papel());
+    await conBuzonInterno();
+
+    await barrer();
+
+    expect(correos().sent).toHaveLength(0);
+  });
+
+  /*
+   * EL ASUNTO DICE SI ALGO SE PASO. Es lo unico que se lee sin abrir el
+   * correo, y la diferencia entre «hay trabajo» y «se esta incumpliendo una
+   * promesa» tiene que verse desde la bandeja de entrada.
+   */
+  it('cuando el plazo se paso, el asunto lo dice', async () => {
+    const ficha = await crear(papel());
+    // Cinco dias de plazo pedidos hace diez: cinco de retraso.
+    await pedirRetirada(ficha.body.id, haceDias(10));
+    await conBuzonInterno();
+
+    await barrer();
+
+    expect(correos().sent[0]?.subject).toContain('fuera de plazo');
+  });
+
+  /*
+   * SIN CANAL CONFIGURADO NO SE MARCA COMO AVISADA. Si se marcara, el dia
+   * que alguien ponga un buzon el aviso ya no saldria: el sistema creeria
+   * haberlo dado.
+   */
+  it('sin buzon ni chat, no se da por avisada', async () => {
+    const ficha = await crear(papel());
+    await pedirRetirada(ficha.body.id, haceDias(1));
+
+    /*
+     * SE QUITA A MANO. Los ajustes de avisos no se borran entre pruebas y el
+     * servicio los cachea, asi que dar por hecho que estan vacios es dar por
+     * hecho algo que no esta escrito en ninguna parte.
+     */
+    await buzonInterno(null);
+
+    await barrer();
+    expect(correos().sent).toHaveLength(0);
+
+    await conBuzonInterno();
+    await barrer();
+    expect(correos().sent).toHaveLength(1);
+  });
+});
+
+/* ------------------------------------------------------------------------ */
+
+describe('el cliente retira sus fotos sin pedirle permiso a nadie', () => {
+  const RUTA_PUBLICA_RETIRADA = '/api/v1/media-removal';
+  const CORREO = 'marta@example.com';
+
+  /*
+   * ========================================================================
+   * ESTE BLOQUE TIENE UN PRESUPUESTO DE CINCO LLAMADAS, Y LAS GASTA TODAS
+   * ========================================================================
+   * La ruta publica esta limitada a CINCO INTENTOS POR CUARTO DE HORA Y POR
+   * IP, igual que la recuperacion de contrasena. No es por carga —esto se usa
+   * tres veces al ano— sino porque un testigo es un secreto de 32 bytes y la
+   * unica forma de atacarlo es probar muchos.
+   *
+   * Ese limite es lo que se quiere en produccion, asi que la prueba se adapta
+   * a el y no al reves. Si hace falta comprobar algo mas, va DENTRO de una
+   * de estas llamadas: una sexta no fallaria por lo que prueba, fallaria con
+   * un 429 que manda a buscar el error donde no esta.
+   */
+
+  function correos(): LogEmailProvider {
+    return app.get<LogEmailProvider>(EMAIL_PROVIDER);
+  }
+
+  /** La ficha con correo, y el testigo que saco el correo de constancia. */
+  async function conEnlace(extra: Record<string, unknown> = {}) {
+    correos().sent.length = 0;
+
+    const ficha = await crear(papel({ customerEmail: CORREO, ...extra }));
+    const constancia = correos().sent.find((mensaje) => mensaje.to === CORREO);
+
+    const testigo = /#t=([A-Za-z0-9_-]{43})/.exec(constancia?.text ?? '')?.[1] ?? null;
+    return { ficha, testigo };
+  }
+
+  async function retirar(token: unknown) {
+    return request(app.getHttpServer()).post(RUTA_PUBLICA_RETIRADA).send({ token });
+  }
+
+  /*
+   * LA PRUEBA QUE JUSTIFICA LA ETAPA, y lleva dentro todo lo que se puede
+   * comprobar de una sola retirada: hasta aqui, retirar dependia SIEMPRE de
+   * que alguien del equipo leyera un mensaje y pulsara un boton.
+   */
+  it('el enlace del correo despublica, avisa a la empresa y no filtra nada', async () => {
+    const ajustes = app.get(NotificationSettingsService);
+    const actuales = await ajustes.get();
+    await ajustes.update(
+      { ...actuales, internalEmail: 'operaciones@example.com' },
+      { staffId: ADA, role: 'ADMIN', email: 'ada@example.com', firstName: 'Ada' },
+      null,
+    );
+
+    const { ficha, testigo } = await conEnlace({ photoPaths: [FOTO] });
+    await publicarGaleria();
+    expect((await leerPublica()).body.photos).toHaveLength(1);
+
+    expect(testigo).not.toBeNull();
+    correos().sent.length = 0;
+
+    const respuesta = await retirar(testigo);
+
+    // --- Despublica al momento -------------------------------------------
+    expect(respuesta.status).toBe(200);
+    expect(respuesta.body).toEqual({ done: true });
+    expect((await leerPublica()).body.photos).toEqual([]);
+
+    const lista = await listar();
+    expect(lista.body.find((f: { id: string }) => f.id === ficha.body.id).revokedAt).not.toBeNull();
+
+    /*
+     * --- No devuelve nada de nadie ---------------------------------------
+     * Quien llegue con un enlace filtrado puede despublicar —que es
+     * reversible desde el panel— pero no puede averiguar de quien era.
+     */
+    expect(Object.keys(respuesta.body)).toEqual(['done']);
+
+    /*
+     * --- Queda como accion del CLIENTE -----------------------------------
+     * Si quedara a nombre de quien anoto la ficha, el registro atribuiria a
+     * una persona algo que no hizo.
+     */
+    const filas = await db.query<{
+      actorType: string;
+      surface: string;
+      metadata: Record<string, unknown>;
+    }>(
+      `SELECT "actorType", surface, metadata FROM audit_logs
+        WHERE action = 'media_consent.revoked'`,
+    );
+
+    expect(filas.rows[0]?.actorType).toBe('CUSTOMER');
+    expect(filas.rows[0]?.surface).toBe('SITE');
+
+    const metadata = JSON.stringify(filas.rows[0]?.metadata);
+    expect(metadata).toContain('FT-2026-001');
+    expect(metadata).not.toContain('Marta');
+    expect(metadata).not.toContain('Evergreen');
+    /* Y NUNCA EL TESTIGO: es una credencial. */
+    expect(metadata).not.toContain(testigo);
+
+    /*
+     * --- La empresa se entera --------------------------------------------
+     * Es la unica pega real de dejar que el cliente retire por su cuenta: la
+     * portada deja de ensenar algo y nadie lo sabe hasta que mira.
+     */
+    const aviso = correos().sent.find((m) => m.to === 'operaciones@example.com');
+    expect(aviso).toBeDefined();
+    expect(aviso?.subject).toContain('FT-2026-001');
+    expect(aviso?.text).not.toContain('Marta');
+  });
+
+  /*
+   * EL TESTIGO SE GASTA. Un enlace que sigue sirviendo despues de usarse es
+   * una credencial viva en un buzon para siempre.
+   */
+  it('el mismo enlace no sirve dos veces', async () => {
+    const { testigo } = await conEnlace();
+
+    expect((await retirar(testigo)).body).toEqual({ done: true });
+    expect((await retirar(testigo)).body).toEqual({ done: false });
+  });
+
+  /*
+   * UN TESTIGO FALSO Y UNO GASTADO RESPONDEN IGUAL, y los dos con 200.
+   * Distinguirlos convertiria esta ruta en una forma de averiguar que
+   * enlaces existieron; devolver 404 convertiria los registros del servidor
+   * en un contador de aciertos.
+   */
+  it('un enlace que no existe responde lo mismo que uno gastado', async () => {
+    const respuesta = await retirar('a'.repeat(43));
+
+    expect(respuesta.status).toBe(200);
+    expect(respuesta.body).toEqual({ done: false });
+  });
+
+  /*
+   * LO QUE NO TIENE NI FORMA DE ENLACE NI LLEGA A LA BASE. Es la primera
+   * puerta: evita una consulta por cada cadena que alguien pegue.
+   */
+  it('algo que ni siquiera tiene forma de enlace se rechaza', async () => {
+    expect((await retirar('corto')).status).toBe(400);
+  });
+});
+
+/* ------------------------------------------------------------------------ */
+
+describe('la constancia que recibe el cliente', () => {
+  const CORREO = 'marta@example.com';
+
+  function correos(): LogEmailProvider {
+    return app.get<LogEmailProvider>(EMAIL_PROVIDER);
+  }
+
+  beforeEach(() => {
+    correos().sent.length = 0;
+  });
+
+  /*
+   * HASTA AHORA EL CLIENTE NO RECIBIA NADA. Ni que habia autorizado, ni que
+   * podia retirarlo, ni como. Un permiso del que la persona no conserva
+   * constancia solo tiene nuestra palabra detras.
+   */
+  it('se le manda al anotar la ficha, con su enlace', async () => {
+    await crear(papel({ customerEmail: CORREO }));
+
+    const constancia = correos().sent.find((m) => m.to === CORREO);
+    expect(constancia).toBeDefined();
+    expect(constancia?.text).toContain('https://freshnesstouch.example/retirar-fotos#t=');
+    expect(constancia?.text).toContain('FT-2026-001');
+  });
+
+  /*
+   * EN SU IDIOMA. Mandarle en un idioma que no lee un correo que habla de
+   * publicar fotos de su casa es la peor version posible de este correo: ni
+   * sirve de constancia ni se atreve a pulsar el boton.
+   */
+  it('en el idioma del cliente, no en el de quien la anota', async () => {
+    await crear(papel({ customerEmail: CORREO, customerLocale: 'es' }));
+
+    const constancia = correos().sent.find((m) => m.to === CORREO);
+    expect(constancia?.subject).toBe('Constancia de su permiso de imagen');
+  });
+
+  it('sin correo no se manda nada, y la ficha vale igual', async () => {
+    const ficha = await crear(papel());
+
+    expect(ficha.status).toBe(201);
+    expect(ficha.body.hasRemovalLink).toBe(false);
+    expect(correos().sent).toHaveLength(0);
+  });
+
+  /*
+   * EL RESUMEN NO SALE NUNCA HACIA EL PANEL. Una pantalla que lo recibiera
+   * lo dejaria en la memoria del navegador y en cualquier extension.
+   */
+  it('el panel sabe que hay enlace, pero no cual', async () => {
+    const ficha = await crear(papel({ customerEmail: CORREO }));
+
+    expect(ficha.body.hasRemovalLink).toBe(true);
+    expect(JSON.stringify(ficha.body)).not.toContain('removalTokenHash');
+    expect(JSON.stringify(ficha.body)).not.toContain('#t=');
   });
 });

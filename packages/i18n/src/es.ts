@@ -450,6 +450,12 @@ export const es: TranslationResources = {
       customerName: 'Cliente',
       propertyAddress: 'Propiedad',
       propertyAddressHelp: 'No sale nunca en la web. Está aquí para poder encontrar la pieza.',
+      customerEmail: 'Correo del cliente',
+      customerEmailHelp:
+        'Opcional. Con él recibe constancia de lo que autorizó y un enlace con el que lo retira él mismo, sin esperar a nadie.',
+      customerLocale: 'Se le escribe en',
+      customerLocaleHelp: 'Lo que se le manda habla de publicar su casa: tiene que poder leerlo.',
+      locale: { en: 'Inglés', es: 'Español' },
       occupancy: 'Quién vive allí',
       occupiedByOthers: 'En la vivienda vive alguien que no es quien firma',
       occupiedByOthersHelp:
@@ -496,6 +502,21 @@ export const es: TranslationResources = {
       signedOn: 'Firmado el {{when}}',
       revokedOn: 'Retirado el {{when}}',
       errInvalid: 'Hay algo del permiso que todavía no vale.',
+      removalTitle: 'Retirada pedida',
+      removalAsk: 'El cliente ha pedido la retirada',
+      removalAskHelp:
+        'La fecha de su correo o su mensaje, no la de hoy: el plazo corre desde que lo pidió, no desde que lo leímos.',
+      removalPending_one: 'Pedida el {{when}} — queda 1 día, hasta el {{deadline}}.',
+      removalPending_other: 'Pedida el {{when}} — quedan {{count}} días, hasta el {{deadline}}.',
+      removalToday: 'Pedida el {{when}} — el plazo vence hoy, {{deadline}}.',
+      removalOverdue_one: 'Pedida el {{when}} — 1 día de retraso sobre el plazo del {{deadline}}.',
+      removalOverdue_other:
+        'Pedida el {{when}} — {{count}} días de retraso sobre el plazo del {{deadline}}.',
+      removalDone: 'Pedida el {{when}}, retirada el {{fulfilled}}.',
+      removalCancel: 'Fue un error',
+      removalSaved: 'Petición de retirada anotada',
+      removalCancelled: 'Petición de retirada anulada',
+      removalStillPublished: 'Sus fotos y vídeos siguen en la web.',
       noEvidence: 'Sin la prueba guardada: este permiso no se le puede enseñar a nadie.',
       hasEvidence: 'Prueba guardada.',
       attachEvidence: 'Guardar la prueba',
@@ -1116,6 +1137,8 @@ export const es: TranslationResources = {
           restored: 'Restituyó un permiso de imagen',
           evidence_attached: 'Guardó la prueba de un permiso',
           evidence_removed: 'Borró la prueba de un permiso',
+          removal_requested: 'El cliente pidió la retirada',
+          removal_request_cancelled: 'Se anuló la petición de retirada',
         },
         pricing: {
           updated: 'Cambió las tarifas',
@@ -1702,6 +1725,19 @@ export const es: TranslationResources = {
    * La seccion no se pinta si no hay videos configurados, asi que estos
    * textos pueden existir mucho antes de que haya contenido.
    */
+  removal: {
+    title: 'Retirar sus fotos de nuestra web',
+    intro:
+      'Pulse el botón y las fotos y los vídeos de su vivienda dejan de publicarse. Surte efecto al momento.',
+    help: 'No tiene que decirnos por qué. Si cambia de idea, escríbanos sin más.',
+    confirm: 'Sí, retírenlas',
+    sending: 'Retirando…',
+    done: 'Hecho. Las fotos y los vídeos de su vivienda ya no se publican.',
+    invalid:
+      'Este enlace ya no sirve. Puede que se haya usado antes. Escríbanos y las retiramos nosotros.',
+    error: 'No hemos podido contactar con el servidor. Inténtelo dentro de un momento.',
+  },
+
   gallery: {
     title: 'Antes y después',
     subtitle:

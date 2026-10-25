@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { LocaleSchema, type Locale } from './enums';
 import { GalleryPhotoPathSchema, YouTubeVideoIdSchema } from './gallery';
 
 /**
@@ -205,6 +206,40 @@ export const MediaConsentSchema = z
     evidenceKind: ConsentEvidenceKindSchema.default('SIGNED_PAPER'),
 
     customerName: texto(CONSENT_NAME_MAX),
+
+    /**
+     * EL CORREO DEL CLIENTE, PARA PODER DEVOLVERLE EL CONTROL.
+     *
+     * Sin esto, el registro sabe de quien es cada foto pero no tiene forma
+     * de escribirle, y entonces retirar depende SIEMPRE de que el cliente
+     * sepa a quien dirigirse y de que alguien del equipo lea su mensaje.
+     *
+     * Con esto se le puede mandar constancia de lo que autorizo y un enlace
+     * que lo retira al momento, sin intermediarios.
+     *
+     * NULO PARA LAS FICHAS DE PAPEL en las que nadie lo apunto. No es
+     * obligatorio: un permiso firmado sin correo sigue siendo un permiso.
+     * Lo que no tiene es salida automatica.
+     *
+     * NUNCA sale al sitio publico ni al registro de auditoria.
+     */
+    customerEmail: z.string().trim().toLowerCase().email().max(160).nullable().default(null),
+
+    /**
+     * EN QUE IDIOMA SE LE ESCRIBE.
+     *
+     * Porque lo que se le manda —la constancia de lo que autorizo y el
+     * enlace que lo retira— tiene que poder leerlo. Mandarle a alguien, en
+     * un idioma que no entiende, un correo que habla de publicar fotos de
+     * su casa es la peor version posible de este correo: ni sirve de
+     * constancia ni se atreve a pulsar el boton.
+     *
+     * Es el mismo criterio que ya rige para la invitacion al panel. Cuando
+     * el permiso viene de una reserva se sabe —lo eligio al reservar—; en
+     * una ficha de papel lo elige quien la anota.
+     */
+    customerLocale: LocaleSchema.default('en'),
+
     /** La casa. NUNCA sale al sitio publico. */
     propertyAddress: texto(CONSENT_ADDRESS_MAX),
 
@@ -309,6 +344,36 @@ export const StoredMediaConsentSchema = z.object({
    */
   evidencePath: ConsentEvidencePathSchema.nullable().default(null),
 
+  /**
+   * Si este cliente tiene enlace para retirar sus fotos el solo.
+   *
+   * UN SI O UN NO, NUNCA EL ENLACE. El panel lo necesita para no prometer
+   * una salida automatica a quien no la tiene —una ficha de papel sin
+   * correo—, pero el testigo no puede viajar hasta un navegador: ahi se
+   * queda en la memoria de la pestana y en cualquier extension instalada.
+   */
+  hasRemovalLink: z.boolean().default(false),
+
+  /**
+   * EL DIA QUE EL CLIENTE PIDIO LA RETIRADA, o `null` si no la ha pedido.
+   *
+   * ========================================================================
+   * POR QUE NO BASTA CON `revokedAt`
+   * ========================================================================
+   * Retirar es un boton y despublica al momento, asi que si se mira solo
+   * `revokedAt` el plazo se cumple SIEMPRE: parece que se tardo cero.
+   *
+   * Pero el reloj no empieza cuando alguien pulsa, empieza cuando el cliente
+   * escribe. El hueco peligroso es justo ese —entre que llega el correo y
+   * que alguien entra al panel— y es el unico tramo donde se puede incumplir
+   * una promesa de cinco dias. Sin anotar cuando se pidio, ese hueco no
+   * existe para el sistema y no se puede avisar de nada.
+   *
+   * Va aqui y no en el contrato del papel porque no es algo que el cliente
+   * firmara: es algo que paso despues.
+   */
+  removalRequestedAt: FechaSchema.nullable().default(null),
+
   /** Cuando se retiro el permiso, o `null` si sigue en pie. */
   revokedAt: z.string().nullable(),
   createdAt: z.string(),
@@ -389,6 +454,10 @@ export function consentFromBooking(datos: {
   marcado: BookingMediaConsent;
   reference: string;
   customerName: string;
+  /** El de la reserva: es lo que hace posible devolverle el control. */
+  customerEmail: string;
+  /** El que eligio al reservar: en ese idioma se le escribe. */
+  customerLocale: Locale;
   propertyAddress: string;
   serviceDate: string;
   signedAt: string;
@@ -397,6 +466,8 @@ export function consentFromBooking(datos: {
     reference: datos.reference,
     evidenceKind: 'WEB_FORM',
     customerName: datos.customerName,
+    customerEmail: datos.customerEmail,
+    customerLocale: datos.customerLocale,
     propertyAddress: datos.propertyAddress,
     occupiedByOthers: datos.marcado.occupiedByOthers,
     /*
@@ -428,4 +499,173 @@ export function consentFromBooking(datos: {
     photoPaths: [],
     notes: `Formulario de reserva, texto v${String(BOOKING_CONSENT_TEXT_VERSION)}`,
   };
+}
+
+// ---------------------------------------------------------------------------
+// El plazo de retirada
+// ---------------------------------------------------------------------------
+
+/**
+ * Lo que se manda al anotar que un cliente pidio la retirada.
+ *
+ * UN OBJETO PARA UN SOLO CAMPO, y no la fecha suelta, porque el dia que haya
+ * que anotar tambien por donde llego la peticion —correo, mensaje— se anade
+ * una clave y las peticiones anteriores siguen valiendo. Con una fecha suelta
+ * en el cuerpo, ese dia hay que cambiar el contrato entero.
+ */
+export const RemovalRequestSchema = z.strictObject({
+  requestedAt: FechaSchema,
+});
+export type RemovalRequest = z.infer<typeof RemovalRequestSchema>;
+
+/** Suma dias a una fecha `AAAA-MM-DD`, en UTC, sin arrastrar husos. */
+function sumarDias(fecha: string, dias: number): string {
+  const base = new Date(`${fecha}T00:00:00Z`);
+  base.setUTCDate(base.getUTCDate() + dias);
+  return base.toISOString().slice(0, 10);
+}
+
+/** Dias enteros de `desde` a `hasta`. Negativo si `hasta` ya paso. */
+function diasEntre(desde: string, hasta: string): number {
+  const a = Date.parse(`${desde}T00:00:00Z`);
+  const b = Date.parse(`${hasta}T00:00:00Z`);
+  return Math.round((b - a) / 86_400_000);
+}
+
+/** El dia en que vence lo que el papel prometio. */
+export function removalDeadline(requestedAt: string, removalDays: number): string {
+  return sumarDias(requestedAt, removalDays);
+}
+
+export interface RemovalState {
+  /** El cliente ha pedido la retirada. */
+  requested: boolean;
+  /** Ya se retiro: la promesa esta cumplida. */
+  fulfilled: boolean;
+  /** El dia en que vence, o `null` si no se ha pedido nada. */
+  deadline: string | null;
+  /** Dias que quedan. Negativo si ya se paso. `null` si no aplica. */
+  daysLeft: number | null;
+  /** Se paso el plazo y la pieza sigue publicada. */
+  overdue: boolean;
+}
+
+/** Lo minimo que hace falta para situar una promesa de retirada. */
+export interface RemovalFacts {
+  /** El dia que el cliente lo pidio, o `null` si no lo ha pedido. */
+  requestedAt: string | null;
+  /** Los dias que promete ese papel. */
+  removalDays: number;
+  /** Si ya se retiro. */
+  revoked: boolean;
+}
+
+/**
+ * En que punto esta la promesa de retirada.
+ *
+ * UNA SOLA FUNCION PARA LOS TRES SITIOS que lo preguntan —el panel, el
+ * barrido que avisa y las pruebas—, porque es una cuenta con un borde
+ * resbaladizo: el dia del vencimiento todavia NO esta vencido. Escrita tres
+ * veces, uno de los tres se habria quedado con el borde al reves.
+ *
+ * TOMA CUATRO DATOS Y NO LA FICHA ENTERA. El barrido lee de la base solo lo
+ * que necesita para decidir —son cuatro columnas de una tabla que lleva
+ * nombres y direcciones— y con una firma que pidiera la ficha completa
+ * tendria que cargarla igualmente para hacer una resta.
+ */
+export function removalState(datos: RemovalFacts, hoy: string): RemovalState {
+  const { requestedAt } = datos;
+
+  if (requestedAt === null) {
+    return { requested: false, fulfilled: false, deadline: null, daysLeft: null, overdue: false };
+  }
+
+  const deadline = removalDeadline(requestedAt, datos.removalDays);
+  const fulfilled = datos.revoked;
+  const daysLeft = diasEntre(hoy, deadline);
+
+  return {
+    requested: true,
+    fulfilled,
+    deadline,
+    daysLeft,
+    /*
+     * El dia del vencimiento NO cuenta como vencido: prometer «en cinco
+     * dias» incluye el quinto. Se pasa al sexto.
+     */
+    overdue: !fulfilled && daysLeft < 0,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// El enlace con el que el cliente retira sus fotos
+// ---------------------------------------------------------------------------
+
+/**
+ * UN TESTIGO DE RETIRADA ES UNA CREDENCIAL.
+ *
+ * Quien lo tenga puede despublicar las fotos de esa ficha sin identificarse
+ * de ninguna otra forma. Por eso:
+ *
+ *   - NO SE GUARDA. De el solo queda su resumen criptografico en la fila,
+ *     igual que con una contrasena. Ni la base de datos ni una copia de
+ *     seguridad robada sirven para retirar nada.
+ *   - NO SE ESCRIBE EN NINGUN REGISTRO, ni del servidor ni de auditoria. Es
+ *     la misma regla que ya rige para los enlaces de invitacion al panel.
+ *   - VIAJA EN EL FRAGMENTO de la direccion (`#t=...`) y no en la ruta. Lo
+ *     que va detras de la almohadilla NO LLEGA AL SERVIDOR: no aparece en
+ *     los registros del servidor web, ni en la cabecera `Referer` cuando el
+ *     navegador salta a otra pagina.
+ *
+ * ========================================================================
+ * LO QUE PUEDE HACER QUIEN LO ROBE
+ * ========================================================================
+ * Despublicar unas fotos. Nada mas: no lee la ficha, no ve el nombre ni la
+ * direccion, no publica nada y no toca ninguna otra. Y es REVERSIBLE desde
+ * el panel con el boton de restituir.
+ *
+ * Es la direccion de fallo que se eligio a proposito. Un enlace que
+ * PUBLICARA habria sido lo contrario: irreversible y en el sentido malo.
+ */
+export const REMOVAL_TOKEN_BYTES = 32;
+
+/** 32 bytes en base64url: 43 caracteres sin relleno. */
+export const REMOVAL_TOKEN_PATTERN = /^[A-Za-z0-9_-]{43}$/;
+
+export const RemovalTokenSchema = z
+  .string()
+  .regex(REMOVAL_TOKEN_PATTERN, 'Ese no es un enlace de retirada');
+
+/** Lo que el sitio publico manda al pulsar el boton de retirar. */
+export const RemovalLinkRequestSchema = z.strictObject({
+  token: RemovalTokenSchema,
+});
+export type RemovalLinkRequest = z.infer<typeof RemovalLinkRequestSchema>;
+
+/**
+ * Lo que responde.
+ *
+ * UN SOLO BOOLEANO, y a proposito: no dice de quien era la ficha, ni cuantas
+ * piezas amparaba, ni si el testigo existio alguna vez. Quien llegue con un
+ * enlace filtrado no puede sacar de aqui ningun dato.
+ *
+ * Tolerante con campos nuevos, como todo lo que lee un navegador.
+ */
+export const RemovalLinkResultSchema = z.object({
+  done: z.boolean(),
+});
+export type RemovalLinkResult = z.infer<typeof RemovalLinkResultSchema>;
+
+/** La ruta de la pagina publica de retirada, dentro del sitio. */
+export const REMOVAL_LINK_PATH = '/retirar-fotos';
+
+/**
+ * La direccion completa que va en el correo.
+ *
+ * EL TESTIGO VA DETRAS DE LA ALMOHADILLA, que es lo que hace que no llegue
+ * al servidor. La pagina lo lee del fragmento y lo manda en el cuerpo de una
+ * peticion, nunca en la direccion.
+ */
+export function removalLinkUrl(baseUrl: string, token: string): string {
+  return `${baseUrl.replace(/\/$/, '')}${REMOVAL_LINK_PATH}#t=${token}`;
 }

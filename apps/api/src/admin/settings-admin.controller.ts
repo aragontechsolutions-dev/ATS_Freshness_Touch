@@ -39,6 +39,8 @@ import {
   Gallery,
   ConsentEvidenceTypeSchema,
   MediaConsentSchema,
+  RemovalRequestSchema,
+  type RemovalRequest,
   type MediaConsent,
   type StoredMediaConsent,
   GalleryImageKindSchema,
@@ -47,6 +49,7 @@ import {
 } from '@freshness/types';
 import type { Request, Response } from 'express';
 import { ADMIN_ROUTE, CurrentStaff, Roles } from '../auth/auth.decorators';
+import { ConsentReceiptService } from '../notifications/consent-receipt.service';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
 import { SKIP_QUOTE_THROTTLER } from '../common/throttling';
 import { NotificationSettingsService } from '../notifications/notification-settings.service';
@@ -472,7 +475,10 @@ export class GalleryAdminController {
 @SkipThrottle(SKIP_QUOTE_THROTTLER)
 @Controller(`${ADMIN_ROUTE}/media-consents`)
 export class MediaConsentsAdminController {
-  constructor(private readonly consentimientos: MediaConsentsService) {}
+  constructor(
+    private readonly consentimientos: MediaConsentsService,
+    private readonly constancia: ConsentReceiptService,
+  ) {}
 
   @Get()
   @Roles('ADMIN')
@@ -480,15 +486,31 @@ export class MediaConsentsAdminController {
     return this.consentimientos.list();
   }
 
+  /**
+   * Anota una ficha nueva y, si lleva correo, le manda la constancia.
+   *
+   * EL CORREO SALE DESPUES DE GUARDAR Y NO BLOQUEA LA RESPUESTA SI FALLA.
+   * La ficha existe y el permiso vale; lo que se pierde si el correo no sale
+   * es la comodidad de que el cliente pueda retirarlo el solo, no su
+   * derecho a pedirlo.
+   */
   @Post()
   @Roles('ADMIN')
   @HttpCode(201)
-  create(
+  async create(
     @Body(new ZodValidationPipe<MediaConsent>(MediaConsentSchema)) consent: MediaConsent,
     @CurrentStaff() staff: AuthenticatedStaff,
     @Req() request: Request,
   ): Promise<StoredMediaConsent> {
-    return this.consentimientos.create(consent, staff, request.ip ?? null);
+    const { ficha, removalToken } = await this.consentimientos.create(
+      consent,
+      staff,
+      request.ip ?? null,
+    );
+
+    await this.constancia.enviar(consent, removalToken);
+
+    return ficha;
   }
 
   @Put(':id')
@@ -536,6 +558,48 @@ export class MediaConsentsAdminController {
     @Req() request: Request,
   ): Promise<StoredMediaConsent> {
     return this.consentimientos.setRevoked(id, false, staff, request.ip ?? null);
+  }
+
+  /* -------------------------------------------------------------------- */
+  /*  El plazo de retirada                                                 */
+  /* -------------------------------------------------------------------- */
+
+  /**
+   * ANOTA EL DIA EN QUE EL CLIENTE PIDIO LA RETIRADA.
+   *
+   * Arranca el reloj de los dias que promete el papel y pone la ficha en la
+   * lista de avisos. NO retira nada: eso sigue siendo el boton de retirar,
+   * que es el que despublica.
+   *
+   * Son dos acciones separadas a proposito. Juntarlas parece comodo hasta el
+   * dia en que alguien anota una peticion de hace tres dias para dejar
+   * constancia y despublica sin querer.
+   */
+  @Post(':id/removal-request')
+  @Roles('ADMIN')
+  requestRemoval(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body(new ZodValidationPipe<RemovalRequest>(RemovalRequestSchema)) cuerpo: RemovalRequest,
+    @CurrentStaff() staff: AuthenticatedStaff,
+    @Req() request: Request,
+  ): Promise<StoredMediaConsent> {
+    return this.consentimientos.setRemovalRequest(
+      id,
+      cuerpo.requestedAt,
+      staff,
+      request.ip ?? null,
+    );
+  }
+
+  /** Anula una peticion anotada por error. Tambien queda registrado. */
+  @Post(':id/removal-request/cancel')
+  @Roles('ADMIN')
+  cancelRemovalRequest(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentStaff() staff: AuthenticatedStaff,
+    @Req() request: Request,
+  ): Promise<StoredMediaConsent> {
+    return this.consentimientos.setRemovalRequest(id, null, staff, request.ip ?? null);
   }
 
   /* -------------------------------------------------------------------- */

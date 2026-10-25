@@ -822,6 +822,27 @@ export function setMediaConsentRevoked(id: string, revocado: boolean): Promise<S
 }
 
 /**
+ * Anota el dia en que el cliente pidio la retirada, o anula la peticion.
+ *
+ * ARRANCA EL RELOJ, NO RETIRA NADA. Despublicar sigue siendo el boton de
+ * retirar. La fecha la elige quien anota porque el correo del cliente puede
+ * llevar dias en el buzon, y el plazo se cuenta desde que lo pidio.
+ */
+export function setMediaConsentRemovalRequest(
+  id: string,
+  requestedAt: string | null,
+): Promise<StoredMediaConsent> {
+  const ruta = `${PERMISOS}/${id}/removal-request`;
+
+  return requestedAt === null
+    ? request(`${ruta}/cancel`, unPermiso('peticion de retirada'), { method: 'POST' })
+    : request(ruta, unPermiso('peticion de retirada'), {
+        method: 'POST',
+        body: { requestedAt },
+      });
+}
+
+/**
  * Guarda la PRUEBA del permiso: el escaneo del papel, el PDF del correo.
  *
  * Va a un almacen privado, no al de la galeria. Aqui se manda igual que una
