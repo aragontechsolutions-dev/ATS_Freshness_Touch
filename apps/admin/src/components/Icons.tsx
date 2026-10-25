@@ -201,6 +201,23 @@ export function CloseIcon({ className }: IconProps) {
 
 /* ------------------------------- Acciones ------------------------------- */
 
+export function UploadIcon({ className }: IconProps) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      className={className}
+      aria-hidden="true"
+    >
+      {/* Bandeja abierta y una flecha que entra: subir, no descargar. */}
+      <path strokeLinecap="round" d="M4 16v2.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V16" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M12 15V4m0 0L8 8m4-4 4 4" />
+    </svg>
+  );
+}
+
 export function PlusIcon({ className }: IconProps) {
   return (
     <Trazo className={className} strokeWidth={2}>

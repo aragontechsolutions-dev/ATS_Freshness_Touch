@@ -660,6 +660,7 @@ export const en = {
         'What visitors see before they press play. Without one, the card shows our brand colours. We do not use YouTube’s own thumbnail, because loading it would send visitor data to Google before anyone presses anything.',
       posterAlt: 'Video thumbnail',
       removePoster: 'Remove thumbnail',
+      uploadPoster: 'Upload thumbnail',
     },
 
     location: {

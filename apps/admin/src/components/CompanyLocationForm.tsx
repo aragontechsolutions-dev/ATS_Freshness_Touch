@@ -339,7 +339,7 @@ export function CompanyLocationForm({ locale, onSessionLost }: CompanyLocationFo
       )}
 
       <div className="flex flex-wrap items-center gap-3">
-        <button type="submit" className="ft-btn ft-btn-primary" disabled={guardando}>
+        <button type="submit" className="ft-btn-primary" disabled={guardando}>
           {guardando && <SpinnerIcon className="mr-2 h-4 w-4" />}
           {t('admin.location.save')}
         </button>

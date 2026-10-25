@@ -339,7 +339,7 @@ export function SiteCopyForm({ locale, onSessionLost }: SiteCopyFormProps) {
         {!sinCambios && (
           <button
             type="button"
-            className="ft-btn-outline"
+            className="ft-btn-ghost"
             onClick={() => {
               setBorrador(aBorrador(guardado ?? {}));
               setProblema(null);
