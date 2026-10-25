@@ -207,10 +207,10 @@ Prometer en el permiso que se retira en X días obliga a poder hacerlo. Hace
 falta saber, de un vídeo cualquiera, **de qué cliente es**. Si no, una
 petición de retirada se convierte en revisar el canal entero a ojo.
 
-**Desde la etapa 2.D.1 el sistema lo hace solo**: cada permiso se anota con
-las piezas que ampara, y retirarlo las deja de publicar al momento. Lo que
-sigue es lo que hace falta **mientras no exista la pantalla del panel**, y lo
-que conviene seguir guardando aunque exista:
+**Desde la etapa 2.D el sistema lo hace solo**: cada permiso se anota en
+_Ajustes → Permisos de imagen_ con las piezas que ampara, y retirarlo las deja
+de publicar al momento. Lo que sigue es lo que conviene seguir guardando
+igualmente, porque el sistema guarda la anotación pero no el papel:
 
 - Una hoja de cálculo con una fila por pieza publicada: fecha del servicio,
   cliente, dirección, enlace del vídeo o nombre del archivo de la foto, y
@@ -808,18 +808,49 @@ Ni el nombre ni la dirección. El registro de auditoría se consulta, se exporta
 y se enseña; de ahí vendría el problema. Lo que guarda es la referencia del
 papel, cuántas piezas ampara y si autoriza el «antes».
 
-#### Lo que falta de esta etapa
+#### Modo estricto: lista blanca, no lista negra
 
-**La pantalla del panel (2.D.2).** Hoy el registro existe y funciona, pero solo
-se llega a él por la API. Hasta que exista la pantalla, sigue sirviendo la hoja
-de cálculo de la sección 6.
+**Sin papel no se publica.** El filtro no quita lo revocado: deja pasar solo lo
+amparado por un permiso firmado y en pie.
 
-Y una decisión tomada a conciencia: **una pieza sin permiso anotado se sigue
-publicando**, con aviso en el panel cuando exista la pantalla. Bloquearla haría
-desaparecer de la portada lo que ya estaba publicado el día del despliegue, y
-una sección que se vacía sola en un despliegue es exactamente el fallo que este
-proyecto ya se comió una vez. Si se prefiere el modo estricto —no publicar sin
-papel— es un cambio de una línea en el filtro.
+La diferencia no es de matiz. Con una lista negra, una foto que nadie anotó se
+publica igual — y publicar la casa de alguien sin su permiso es el escenario
+que todo este módulo existe para evitar. Con lista blanca, olvidar anotar un
+papel tiene una consecuencia **visible** —la foto no sale— en vez de una
+invisible —la foto sale sin permiso—. De las dos, esta es la que se arregla,
+porque se nota.
+
+Una pieza con un permiso **revocado** no se publica aunque otro la ampare. No
+debería pasar —una pieza es de una casa— pero si pasara, lo que manda es la
+voluntad de quien dijo que no.
+
+#### La pantalla del panel (etapa 2.D.2)
+
+_Ajustes → Permisos de imagen_, pegada a la de la galería: primero lo que se
+publica, después el papel que lo permite. Separadas, el papel parecería
+papeleo; juntas se ve que sin él no sale nada.
+
+Tres decisiones de la pantalla:
+
+1. **La casilla del «antes» va aparte y destacada.** Es la parte sensible del
+   permiso —la casa sucia de una persona concreta— y marcarla sin querer,
+   entre otras diez, sería fácil. Arranca sin marcar: darla por supuesta sería
+   justo lo contrario de lo que hace falta.
+2. **Retirar pide confirmación**, porque despublica al momento. Entre pulsar y
+   que la foto desaparezca de la web no hay nada. Restituir no la pide: no
+   quita nada.
+3. **Un permiso retirado sigue en la lista**, en gris y marcado. Es exactamente
+   lo que hay que poder enseñar.
+
+**Y la galería avisa de lo que no se está publicando.** Sin eso, el modo
+estricto sería una trampa: se sube una foto, se guarda, se ve en el panel y no
+aparece en la web, sin forma de saber por qué. Ahora lo dice arriba —cuántas
+piezas— y en cada tarjeta afectada —cuál—.
+
+> **Al desplegar esto, lo que ya estaba publicado deja de verse** hasta que su
+> permiso esté anotado. Es la consecuencia buscada del modo estricto, pero
+> conviene saberlo **antes** de desplegar y no después: lo primero que hay que
+> hacer es anotar los permisos de lo que ya está en la portada.
 
 ### Lo que todavía no existe
 

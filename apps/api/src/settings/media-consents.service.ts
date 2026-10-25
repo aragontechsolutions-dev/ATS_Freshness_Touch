@@ -70,31 +70,52 @@ export class MediaConsentsService {
   }
 
   /**
-   * Las piezas que ya no se pueden publicar.
+   * Las piezas que SI se pueden publicar.
    *
-   * ESTO LO LLAMA LA GALERIA PUBLICA EN CADA VISITA, y es lo que convierte el
-   * registro en algo que cumple solo. Se piden solo las revocadas y solo sus
-   * dos listas: ni un nombre ni una direccion salen de la base para esto.
+   * ========================================================================
+   * MODO ESTRICTO: SIN PAPEL NO SE PUBLICA
+   * ========================================================================
+   * No es una lista negra de lo retirado, es una lista blanca de lo
+   * amparado. La diferencia importa: con una lista negra, una foto que nadie
+   * anoto se publica — y publicar la casa de alguien sin su permiso firmado
+   * es el escenario que todo este modulo existe para evitar.
+   *
+   * Olvidar anotar un papel ahora tiene una consecuencia VISIBLE —la foto no
+   * sale— en vez de una invisible —la foto sale sin permiso—. De las dos,
+   * esta es la que se arregla, porque se nota.
+   *
+   * UNA PIEZA CON UN PERMISO REVOCADO NO SE PUBLICA AUNQUE OTRO LA AMPARE.
+   * No deberia pasar —una pieza es de una casa— pero si pasara, lo que manda
+   * es la voluntad de quien dijo que no.
+   *
+   * ESTO LO LLAMA LA GALERIA PUBLICA EN CADA VISITA. Salen de la base solo
+   * las dos listas: ni un nombre ni una direccion.
    */
-  async piezasRetiradas(
+  async piezasPublicables(
     now: number = Date.now(),
   ): Promise<{ videoIds: Set<string>; photoPaths: Set<string> }> {
     if (this.cached && this.cached.expiresAt > now) return this.cached.value;
 
     const filas = await this.prisma.db.mediaConsent.findMany({
-      where: { revokedAt: { not: null } },
-      select: { videoIds: true, photoPaths: true },
+      select: { revokedAt: true, videoIds: true, photoPaths: true },
     });
 
-    const videoIds = new Set<string>();
-    const photoPaths = new Set<string>();
+    const amparados = { videoIds: new Set<string>(), photoPaths: new Set<string>() };
+    const retirados = { videoIds: new Set<string>(), photoPaths: new Set<string>() };
 
     for (const fila of filas) {
-      for (const id of fila.videoIds) videoIds.add(id);
-      for (const path of fila.photoPaths) photoPaths.add(path);
+      const destino = fila.revokedAt === null ? amparados : retirados;
+      for (const id of fila.videoIds) destino.videoIds.add(id);
+      for (const path of fila.photoPaths) destino.photoPaths.add(path);
     }
 
-    const value = { videoIds, photoPaths };
+    const value = {
+      videoIds: new Set([...amparados.videoIds].filter((id) => !retirados.videoIds.has(id))),
+      photoPaths: new Set(
+        [...amparados.photoPaths].filter((path) => !retirados.photoPaths.has(path)),
+      ),
+    };
+
     this.cached = { value, expiresAt: now + CACHE_TTL_MS };
     return value;
   }

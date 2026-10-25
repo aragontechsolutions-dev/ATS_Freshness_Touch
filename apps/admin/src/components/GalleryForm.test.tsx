@@ -61,6 +61,7 @@ const MINI_URL = `https://ejemplo.supabase.co/storage/v1/object/public/gallery/$
 const VACIA: AdminGallery = {
   gallery: { videos: [], photos: [] },
   imageUrls: {},
+  uncovered: { videoIds: [], photoPaths: [] },
   updatedAt: null,
   updatedBy: null,
 };
@@ -74,6 +75,7 @@ const CON_DOS: AdminGallery = {
     photos: [],
   },
   imageUrls: {},
+  uncovered: { videoIds: [], photoPaths: [] },
   updatedAt: '2026-10-20T12:00:00.000Z',
   updatedBy: 'Ada Jefa',
 };
@@ -85,6 +87,7 @@ const CON_FOTO: AdminGallery = {
     photos: [{ path: FOTO, title: { en: 'Kitchen', es: 'Cocina' } }],
   },
   imageUrls: { [FOTO]: FOTO_URL },
+  uncovered: { videoIds: [], photoPaths: [] },
   updatedAt: '2026-10-20T12:00:00.000Z',
   updatedBy: 'Ada Jefa',
 };
@@ -96,6 +99,7 @@ const CON_MINIATURA: AdminGallery = {
     photos: [],
   },
   imageUrls: { [MINI]: MINI_URL },
+  uncovered: { videoIds: [], photoPaths: [] },
   updatedAt: '2026-10-20T12:00:00.000Z',
   updatedBy: 'Ada Jefa',
 };
@@ -152,6 +156,7 @@ beforeEach(() => {
           v.poster === null ? [] : [[v.poster, MINI_URL] as const],
         ),
       ]),
+      uncovered: { videoIds: [], photoPaths: [] },
       updatedAt: '2026-10-20T13:00:00.000Z',
       updatedBy: 'Ada Jefa',
     }),
@@ -536,5 +541,59 @@ describe('la miniatura de un video', () => {
     await elegirMiniatura(imagen());
 
     expect(saveGallery).not.toHaveBeenCalled();
+  });
+});
+
+describe('lo que esta guardado pero no se publica', () => {
+  /*
+   * ========================================================================
+   * SIN ESTO EL MODO ESTRICTO SERIA UNA TRAMPA
+   * ========================================================================
+   * La galeria publica funciona con lista blanca: sin un permiso firmado y
+   * en pie, una pieza no sale. Esta bien — publicar la casa de alguien sin
+   * su permiso es lo que todo el modulo evita— pero sin avisar aqui, lo que
+   * pasa es que se sube una foto, se guarda, se ve en esta pantalla y no
+   * aparece en la web, y no hay forma de saber por que.
+   */
+  const SIN_PERMISO: AdminGallery = {
+    gallery: {
+      videos: [{ videoId: UNO, title: { en: null, es: null }, poster: null }],
+      photos: [{ path: FOTO, title: { en: null, es: null } }],
+    },
+    imageUrls: { [FOTO]: FOTO_URL },
+    uncovered: { videoIds: [UNO], photoPaths: [FOTO] },
+    updatedAt: '2026-10-25T12:00:00.000Z',
+    updatedBy: 'Ada Jefa',
+  };
+
+  it('se avisa arriba, con cuantas piezas son', async () => {
+    fetchGallery.mockResolvedValue(SIN_PERMISO);
+    await montar();
+
+    expect(contenedor.textContent).toContain('2 items are saved but not published');
+  });
+
+  it('y se dice que hacer', async () => {
+    fetchGallery.mockResolvedValue(SIN_PERMISO);
+    await montar();
+
+    expect(contenedor.textContent).toContain('Image releases');
+  });
+
+  it('cada tarjeta afectada lo dice por su cuenta', async () => {
+    // Arriba se dice cuantas; en la tarjeta, cual.
+    fetchGallery.mockResolvedValue(SIN_PERMISO);
+    await montar();
+
+    const avisos = contenedor.textContent?.match(/Not on the website/g) ?? [];
+    expect(avisos).toHaveLength(2);
+  });
+
+  it('sin piezas descubiertas no se avisa de nada', async () => {
+    fetchGallery.mockResolvedValue(CON_FOTO);
+    await montar();
+
+    expect(contenedor.textContent).not.toContain('not published');
+    expect(contenedor.textContent).not.toContain('Not on the website');
   });
 });

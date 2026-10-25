@@ -425,6 +425,61 @@ export const es: TranslationResources = {
     },
 
     /* -------------------------- Avisos ----------------------------- */
+    /* ---------------------- Los permisos de imagen ------------------------ */
+    consents: {
+      title: 'Permisos de imagen',
+      intro:
+        'El papel firmado que permite publicar la casa de un cliente, enlazado con las piezas que ampara. Retirarlo las despublica al momento.',
+      strictNotice:
+        'No se publica nada sin un permiso anotado. Una pieza sin permiso se queda guardada pero no sale en la web.',
+      add: 'Anotar un permiso',
+      empty:
+        'Todavía no hay permisos anotados. Hasta que haya uno, nada de la galería sale en la web.',
+      reference: 'Referencia',
+      referenceHelp: 'La que va escrita en el papel, para poder emparejar el escaneo.',
+      customerName: 'Cliente',
+      propertyAddress: 'Propiedad',
+      propertyAddressHelp: 'No sale nunca en la web. Está aquí para poder encontrar la pieza.',
+      serviceDate: 'Fecha del servicio',
+      signedAt: 'Fecha de la firma',
+      removalDays: 'Plazo de retirada (días)',
+      covers: 'Qué se grabó',
+      coversInterior: 'Interior',
+      coversExterior: 'Exterior',
+      allowsBefore: 'Se pueden publicar las imágenes del «antes»',
+      allowsBeforeHelp:
+        'La parte sensible: el «antes» es la casa de esa persona, sucia. Márcalo solo si el papel lo dice.',
+      channels: 'Dónde se puede publicar',
+      channelsHelp:
+        'Lo que enumera el papel. Para que una pieza salga aquí, la web tiene que estar marcada.',
+      channel: {
+        WEBSITE: 'Sitio web',
+        FACEBOOK: 'Facebook',
+        INSTAGRAM: 'Instagram',
+        YOUTUBE: 'YouTube',
+      },
+      videoIds: 'Vídeos que ampara',
+      photoPaths: 'Fotos que ampara',
+      piecesHelp: 'Uno por línea, copiados de la pantalla de la galería.',
+      notes: 'Notas',
+      save: 'Guardar el permiso',
+      cancel: 'Cancelar',
+      saved: 'Permiso guardado',
+      edit: 'Editar',
+      revoke: 'Retirar',
+      restore: 'Restituir',
+      revoked: 'Permiso retirado. Sus piezas ya no salen en la web.',
+      restored: 'Permiso restituido',
+      revokedChip: 'Retirado',
+      beforeChip: 'Cubre el «antes»',
+      confirmRevoke:
+        'Retirar este permiso quita sus fotos y vídeos de la web al momento. ¿Continuar?',
+      summary: '{{videos}} vídeo(s) y {{photos}} foto(s) · retirada en {{days}} días',
+      signedOn: 'Firmado el {{when}}',
+      revokedOn: 'Retirado el {{when}}',
+      errInvalid: 'Hay algo del permiso que todavía no vale.',
+    },
+
     notifications: {
       title: 'Avisos',
       intro: 'Qué se envía y a dónde llega.',
@@ -621,6 +676,11 @@ export const es: TranslationResources = {
       posterAlt: 'Miniatura del vídeo',
       removePoster: 'Quitar la miniatura',
       uploadPoster: 'Subir miniatura',
+      uncovered_one: 'Hay {{count}} pieza guardada que no se está publicando.',
+      uncovered_other: 'Hay {{count}} piezas guardadas que no se están publicando.',
+      uncoveredHelp:
+        'Nada sale en la web sin un permiso firmado anotado. Anótalo en Permisos de imagen y enlázalo con la pieza.',
+      notPublished: 'No sale en la web: falta el permiso',
     },
 
     location: {
