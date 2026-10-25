@@ -6,6 +6,7 @@ import {
   CONSENT_EVIDENCE_TYPES,
   CONSENT_REMOVAL_DAYS_DEFAULT,
   MediaConsentSchema,
+  removalState,
   type ConsentChannel,
   type ConsentEvidenceKind,
   type Locale,
@@ -16,6 +17,7 @@ import {
   ApiClientError,
   createMediaConsent,
   deleteMediaConsentEvidence,
+  setMediaConsentRemovalRequest,
   downloadMediaConsentEvidence,
   fetchMediaConsents,
   setMediaConsentRevoked,
@@ -114,6 +116,16 @@ export function MediaConsentsForm({ locale, onSessionLost }: MediaConsentsFormPr
   const [editando, setEditando] = useState<string | null>(null);
   const [borrador, setBorrador] = useState<Borrador>(VACIO);
 
+  /*
+   * HOY, EN LA ZONA DEL NAVEGADOR y calculado una sola vez por pintado.
+   *
+   * Dentro del bucle de las fichas se recalcularia por cada una, y entre la
+   * primera y la ultima puede cambiar el dia. Un plazo que vence hoy en una
+   * tarjeta y manana en la de abajo es el tipo de incoherencia que hace
+   * desconfiar de toda la pantalla.
+   */
+  const hoy = new Date().toISOString().slice(0, 10);
+
   const perdioSesion = onSessionLost;
 
   const cargar = useCallback(async () => {
@@ -193,6 +205,33 @@ export function MediaConsentsForm({ locale, onSessionLost }: MediaConsentsFormPr
     try {
       await setMediaConsentRevoked(ficha.id, retirar);
       toast.success(retirar ? 'admin.consents.revoked' : 'admin.consents.restored');
+      await cargar();
+    } catch (error) {
+      manejar(error);
+    } finally {
+      setGuardando(false);
+    }
+  };
+
+  /**
+   * ANOTA QUE EL CLIENTE PIDIO LA RETIRADA, o anula la anotacion.
+   *
+   * NO RETIRA NADA: arranca el reloj y pone la ficha en la lista de avisos.
+   * Despublicar sigue siendo el boton de retirar, y son dos cosas distintas
+   * a proposito — anotar una peticion de hace tres dias para dejar
+   * constancia no puede despublicar sin querer.
+   */
+  const anotarRetirada = async (
+    ficha: StoredMediaConsent,
+    requestedAt: string | null,
+  ): Promise<void> => {
+    setProblema(null);
+    setGuardando(true);
+    try {
+      await setMediaConsentRemovalRequest(ficha.id, requestedAt);
+      toast.success(
+        requestedAt === null ? 'admin.consents.removalCancelled' : 'admin.consents.removalSaved',
+      );
       await cargar();
     } catch (error) {
       manejar(error);
@@ -546,6 +585,14 @@ export function MediaConsentsForm({ locale, onSessionLost }: MediaConsentsFormPr
         <ul className="list-none space-y-3 p-0">
           {fichas.map((ficha) => {
             const retirado = ficha.revokedAt !== null;
+            const retirada = removalState(
+              {
+                requestedAt: ficha.removalRequestedAt,
+                removalDays: ficha.consent.removalDays,
+                revoked: retirado,
+              },
+              hoy,
+            );
 
             return (
               <li
@@ -591,6 +638,50 @@ export function MediaConsentsForm({ locale, onSessionLost }: MediaConsentsFormPr
                     : t('admin.consents.signedOn', { when: ficha.consent.signedAt })}
                   {ficha.updatedBy !== null && ` · ${ficha.updatedBy}`}
                 </p>
+
+                {/*
+                 * EL PLAZO DE RETIRADA.
+                 *
+                 * Es lo unico de esta pantalla con FECHA LIMITE, asi que se
+                 * pinta como una alarma y no como un dato mas: en rojo si se
+                 * paso, en ambar mientras corre. Una promesa que vence hoy no
+                 * puede verse igual que la referencia del papel.
+                 */}
+                {retirada.requested && (
+                  <p
+                    className={
+                      'rounded-md px-2 py-1 text-xs font-medium ' +
+                      (retirada.overdue
+                        ? 'bg-red-100 text-red-900 dark:bg-red-900/40 dark:text-red-100'
+                        : retirada.fulfilled
+                          ? 'bg-slate-100 text-slate-700 dark:bg-night-700 dark:text-slate-300'
+                          : 'bg-amber-100 text-amber-900 dark:bg-amber-900/40 dark:text-amber-100')
+                    }
+                  >
+                    {retirada.fulfilled
+                      ? t('admin.consents.removalDone', {
+                          when: ficha.removalRequestedAt,
+                          fulfilled: ficha.revokedAt === null ? '' : ficha.revokedAt.slice(0, 10),
+                        })
+                      : retirada.overdue
+                        ? t('admin.consents.removalOverdue', {
+                            count: Math.abs(retirada.daysLeft ?? 0),
+                            when: ficha.removalRequestedAt,
+                            deadline: retirada.deadline,
+                          })
+                        : retirada.daysLeft === 0
+                          ? t('admin.consents.removalToday', {
+                              when: ficha.removalRequestedAt,
+                              deadline: retirada.deadline,
+                            })
+                          : t('admin.consents.removalPending', {
+                              count: retirada.daysLeft ?? 0,
+                              when: ficha.removalRequestedAt,
+                              deadline: retirada.deadline,
+                            })}
+                    {!retirada.fulfilled && ` ${t('admin.consents.removalStillPublished')}`}
+                  </p>
+                )}
 
                 {/*
                  * LA PRUEBA, EN SU PROPIA LINEA Y CON SU AVISO.
@@ -656,6 +747,25 @@ export function MediaConsentsForm({ locale, onSessionLost }: MediaConsentsFormPr
                   >
                     {retirado ? t('admin.consents.restore') : t('admin.consents.revoke')}
                   </button>
+
+                  {retirada.requested ? (
+                    <button
+                      type="button"
+                      className="ft-btn-ghost"
+                      onClick={() => void anotarRetirada(ficha, null)}
+                      disabled={guardando}
+                    >
+                      {t('admin.consents.removalCancel')}
+                    </button>
+                  ) : (
+                    <PedirRetirada
+                      etiqueta={t('admin.consents.removalAsk')}
+                      ayuda={t('admin.consents.removalAskHelp')}
+                      hoy={hoy}
+                      deshabilitado={guardando}
+                      onFecha={(fecha) => void anotarRetirada(ficha, fecha)}
+                    />
+                  )}
                 </div>
               </li>
             );
@@ -667,6 +777,79 @@ export function MediaConsentsForm({ locale, onSessionLost }: MediaConsentsFormPr
 }
 
 /* ------------------------------------------------------------------------ */
+
+/**
+ * EL BOTON QUE ANOTA LA PETICION, CON SU FECHA.
+ *
+ * LA FECHA SE PIDE Y NO SE SUPONE. Poner «hoy» sin preguntar regalaria los
+ * dias que el correo del cliente lleve en el buzon, y el plazo se mediria
+ * desde que nos enteramos en vez de desde que lo pidio — que es justo la
+ * promesa que se firmo. Viene rellena con hoy, que es el caso frecuente,
+ * pero se puede cambiar.
+ *
+ * NO ADMITE UNA FECHA FUTURA: nadie pide algo manana.
+ */
+function PedirRetirada({
+  etiqueta,
+  ayuda,
+  hoy,
+  deshabilitado,
+  onFecha,
+}: {
+  etiqueta: string;
+  ayuda: string;
+  hoy: string;
+  deshabilitado: boolean;
+  onFecha: (fecha: string) => void;
+}) {
+  const [abierto, setAbierto] = useState(false);
+  const [fecha, setFecha] = useState(hoy);
+
+  if (!abierto) {
+    return (
+      <button
+        type="button"
+        className="ft-btn-ghost"
+        onClick={() => {
+          setFecha(hoy);
+          setAbierto(true);
+        }}
+        disabled={deshabilitado}
+      >
+        {etiqueta}
+      </button>
+    );
+  }
+
+  return (
+    <div className="flex flex-wrap items-end gap-2">
+      <label className="block">
+        <span className="ft-label">{etiqueta}</span>
+        <span className="mb-1 block text-xs text-slate-600 dark:text-slate-400">{ayuda}</span>
+        <input
+          type="date"
+          className="ft-input"
+          max={hoy}
+          value={fecha}
+          onChange={(evento) => {
+            setFecha(evento.target.value);
+          }}
+        />
+      </label>
+      <button
+        type="button"
+        className="ft-btn-primary"
+        onClick={() => {
+          setAbierto(false);
+          onFecha(fecha);
+        }}
+        disabled={deshabilitado || fecha === ''}
+      >
+        {etiqueta}
+      </button>
+    </div>
+  );
+}
 
 /**
  * UN BOTON DE VERDAD, NO UN TEXTO AZUL.

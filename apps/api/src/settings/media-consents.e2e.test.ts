@@ -11,6 +11,10 @@ import { AppModule } from '../app.module';
 import { applyBodyParsers } from '../common/body-parsers';
 import { AUTH_PROVIDER } from '../auth/auth.types';
 import type { LocalAuthProvider } from '../auth/providers/local-auth.provider';
+import { EMAIL_PROVIDER } from '../notifications/notifications.types';
+import type { LogEmailProvider } from '../notifications/providers/log-email.provider';
+import { NotificationSettingsService } from '../notifications/notification-settings.service';
+import { RemovalDeadlineSweepService } from '../notifications/removal-deadline-sweep.service';
 import { GalleryService } from './gallery.service';
 import { MediaConsentsService } from './media-consents.service';
 
@@ -21,6 +25,8 @@ vi.hoisted(() => {
   process.env.AUTH_LOCAL_SECRET = 'secreto-de-pruebas-de-los-permisos';
   process.env.EMAIL_PROVIDER = 'log';
   process.env.REMINDER_SWEEP_MINUTES = '0';
+  /* El barrido de plazos, a mano: una prueba no puede depender del reloj. */
+  process.env.REMOVAL_SWEEP_MINUTES = '0';
   process.env.AUDIT_PURGE_HOURS = '0';
   process.env.RATE_LIMIT_MAX = '2000';
   process.env.QUOTE_RATE_LIMIT_MAX = '2000';
@@ -716,5 +722,196 @@ describe('la prueba del permiso', () => {
   it('un permiso sin prueba responde que no la hay', async () => {
     const ficha = await crear(papel());
     expect((await descargar(ficha.body.id)).status).toBe(404);
+  });
+});
+
+/* ------------------------------------------------------------------------ */
+
+describe('el plazo de retirada', () => {
+  const BUZON = 'operaciones@example.com';
+
+  /** El dia de hoy y el de hace `dias` dias, en el formato del papel. */
+  function haceDias(dias: number): string {
+    const fecha = new Date();
+    fecha.setUTCDate(fecha.getUTCDate() - dias);
+    return fecha.toISOString().slice(0, 10);
+  }
+
+  async function pedirRetirada(id: string, requestedAt: string) {
+    return request(app.getHttpServer())
+      .post(`${RUTA}/${id}/removal-request`)
+      .set('authorization', `Bearer ${await comoAda()}`)
+      .send({ requestedAt });
+  }
+
+  async function anularPeticion(id: string) {
+    return request(app.getHttpServer())
+      .post(`${RUTA}/${id}/removal-request/cancel`)
+      .set('authorization', `Bearer ${await comoAda()}`)
+      .send();
+  }
+
+  function correos(): LogEmailProvider {
+    return app.get<LogEmailProvider>(EMAIL_PROVIDER);
+  }
+
+  async function buzonInterno(destino: string | null): Promise<void> {
+    const ajustes = app.get(NotificationSettingsService);
+    const actuales = await ajustes.get();
+    await ajustes.update(
+      { ...actuales, internalEmail: destino },
+      { staffId: ADA, role: 'ADMIN', email: 'ada@example.com', firstName: 'Ada' },
+      null,
+    );
+  }
+
+  const conBuzonInterno = () => buzonInterno(BUZON);
+
+  async function barrer(): Promise<void> {
+    await app.get(RemovalDeadlineSweepService).pasada();
+  }
+
+  beforeEach(() => {
+    correos().sent.length = 0;
+  });
+
+  /*
+   * ANOTAR NO RETIRA. Son dos acciones distintas a proposito: anotar una
+   * peticion de hace tres dias para dejar constancia no puede despublicar
+   * sin querer.
+   */
+  it('anotar la peticion arranca el reloj pero no despublica nada', async () => {
+    const ficha = await crear(papel({ photoPaths: [FOTO] }));
+    await publicarGaleria();
+
+    const anotada = await pedirRetirada(ficha.body.id, haceDias(1));
+
+    expect(anotada.status).toBe(201);
+    expect(anotada.body.removalRequestedAt).toBe(haceDias(1));
+    expect(anotada.body.revokedAt).toBeNull();
+    expect((await leerPublica()).body.photos).toHaveLength(1);
+  });
+
+  it('no admite una fecha que no es una fecha', async () => {
+    const ficha = await crear(papel());
+    expect((await pedirRetirada(ficha.body.id, '20/10/2026')).status).toBe(400);
+  });
+
+  it('se puede anular si se anoto por error', async () => {
+    const ficha = await crear(papel());
+    await pedirRetirada(ficha.body.id, haceDias(1));
+
+    const anulada = await anularPeticion(ficha.body.id);
+    expect(anulada.body.removalRequestedAt).toBeNull();
+  });
+
+  /*
+   * LA PRUEBA QUE JUSTIFICA LA ETAPA: hasta ahora, si nadie entraba al
+   * panel, el plazo se incumplia en silencio.
+   */
+  it('el barrido avisa al buzon interno de lo que sigue pendiente', async () => {
+    const ficha = await crear(papel());
+    await pedirRetirada(ficha.body.id, haceDias(1));
+    await conBuzonInterno();
+
+    await barrer();
+
+    expect(correos().sent).toHaveLength(1);
+    expect(correos().sent[0]?.to).toBe(BUZON);
+    expect(correos().sent[0]?.text).toContain('FT-2026-001');
+  });
+
+  /*
+   * NI UN NOMBRE NI UNA DIRECCION EN EL CORREO. Es el canal menos controlado
+   * que tiene el sistema: se reenvia, se queda en un movil y en un buzon
+   * para siempre. Y lo que el permiso promete no exponer es justo eso.
+   */
+  it('y el correo no lleva el nombre del cliente ni su direccion', async () => {
+    const ficha = await crear(papel());
+    await pedirRetirada(ficha.body.id, haceDias(1));
+    await conBuzonInterno();
+
+    await barrer();
+
+    const enviado = correos().sent[0];
+    for (const cuerpo of [enviado?.text ?? '', enviado?.html ?? '', enviado?.subject ?? '']) {
+      expect(cuerpo).not.toContain('Marta');
+      expect(cuerpo).not.toContain('Evergreen');
+    }
+  });
+
+  /*
+   * UNA VEZ AL DIA Y NO EN CADA PASADA. El barrido corre cada hora; un aviso
+   * que se repite cada hora es un aviso que se deja de leer.
+   */
+  it('no repite el aviso en la siguiente pasada del mismo dia', async () => {
+    const ficha = await crear(papel());
+    await pedirRetirada(ficha.body.id, haceDias(1));
+    await conBuzonInterno();
+
+    await barrer();
+    await barrer();
+
+    expect(correos().sent).toHaveLength(1);
+  });
+
+  it('retirarla la saca de los avisos', async () => {
+    const ficha = await crear(papel());
+    await pedirRetirada(ficha.body.id, haceDias(1));
+    await conBuzonInterno();
+    await revocar(ficha.body.id);
+
+    await barrer();
+
+    expect(correos().sent).toHaveLength(0);
+  });
+
+  it('sin peticiones abiertas no manda nada', async () => {
+    await crear(papel());
+    await conBuzonInterno();
+
+    await barrer();
+
+    expect(correos().sent).toHaveLength(0);
+  });
+
+  /*
+   * EL ASUNTO DICE SI ALGO SE PASO. Es lo unico que se lee sin abrir el
+   * correo, y la diferencia entre «hay trabajo» y «se esta incumpliendo una
+   * promesa» tiene que verse desde la bandeja de entrada.
+   */
+  it('cuando el plazo se paso, el asunto lo dice', async () => {
+    const ficha = await crear(papel());
+    // Cinco dias de plazo pedidos hace diez: cinco de retraso.
+    await pedirRetirada(ficha.body.id, haceDias(10));
+    await conBuzonInterno();
+
+    await barrer();
+
+    expect(correos().sent[0]?.subject).toContain('fuera de plazo');
+  });
+
+  /*
+   * SIN CANAL CONFIGURADO NO SE MARCA COMO AVISADA. Si se marcara, el dia
+   * que alguien ponga un buzon el aviso ya no saldria: el sistema creeria
+   * haberlo dado.
+   */
+  it('sin buzon ni chat, no se da por avisada', async () => {
+    const ficha = await crear(papel());
+    await pedirRetirada(ficha.body.id, haceDias(1));
+
+    /*
+     * SE QUITA A MANO. Los ajustes de avisos no se borran entre pruebas y el
+     * servicio los cachea, asi que dar por hecho que estan vacios es dar por
+     * hecho algo que no esta escrito en ninguna parte.
+     */
+    await buzonInterno(null);
+
+    await barrer();
+    expect(correos().sent).toHaveLength(0);
+
+    await conBuzonInterno();
+    await barrer();
+    expect(correos().sent).toHaveLength(1);
   });
 });

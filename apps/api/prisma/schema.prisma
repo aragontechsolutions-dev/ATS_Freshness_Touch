@@ -1091,6 +1091,19 @@ model MediaConsent {
   /// referencia, que es como nacieron todas las fichas anteriores.
   evidencePath String?
 
+  /// EL DIA QUE EL CLIENTE PIDIO LA RETIRADA. NULL si no la ha pedido.
+  ///
+  /// No basta con `revokedAt`: retirar es un boton y despublica al momento,
+  /// asi que mirando solo esa fecha el plazo se cumple siempre. El reloj
+  /// empieza cuando el cliente escribe, y el hueco peligroso es el que va
+  /// desde ahi hasta que alguien entra al panel.
+  removalRequestedAt DateTime? @db.Date
+
+  /// La ultima vez que se aviso al responsable de esta peticion pendiente.
+  /// Es lo que evita repetir el aviso en cada pasada del barrido, y vive en
+  /// la base y no en memoria para que un reinicio no vuelva a avisar de todo.
+  removalReminderSentAt DateTime? @db.Timestamptz(3)
+
   /// Cuando el cliente retiro el permiso. NULL mientras siga en pie.
   revokedAt DateTime? @db.Timestamptz(3)
 

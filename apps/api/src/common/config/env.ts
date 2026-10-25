@@ -282,6 +282,16 @@ export const EnvSchema = z
      * sesion del panel.
      */
     CONSENT_EVIDENCE_BUCKET: z.string().min(1).default('consent-evidence'),
+    /**
+     * Cada cuantos minutos se repasan los plazos de retirada pendientes.
+     *
+     * Una hora basta: el plazo se mide en DIAS, asi que mirarlo cada minuto
+     * no adelanta nada y mirarlo una vez al dia deja el aviso a merced de que
+     * el proceso este vivo en ese instante exacto. Cero lo apaga, que es lo
+     * que usan las pruebas para llamar al barrido a mano y no depender del
+     * reloj.
+     */
+    REMOVAL_SWEEP_MINUTES: z.coerce.number().int().min(0).default(60),
     STORAGE_TIMEOUT_MS: z.coerce.number().int().min(500).default(10_000),
     /** Secreto del proveedor local. Solo desarrollo y pruebas. */
     AUTH_LOCAL_SECRET: z.string().min(1).default('secreto-de-desarrollo-no-usar-en-produccion'),

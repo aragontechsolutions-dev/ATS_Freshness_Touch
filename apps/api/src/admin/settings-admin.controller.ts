@@ -39,6 +39,8 @@ import {
   Gallery,
   ConsentEvidenceTypeSchema,
   MediaConsentSchema,
+  RemovalRequestSchema,
+  type RemovalRequest,
   type MediaConsent,
   type StoredMediaConsent,
   GalleryImageKindSchema,
@@ -536,6 +538,48 @@ export class MediaConsentsAdminController {
     @Req() request: Request,
   ): Promise<StoredMediaConsent> {
     return this.consentimientos.setRevoked(id, false, staff, request.ip ?? null);
+  }
+
+  /* -------------------------------------------------------------------- */
+  /*  El plazo de retirada                                                 */
+  /* -------------------------------------------------------------------- */
+
+  /**
+   * ANOTA EL DIA EN QUE EL CLIENTE PIDIO LA RETIRADA.
+   *
+   * Arranca el reloj de los dias que promete el papel y pone la ficha en la
+   * lista de avisos. NO retira nada: eso sigue siendo el boton de retirar,
+   * que es el que despublica.
+   *
+   * Son dos acciones separadas a proposito. Juntarlas parece comodo hasta el
+   * dia en que alguien anota una peticion de hace tres dias para dejar
+   * constancia y despublica sin querer.
+   */
+  @Post(':id/removal-request')
+  @Roles('ADMIN')
+  requestRemoval(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body(new ZodValidationPipe<RemovalRequest>(RemovalRequestSchema)) cuerpo: RemovalRequest,
+    @CurrentStaff() staff: AuthenticatedStaff,
+    @Req() request: Request,
+  ): Promise<StoredMediaConsent> {
+    return this.consentimientos.setRemovalRequest(
+      id,
+      cuerpo.requestedAt,
+      staff,
+      request.ip ?? null,
+    );
+  }
+
+  /** Anula una peticion anotada por error. Tambien queda registrado. */
+  @Post(':id/removal-request/cancel')
+  @Roles('ADMIN')
+  cancelRemovalRequest(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentStaff() staff: AuthenticatedStaff,
+    @Req() request: Request,
+  ): Promise<StoredMediaConsent> {
+    return this.consentimientos.setRemovalRequest(id, null, staff, request.ip ?? null);
   }
 
   /* -------------------------------------------------------------------- */

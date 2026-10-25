@@ -222,9 +222,13 @@ igualmente, porque el sistema guarda la anotación pero no el papel:
 - **La grabación original, guardada aparte.** Si un día YouTube quita el
   vídeo, el material no se pierde.
 
-De las tres, la primera ya la hace el sistema; las otras dos siguen siendo
-trabajo de archivo, porque el sistema guarda la anotación del papel y no el
-papel.
+De las tres, las dos primeras ya las hace el sistema desde las etapas 2.D y
+2.D.4: el registro ata cada pieza a su permiso, y la prueba firmada se guarda
+junto a la ficha. La grabación original sigue siendo trabajo de archivo.
+
+Y desde la etapa 2.D.6 **el plazo tampoco depende de que alguien se acuerde**:
+se anota el día en que el cliente lo pidió y el sistema avisa todos los días
+hasta que se cumple. Ver la sección 11.
 
 ---
 
@@ -1162,6 +1166,74 @@ cliente y no se pierde por un permiso que se puede volver a anotar a mano. Y
 el fallo se registra como **error** y no como aviso porque dejarlo pasar en
 silencio sería perder la única señal de que hay que anotarlo.
 
-### Lo que todavía no existe en el registro
+### El plazo de retirada se vigila solo (etapa 2.D.6)
 
-- **Avisar cuando vence un plazo de retirada.**
+El sistema ya cumplía **media promesa**: retirar es un botón y despublica al
+momento. Pero ese botón hay que pulsarlo, y el hueco peligroso va **desde que
+llega el correo del cliente hasta que alguien entra al panel**. Ahí es donde
+una promesa de cinco días se incumple sin que nadie se entere.
+
+#### El reloj no empieza cuando alguien pulsa
+
+Mirando solo `revokedAt`, el plazo se cumple **siempre**: parece que se tardó
+cero. Por eso la ficha anota aparte **el día en que el cliente lo pidió**
+(`removalRequestedAt`), y ese día **lo teclea quien anota, no lo pone el
+servidor**: el correo del cliente puede llevar dos días en el buzón, y poner
+«hoy» automáticamente regalaría esos dos días.
+
+Anotar la petición **no retira nada**. Son dos acciones separadas a propósito:
+juntarlas parece cómodo hasta el día en que alguien anota una petición de hace
+tres días para dejar constancia y despublica sin querer.
+
+#### El aviso
+
+Un barrido pasa cada hora y manda **un aviso al día**, al buzón interno y al
+chat de operaciones, mientras haya peticiones abiertas.
+
+- **Todos los días, no solo al final.** Avisar «cuando queden dos días» deja
+  tres días de silencio, y si ese aviso se pierde —spam, servidor caído— ya no
+  hay otro. Son pocas: un cliente que pide retirar sus fotos es raro, y el día
+  que pase, lo caro es olvidarla.
+- **Una vez al día, y la cuenta vive en la base.** En memoria, cada despliegue
+  a media mañana volvería a avisar de todo. Un aviso que se repite es un aviso
+  que se deja de leer.
+- **Un fallo al avisar no marca la ficha como avisada**, así que vuelve a
+  entrar en la siguiente pasada. Es lo contrario del barrido de recordatorios
+  de reserva, y la diferencia está en lo que cuesta equivocarse: un
+  recordatorio de cita que no llega es una molestia; un plazo legal que nadie
+  recuerda es una promesa incumplida.
+- **Sin ningún canal configurado tampoco se marca**, y se registra un aviso en
+  el servidor. Que el sistema sepa que hay una promesa venciendo y no tenga a
+  quién decírselo es un problema, no una configuración válida.
+
+#### Ni un nombre ni una dirección salen de ahí
+
+El correo y el mensaje de Telegram llevan **la referencia del permiso y el
+plazo, y nada más**. Son los dos canales menos controlados del sistema: se
+reenvían, se quedan en el móvil de quien los lee y en un buzón para siempre.
+Con la referencia se abre la ficha en el panel, que es donde ese dato puede
+verse y donde hace falta estar identificado para verlo.
+
+Por lo mismo tampoco llevan un enlace directo a la ficha: una dirección en un
+correo invita a pulsarla desde cualquier sitio.
+
+#### El borde de la cuenta
+
+**El día del vencimiento todavía no está vencido.** Prometer «en cinco días»
+incluye el quinto; se pasa al sexto. Es una resta de dos líneas, y por eso
+está escrita **una sola vez** —la usan el panel, el barrido y las pruebas— y
+tiene su propia prueba: las cuentas de dos líneas son las que se escriben de
+memoria y se escriben al revés.
+
+#### En el panel
+
+Cada ficha con petición abierta se pinta como una alarma y no como un dato
+más: **en ámbar** mientras el plazo corre, **en rojo** si se pasó, con los días
+que quedan o los de retraso. Una vez retirada queda en gris, diciendo qué día
+se pidió y qué día se cumplió — que es lo que hay que poder demostrar.
+
+| Variable                | Valor | Qué hace                                                                       |
+| ----------------------- | ----- | ------------------------------------------------------------------------------ |
+| `REMOVAL_SWEEP_MINUTES` | `60`  | Cada cuánto se repasa. Una hora basta: el plazo se mide en días. `0` lo apaga. |
+
+### Lo que todavía no existe en el registro

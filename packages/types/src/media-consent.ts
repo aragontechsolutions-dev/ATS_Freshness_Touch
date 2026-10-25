@@ -309,6 +309,26 @@ export const StoredMediaConsentSchema = z.object({
    */
   evidencePath: ConsentEvidencePathSchema.nullable().default(null),
 
+  /**
+   * EL DIA QUE EL CLIENTE PIDIO LA RETIRADA, o `null` si no la ha pedido.
+   *
+   * ========================================================================
+   * POR QUE NO BASTA CON `revokedAt`
+   * ========================================================================
+   * Retirar es un boton y despublica al momento, asi que si se mira solo
+   * `revokedAt` el plazo se cumple SIEMPRE: parece que se tardo cero.
+   *
+   * Pero el reloj no empieza cuando alguien pulsa, empieza cuando el cliente
+   * escribe. El hueco peligroso es justo ese —entre que llega el correo y
+   * que alguien entra al panel— y es el unico tramo donde se puede incumplir
+   * una promesa de cinco dias. Sin anotar cuando se pidio, ese hueco no
+   * existe para el sistema y no se puede avisar de nada.
+   *
+   * Va aqui y no en el contrato del papel porque no es algo que el cliente
+   * firmara: es algo que paso despues.
+   */
+  removalRequestedAt: FechaSchema.nullable().default(null),
+
   /** Cuando se retiro el permiso, o `null` si sigue en pie. */
   revokedAt: z.string().nullable(),
   createdAt: z.string(),
@@ -427,5 +447,101 @@ export function consentFromBooking(datos: {
     videoIds: [],
     photoPaths: [],
     notes: `Formulario de reserva, texto v${String(BOOKING_CONSENT_TEXT_VERSION)}`,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// El plazo de retirada
+// ---------------------------------------------------------------------------
+
+/**
+ * Lo que se manda al anotar que un cliente pidio la retirada.
+ *
+ * UN OBJETO PARA UN SOLO CAMPO, y no la fecha suelta, porque el dia que haya
+ * que anotar tambien por donde llego la peticion —correo, mensaje— se anade
+ * una clave y las peticiones anteriores siguen valiendo. Con una fecha suelta
+ * en el cuerpo, ese dia hay que cambiar el contrato entero.
+ */
+export const RemovalRequestSchema = z.strictObject({
+  requestedAt: FechaSchema,
+});
+export type RemovalRequest = z.infer<typeof RemovalRequestSchema>;
+
+/** Suma dias a una fecha `AAAA-MM-DD`, en UTC, sin arrastrar husos. */
+function sumarDias(fecha: string, dias: number): string {
+  const base = new Date(`${fecha}T00:00:00Z`);
+  base.setUTCDate(base.getUTCDate() + dias);
+  return base.toISOString().slice(0, 10);
+}
+
+/** Dias enteros de `desde` a `hasta`. Negativo si `hasta` ya paso. */
+function diasEntre(desde: string, hasta: string): number {
+  const a = Date.parse(`${desde}T00:00:00Z`);
+  const b = Date.parse(`${hasta}T00:00:00Z`);
+  return Math.round((b - a) / 86_400_000);
+}
+
+/** El dia en que vence lo que el papel prometio. */
+export function removalDeadline(requestedAt: string, removalDays: number): string {
+  return sumarDias(requestedAt, removalDays);
+}
+
+export interface RemovalState {
+  /** El cliente ha pedido la retirada. */
+  requested: boolean;
+  /** Ya se retiro: la promesa esta cumplida. */
+  fulfilled: boolean;
+  /** El dia en que vence, o `null` si no se ha pedido nada. */
+  deadline: string | null;
+  /** Dias que quedan. Negativo si ya se paso. `null` si no aplica. */
+  daysLeft: number | null;
+  /** Se paso el plazo y la pieza sigue publicada. */
+  overdue: boolean;
+}
+
+/** Lo minimo que hace falta para situar una promesa de retirada. */
+export interface RemovalFacts {
+  /** El dia que el cliente lo pidio, o `null` si no lo ha pedido. */
+  requestedAt: string | null;
+  /** Los dias que promete ese papel. */
+  removalDays: number;
+  /** Si ya se retiro. */
+  revoked: boolean;
+}
+
+/**
+ * En que punto esta la promesa de retirada.
+ *
+ * UNA SOLA FUNCION PARA LOS TRES SITIOS que lo preguntan —el panel, el
+ * barrido que avisa y las pruebas—, porque es una cuenta con un borde
+ * resbaladizo: el dia del vencimiento todavia NO esta vencido. Escrita tres
+ * veces, uno de los tres se habria quedado con el borde al reves.
+ *
+ * TOMA CUATRO DATOS Y NO LA FICHA ENTERA. El barrido lee de la base solo lo
+ * que necesita para decidir —son cuatro columnas de una tabla que lleva
+ * nombres y direcciones— y con una firma que pidiera la ficha completa
+ * tendria que cargarla igualmente para hacer una resta.
+ */
+export function removalState(datos: RemovalFacts, hoy: string): RemovalState {
+  const { requestedAt } = datos;
+
+  if (requestedAt === null) {
+    return { requested: false, fulfilled: false, deadline: null, daysLeft: null, overdue: false };
+  }
+
+  const deadline = removalDeadline(requestedAt, datos.removalDays);
+  const fulfilled = datos.revoked;
+  const daysLeft = diasEntre(hoy, deadline);
+
+  return {
+    requested: true,
+    fulfilled,
+    deadline,
+    daysLeft,
+    /*
+     * El dia del vencimiento NO cuenta como vencido: prometer «en cinco
+     * dias» incluye el quinto. Se pasa al sexto.
+     */
+    overdue: !fulfilled && daysLeft < 0,
   };
 }

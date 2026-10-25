@@ -48,6 +48,17 @@ import { stripImageMetadata } from '../storage/strip-image-metadata';
  */
 const CACHE_TTL_MS = 30_000;
 
+/** Lo que el barrido de plazos necesita saber, y nada mas. */
+export interface RetiradaPendiente {
+  id: string;
+  reference: string;
+  removalDays: number;
+  /** `AAAA-MM-DD`: el dia que el cliente lo pidio. */
+  requestedAt: string;
+  /** La ultima vez que se aviso de esta, en ISO, o `null`. */
+  reminderSentAt: string | null;
+}
+
 @Injectable()
 export class MediaConsentsService {
   private cached: {
@@ -412,6 +423,136 @@ export class MediaConsentsService {
     return aFicha(fila);
   }
 
+  /* ---------------------------------------------------------------------- */
+  /*  El plazo de retirada                                                   */
+  /* ---------------------------------------------------------------------- */
+
+  /**
+   * Anota el dia en que el cliente pidio la retirada, o lo borra.
+   *
+   * ========================================================================
+   * LA FECHA LA ELIGE QUIEN ANOTA, Y NO ES EL RELOJ DEL SERVIDOR
+   * ========================================================================
+   * Porque el correo del cliente puede llevar dos dias en el buzon. Poner
+   * «hoy» automaticamente regalaria esos dos dias y haria que el plazo se
+   * midiera desde que nos enteramos, no desde que lo pidio — que es
+   * exactamente la promesa que se firmo.
+   *
+   * ANOTARLO NO RETIRA NADA. Son dos acciones distintas a proposito: esta
+   * arranca el reloj y pone la ficha en la lista de avisos; retirar es el
+   * boton de siempre, y es el que despublica. Juntarlas parece comodo hasta
+   * el dia que alguien anota una peticion de hace tres dias para dejar
+   * constancia y despublica sin querer.
+   *
+   * SE BORRA EL ULTIMO AVISO al cambiar la fecha, para que el barrido vuelva
+   * a contar desde cero: si no, mover la peticion a otro dia dejaria la
+   * primera notificacion sin repetir.
+   */
+  async setRemovalRequest(
+    id: string,
+    requestedAt: string | null,
+    staff: AuthenticatedStaff,
+    ipAddress: string | null,
+  ): Promise<StoredMediaConsent> {
+    const anterior = await this.exigirQueExista(id);
+
+    const fila = await this.prisma.db.$transaction(async (tx) => {
+      const guardada = await tx.mediaConsent.update({
+        where: { id },
+        data: {
+          removalRequestedAt: requestedAt === null ? null : new Date(`${requestedAt}T00:00:00Z`),
+          removalReminderSentAt: null,
+          updatedByStaffId: staff.staffId,
+        },
+        include: { updatedBy: { select: { firstName: true, lastName: true } } },
+      });
+
+      await this.audit.record(
+        {
+          staff,
+          surface: 'PANEL',
+          action:
+            requestedAt === null
+              ? 'media_consent.removal_request_cancelled'
+              : 'media_consent.removal_requested',
+          entityType: 'media_consent',
+          entityId: id,
+          /*
+           * La fecha SI entra: es la que decide si la promesa se cumplio, y
+           * es el dato que hara falta el dia que alguien pregunte. El nombre
+           * y la direccion siguen fuera, como en todo este registro.
+           */
+          metadata: {
+            reference: anterior.reference,
+            requestedAt,
+            removalDays: anterior.removalDays,
+          },
+          ipAddress,
+        },
+        tx,
+      );
+
+      return guardada;
+    });
+
+    return aFicha(fila);
+  }
+
+  /**
+   * Las peticiones de retirada que siguen abiertas.
+   *
+   * ========================================================================
+   * DEVUELVE CUATRO COLUMNAS Y NO LA FICHA
+   * ========================================================================
+   * Quien llama a esto es el barrido que avisa, y lo que manda por correo y
+   * por Telegram es la referencia y el plazo. Cargar la ficha entera traeria
+   * el nombre del cliente y la direccion de su casa a un proceso que no los
+   * necesita — y lo que no se carga no se puede filtrar por error a un canal
+   * que no deberia verlo.
+   *
+   * Se pregunta a la base y no se filtra en memoria sobre `list()` porque el
+   * barrido corre cada hora para encontrar, casi siempre, nada: ese es el
+   * caso que conviene que sea barato. Hay un indice parcial con exactamente
+   * esta condicion.
+   */
+  async retiradasPendientes(): Promise<RetiradaPendiente[]> {
+    const filas = await this.prisma.db.mediaConsent.findMany({
+      where: { removalRequestedAt: { not: null }, revokedAt: null },
+      orderBy: { removalRequestedAt: 'asc' },
+      select: {
+        id: true,
+        reference: true,
+        removalDays: true,
+        removalRequestedAt: true,
+        removalReminderSentAt: true,
+      },
+    });
+
+    return filas.flatMap((fila) =>
+      fila.removalRequestedAt === null
+        ? []
+        : [
+            {
+              id: fila.id,
+              reference: fila.reference,
+              removalDays: fila.removalDays,
+              requestedAt: soloFecha(fila.removalRequestedAt),
+              reminderSentAt: fila.removalReminderSentAt?.toISOString() ?? null,
+            },
+          ],
+    );
+  }
+
+  /** Deja constancia de que ya se aviso de estas, para no repetirlo hoy. */
+  async marcarAvisadas(ids: readonly string[], cuando: Date): Promise<void> {
+    if (ids.length === 0) return;
+
+    await this.prisma.db.mediaConsent.updateMany({
+      where: { id: { in: [...ids] } },
+      data: { removalReminderSentAt: cuando },
+    });
+  }
+
   private async exigirQueExista(id: string) {
     const fila = await this.prisma.db.mediaConsent.findUnique({ where: { id } });
     if (!fila) throw new NotFoundException('Ese permiso no existe');
@@ -463,6 +604,7 @@ interface FilaConAutor {
   photoPaths: string[];
   notes: string | null;
   evidencePath: string | null;
+  removalRequestedAt: Date | null;
   revokedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
@@ -499,6 +641,8 @@ function aFicha(fila: FilaConAutor): StoredMediaConsent {
     id: fila.id,
     consent,
     evidencePath: fila.evidencePath,
+    removalRequestedAt:
+      fila.removalRequestedAt === null ? null : soloFecha(fila.removalRequestedAt),
     revokedAt: fila.revokedAt?.toISOString() ?? null,
     createdAt: fila.createdAt.toISOString(),
     updatedAt: fila.updatedAt.toISOString(),
