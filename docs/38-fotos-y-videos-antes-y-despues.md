@@ -137,15 +137,17 @@ para recibir el servicio de limpieza.
 Firma: ______________________________  Fecha: _________________
 ```
 
-### Dos decisiones que faltan en el modelo
+### Las dos decisiones, ya tomadas
 
-1. **El plazo de retirada** (los `____ días`). Recomendado: **5 días
-   laborables.** Prometer «inmediatamente» es prometer algo que no se puede
-   cumplir un domingo.
-2. **Si el permiso se pide antes o después del servicio.** Recomendado:
-   **antes**, al confirmar la reserva. Después de limpiar, pedirlo delante de
-   la casa recién limpia es una situación en la que el cliente se siente
-   obligado a decir sí, y eso debilita el permiso.
+1. **El plazo de retirada son 5 días.** Prometer «inmediatamente» es prometer
+   algo que no se puede cumplir un domingo. Es el valor que el panel propone
+   solo al crear una ficha; se puede cambiar ficha a ficha dentro del margen
+   de 1 a 30 días, por si un papel concreto dice otra cosa.
+2. **El permiso se pide antes del servicio**, al confirmar la reserva. Después
+   de limpiar, pedirlo delante de la casa recién limpia es una situación en la
+   que el cliente se siente obligado a decir sí, y eso debilita el permiso.
+   Además resuelve el caso normal: que el día del servicio no haya nadie en
+   casa. La sección 11 desarrolla cómo se obtiene en cada situación.
 
 ---
 
@@ -220,8 +222,9 @@ igualmente, porque el sistema guarda la anotación pero no el papel:
 - **La grabación original, guardada aparte.** Si un día YouTube quita el
   vídeo, el material no se pierde.
 
-Cuando montemos el registro dentro del sistema esto pasa a ser automático,
-pero la hoja de cálculo vale desde el primer día y no depende de mí.
+De las tres, la primera ya la hace el sistema; las otras dos siguen siendo
+trabajo de archivo, porque el sistema guarda la anotación del papel y no el
+papel.
 
 ---
 
@@ -856,11 +859,11 @@ piezas— y en cada tarjeta afectada —cuál—.
 
 - **Reordenar** los vídeos y las fotos arrastrando. Hoy el orden es el de
   subida; para cambiarlo hay que quitar y volver a poner.
-- **El registro de consentimientos** (etapa 2.D), que une el papel firmado con
-  la pieza publicada. Mientras no exista, sirve la hoja de cálculo de la
-  sección 6.
 - **Limpieza de huérfanos**: una foto subida y nunca guardada se queda en el
   almacén sin verse en ninguna parte. No molesta a nadie, pero ocupa.
+- **Avisar cuando vence un plazo de retirada.** Hoy el plazo se promete en el
+  papel y se cumple pulsando un botón, pero si nadie entra al panel, nadie
+  avisa de que el reloj corre.
 
 ### El bucket de Supabase Storage
 
@@ -884,16 +887,18 @@ quién subió qué.
 
 ## 10. Qué hace falta para seguir
 
-Por orden, y lo primero bloquea el resto:
+El código de las etapas 2.B, 2.C y 2.D **ya está construido y desplegado**:
+la galería, la subida desde el panel, el registro de consentimientos y el modo
+estricto. Lo que queda no es código, salvo lo anotado arriba:
 
 1. **Un abogado de Georgia revisa el modelo** de la sección 2, junto con el
-   dossier.
-2. **La dueña decide** el plazo de retirada y si el permiso se pide antes o
-   después del servicio.
-3. **Se firman los primeros permisos** y se graban 3–5 piezas cortas.
-4. Con eso ya en la mano, se monta el código: la galería y la sección de
-   vídeos (etapa 2.B), la subida desde el panel (2.C) y el registro de
-   consentimientos (2.D).
+   dossier. Es lo único que sigue bloqueando lo demás.
+2. **Se firman los primeros permisos** y se graban 3–5 piezas cortas.
 
-Mientras no haya permisos firmados, **la sección se puede construir pero no se
-puede publicar con material real.**
+Decidido ya por la dueña: el plazo de retirada es de **5 días**, y el permiso
+se pide **antes del servicio**, al confirmar la reserva (sección 11).
+
+Mientras no haya permisos anotados, **la sección se puede construir pero no
+enseña nada**: el modo estricto no publica lo que no tiene papel, así que una
+galería llena de fotos sin ficha se ve vacía desde fuera. Es la consecuencia
+buscada.

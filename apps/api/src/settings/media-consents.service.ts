@@ -1,7 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import {
   MediaConsentSchema,
-  revokedPieces,
   type AuthenticatedStaff,
   type MediaConsent,
   type StoredMediaConsent,
@@ -21,7 +20,7 @@ import { PrismaService } from '../database/prisma.service';
  * retira en un plazo. Sin un registro, cumplirlo significa revisar el canal
  * entero a ojo intentando reconocer una cocina.
  *
- * Aqui revocar es un boton, y `piezasRetiradas()` hace que la galeria
+ * Aqui revocar es un boton, y `piezasPublicables()` hace que la galeria
  * publica deje de servir esas piezas AL MOMENTO. El plazo prometido pasa a
  * ser el tiempo que se tarda en pulsar.
  *
@@ -344,6 +343,3 @@ function resumen(consent: MediaConsent) {
     allowsBefore: consent.allowsBefore,
   };
 }
-
-/** Re-exportado para que la galeria no tenga que importar de dos sitios. */
-export { revokedPieces };
