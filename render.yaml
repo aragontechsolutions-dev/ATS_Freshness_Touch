@@ -184,6 +184,14 @@ services:
       - key: REMOVAL_SWEEP_MINUTES
         value: '60'
 
+      # Cada cuantos minutos se cierran las reservas que nadie llego a pagar.
+      # Lo que esto libera es DINERO RETENIDO en la tarjeta de un cliente, y
+      # cada vuelta de reloj de mas es un rato mas con su saldo bloqueado por
+      # una reserva que no existe. La franja de la agenda no depende de esto:
+      # se libera sola al vencer el plazo. Cero lo apaga.
+      - key: HOLD_SWEEP_MINUTES
+        value: '15'
+
       # La direccion del SITIO PUBLICO, para componer el enlace con el que un
       # cliente retira sus fotos el solo. La API no lo sabe por su cuenta: se
       # despliegan por separado y en dominios distintos.

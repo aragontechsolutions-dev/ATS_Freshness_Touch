@@ -651,12 +651,97 @@ Honestidad sobre el alcance de las pruebas:
 
 ## 11. Pendiente
 
-| Tarea                                              | Etapa |
-| -------------------------------------------------- | ----- |
-| Probar el pago real con credenciales de Stripe     | 2.2c  |
-| ~~Captura desde el panel~~ — hecho                 | 2.3   |
-| ~~Devolución desde el panel~~ — hecho (§8)         | 3.21  |
-| ~~Cobro del saldo final al terminar~~ — hecho (§9) | 3.23  |
-| ~~Devolver un cobro final~~ — hecho (§8)           | 3.24  |
-| Liberar franjas cuyo `holdExpiresAt` ya venció     | 2.3   |
-| Reintentar la retención de una reserva sin pago    | 2.3   |
+| Tarea                                                | Etapa |
+| ---------------------------------------------------- | ----- |
+| Probar el pago real con credenciales de Stripe       | 2.2c  |
+| ~~Captura desde el panel~~ — hecho                   | 2.3   |
+| ~~Devolución desde el panel~~ — hecho (§8)           | 3.21  |
+| ~~Cobro del saldo final al terminar~~ — hecho (§9)   | 3.23  |
+| ~~Devolver un cobro final~~ — hecho (§8)             | 3.24  |
+| ~~Cerrar las reservas que nadie pagó~~ — hecho (§12) | 2.3   |
+| Reintentar la retención de una reserva sin pago      | 2.3   |
+
+---
+
+## 12. Las reservas que nadie llegó a pagar
+
+Un formulario abandonado a mitad del pago dejaba una reserva en
+`PENDING_PAYMENT` que **no se movía nunca más**.
+
+### Lo que esto NO arregla, para no venderlo mal
+
+**No desbloquea la agenda: eso ya funcionaba.** `findOccupied` deja de contar
+las pendientes de pago pasado el plazo, así que el hueco vuelve a ofrecerse
+solo, sin esperar a ningún barrido.
+
+> Esto es importante porque es fácil contar la historia al revés. La frase
+> «una reserva sin pagar bloquea la agenda para siempre» era falsa; la
+> comprobación está en `availability.service.ts`, en el `holdCutoff`.
+
+### Lo que sí quedaba abierto, y son tres cosas
+
+1. **El cliente no podía volver a reservar esa misma hora.** Hay un índice
+   único sobre `(customerId, scheduledStart)` que excluye solo las
+   **canceladas**. Con la fila zombi viva, el mismo cliente reintentando su
+   reserva recibía un «ya tienes una reserva a esa hora» — verdad en la base y
+   mentira para él, porque la suya nunca llegó a existir. **Es la única de las
+   tres que el cliente veía.**
+2. **El dinero se quedaba retenido en su tarjeta.** Si llegó a autorizar y el
+   aviso del proveedor se perdió, hay una retención viva. Ahora se libera en
+   vez de esperar a que caduque sola días después.
+3. **El panel acumulaba filas** que no significan nada y ensucian cualquier
+   recuento.
+
+### El corte es el mismo que el de la agenda
+
+Sale de `AvailabilityService.corteDeRetencion()`, la misma función que decide
+cuándo la franja vuelve a ofrecerse. Con dos cuentas separadas, cambiar el
+plazo dejaría la franja en tierra de nadie: libre para reservar pero con una
+reserva viva encima, o cancelada mientras la agenda aún la respeta.
+
+Es la misma razón por la que el barrido de los pines de puerta exporta su SQL
+en vez de dejar que la prueba escriba el suyo.
+
+### Primero el dinero, después la fila
+
+Se libera la retención y **solo entonces** se cancela la reserva. Si liberar
+falla, **la fila no se cancela** y la siguiente pasada vuelve a intentarlo.
+
+Va en esta dirección a propósito: una fila cancelada con una retención viva
+detrás es **dinero de un cliente bloqueado en un sitio donde ya nadie va a
+mirar**.
+
+### Dos detalles de la cancelación
+
+- **`cancelledBy` es `SYSTEM`**, no `COMPANY` ni `CUSTOMER`: no lo decidió
+  nadie. A nombre de la empresa parecería que alguien la canceló; a nombre del
+  cliente, que se arrepintió.
+- **Se vuelve a comprobar el estado dentro de la transacción**, con un
+  `updateMany` que lleva `status` en el `where`. Entre la consulta y la
+  escritura pudo llegar el aviso del proveedor confirmando el pago, y cancelar
+  entonces sería tirar una reserva pagada.
+
+### Lo que NO hace
+
+- **No avisa al cliente.** Un correo diciendo «hemos cancelado la reserva que
+  no llegaste a pagar» es ruido para alguien que ya decidió no seguir, y sería
+  un correo no solicitado a quien quizá se equivocó de web.
+- **No toca retenciones que ya no están vivas** (cobradas o ya liberadas):
+  pedirle al proveedor que deshaga algo que no está hecho es un error, no una
+  precaución.
+- **No reintenta la retención** de una reserva cuyo pago falló al crearse. Eso
+  sigue en la §11.
+
+### Qué se comprueba
+
+Diez pruebas de extremo a extremo (`hold-expiry-sweep.e2e.test.ts`): a qué
+reservas alcanza y a cuáles no (recién creada, ya confirmada), que queda como
+cancelada por el sistema con su motivo y su rastro en auditoría, que se le
+pide al proveedor liberar con el identificador correcto, que **no** se le pide
+nada por una retención ya cobrada, que un fallo del proveedor deja la reserva
+pendiente **y la siguiente pasada la cierra**, y que el par `(cliente, hora)`
+queda libre para volver a reservar.
+
+| Variable             | Valor | Qué hace                                                                               |
+| -------------------- | ----- | -------------------------------------------------------------------------------------- |
+| `HOLD_SWEEP_MINUTES` | `15`  | Cada cuánto pasa. Lo que libera es dinero retenido en una tarjeta ajena. `0` lo apaga. |

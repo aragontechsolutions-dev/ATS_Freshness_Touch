@@ -1,6 +1,8 @@
 import { Logger, Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import type { Env } from '../common/config/env';
+import { SchedulingModule } from '../scheduling/scheduling.module';
+import { HoldExpirySweepService } from './hold-expiry-sweep.service';
 import { MockPaymentsController } from './mock-payments.controller';
 import { PaymentsService } from './payments.service';
 import { PAYMENT_PROVIDER, type PaymentProvider } from './payments.types';
@@ -14,7 +16,13 @@ import { WebhooksService } from './webhooks.service';
  * Es el unico punto del sistema que conoce ambas implementaciones.
  */
 @Module({
-  imports: [ConfigModule],
+  /*
+   * `SchedulingModule` entra por el barrido de retenciones vencidas: el corte
+   * que decide cuando una reserva sin pagar deja de retener su hueco lo pone
+   * la agenda, y tiene que ser EL MISMO para los dos. Ver el comentario de
+   * `corteDeRetencion`.
+   */
+  imports: [ConfigModule, SchedulingModule],
   controllers: [WebhooksController, MockPaymentsController],
   providers: [
     {
@@ -52,7 +60,9 @@ import { WebhooksService } from './webhooks.service';
     },
     PaymentsService,
     WebhooksService,
+    HoldExpirySweepService,
   ],
-  exports: [PaymentsService],
+  /* El barrido se exporta para que las pruebas llamen a la pasada a mano. */
+  exports: [PaymentsService, HoldExpirySweepService],
 })
 export class PaymentsModule {}

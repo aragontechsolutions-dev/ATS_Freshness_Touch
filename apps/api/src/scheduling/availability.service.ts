@@ -111,6 +111,25 @@ export class AvailabilityService {
    * no paguen el mismo hueco. Pasado el plazo dejan de contar, porque un
    * formulario abandonado no puede bloquear la agenda para siempre.
    */
+  /**
+   * EL INSTANTE ANTES DEL CUAL UNA RESERVA SIN PAGAR YA NO RETIENE SU HUECO.
+   *
+   * ========================================================================
+   * SE EXPORTA PARA QUE EL BARRIDO USE ESTA MISMA REGLA, NO UNA COPIA
+   * ========================================================================
+   * La agenda deja de contar una reserva pendiente de pago pasado este
+   * plazo; el barrido que las cancela tiene que usar EXACTAMENTE el mismo
+   * corte. Con dos cuentas separadas, cualquier cambio del plazo dejaria una
+   * franja en tierra de nadie: libre para reservar pero con una reserva viva
+   * encima, o al reves — cancelada mientras la agenda aun la respeta.
+   *
+   * Es la misma razon por la que el barrido de los pines de puerta exporta
+   * su SQL en vez de dejar que la prueba escriba el suyo.
+   */
+  corteDeRetencion(now: Date): Date {
+    return new Date(now.getTime() - this.config.paymentHoldMinutes * 60_000);
+  }
+
   async findOccupied(
     date: string,
     now: Date,
@@ -123,7 +142,7 @@ export class AvailabilityService {
     const day = DateTime.fromISO(date, { zone: this.config.timezone });
     const dayStart = day.startOf('day').toJSDate();
     const dayEnd = day.endOf('day').toJSDate();
-    const holdCutoff = new Date(now.getTime() - this.config.paymentHoldMinutes * 60_000);
+    const holdCutoff = this.corteDeRetencion(now);
 
     const db = client ?? this.prisma.db;
     const bookings = await db.booking.findMany({
