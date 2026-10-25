@@ -957,6 +957,7 @@ export const es: TranslationResources = {
         business_settings: 'Configuración',
         audit: 'Registro de actividad',
         session: 'Sesión',
+        media_consent: 'Permiso de imagen',
       },
 
       /*
@@ -1019,6 +1020,12 @@ export const es: TranslationResources = {
         },
         gallery: {
           updated: 'Cambió la galería de antes y después',
+        },
+        media_consent: {
+          created: 'Anotó un permiso de imagen',
+          updated: 'Corrigió un permiso de imagen',
+          revoked: 'Retiró un permiso de imagen',
+          restored: 'Restituyó un permiso de imagen',
         },
         pricing: {
           updated: 'Cambió las tarifas',

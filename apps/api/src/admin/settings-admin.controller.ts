@@ -3,6 +3,8 @@ import {
   Controller,
   Get,
   HttpCode,
+  Param,
+  ParseUUIDPipe,
   Post,
   Put,
   Query,
@@ -32,6 +34,9 @@ import {
   SiteCopySchema,
   AdminGallery,
   Gallery,
+  MediaConsentSchema,
+  type MediaConsent,
+  type StoredMediaConsent,
   GalleryImageKindSchema,
   GalleryPhotoUpload,
   GallerySchema,
@@ -47,6 +52,7 @@ import { ServiceAreaService } from '../settings/service-area.service';
 import { CompanyLocationService } from '../settings/company-location.service';
 import { SiteCopyService } from '../settings/site-copy.service';
 import { GalleryService } from '../settings/gallery.service';
+import { MediaConsentsService } from '../settings/media-consents.service';
 
 /**
  * CONFIGURACION DEL NEGOCIO DESDE EL PANEL
@@ -446,5 +452,85 @@ export class GalleryAdminController {
     }
 
     return { path: resultado.path, url: resultado.url };
+  }
+}
+
+/**
+ * EL REGISTRO DE CONSENTIMIENTOS DE IMAGEN
+ * ----------------------------------------
+ * SOLO ADMINISTRACION, y aqui el motivo de que tambien lo sea para LEER no
+ * admite discusion: cada ficha lleva el nombre de un cliente y LA DIRECCION
+ * DE SU CASA. Es justo lo que el permiso que firmo promete no mostrar.
+ *
+ * Nada de esto sale nunca al sitio publico. De la galeria publica solo sale
+ * el efecto: la pieza esta o no esta.
+ */
+@SkipThrottle(SKIP_QUOTE_THROTTLER)
+@Controller(`${ADMIN_ROUTE}/media-consents`)
+export class MediaConsentsAdminController {
+  constructor(private readonly consentimientos: MediaConsentsService) {}
+
+  @Get()
+  @Roles('ADMIN')
+  list(): Promise<StoredMediaConsent[]> {
+    return this.consentimientos.list();
+  }
+
+  @Post()
+  @Roles('ADMIN')
+  @HttpCode(201)
+  create(
+    @Body(new ZodValidationPipe<MediaConsent>(MediaConsentSchema)) consent: MediaConsent,
+    @CurrentStaff() staff: AuthenticatedStaff,
+    @Req() request: Request,
+  ): Promise<StoredMediaConsent> {
+    return this.consentimientos.create(consent, staff, request.ip ?? null);
+  }
+
+  @Put(':id')
+  @Roles('ADMIN')
+  update(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body(new ZodValidationPipe<MediaConsent>(MediaConsentSchema)) consent: MediaConsent,
+    @CurrentStaff() staff: AuthenticatedStaff,
+    @Req() request: Request,
+  ): Promise<StoredMediaConsent> {
+    return this.consentimientos.update(id, consent, staff, request.ip ?? null);
+  }
+
+  /**
+   * RETIRAR UN PERMISO.
+   *
+   * No borra la ficha: marca la fecha. Un permiso retirado es exactamente lo
+   * que hay que poder demostrar —que existio, que amparaba estas piezas y
+   * cuando dejo de hacerlo—, y borrarlo dejaria el registro contando solo la
+   * mitad buena.
+   *
+   * A partir de aqui la galeria publica deja de servir esas piezas sin que
+   * nadie tenga que acordarse de quitarlas.
+   *
+   * DOS RUTAS Y NO UNA CON UN BOOLEANO: son dos cosas distintas y cada una
+   * deja su propia huella en el registro. La pregunta que llega tarde es
+   * «cuando se retiro», y con un booleano habria que deducirla.
+   */
+  @Post(':id/revoke')
+  @Roles('ADMIN')
+  revoke(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentStaff() staff: AuthenticatedStaff,
+    @Req() request: Request,
+  ): Promise<StoredMediaConsent> {
+    return this.consentimientos.setRevoked(id, true, staff, request.ip ?? null);
+  }
+
+  /** Deshacer una retirada hecha por error. Tambien queda registrado. */
+  @Post(':id/restore')
+  @Roles('ADMIN')
+  restore(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentStaff() staff: AuthenticatedStaff,
+    @Req() request: Request,
+  ): Promise<StoredMediaConsent> {
+    return this.consentimientos.setRevoked(id, false, staff, request.ip ?? null);
   }
 }

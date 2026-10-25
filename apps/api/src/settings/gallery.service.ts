@@ -14,6 +14,7 @@ import {
 } from '@freshness/types';
 import { AuditService } from '../audit/audit.service';
 import { PrismaService } from '../database/prisma.service';
+import { MediaConsentsService } from './media-consents.service';
 import { stripImageMetadata } from '../storage/strip-image-metadata';
 import { IMAGE_STORAGE, type ImageStorage } from '../storage/storage.types';
 
@@ -53,6 +54,7 @@ export class GalleryService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     @Inject(IMAGE_STORAGE) private readonly storage: ImageStorage,
+    private readonly consentimientos: MediaConsentsService,
   ) {}
 
   /** La galeria vigente. */
@@ -281,21 +283,42 @@ export class GalleryService {
   async getPublic(): Promise<PublicGallery> {
     const gallery = await this.get();
 
-    const photos = gallery.photos.flatMap((photo) => {
-      const url = this.storage.publicUrl(photo.path);
-      return url === null ? [] : [{ url, title: photo.title }];
-    });
+    /*
+     * LO QUE UN CLIENTE RETIRO NO SE SIRVE, Y ESO SE COMPRUEBA AQUI.
+     *
+     * Podria comprobarse al guardar, pero entonces revocar un permiso
+     * dependeria de que alguien se acordara despues de editar la galeria.
+     * Comprobandolo al leer, retirar es un boton y surte efecto en la
+     * siguiente visita: el plazo que promete el papel pasa a ser el tiempo
+     * que se tarda en pulsar.
+     *
+     * SI ESTO FALLA, NO SE PUBLICA NADA. Es lo contrario de la regla general
+     * del sitio —que nunca deja de pintarse— y es deliberado: servir una
+     * foto que alguien pidio retirar es un problema legal; una seccion
+     * vacia un minuto, no. Y cuando la base no responde la galeria ya sale
+     * vacia de todas formas, asi que no cambia nada mas.
+     */
+    const retiradas = await this.consentimientos.piezasRetiradas();
+
+    const photos = gallery.photos
+      .filter((photo) => !retiradas.photoPaths.has(photo.path))
+      .flatMap((photo) => {
+        const url = this.storage.publicUrl(photo.path);
+        return url === null ? [] : [{ url, title: photo.title }];
+      });
 
     /*
      * UN VIDEO SIN MINIATURA SIGUE SALIENDO. No es como una foto, que sin
      * direccion no es nada: el video se ve igual, solo que la tarjeta se
      * pinta con los colores de la marca.
      */
-    const videos = gallery.videos.map((video) => ({
-      videoId: video.videoId,
-      title: video.title,
-      posterUrl: video.poster === null ? null : this.storage.publicUrl(video.poster),
-    }));
+    const videos = gallery.videos
+      .filter((video) => !retiradas.videoIds.has(video.videoId))
+      .map((video) => ({
+        videoId: video.videoId,
+        title: video.title,
+        posterUrl: video.poster === null ? null : this.storage.publicUrl(video.poster),
+      }));
 
     if (videos.length === 0 && photos.length === 0) return DEFAULT_PUBLIC_GALLERY;
 

@@ -8,6 +8,7 @@ import { ServiceAreaService } from './service-area.service';
 import { CompanyLocationService } from './company-location.service';
 import { GalleryController } from './gallery.controller';
 import { GalleryService } from './gallery.service';
+import { MediaConsentsService } from './media-consents.service';
 import { SiteCopyController } from './site-copy.controller';
 import { SiteCopyService } from './site-copy.service';
 
@@ -23,6 +24,7 @@ import { SiteCopyService } from './site-copy.service';
     BusinessSettingsService,
     SiteCopyService,
     GalleryService,
+    MediaConsentsService,
     ServiceAreaService,
     CompanyLocationService,
     PricingRatesService,
@@ -32,6 +34,7 @@ import { SiteCopyService } from './site-copy.service';
     BusinessSettingsService,
     SiteCopyService,
     GalleryService,
+    MediaConsentsService,
     ServiceAreaService,
     CompanyLocationService,
     PricingRatesService,

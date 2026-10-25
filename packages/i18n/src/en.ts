@@ -1008,6 +1008,7 @@ export const en = {
         business_settings: 'Settings',
         audit: 'Activity log',
         session: 'Session',
+        media_consent: 'Image release',
       },
 
       /*
@@ -1073,6 +1074,12 @@ export const en = {
         },
         gallery: {
           updated: 'Before-and-after gallery changed',
+        },
+        media_consent: {
+          created: 'Image release recorded',
+          updated: 'Image release corrected',
+          revoked: 'Image release withdrawn',
+          restored: 'Image release reinstated',
         },
         notifications: {
           updated: 'Alert settings changed',

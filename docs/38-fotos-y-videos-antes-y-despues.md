@@ -207,7 +207,10 @@ Prometer en el permiso que se retira en X días obliga a poder hacerlo. Hace
 falta saber, de un vídeo cualquiera, **de qué cliente es**. Si no, una
 petición de retirada se convierte en revisar el canal entero a ojo.
 
-Mínimo viable, mientras no exista el registro en el sistema (etapa 2.D):
+**Desde la etapa 2.D.1 el sistema lo hace solo**: cada permiso se anota con
+las piezas que ampara, y retirarlo las deja de publicar al momento. Lo que
+sigue es lo que hace falta **mientras no exista la pantalla del panel**, y lo
+que conviene seguir guardando aunque exista:
 
 - Una hoja de cálculo con una fila por pieza publicada: fecha del servicio,
   cliente, dirección, enlace del vídeo o nombre del archivo de la foto, y
@@ -729,6 +732,94 @@ sigue rechazándolos.
 > que tienen el mismo riesgo pero se usan a la vez para leer desde la web y
 > para escribir desde el panel. Separarlos en dos contratos es una etapa
 > propia, no un cambio de una línea.
+
+### El registro de consentimientos (etapa 2.D.1 — el servidor)
+
+El papel firmado, anotado y **atado a las piezas que ampara**. Es lo que
+convierte la sección 6 de este documento en algo que el sistema cumple solo.
+
+#### Qué resuelve
+
+El permiso promete dos cosas, y las dos son promesas legales:
+
+1. **Que se puede retirar.** Sin registro, cumplirlo significa revisar el
+   canal entero a ojo intentando reconocer una cocina.
+2. **Que se retira en un plazo.** Prometer «en cinco días» obliga a poder
+   hacerlo, y a poder demostrar cuándo se hizo.
+
+**Revocar es ahora un botón**, y las piezas que amparaba ese permiso dejan de
+servirse en la siguiente visita. El plazo prometido pasa a ser el tiempo que
+se tarda en pulsar.
+
+#### Tabla propia, y no un campo en la galería
+
+Dos razones que van juntas:
+
+- La fila de la galería **se sirve al público**, y esto lleva el nombre del
+  cliente y **la dirección de su casa** — justo lo que el permiso promete no
+  mostrar.
+- Esto no es configuración: es un registro con vida propia, que se firma, se
+  archiva, se puede corregir y se puede retirar.
+
+La migración activa **seguridad a nivel de fila**, y aquí es de lo más grave
+que podría faltar: sin ella, cualquiera con la clave pública del proyecto
+leería el listado entero saltándose la API. Lo exige una prueba del propio
+proyecto, que fue la que lo cazó.
+
+#### El filtro corre al leer, no al guardar
+
+Podría comprobarse al guardar la galería, pero entonces revocar dependería de
+que alguien se acordara **después** de editarla. Comprobándolo al leer,
+retirar surte efecto solo.
+
+**Si esa consulta falla, no se publica nada.** Es lo contrario de la regla
+general del sitio —que nunca deja de pintarse— y es deliberado: servir una
+foto que alguien pidió retirar es un problema legal; una sección vacía un
+minuto, no. Y cuando la base no responde la galería ya sale vacía de todas
+formas, así que no cambia nada más.
+
+#### No se borra nada
+
+Retirar **marca una fecha**, no borra la ficha. Un permiso retirado es
+exactamente lo que hay que poder demostrar: que existió, que amparaba estas
+piezas y cuándo dejó de hacerlo. Borrarlo dejaría el registro contando solo la
+mitad buena.
+
+Restituir existe porque revocar por error tiene que poder deshacerse, y las
+dos cosas dejan **su propia acción** en el registro (`media_consent.revoked`
+y `media_consent.restored`). La pregunta que llega tarde es «cuándo se
+retiró», y con un solo campo booleano habría que deducirla.
+
+#### Lo que el contrato no deja pasar
+
+| Regla                                             | Por qué                                                                                                                           |
+| ------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| Tiene que cubrir interior, exterior o ambos       | Un permiso que no cubre nada no ampara nada — pero lo **parece**, que es peor                                                     |
+| Si ampara alguna pieza, debe autorizar la **web** | Es donde se publica. Atar una foto a un papel que solo autoriza Instagram es peor que no tener papel, porque parece que sí lo hay |
+| Plazo de retirada entre 1 y 30 días               | Prometer más de un mes no es una promesa, y cero no se puede cumplir un domingo                                                   |
+| Rutas de foto e identificadores de vídeo válidos  | Los mismos que la galería: no se puede atar el papel a una pieza que no existe                                                    |
+
+Las dos primeras están además como `CHECK` en la base: una fila escrita a mano
+desde una consola no pasa por el contrato.
+
+#### La metadata del registro no lleva nada del cliente
+
+Ni el nombre ni la dirección. El registro de auditoría se consulta, se exporta
+y se enseña; de ahí vendría el problema. Lo que guarda es la referencia del
+papel, cuántas piezas ampara y si autoriza el «antes».
+
+#### Lo que falta de esta etapa
+
+**La pantalla del panel (2.D.2).** Hoy el registro existe y funciona, pero solo
+se llega a él por la API. Hasta que exista la pantalla, sigue sirviendo la hoja
+de cálculo de la sección 6.
+
+Y una decisión tomada a conciencia: **una pieza sin permiso anotado se sigue
+publicando**, con aviso en el panel cuando exista la pantalla. Bloquearla haría
+desaparecer de la portada lo que ya estaba publicado el día del despliegue, y
+una sección que se vacía sola en un despliegue es exactamente el fallo que este
+proyecto ya se comió una vez. Si se prefiere el modo estricto —no publicar sin
+papel— es un cambio de una línea en el filtro.
 
 ### Lo que todavía no existe
 
