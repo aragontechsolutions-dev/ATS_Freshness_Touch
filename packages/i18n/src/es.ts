@@ -1426,6 +1426,15 @@ export const es: TranslationResources = {
       doorPinRetention: 'Este pin lo borramos al día siguiente de tu limpieza.',
       customerNotes: '¿Algo más que debamos saber? (opcional)',
       marketingOptIn: 'Quiero recibir ofertas y consejos de limpieza de vez en cuando.',
+
+      mediaConsentTitle: 'Fotos del antes y el después',
+      mediaConsent: 'Pueden fotografiar y grabar esta vivienda y publicarlo en su página web.',
+      mediaConsentHelp:
+        'Es totalmente opcional: no cambia el precio ni el servicio. Nunca mostramos el número de la calle, y puede pedirnos que lo retiremos cuando quiera —por correo o por un mensaje—; lo quitamos de la web en 5 días.',
+      mediaConsentBefore: 'También pueden publicar las imágenes del «antes».',
+      mediaConsentTenant: 'En esta vivienda vive alguien que no soy yo.',
+      mediaConsentTenantHelp:
+        'Entonces necesitamos también su permiso antes de publicar nada: los objetos que salen en el plano son suyos. Nos pondremos en contacto para eso.',
       priceNotice:
         'El precio final se confirma con la dirección completa, así que puede variar ligeramente respecto a la estimación.',
     },

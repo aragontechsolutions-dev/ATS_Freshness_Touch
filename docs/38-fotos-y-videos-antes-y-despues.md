@@ -1092,9 +1092,76 @@ exporta y se enseña.
 mirar en cada vistazo: un registro que crece con cada ojeada es un registro
 que nadie lee, y enterraría las líneas que sí importan.
 
+### El permiso se pide al reservar (etapa 2.D.5)
+
+Es el caso A, y es el que hace que el resto funcione: **si el permiso solo se
+puede obtener en persona, no se obtiene casi nunca**, y con el modo estricto
+lo que no se obtiene no se publica.
+
+En el último paso del formulario de reserva, en su propio recuadro, hay
+**tres casillas**, todas desmarcadas:
+
+1. **«Pueden fotografiar y grabar esta vivienda y publicarlo en su web.»** Sin
+   esto no hay nada.
+2. **«También pueden publicar las imágenes del "antes".»** Sólo aparece si se
+   marca la primera. Es la parte sensible —el «antes» es su casa sucia— y por
+   eso va aparte, igual que en el panel.
+3. **«En esta vivienda vive alguien que no soy yo.»** También sólo si se marca
+   la primera. Es el caso del dueño que alquila.
+
+El texto de ayuda dice lo que tiene que decir: que es **opcional**, que **no
+cambia el precio ni el servicio**, que nunca se muestra el número de la calle,
+y que se puede pedir la retirada por correo o por un mensaje, con el plazo de
+**5 días** escrito.
+
+#### Lo que queda anotado
+
+La ficha se crea sola, **dentro de la misma transacción que la reserva**: o
+quedan las dos o no queda ninguna. Un permiso anotado para una reserva que no
+llegó a existir sería un papel sin casa.
+
+| Campo                             | De dónde sale                                     |
+| --------------------------------- | ------------------------------------------------- |
+| `reference`                       | La referencia de la reserva                       |
+| `evidenceKind`                    | `WEB_FORM`                                        |
+| `customerName`, `propertyAddress` | De la reserva, recortados a lo que cabe           |
+| `serviceDate`                     | El día de la cita                                 |
+| `signedAt`                        | El día en que se reservó                          |
+| `coversInterior/Exterior`         | Los dos, porque el texto habla de «esta vivienda» |
+| `channels`                        | **Sólo `WEBSITE`**                                |
+| `removalDays`                     | 5                                                 |
+| `videoIds`, `photoPaths`          | Vacíos                                            |
+| `notes`                           | `Formulario de reserva, texto v1`                 |
+
+Cuatro decisiones que conviene no perder:
+
+- **Sólo la web.** El texto autoriza la página, no las redes sociales.
+  Publicar en Facebook con un permiso que no las nombra es publicar sin
+  permiso. Añadirlas exige cambiar el texto **y subir la versión**.
+- **Nace sin piezas**, porque el vídeo todavía no existe. Se le atan después
+  desde el panel. El contrato lo admite: la regla que exige autorizar la web
+  sólo se aplica a las fichas que amparan algo.
+- **La versión del texto queda escrita.** Un permiso vale por lo que decía el
+  texto que la persona leyó, no por lo que diga hoy la página. Si se
+  reescribe, los permisos de ayer siguen amparando lo de ayer y hay que poder
+  saber cuál de los dos se aceptó.
+- **Si dice que allí vive otra persona**, la ficha se anota con
+  `occupantConsent` en falso, así que **no podrá llevar piezas atadas** hasta
+  que alguien registre también el permiso del inquilino. La regla se cumple
+  sola.
+
+#### Un fallo aquí no puede tumbar la reserva
+
+Los campos del permiso son más cortos que los de una reserva: un nombre
+compuesto largo o una dirección con dos líneas pueden no caber. Se recortan,
+y aun así, si algo no encajara, **se registra un error con la referencia y la
+reserva sigue adelante**.
+
+Va en esta dirección y no en la otra a propósito: la reserva es el dinero del
+cliente y no se pierde por un permiso que se puede volver a anotar a mano. Y
+el fallo se registra como **error** y no como aviso porque dejarlo pasar en
+silencio sería perder la única señal de que hay que anotarlo.
+
 ### Lo que todavía no existe en el registro
 
-- **Capturar el permiso en la reserva** (la casilla del caso A). Hoy la ficha
-  se teclea en el panel; mientras no esté, el permiso se obtiene por correo o
-  en papel y alguien lo anota a mano.
 - **Avisar cuando vence un plazo de retirada.**

@@ -4,6 +4,10 @@ import { DateTime } from 'luxon';
 import { calculateQuote } from '@freshness/pricing';
 import {
   API_ERROR_CODES,
+  CONSENT_ADDRESS_MAX,
+  CONSENT_NAME_MAX,
+  MediaConsentSchema,
+  consentFromBooking,
   type BookingRequest,
   type BookingResponse,
   type PaymentIntent,
@@ -157,6 +161,110 @@ export class BookingsService {
       );
       return null;
     }
+  }
+
+  /**
+   * Deja anotado el permiso de imagen que el cliente dio al reservar.
+   *
+   * ========================================================================
+   * UN FALLO AQUI NO PUEDE TUMBAR LA RESERVA
+   * ========================================================================
+   * Los campos del permiso son mas cortos que los de una reserva: un nombre
+   * compuesto largo o una direccion con dos lineas pueden no caber. Se
+   * recortan, y aun asi, si algo no encajara, se registra un ERROR con la
+   * referencia y la reserva sigue adelante.
+   *
+   * Es deliberado y va en esta direccion y no en la otra: la reserva es el
+   * dinero del cliente y no se pierde por un permiso que se puede volver a
+   * anotar a mano desde el panel. Al reves —dejar pasar la reserva en
+   * silencio sin el permiso que si marco— seria perder la unica senal de que
+   * hay que anotarlo, y por eso el fallo se registra como error y no como
+   * aviso.
+   */
+  private async anotarPermisoDeImagen(
+    tx: Prisma.TransactionClient,
+    datos: {
+      request: BookingRequest;
+      reference: string;
+      serviceDate: string;
+      signedAt: string;
+      ip: string | null;
+    },
+  ): Promise<void> {
+    const { contact, address } = datos.request;
+
+    const permiso = MediaConsentSchema.safeParse(
+      consentFromBooking({
+        marcado: datos.request.mediaConsent,
+        reference: datos.reference,
+        customerName: recortar(`${contact.firstName} ${contact.lastName}`, CONSENT_NAME_MAX),
+        /*
+         * La direccion aqui sirve para VOLVER A ENCONTRAR la casa cuando un
+         * cliente pida retirar sus fotos, no para mandarle nada: la postal
+         * completa, con su segunda linea, ya esta en la reserva, que es su
+         * sitio. Por eso cabe recortarla sin perder nada util.
+         */
+        propertyAddress: recortar(
+          `${address.line1}, ${address.city}, ${address.state} ${address.postalCode}`,
+          CONSENT_ADDRESS_MAX,
+        ),
+        serviceDate: datos.serviceDate,
+        signedAt: datos.signedAt,
+      }),
+    );
+
+    if (!permiso.success) {
+      this.logger.error(
+        `La reserva ${datos.reference} marco el permiso de imagen y no se pudo anotar: ` +
+          `${permiso.error.issues[0]?.message ?? 'contrato invalido'}. Hay que anotarlo a mano.`,
+      );
+      return;
+    }
+
+    const fila = await tx.mediaConsent.create({
+      data: {
+        reference: permiso.data.reference,
+        evidenceKind: permiso.data.evidenceKind,
+        customerName: permiso.data.customerName,
+        propertyAddress: permiso.data.propertyAddress,
+        occupiedByOthers: permiso.data.occupiedByOthers,
+        occupantConsent: permiso.data.occupantConsent,
+        serviceDate: new Date(`${permiso.data.serviceDate}T00:00:00Z`),
+        signedAt: new Date(`${permiso.data.signedAt}T00:00:00Z`),
+        coversInterior: permiso.data.coversInterior,
+        coversExterior: permiso.data.coversExterior,
+        allowsBefore: permiso.data.allowsBefore,
+        channels: permiso.data.channels,
+        removalDays: permiso.data.removalDays,
+        videoIds: permiso.data.videoIds,
+        photoPaths: permiso.data.photoPaths,
+        notes: permiso.data.notes,
+      },
+    });
+
+    /*
+     * NI EL NOMBRE NI LA DIRECCION, igual que en el resto del registro: lo
+     * que se guarda aqui se consulta, se exporta y se ensena.
+     */
+    await this.audit.record(
+      {
+        staff: null,
+        actorType: 'CUSTOMER',
+        surface: 'SITE',
+        action: 'media_consent.created',
+        entityType: 'media_consent',
+        entityId: fila.id,
+        metadata: {
+          reference: permiso.data.reference,
+          evidenceKind: permiso.data.evidenceKind,
+          videos: 0,
+          photos: 0,
+          allowsBefore: permiso.data.allowsBefore,
+        },
+        ipAddress: datos.ip,
+      },
+      tx,
+    );
   }
 
   /** Recalcula el presupuesto con la direccion completa. */
@@ -432,6 +540,35 @@ export class BookingsService {
           tx,
         );
 
+        /*
+         * EL PERMISO DE IMAGEN, si el cliente lo marco.
+         *
+         * DENTRO DE LA MISMA TRANSACCION: o queda la reserva con su permiso,
+         * o no queda ninguna de las dos cosas. Un permiso anotado para una
+         * reserva que no llego a existir seria un papel sin casa.
+         *
+         * NACE SIN PIEZAS, y por eso no hace falta invalidar la cache de la
+         * galeria: la lista blanca que decide lo que se publica se construye
+         * con los videos y las fotos que ampara cada ficha, y esta no ampara
+         * ninguna todavia.
+         *
+         * SE ESCRIBE AQUI Y NO LLAMANDO AL SERVICIO DE PERMISOS porque aquel
+         * registra al autor como PERSONAL del panel, y aqui quien da el
+         * permiso es el cliente. Es el mismo motivo por el que la auditoria
+         * de abajo dice CUSTOMER y SITE.
+         */
+        if (request.mediaConsent.granted) {
+          await this.anotarPermisoDeImagen(tx, {
+            request,
+            reference: booking.reference,
+            serviceDate: localDate,
+            signedAt: DateTime.fromJSDate(now)
+              .setZone(schedulingConfig.timezone)
+              .toFormat('yyyy-MM-dd'),
+            ip,
+          });
+        }
+
         return {
           bookingId: booking.id,
           reference: booking.reference,
@@ -494,4 +631,15 @@ export class BookingsService {
     const numero = Number(rows[0]?.nextval ?? 0);
     return `FT-${now.getUTCFullYear()}-${String(numero).padStart(4, '0')}`;
   }
+}
+
+/**
+ * Recorta un texto al tamano que admite el registro de permisos.
+ *
+ * SIN PUNTOS SUSPENSIVOS: lo que se guarda tiene que poder compararse con lo
+ * que hay escrito en otro sitio, y tres puntos al final convierten una
+ * comparacion exacta en una aproximada.
+ */
+function recortar(texto: string, max: number): string {
+  return texto.length <= max ? texto : texto.slice(0, max).trimEnd();
 }

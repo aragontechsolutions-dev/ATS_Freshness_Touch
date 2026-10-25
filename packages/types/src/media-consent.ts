@@ -317,3 +317,115 @@ export const StoredMediaConsentSchema = z.object({
   updatedBy: z.string().nullable(),
 });
 export type StoredMediaConsent = z.infer<typeof StoredMediaConsentSchema>;
+
+// ---------------------------------------------------------------------------
+// El permiso que se pide al reservar
+// ---------------------------------------------------------------------------
+
+/**
+ * LA VERSION DEL TEXTO QUE SE ACEPTO.
+ *
+ * Un permiso vale por lo que decia el texto que la persona leyo, no por lo
+ * que diga hoy la pagina. Si manana se reescribe —se anade un canal, se
+ * cambia el plazo—, los permisos de ayer siguen amparando lo de ayer, y hace
+ * falta poder saber cual de los dos firmaron.
+ *
+ * SE SUBE AL CAMBIAR EL TEXTO. No cambiarlo al cambiarlo es peor que no
+ * tenerlo, porque entonces el numero miente.
+ */
+export const BOOKING_CONSENT_TEXT_VERSION = 1;
+
+/**
+ * Lo que se marca en el formulario de reserva.
+ *
+ * ========================================================================
+ * TRES CASILLAS Y NO UNA
+ * ========================================================================
+ * Porque son tres decisiones distintas y juntarlas seria arrancar con una
+ * sola marca cosas que la persona no ha pensado:
+ *
+ *   1. `granted` — si se puede publicar la casa. Sin esto no hay nada.
+ *   2. `allowsBefore` — si se puede publicar el «antes». Es la parte
+ *      sensible: el «antes» es, por definicion, su casa sucia. Va aparte por
+ *      la misma razon que va aparte en el panel.
+ *   3. `occupiedByOthers` — si la vivienda la habita alguien que no es quien
+ *      reserva. Es el caso del dueno que alquila: puede autorizar su
+ *      propiedad, pero los muebles y la ropa del plano son del inquilino.
+ *
+ * ========================================================================
+ * TODO EN FALSO POR DEFECTO, Y NO SOLO POR HIGIENE
+ * ========================================================================
+ * Una casilla premarcada no es un permiso. Y ademas el sitio y la API se
+ * despliegan por separado: una reserva enviada por una version anterior del
+ * formulario no trae este campo, y lo que tiene que ocurrir entonces es que
+ * NO haya permiso — nunca que se suponga uno que nadie dio.
+ */
+export const BookingMediaConsentSchema = z.strictObject({
+  granted: z.boolean().default(false),
+  allowsBefore: z.boolean().default(false),
+  occupiedByOthers: z.boolean().default(false),
+});
+export type BookingMediaConsent = z.infer<typeof BookingMediaConsentSchema>;
+
+export const BOOKING_CONSENT_NONE: BookingMediaConsent = {
+  granted: false,
+  allowsBefore: false,
+  occupiedByOthers: false,
+};
+
+/**
+ * Lo que una reserva con permiso deja anotado en el registro.
+ *
+ * ESTO NO ES UN ATAJO: es el mismo contrato que una ficha tecleada en el
+ * panel, relleno con lo que la reserva ya sabe. Se construye aqui, y no en
+ * la API, para que el texto del formulario y lo que queda escrito no puedan
+ * separarse sin que se note en una prueba.
+ *
+ * NACE SIN PIEZAS. El video todavia no existe cuando se reserva; se le atan
+ * despues desde el panel. El contrato lo admite: la regla que exige
+ * autorizar la web solo se aplica a las fichas que amparan algo.
+ */
+export function consentFromBooking(datos: {
+  marcado: BookingMediaConsent;
+  reference: string;
+  customerName: string;
+  propertyAddress: string;
+  serviceDate: string;
+  signedAt: string;
+}): MediaConsent {
+  return {
+    reference: datos.reference,
+    evidenceKind: 'WEB_FORM',
+    customerName: datos.customerName,
+    propertyAddress: datos.propertyAddress,
+    occupiedByOthers: datos.marcado.occupiedByOthers,
+    /*
+     * Quien reserva no puede dar el permiso de quien vive alli. Si dice que
+     * la vivienda la habita otra persona, la ficha queda anotada con la
+     * mitad que falta a la vista, y sin ese segundo permiso no podra llevar
+     * piezas atadas.
+     */
+    occupantConsent: false,
+    serviceDate: datos.serviceDate,
+    signedAt: datos.signedAt,
+    /*
+     * El texto del formulario habla de «la vivienda que limpiamos», por
+     * dentro y por fuera. Si algun dia se parte en dos casillas, esto tiene
+     * que seguirlo y el numero de version tiene que subir.
+     */
+    coversInterior: true,
+    coversExterior: true,
+    allowsBefore: datos.marcado.allowsBefore,
+    /*
+     * SOLO LA WEB. El texto del formulario autoriza la pagina, no las redes
+     * sociales: publicar en Facebook con un permiso que no las nombra es
+     * publicar sin permiso. Anadirlas exige cambiar el texto y subir la
+     * version.
+     */
+    channels: ['WEBSITE'],
+    removalDays: CONSENT_REMOVAL_DAYS_DEFAULT,
+    videoIds: [],
+    photoPaths: [],
+    notes: `Formulario de reserva, texto v${String(BOOKING_CONSENT_TEXT_VERSION)}`,
+  };
+}

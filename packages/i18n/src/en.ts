@@ -1552,6 +1552,15 @@ export const en = {
       doorPinRetention: 'We delete this pin the day after your cleaning.',
       customerNotes: 'Anything else we should know? (optional)',
       marketingOptIn: 'Send me occasional offers and cleaning tips.',
+
+      mediaConsentTitle: 'Before-and-after photos',
+      mediaConsent: 'You may photograph and film this home and publish it on your website.',
+      mediaConsentHelp:
+        'Entirely optional: it changes neither the price nor the service. We never show the street number, and you can ask us to take it down at any time \u2014 by email or a message \u2014 and it is off the website within 5 days.',
+      mediaConsentBefore: 'You may also publish the "before" footage.',
+      mediaConsentTenant: 'Someone other than me lives in this home.',
+      mediaConsentTenantHelp:
+        'Then we also need their release before anything is published: the belongings in shot are theirs, and we will be in touch about it.',
       priceNotice:
         'Your final price is confirmed with the full address, so it may differ slightly from the estimate.',
     },

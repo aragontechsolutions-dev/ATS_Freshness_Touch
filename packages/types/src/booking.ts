@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { FrequencySchema, LocaleSchema, ServiceTypeSchema } from './enums';
 import { PaymentIntentSchema } from './payment';
 import { DoorPinSchema } from './door-pin';
+import { BOOKING_CONSENT_NONE, BookingMediaConsentSchema } from './media-consent';
 import { QuoteAddOnInputSchema, QuoteDepositSchema, QuoteTotalsSchema } from './quote';
 
 /**
@@ -91,6 +92,27 @@ export const BookingRequestSchema = z
      * la distancia sale del codigo postal. Ver `door-pin.ts`.
      */
     doorPin: DoorPinSchema.optional(),
+
+    /**
+     * EL PERMISO DE IMAGEN, si el cliente lo da al reservar.
+     *
+     * Aqui, y no el dia del servicio, porque el caso NORMAL es que ese dia
+     * no haya nadie en casa: en una mudanza esta vacia, en una recurrente el
+     * cliente esta trabajando, y hay quien contrata desde otro estado. Y
+     * ademas es cuando el permiso es mas libre: pedirlo despues, delante de
+     * la casa recien limpia, pone al cliente en una situacion en la que se
+     * siente obligado a decir que si.
+     *
+     * OPCIONAL Y SIN CONSECUENCIAS, igual que el pin de la puerta: no toca
+     * el precio, no toca el servicio y quien no lo marca reserva igual. Un
+     * permiso que condiciona lo que se contrata no es un permiso libre.
+     *
+     * CON VALOR POR DEFECTO porque el sitio y la API se despliegan por
+     * separado: una reserva enviada por una version anterior del formulario
+     * no trae este campo, y entonces lo que tiene que pasar es que no haya
+     * permiso.
+     */
+    mediaConsent: BookingMediaConsentSchema.default(BOOKING_CONSENT_NONE),
   })
   .refine(
     (value) => new Set(value.addOns.map((addOn) => addOn.code)).size === value.addOns.length,

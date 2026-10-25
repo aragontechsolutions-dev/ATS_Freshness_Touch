@@ -29,6 +29,22 @@ export interface BookingDetailsForm {
   doorPin: DoorPin | null;
   customerNotes: string;
   marketingOptIn: boolean;
+
+  /**
+   * EL PERMISO DE IMAGEN, en tres casillas y no en una.
+   *
+   * `mediaConsent` es si se puede publicar la casa; `mediaConsentBefore`, si
+   * se puede publicar el «antes» —la parte sensible, porque el «antes» es
+   * su casa sucia—; y `mediaConsentTenant`, si alli vive alguien que no es
+   * quien reserva, porque sobre la vida privada de un tercero no se puede
+   * dar permiso.
+   *
+   * OPCIONAL Y SIN CONSECUENCIAS: no toca el precio, no toca el servicio y
+   * quien no lo marca reserva igual.
+   */
+  mediaConsent: boolean;
+  mediaConsentBefore: boolean;
+  mediaConsentTenant: boolean;
 }
 
 export type DetailsErrors = Partial<Record<keyof BookingDetailsForm, string>>;
@@ -47,6 +63,10 @@ export const EMPTY_DETAILS: BookingDetailsForm = {
   doorPin: null,
   customerNotes: '',
   marketingOptIn: false,
+  // Las tres en falso: una casilla premarcada no es un permiso.
+  mediaConsent: false,
+  mediaConsentBefore: false,
+  mediaConsentTenant: false,
 };
 
 /**
