@@ -362,6 +362,29 @@ export function galleryVideoTitle(
 // Lo que ve el sitio publico
 // ---------------------------------------------------------------------------
 
+/*
+ * LO QUE SIGUE NO ES ESTRICTO, Y ESO ES DELIBERADO
+ * ================================================
+ * Todo lo de arriba —lo que se GUARDA y lo que el panel ESCRIBE— es
+ * `strictObject`, y tiene que seguir siendolo: una clave mal escrita no puede
+ * quedarse en la base sin salir nunca en la web.
+ *
+ * Lo de aqui abajo es lo que el navegador LEE, y ahi ser estricto es un fallo.
+ * Costo un incidente descubrirlo:
+ *
+ *   La API empezo a devolver las fotos. Los navegadores que todavia tenian la
+ *   version anterior de la web recibieron una respuesta con dos claves que su
+ *   contrato no conocia —`photos` y `posterUrl`—, la descartaron ENTERA, y la
+ *   seccion de antes y despues desaparecio de la portada: videos incluidos, y
+ *   sin un solo error visible, porque el sitio esta programado para no
+ *   romperse cuando la API no responde.
+ *
+ * La web y la API se despliegan por separado, asi que esa ventana existe en
+ * CADA despliegue. `z.object` ignora lo que no conoce: una version vieja de la
+ * web sigue funcionando con una API nueva, simplemente sin usar lo que no
+ * entiende.
+ */
+
 /**
  * LA GALERIA TAL Y COMO LA RECIBE LA WEB: CON DIRECCIONES, NO CON RUTAS.
  *
@@ -382,7 +405,7 @@ export function galleryVideoTitle(
  * seguridad de contenido sigue siendo el muro, porque fija el unico origen
  * desde el que el navegador cargara una imagen.
  */
-export const PublicGalleryPhotoSchema = z.strictObject({
+export const PublicGalleryPhotoSchema = z.object({
   url: z.string().url(),
   title: GalleryTitleSchema,
 });
@@ -395,14 +418,14 @@ export type PublicGalleryPhoto = z.infer<typeof PublicGalleryPhotoSchema>;
  * que el panel puede escribir sin poder apuntar a otro sitio, y la direccion
  * la compone el servidor.
  */
-export const PublicGalleryVideoSchema = z.strictObject({
+export const PublicGalleryVideoSchema = z.object({
   videoId: YouTubeVideoIdSchema,
   title: GalleryTitleSchema,
   posterUrl: z.string().url().nullable(),
 });
 export type PublicGalleryVideo = z.infer<typeof PublicGalleryVideoSchema>;
 
-export const PublicGallerySchema = z.strictObject({
+export const PublicGallerySchema = z.object({
   videos: z.array(PublicGalleryVideoSchema).default([]),
   photos: z.array(PublicGalleryPhotoSchema).default([]),
 });
