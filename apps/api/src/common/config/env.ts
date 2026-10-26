@@ -294,6 +294,19 @@ export const EnvSchema = z
     REMOVAL_SWEEP_MINUTES: z.coerce.number().int().min(0).default(60),
 
     /**
+     * Cada cuantos minutos se cierran las reservas que nadie llego a pagar.
+     *
+     * Quince, igual que el recordatorio: lo que esto libera es DINERO
+     * RETENIDO en la tarjeta de un cliente, y cada vuelta de reloj de mas es
+     * un rato mas con su saldo bloqueado por una reserva que no existe.
+     *
+     * No hace falta ir mas rapido: la franja de la agenda ya se libera sola
+     * al vencer el plazo, sin esperar a este barrido. Cero lo apaga, que es
+     * lo que usan las pruebas para llamarlo a mano.
+     */
+    HOLD_SWEEP_MINUTES: z.coerce.number().int().min(0).default(15),
+
+    /**
      * La direccion del SITIO PUBLICO, para componer el enlace con el que un
      * cliente retira sus fotos.
      *

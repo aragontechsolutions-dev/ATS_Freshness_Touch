@@ -46,6 +46,7 @@ export const BARRIDOS = [
   'geocoding',
   'auditPurge',
   'removalDeadlines',
+  'expiredHolds',
 ] as const;
 export type Barrido = (typeof BARRIDOS)[number];
 
