@@ -651,15 +651,15 @@ Honestidad sobre el alcance de las pruebas:
 
 ## 11. Pendiente
 
-| Tarea                                                | Etapa |
-| ---------------------------------------------------- | ----- |
-| Probar el pago real con credenciales de Stripe       | 2.2c  |
-| ~~Captura desde el panel~~ — hecho                   | 2.3   |
-| ~~Devolución desde el panel~~ — hecho (§8)           | 3.21  |
-| ~~Cobro del saldo final al terminar~~ — hecho (§9)   | 3.23  |
-| ~~Devolver un cobro final~~ — hecho (§8)             | 3.24  |
-| ~~Cerrar las reservas que nadie pagó~~ — hecho (§12) | 2.3   |
-| Reintentar la retención de una reserva sin pago      | 2.3   |
+| Tarea                                                  | Etapa |
+| ------------------------------------------------------ | ----- |
+| **Recorrer el flujo con las tarjetas de prueba** (§10) | 2.2c  |
+| ~~Captura desde el panel~~ — hecho                     | 2.3   |
+| ~~Devolución desde el panel~~ — hecho (§8)             | 3.21  |
+| ~~Cobro del saldo final al terminar~~ — hecho (§9)     | 3.23  |
+| ~~Devolver un cobro final~~ — hecho (§8)               | 3.24  |
+| ~~Cerrar las reservas que nadie pagó~~ — hecho (§12)   | 2.3   |
+| Reintentar la retención de una reserva sin pago        | 2.3   |
 
 ---
 

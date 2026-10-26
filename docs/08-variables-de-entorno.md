@@ -263,17 +263,59 @@ Directory. Sus variables:
 
 ---
 
-## 5. Stripe (implementado — activación pendiente)
+## 5. Stripe (activo en producción)
 
-El módulo de pagos ya funciona de punta a punta con el proveedor simulado. Para
-pasar a cobros reales hacen falta tres cosas, en este orden:
+> **`PAYMENT_PROVIDER=stripe`: se cobra de verdad.** Cada reserva retiene 35 $
+> en la tarjeta de una persona. Volver a `mock` no deshace nada de lo ya
+> cobrado: lo único que hace es dejar de cobrar.
 
-**1. Claves de la cuenta** (Stripe → Developers → API keys):
+El orden de estos pasos **no es decorativo**: la API **se niega a arrancar**
+con `PAYMENT_PROVIDER=stripe` si falta cualquiera de las dos claves, así que
+el interruptor va el último. Al revés, el despliegue se cae.
+
+**1. Claves de la cuenta** (Stripe → API keys):
 
 ```bash
-STRIPE_SECRET_KEY=sk_test_...            # solo Render, nunca en el navegador
-VITE_STRIPE_PUBLISHABLE_KEY=pk_test_...  # navegador, es pública por diseño
+STRIPE_SECRET_KEY=rk_live_...            # solo Render, nunca en el navegador
+VITE_STRIPE_PUBLISHABLE_KEY=pk_live_...  # navegador, es pública por diseño
 ```
+
+### Se usa una clave RESTRINGIDA, no la secreta estándar
+
+La clave secreta estándar (`sk_…`) da acceso **a toda la cuenta**: mover
+dinero, cambiar la cuenta bancaria, leer y modificar todo. Si se filtra, se
+filtra todo.
+
+Una restringida (`rk_…`) hace exactamente lo que necesitamos y nada más. Estos
+son los permisos, y salen de contar las llamadas que hace
+`stripe-payment.provider.ts`:
+
+| Recurso en Stripe       | Permiso   | Lo usa                                             |
+| ----------------------- | --------- | -------------------------------------------------- |
+| **Customers**           | Escritura | `customers.create` — la ficha para cobrar el saldo |
+| **Payment Intents**     | Escritura | `create`, `capture`, `cancel`                      |
+| **Charges and Refunds** | Escritura | `refunds.create`                                   |
+
+Nada más. La verificación de los webhooks **no usa la clave**: se hace con el
+`whsec_…` sobre los bytes del cuerpo.
+
+> Stripe agrupa cargos y reembolsos en un solo permiso, así que ese concede
+> algo más de lo estrictamente necesario. **No hay forma de separarlos** y es
+> el mínimo posible para poder devolver dinero.
+
+> El nombre de la variable sigue siendo `STRIPE_SECRET_KEY` aunque la clave
+> empiece por `rk_`: el código no mira el prefijo.
+
+**Dónde vive cada una, y esto no se negocia:**
+
+| Clave       | Dónde            | Por qué                                                                 |
+| ----------- | ---------------- | ----------------------------------------------------------------------- |
+| `rk_live_…` | **Solo Render**  | Mueve dinero                                                            |
+| `whsec_…`   | **Solo Render**  | Con él se falsifican avisos de «pago recibido»                          |
+| `pk_live_…` | Vercel (landing) | Es pública por diseño: va dentro del JavaScript que descarga cualquiera |
+
+El panel (`admin`) **no usa ninguna clave de Stripe**: capturar, devolver y
+cobrar el saldo los hace la API, nunca el navegador.
 
 **2. Endpoint de webhook** (Stripe → Developers → Webhooks → Add endpoint):
 

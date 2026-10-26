@@ -124,13 +124,27 @@ services:
 
       # --- Pagos ---
       # mock | stripe. Con "mock" los depositos se SIMULAN: no se retiene
-      # dinero real. Sirve para desplegar y probar el flujo completo antes de
-      # tener cuenta de Stripe; la API avisa por error en los registros
-      # mientras siga asi en produccion.
+      # dinero real.
+      #
+      # EN "stripe" SE COBRA DE VERDAD. A partir de aqui cada reserva retiene
+      # 35 dolares en la tarjeta de una persona. Volver a "mock" no deshace
+      # nada de lo ya cobrado: lo unico que hace es dejar de cobrar.
+      #
+      # LA API NO ARRANCA con "stripe" y sin las dos claves de abajo. Es
+      # deliberado: el fallo se ve en el despliegue y no la primera vez que
+      # alguien intenta pagar.
       - key: PAYMENT_PROVIDER
-        value: mock
+        value: stripe
       # Secretos: se introducen a mano en el panel, nunca en el repositorio.
-      # STRIPE_SECRET_KEY:     clave secreta de la cuenta (sk_live_... ).
+      # STRIPE_SECRET_KEY:     la clave de la cuenta. Se usa una RESTRINGIDA
+      #                        (rk_live_...) con permiso de escritura sobre
+      #                        Customers, Payment Intents y Charges and
+      #                        Refunds, y nada mas: son las unicas llamadas
+      #                        que hace el codigo. Una clave de acceso total
+      #                        podria ademas mover el dinero de la cuenta.
+      #                        El nombre de la variable no cambia aunque la
+      #                        clave empiece por "rk_": el codigo no mira el
+      #                        prefijo.
       # STRIPE_WEBHOOK_SECRET: secreto del endpoint de webhook (whsec_...),
       #                        que es DISTINTO de la clave secreta. Sin el, no
       #                        hay forma de comprobar que un aviso de "deposito
