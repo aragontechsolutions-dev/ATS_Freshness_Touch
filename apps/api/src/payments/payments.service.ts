@@ -137,6 +137,8 @@ export class PaymentsService {
     bookingId: string;
     bookingReference: string;
     amountCents: number;
+    /** A donde va el recibo del cobro. Ver `BalanceChargeRequest`. */
+    customerEmail: string;
     providerCustomerId: string;
     providerPaymentMethodId: string;
   }): Promise<ProviderPayment> {

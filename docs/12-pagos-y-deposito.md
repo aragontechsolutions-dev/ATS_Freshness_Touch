@@ -624,6 +624,22 @@ se queda en el registro del servidor, nunca llega al navegador.
 | El saldo se guarda como movimiento **aparte**        | Que el depósito siga leyéndose donde siempre          |
 | La auditoría no contiene `pi_`, `pm_` ni `cus_`      | Que una credencial no acabe en una pantalla           |
 | El detalle dice que hay tarjeta **sin enseñar cuál** | Lo mismo, en la API                                   |
+| **El recibo va al correo del cliente**               | Un cargo que no se reconoce acaba en disputa          |
+
+### El recibo
+
+Tanto la retención del depósito como el cobro del saldo mandan `receipt_email`
+al correo del cliente, así que Stripe le envía **su recibo de cada uno**.
+
+En el saldo importa más que en el depósito, y por eso se dice aquí: **se cobra
+sin el cliente delante**, días después del servicio. Lo primero que sabe del
+cargo es su extracto bancario. Un recibo de los 35 $ del depósito y **ninguno**
+de los ~150 $ restantes es justo al revés de lo que hace falta — y un cargo que
+no se reconoce acaba en **disputa**, que cuesta la comisión además del importe,
+se gane o se pierda.
+
+> El recibo del depósito llega **al capturarlo**, no al retenerlo: una
+> retención no es un cobro y Stripe no manda recibo de ella.
 
 ### Lo que NO hace
 

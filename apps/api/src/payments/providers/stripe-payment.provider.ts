@@ -152,6 +152,14 @@ export class StripePaymentProvider implements PaymentProvider {
           off_session: true,
           confirm: true,
           description: `Saldo del servicio - reserva ${request.bookingReference}`,
+          /*
+           * EL RECIBO, igual que en la retencion. Aqui importa mas: es la
+           * parte grande del importe y se cobra SIN EL CLIENTE DELANTE, asi
+           * que lo primero que sabe del cargo es su extracto bancario. Un
+           * cargo que no se reconoce acaba en disputa, y una disputa cuesta
+           * la comision ademas del importe, se gane o se pierda.
+           */
+          receipt_email: request.customerEmail,
           statement_descriptor_suffix: this.options.statementDescriptorSuffix,
           metadata: {
             bookingId: request.bookingId,
