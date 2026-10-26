@@ -48,6 +48,16 @@ export interface BalanceChargeRequest {
   bookingId: string;
   bookingReference: string;
   amountCents: number;
+  /**
+   * A donde mandar el recibo.
+   *
+   * ES LA PARTE GRANDE DEL IMPORTE Y SE COBRA SIN EL CLIENTE DELANTE: ve el
+   * cargo en su extracto dias despues del servicio, sin haber tecleado nada.
+   * Un recibo del deposito de 35 dolares y ninguno de los 150 restantes es
+   * justo al reves de lo que hace falta — y un cargo que no se reconoce
+   * acaba en disputa.
+   */
+  customerEmail: string;
   /** La tarjeta guardada y su titular en el proveedor. */
   providerCustomerId: string;
   providerPaymentMethodId: string;

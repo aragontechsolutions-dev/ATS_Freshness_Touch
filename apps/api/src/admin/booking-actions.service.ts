@@ -231,6 +231,8 @@ export class BookingActionsService {
         reference: true,
         status: true,
         balanceDueCents: true,
+        /* Solo el correo: aqui no hace falta nada mas del cliente. */
+        customer: { select: { email: true } },
         payments: {
           where: { kind: { in: ['DEPOSIT_HOLD', 'FINAL_CHARGE'] } },
           orderBy: { createdAt: 'desc' },
@@ -286,6 +288,7 @@ export class BookingActionsService {
       bookingId,
       bookingReference: booking.reference,
       amountCents: importe,
+      customerEmail: booking.customer.email,
       providerCustomerId: deposito.providerCustomerId,
       providerPaymentMethodId: deposito.providerPaymentMethodId,
     });
@@ -352,6 +355,7 @@ export class BookingActionsService {
     bookingId: string;
     bookingReference: string;
     amountCents: number;
+    customerEmail: string;
     providerCustomerId: string;
     providerPaymentMethodId: string;
   }): ReturnType<PaymentsService['chargeBalance']> {

@@ -9,6 +9,7 @@ import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { AdminBookingDetailSchema, AdminBookingListSchema } from '@freshness/types';
 import { AppModule } from '../app.module';
+import { PAYMENT_PROVIDER, type PaymentProvider } from '../payments/payments.types';
 import { ADMIN_ROUTE, Roles } from './auth.decorators';
 import { AUTH_PROVIDER } from './auth.types';
 import type { LocalAuthProvider } from './providers/local-auth.provider';
@@ -992,7 +993,25 @@ describe('acciones sobre la reserva', () => {
     it('cobra el saldo, lo guarda como movimiento aparte y deja rastro', async () => {
       await listoParaCobrar();
 
+      /*
+       * EL RECIBO VA AL CLIENTE, Y ESTA ES LA PARTE GRANDE DEL IMPORTE.
+       *
+       * El saldo se cobra SIN EL CLIENTE DELANTE, dias despues del servicio:
+       * lo primero que sabe del cargo es su extracto bancario. Durante un
+       * tiempo se mandaba recibo del deposito de 35 dolares y NINGUNO de los
+       * ~150 restantes, que es justo al reves de lo que hace falta — y un
+       * cargo que no se reconoce acaba en disputa, que cuesta la comision
+       * ademas del importe.
+       *
+       * Se comprueba AQUI y no en una prueba propia porque cobrar gasta el
+       * saldo: una prueba aparte dejaria a esta sin nada que cobrar.
+       */
+      const cobro = vi.spyOn(app.get<PaymentProvider>(PAYMENT_PROVIDER), 'chargeBalance');
+
       const respuesta = await cobrar(admin).expect(200);
+
+      expect(cobro.mock.calls[0]?.[0].customerEmail).toBe('luis.acciones@example.com');
+      cobro.mockRestore();
 
       expect(respuesta.body.finalCharge.status).toBe('SUCCEEDED');
       expect(respuesta.body.finalCharge.amountCents).toBe(respuesta.body.balanceDueCents);
