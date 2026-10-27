@@ -13,6 +13,7 @@ import { DatabaseModule } from './database/database.module';
 import { DistanceModule } from './distance/distance.module';
 import { HealthModule } from './health/health.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { StaffNotificationsModule } from './staff-notifications/staff-notifications.module';
 import { PaymentsModule } from './payments/payments.module';
 import { QuotesModule } from './quotes/quotes.module';
 import { SchedulingModule } from './scheduling/scheduling.module';
@@ -57,6 +58,11 @@ import { SettingsModule } from './settings/settings.module';
     DistanceModule,
     SettingsModule,
     NotificationsModule,
+    /*
+     * La bandeja del equipo. Va ANTES que los modulos que emiten avisos para
+     * que su proveedor global este registrado cuando lo pidan.
+     */
+    StaffNotificationsModule,
     QuotesModule,
     SchedulingModule,
     PaymentsModule,

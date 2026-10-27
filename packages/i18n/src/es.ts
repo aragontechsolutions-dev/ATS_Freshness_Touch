@@ -281,6 +281,48 @@ export const es: TranslationResources = {
     reasonPlaceholder: '¿Por qué haces esto?',
     reasonHelp: 'Se guarda con tu nombre en el registro de auditoría.',
     reasonRequired: 'Escribe antes un motivo.',
+
+    inbox: {
+      title: 'Notificaciones',
+      open: 'Notificaciones',
+      empty: 'No hay nada nuevo.',
+      showAll: 'Ver todas',
+      markAllRead: 'Marcar todas como leídas',
+      unread: 'Sin leer',
+      openEntity: 'Abrir la reserva',
+      badgeLabel_one: '1 notificación sin leer',
+      badgeLabel_other: '{{count}} notificaciones sin leer',
+      kind: {
+        booking: {
+          confirmed: {
+            title: 'Reserva nueva por asignar',
+            body: 'La reserva {{reference}} está confirmada y todavía no tiene equipo.',
+          },
+          hold_open: {
+            title: 'Reserva cancelada con el depósito retenido',
+            body: 'Quedan {{amount}} retenidos en la tarjeta. Decide: cóbralos o libéralos, o caducarán solos.',
+          },
+        },
+        payment: {
+          refund_failed: {
+            title: 'Una devolución fue rechazada',
+            body: 'La devolución de {{amount}} de {{reference}} falló. El dinero sigue aquí y el cliente lo está esperando.',
+          },
+        },
+        media_consent: {
+          self_revoked: {
+            title: 'Un cliente retiró sus fotos',
+            body: 'El permiso {{reference}} se retiró desde el enlace de su correo. Sus fotos ya no están en la web.',
+          },
+        },
+        job: {
+          assigned: {
+            title: 'Tienes un trabajo asignado',
+            body: 'Reserva {{reference}}, {{when}}.',
+          },
+        },
+      },
+    },
     reasonMissing:
       'Escribe arriba el motivo para poder usar «Cancelar la reserva» y «El cliente no estaba».',
     holdStillOpen_one:

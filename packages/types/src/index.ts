@@ -11,6 +11,7 @@ export * from './business-settings';
 export * from './site-copy';
 export * from './gallery';
 export * from './media-consent';
+export * from './staff-notification';
 export * from './service-area';
 export * from './geo-distance';
 export * from './clock-in';

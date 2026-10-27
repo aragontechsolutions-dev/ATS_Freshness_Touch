@@ -652,6 +652,10 @@ model Staff {
   adjustmentsProposed BookingFieldAdjustment[] @relation("AjustePropuestoPor")
   adjustmentsResolved BookingFieldAdjustment[] @relation("AjusteResueltoPor")
   mediaConsents       MediaConsent[]           @relation("ConsentimientoAnotadoPor")
+
+  /// Notificaciones dirigidas a esta persona, y las que ha leido.
+  notificacionesDirigidas StaffNotification[]     @relation("NotificacionDirigidaA")
+  notificacionesLeidas    StaffNotificationRead[] @relation("NotificacionLeidaPor")
   createdAt           DateTime                 @default(now()) @db.Timestamptz(3)
   updatedAt           DateTime                 @updatedAt @db.Timestamptz(3)
 
@@ -1036,6 +1040,68 @@ model BookingFieldAdjustment {
 /// NO SE BORRA AL REVOCAR. Un permiso retirado es exactamente lo que hay que
 /// poder demostrar: que existio, que amparaba estas piezas y cuando dejo de
 /// hacerlo. Borrarlo dejaria el registro contando solo la mitad buena.
+/// LA BANDEJA DEL EQUIPO
+///
+/// No confundir con `notifications`, que es el registro de lo que se le ENVIA
+/// AL CLIENTE y cuelga de una reserva. Esto mira hacia dentro: es lo que una
+/// persona del equipo tiene que enterarse al entrar al panel.
+model StaffNotification {
+  id String @id @default(uuid(4)) @db.Uuid
+
+  /// Que paso. Del catalogo cerrado de `@freshness/types`, no texto libre.
+  kind String
+
+  /// A que puesto le toca. «Hay una reserva nueva» es de coordinacion, sea
+  /// quien sea quien entre ese dia: dirigirla a una persona concreta
+  /// significaria que si esa persona libra, nadie la ve.
+  audience StaffRole
+
+  /// Estrecha la notificacion a UNA persona dentro de ese puesto. Se usa para
+  /// «te han asignado un trabajo», que es de quien lo tiene y de nadie mas.
+  /// NULL = la ve todo el puesto.
+  staffId String? @db.Uuid
+  staff   Staff?  @relation("NotificacionDirigidaA", fields: [staffId], references: [id], onDelete: Cascade)
+
+  /// A que se refiere, para poder abrirlo desde la lista.
+  entityType String?
+  entityId   String?
+
+  /// Lo que hace falta para componer el texto en el idioma de quien mira: una
+  /// referencia, un importe, unos dias. El TEXTO NO SE GUARDA — guardar la
+  /// frase ya escrita dejaria las de ayer en el idioma de quien las provoco, y
+  /// corregir una errata no arreglaria las que ya estan.
+  /// NUNCA nombres ni direcciones, igual que en la auditoria.
+  params Json @default("{}")
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+
+  reads StaffNotificationRead[]
+
+  /// La consulta de la bandeja es siempre la misma: lo de mi puesto, lo mas
+  /// reciente primero.
+  @@index([audience, createdAt(sort: Desc)])
+  @@map("staff_notifications")
+}
+
+/// QUIEN HA LEIDO QUE.
+///
+/// Tabla aparte y no una marca en la notificacion porque una del puesto la ven
+/// varias personas: si fuera un booleano, la primera que la abriera la haria
+/// desaparecer del globo de las demas.
+model StaffNotificationRead {
+  notificationId String            @db.Uuid
+  notification   StaffNotification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+
+  staffId String @db.Uuid
+  staff   Staff  @relation("NotificacionLeidaPor", fields: [staffId], references: [id], onDelete: Cascade)
+
+  readAt DateTime @default(now()) @db.Timestamptz(3)
+
+  @@id([notificationId, staffId])
+  @@index([staffId])
+  @@map("staff_notification_reads")
+}
+
 model MediaConsent {
   id String @id @default(uuid(4)) @db.Uuid
 

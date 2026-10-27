@@ -13,6 +13,7 @@ import {
   type AuthenticatedStaff,
 } from '@freshness/types';
 import { AuditService } from '../audit/audit.service';
+import { StaffNotificationsService } from '../staff-notifications/staff-notifications.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../database/prisma.service';
 
@@ -36,6 +37,8 @@ export class AssignmentsService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly notifications: NotificationsService,
+    /** La bandeja del panel: lo que cada persona ve al entrar. */
+    private readonly bandeja: StaffNotificationsService,
   ) {}
 
   /**
@@ -161,6 +164,40 @@ export class AssignmentsService {
      * colgando cuando el proceso termine.
      */
     await this.notifications.jobAssigned(bookingId, await this.nombresDePila(assignments));
+
+    /*
+     * Y UNA NOTIFICACION A CADA PERSONA, en su bandeja del panel.
+     *
+     * ESTA SI VA DIRIGIDA, no al puesto: «te han asignado un trabajo» es de
+     * quien lo tiene y de nadie mas. El grupo de Telegram ya lo ve todo el
+     * equipo; la bandeja es lo que cada una abre al entrar.
+     *
+     * Se deja para QUIEN ENTRA, no para quien sale: a quien se le quita un
+     * trabajo se entera por el grupo, y un aviso en su bandeja de algo que ya
+     * no le toca solo confunde.
+     */
+    const nuevos = assignments.filter(
+      (a) => !anterior.some((previo) => previo.staffId === a.staffId),
+    );
+
+    for (const asignacion of nuevos) {
+      await this.bandeja.emitir({
+        kind: 'job.assigned',
+        staffId: asignacion.staffId,
+        entityType: 'booking',
+        entityId: bookingId,
+        /*
+         * La referencia y la hora, nada del cliente: la bandeja se mira en
+         * una pantalla compartida y el nombre y la calle ya estan en la
+         * ficha del trabajo, que es su sitio.
+         */
+        params: {
+          reference: booking.reference,
+          scheduledStart: booking.scheduledStart.toISOString(),
+          isLead: asignacion.isLead,
+        },
+      });
+    }
   }
 
   /**

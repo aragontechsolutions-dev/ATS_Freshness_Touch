@@ -2,6 +2,7 @@ import { Body, Controller, HttpCode, Ip, Post, UsePipes } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { RemovalLinkRequestSchema, type RemovalLinkRequest } from '@freshness/types';
 import { ConsentReceiptService } from '../notifications/consent-receipt.service';
+import { StaffNotificationsService } from '../staff-notifications/staff-notifications.service';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
 import { RECOVERY_RATE_LIMIT } from '../common/throttling';
 import { MediaConsentsService } from './media-consents.service';
@@ -46,6 +47,7 @@ export class MediaRemovalController {
   constructor(
     private readonly consentimientos: MediaConsentsService,
     private readonly constancia: ConsentReceiptService,
+    private readonly bandeja: StaffNotificationsService,
   ) {}
 
   /**
@@ -75,6 +77,17 @@ export class MediaRemovalController {
      */
     if (resultado.retirada !== null) {
       await this.constancia.avisarRetiradaPorElCliente(resultado.retirada);
+
+      /*
+       * Y EN LA BANDEJA, que es donde se mira sin depender del correo. Un
+       * aviso que solo existe en un buzon desaparece en cuanto alguien
+       * archiva el mensaje, y esto es un cambio en lo que la portada ensena.
+       */
+      await this.bandeja.emitir({
+        kind: 'media_consent.self_revoked',
+        entityType: 'media_consent',
+        params: { reference: resultado.retirada },
+      });
     }
 
     return { done: resultado.retirada !== null };

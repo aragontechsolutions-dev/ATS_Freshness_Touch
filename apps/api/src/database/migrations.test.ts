@@ -73,6 +73,8 @@ describe('migraciones', () => {
       'quotes',
       'recurring_series',
       'staff',
+      'staff_notification_reads',
+      'staff_notifications',
       'webhook_events',
     ]);
   });
