@@ -281,6 +281,16 @@ export const es: TranslationResources = {
     reasonPlaceholder: '¿Por qué haces esto?',
     reasonHelp: 'Se guarda con tu nombre en el registro de auditoría.',
     reasonRequired: 'Escribe antes un motivo.',
+    reasonMissing:
+      'Escribe arriba el motivo para poder usar «Cancelar la reserva» y «El cliente no estaba».',
+    holdStillOpen_one:
+      'Esta reserva está cancelada y quedan {{amount}} retenidos en la tarjeta. Decide: cóbralos o libéralos. Caducan solos dentro de 1 día.',
+    holdStillOpen_other:
+      'Esta reserva está cancelada y quedan {{amount}} retenidos en la tarjeta. Decide: cóbralos o libéralos. Caducan solos dentro de {{count}} días.',
+    holdStillOpenToday:
+      'Esta reserva está cancelada y quedan {{amount}} retenidos en la tarjeta. Caducan HOY: después ya no se pueden cobrar.',
+    holdStillOpenExpired:
+      'Esta reserva está cancelada y la retención de {{amount}} ha caducado: ya no se puede cobrar, y el dinero vuelve solo al cliente.',
     depositHeld: 'Hay {{amount}} retenidos en la tarjeta, sin cobrar.',
     captureDeposit: 'Cobrar el depósito',
     releaseDeposit: 'Liberar la retención',

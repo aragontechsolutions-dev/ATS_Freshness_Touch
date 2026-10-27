@@ -318,6 +318,27 @@ export const en = {
     reasonPlaceholder: 'Why are you doing this?',
     reasonHelp: 'It is saved with your name in the audit log.',
     reasonRequired: 'Add a reason first.',
+    /*
+     * EL MISMO AVISO, PERO A LA VISTA. `reasonRequired` vive en un `title`,
+     * que solo aparece si el raton se queda quieto encima y que en movil NO
+     * APARECE NUNCA. El resultado es un boton gris que no explica nada y una
+     * persona convencida de que el sistema no deja cancelar.
+     */
+    reasonMissing:
+      'Write the reason above to enable “Cancel the booking” and “The customer was not there”.',
+    /*
+     * CANCELAR NO TOCA EL DINERO, a proposito: son dos decisiones. Pero sin
+     * decirlo, una retencion se queda viva detras de una reserva que ya nadie
+     * va a mirar.
+     */
+    holdStillOpen_one:
+      'This booking is cancelled and {{amount}} is still held on the card. Decide: charge it or release it. It expires on its own in 1 day.',
+    holdStillOpen_other:
+      'This booking is cancelled and {{amount}} is still held on the card. Decide: charge it or release it. It expires on its own in {{count}} days.',
+    holdStillOpenToday:
+      'This booking is cancelled and {{amount}} is still held on the card. It expires TODAY: after that it can no longer be charged.',
+    holdStillOpenExpired:
+      'This booking is cancelled and the hold of {{amount}} has expired: it can no longer be charged, and the money goes back to the customer on its own.',
     depositHeld: '{{amount}} is held on the card, not charged.',
     captureDeposit: 'Charge the deposit',
     releaseDeposit: 'Release the hold',
