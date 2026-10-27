@@ -3,6 +3,8 @@ import { randomUUID } from 'node:crypto';
 import { DateTime } from 'luxon';
 import { calculateQuote } from '@freshness/pricing';
 import { ConsentReceiptService } from '../notifications/consent-receipt.service';
+import { NotificationsService } from '../notifications/notifications.service';
+import { StaffNotificationsService } from '../staff-notifications/staff-notifications.service';
 import { crearTestigoDeRetirada } from '../settings/removal-token';
 import {
   API_ERROR_CODES,
@@ -10,6 +12,9 @@ import {
   CONSENT_NAME_MAX,
   MediaConsentSchema,
   consentFromBooking,
+  AGREED_PRICE_LINE_CODE,
+  type AdminBookingOverrides,
+  type AuthenticatedStaff,
   type MediaConsent,
   type BookingRequest,
   type BookingResponse,
@@ -25,7 +30,22 @@ import { GeocodingService } from '../geocoding/geocoding.service';
 import { AuditService } from '../audit/audit.service';
 import { AvailabilityService } from '../scheduling/availability.service';
 import type { SchedulingConfig } from '../scheduling/scheduling.config';
-import { isSlotStillAvailable } from '../scheduling/slots';
+import { equiposOcupadosEn, isSlotStillAvailable } from '../scheduling/slots';
+
+/**
+ * LO QUE ANADE UNA RESERVA HECHA DESDE EL PANEL.
+ *
+ * Nulo —el caso normal— significa que la reserva viene del sitio publico y
+ * que no se salta nada. Que sea un parametro y no un servicio aparte es
+ * deliberado: duplicar el camino de creacion seria duplicar el calculo del
+ * precio, el bloqueo del dia, la reutilizacion del cliente y el rastro de
+ * auditoria, y el dia que uno de los dos cambie, el otro no.
+ */
+export interface OpcionesDeAdministracion {
+  /** Quien la crea. Va a la auditoria; sin esto no hay a quien preguntar. */
+  staff: AuthenticatedStaff;
+  overrides: AdminBookingOverrides;
+}
 
 @Injectable()
 export class BookingsService {
@@ -52,6 +72,13 @@ export class BookingsService {
      * lo retira. Se usa FUERA de la transaccion: ver el final de `create`.
      */
     private readonly constancia: ConsentReceiptService,
+    /**
+     * Para avisar de una reserva creada desde el panel. La del sitio publico
+     * NO avisa desde aqui: nace pendiente de pago y quien avisa es el webhook
+     * cuando el deposito queda retenido, que es cuando hay algo que contar.
+     */
+    private readonly notifications: NotificationsService,
+    private readonly bandeja: StaffNotificationsService,
   ) {}
 
   /**
@@ -79,6 +106,8 @@ export class BookingsService {
     request: BookingRequest,
     now: Date = new Date(),
     ip: string | null = null,
+    /** Presente solo cuando la crea el panel. Ver `OpcionesDeAdministracion`. */
+    admin: OpcionesDeAdministracion | null = null,
   ): Promise<BookingResponse> {
     const durationMinutes = this.availability.durationFor(request);
     const startsAt = new Date(request.startsAt);
@@ -92,13 +121,25 @@ export class BookingsService {
     // --- Precio y distancia, siempre en el servidor -------------------------
     const quote = await this.buildQuote(request, now);
 
-    if (quote.totals.totalCents === 0) {
-      // Fuera del area de servicio o pendiente de propuesta manual.
+    /*
+     * TOTAL CERO = fuera del area de servicio o pendiente de propuesta
+     * manual. Para el sitio publico es un muro, y debe serlo.
+     *
+     * Desde el panel NO, siempre que se escriba un precio: hay clientas de
+     * siempre que viven mas lejos de lo que el cotizador atiende solo, y
+     * negarse a agendarlas porque el motor no sabe ponerles precio seria
+     * dejar fuera del sistema justo los trabajos que mas cuesta recordar.
+     */
+    const precioPactado = admin?.overrides.priceOverrideCents ?? null;
+
+    if (quote.totals.totalCents === 0 && precioPactado === null) {
       throw new BadRequestException({
         code: API_ERROR_CODES.OUT_OF_SERVICE_AREA,
         messageKey: quote.manualReview.reasonKeys[0] ?? 'booking.errorNotBookable',
       });
     }
+
+    const quoteFinal = admin ? ajustarParaElPanel(quote, precioPactado) : quote;
 
     const endsAt = new Date(startsAt.getTime() + durationMinutes * 60_000);
     const holdExpiresAt = new Date(now.getTime() + schedulingConfig.paymentHoldMinutes * 60_000);
@@ -107,7 +148,8 @@ export class BookingsService {
     try {
       booking = await this.persist({
         request,
-        quote,
+        quote: quoteFinal,
+        admin,
         startsAt,
         endsAt,
         durationMinutes,
@@ -134,7 +176,54 @@ export class BookingsService {
       throw error;
     }
 
+    if (admin) await this.avisarDeLaReservaManual(booking, admin);
+
     return { ...booking, payment: await this.holdDeposit(booking, request) };
+  }
+
+  /**
+   * AVISA DE UNA RESERVA QUE NACIO YA CONFIRMADA.
+   *
+   * La del sitio publico no pasa por aqui: nace pendiente de pago y quien
+   * avisa es el webhook cuando el deposito queda retenido. Esta no tiene
+   * webhook que la confirme —no hay pago— asi que el aviso sale aqui o no
+   * sale.
+   *
+   * FUERA DE LA TRANSACCION y sin tumbar nada si falla: la cita ya esta
+   * guardada, y perderla porque un servidor de correo no responde seria
+   * exactamente lo que no debe pasar.
+   */
+  private async avisarDeLaReservaManual(
+    booking: Omit<BookingResponse, 'payment'>,
+    admin: OpcionesDeAdministracion,
+  ): Promise<void> {
+    /*
+     * AL CLIENTE, SALVO QUE SE DIGA QUE NO. Una clienta que acaba de colgar
+     * el telefono ya sabe que viene el martes; pero el caso normal es que
+     * tener la cita por escrito evita la mitad de las llamadas despues.
+     */
+    if (admin.overrides.notifyCustomer) {
+      try {
+        await this.notifications.bookingConfirmed(booking.bookingId);
+      } catch (error) {
+        this.logger.error(
+          `No se pudo avisar de la reserva manual ${booking.reference}: ` +
+            (error instanceof Error ? error.message : 'error desconocido'),
+        );
+      }
+    }
+
+    /*
+     * Y A LA BANDEJA DE COORDINACION, siempre: una reserva confirmada sigue
+     * siendo una reserva sin equipo asignado, la haya metido quien la haya
+     * metido. `emitir` se traga sus propios fallos.
+     */
+    await this.bandeja.emitir({
+      kind: 'booking.confirmed',
+      entityType: 'booking',
+      entityId: booking.bookingId,
+      params: { reference: booking.reference },
+    });
   }
 
   /**
@@ -319,6 +408,8 @@ export class BookingsService {
   private async persist(args: {
     request: BookingRequest;
     quote: QuoteResponse;
+    /** Nulo cuando la reserva viene del sitio publico, que es lo normal. */
+    admin: OpcionesDeAdministracion | null;
     startsAt: Date;
     endsAt: Date;
     durationMinutes: number;
@@ -337,7 +428,7 @@ export class BookingsService {
     schedulingConfig: SchedulingConfig;
   }): Promise<Omit<BookingResponse, 'payment'>> {
     const { request, quote, startsAt, endsAt, durationMinutes, now, holdExpiresAt, ip } = args;
-    const { schedulingConfig } = args;
+    const { schedulingConfig, admin } = args;
 
     /*
      * La version de tarifas QUEDA CONGELADA con la reserva: es lo que permite
@@ -352,7 +443,16 @@ export class BookingsService {
      * pedir una tarjeta para retener nada seria un obstaculo sin sentido: la
      * reserva queda confirmada directamente.
      */
-    const requierePago = quote.deposit.amountCents > 0;
+    /*
+     * UNA RESERVA DEL PANEL NO RETIENE NADA, y por eso nace CONFIRMED.
+     *
+     * La retencion existe para que un desconocido no bloquee la agenda y
+     * desaparezca. La clienta que lleva dos anos llamando no es ese riesgo, y
+     * pedirle la tarjeta por telefono para retener 35 dolares que se le van a
+     * descontar igual es poner un obstaculo donde no hay problema. Paga como
+     * siempre el dia del servicio.
+     */
+    const requierePago = admin === null && quote.deposit.amountCents > 0;
 
     const localDate = DateTime.fromJSDate(startsAt)
       .setZone(schedulingConfig.timezone)
@@ -393,12 +493,30 @@ export class BookingsService {
         await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`booking:${localDate}`}))`;
 
         const occupied = await this.availability.findOccupied(localDate, now, tx);
-        const libre = isSlotStillAvailable(startsAt, {
-          durationMinutes,
-          now,
-          occupied,
-          config: schedulingConfig,
-        });
+
+        /*
+         * DOS COMPROBACIONES DISTINTAS, NO UNA CON EXCEPCIONES.
+         *
+         * Para el sitio publico la hora tiene que ser una de las franjas que
+         * se ofrecieron: dentro del horario, con la antelacion minima y en la
+         * rejilla. Es lo unico que impide que alguien mande a mano las tres
+         * de la madrugada.
+         *
+         * Desde el panel lo unico que importa de verdad es si hay equipo
+         * libre, porque el resto son suposiciones sobre un desconocido que no
+         * aplican a quien mira su propia agenda. Y aun eso avisa antes: la
+         * primera peticion falla con el choque y solo la segunda, ya marcada,
+         * lo pasa por alto.
+         */
+        const libre = admin
+          ? admin.overrides.allowOverlap ||
+            equiposOcupadosEn(startsAt, endsAt, occupied) < schedulingConfig.crews
+          : isSlotStillAvailable(startsAt, {
+              durationMinutes,
+              now,
+              occupied,
+              config: schedulingConfig,
+            });
 
         if (!libre) {
           throw new ConflictException({
@@ -463,7 +581,7 @@ export class BookingsService {
         const savedQuote = await tx.quote.create({
           data: {
             customerId: customer.id,
-            source: 'WEB',
+            source: admin ? admin.overrides.source : 'WEB',
             locale: request.contact.locale,
             service: request.service,
             frequency: request.frequency,
@@ -552,22 +670,51 @@ export class BookingsService {
          * lo pida.
          */
         await this.audit.record(
-          {
-            staff: null,
-            actorType: 'CUSTOMER',
-            surface: 'SITE',
-            action: 'booking.created',
-            entityType: 'booking',
-            entityId: booking.id,
-            metadata: {
-              reference: booking.reference,
-              service: request.service,
-              zone: quote.distance.zone,
-              totalCents: quote.totals.totalCents,
-              scheduledStart: startsAt.toISOString(),
-            },
-            ipAddress: ip,
-          },
+          admin
+            ? {
+                /*
+                 * LA DEL PANEL ES OTRA ACCION, no la misma con otro actor.
+                 * Responde a una pregunta distinta —quien metio a mano este
+                 * trabajo y por que se salto lo que se salto— y es la que se
+                 * mira cuando una franja aparece doblada o un precio no
+                 * cuadra con la tarifa.
+                 */
+                staff: admin.staff,
+                surface: 'PANEL',
+                action: 'booking.created_manually',
+                entityType: 'booking',
+                entityId: booking.id,
+                metadata: {
+                  reference: booking.reference,
+                  service: request.service,
+                  zone: quote.distance.zone,
+                  totalCents: quote.totals.totalCents,
+                  scheduledStart: startsAt.toISOString(),
+                  source: admin.overrides.source,
+                  /* Los saltos, uno a uno: es lo que hay que poder auditar. */
+                  outsideHours: admin.overrides.allowOutsideHours,
+                  overlapped: admin.overrides.allowOverlap,
+                  agreedPrice: admin.overrides.priceOverrideCents !== null,
+                  ...(admin.overrides.reason ? { reason: admin.overrides.reason } : {}),
+                },
+                ipAddress: ip,
+              }
+            : {
+                staff: null,
+                actorType: 'CUSTOMER',
+                surface: 'SITE',
+                action: 'booking.created',
+                entityType: 'booking',
+                entityId: booking.id,
+                metadata: {
+                  reference: booking.reference,
+                  service: request.service,
+                  zone: quote.distance.zone,
+                  totalCents: quote.totals.totalCents,
+                  scheduledStart: startsAt.toISOString(),
+                },
+                ipAddress: ip,
+              },
           tx,
         );
 
@@ -684,4 +831,60 @@ export class BookingsService {
  */
 function recortar(texto: string, max: number): string {
   return texto.length <= max ? texto : texto.slice(0, max).trimEnd();
+}
+
+/**
+ * AJUSTA LA COTIZACION A LO QUE ES UNA RESERVA DEL PANEL.
+ *
+ * Dos cosas, y las dos dejan el desglose cuadrando:
+ *
+ * 1. EL DEPOSITO A CERO. No se retiene nada, asi que el dia del servicio
+ *    queda por cobrar el total entero y no el total menos treinta y cinco.
+ *    Si no se pusiera a cero, la factura diria que ya se adelanto un dinero
+ *    que nadie adelanto.
+ *
+ * 2. EL PRECIO PACTADO, COMO UNA LINEA MAS. La diferencia con lo que dice el
+ *    motor entra en el desglose como descuento o como recargo, en vez de
+ *    sobrescribir el total a secas. Asi `lines` sigue sumando `totalCents`
+ *    —que es lo que la factura y el correo dan por hecho— y ademas se ve de
+ *    donde sale la diferencia, que es justo lo que alguien querra entender
+ *    dentro de un ano.
+ */
+function ajustarParaElPanel(quote: QuoteResponse, precioPactado: number | null): QuoteResponse {
+  const sinDeposito: QuoteResponse = {
+    ...quote,
+    deposit: { amountCents: 0, capped: false, appliedToTotal: true },
+    balanceDueAtServiceCents: quote.totals.totalCents,
+  };
+
+  if (precioPactado === null) return sinDeposito;
+
+  const diferencia = precioPactado - quote.totals.totalCents;
+
+  if (diferencia === 0) return sinDeposito;
+
+  const esDescuento = diferencia < 0;
+  const magnitud = Math.abs(diferencia);
+
+  return {
+    ...sinDeposito,
+    lines: [
+      ...quote.lines,
+      {
+        code: AGREED_PRICE_LINE_CODE,
+        kind: esDescuento ? 'DISCOUNT' : 'SURCHARGE',
+        labelKey: 'quote.line.agreedPrice',
+        quantity: 1,
+        unitAmountCents: diferencia,
+        amountCents: diferencia,
+      },
+    ],
+    totals: {
+      ...quote.totals,
+      discountCents: quote.totals.discountCents + (esDescuento ? magnitud : 0),
+      surchargesCents: quote.totals.surchargesCents + (esDescuento ? 0 : magnitud),
+      totalCents: precioPactado,
+    },
+    balanceDueAtServiceCents: precioPactado,
+  };
 }

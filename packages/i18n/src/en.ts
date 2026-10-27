@@ -255,6 +255,66 @@ export const en = {
     retry: 'Try again',
     agenda: 'Agenda',
     toastClose: 'Dismiss',
+
+    /* ---------------------- Meter una reserva a mano ------------------- */
+    /*
+     * Para la clienta de siempre que llama. No es una nota en la agenda: es
+     * una reserva de verdad, y sobre todo OCUPA LA FRANJA, que es lo que
+     * impedia que el cotizador publico volviera a vender ese mismo martes.
+     */
+    newBooking: {
+      open: 'Add a booking',
+      title: 'Add a booking by hand',
+      subtitle:
+        'For the customer who called. It books the slot, so the website can no longer sell it.',
+      close: 'Close',
+      saving: 'Saving…',
+      submit: 'Create the booking',
+
+      jobTitle: 'The job',
+      service: 'Service',
+      frequency: 'How often',
+      frequencyOption: {
+        ONE_TIME: 'One time',
+        WEEKLY: 'Weekly',
+        BIWEEKLY: 'Every two weeks',
+        MONTHLY: 'Monthly',
+      },
+      bedrooms: 'Bedrooms',
+      bathrooms: 'Bathrooms',
+      squareFeet: 'Square feet',
+      addOns: 'Add-ons',
+
+      whenTitle: 'When',
+      date: 'Date',
+      time: 'Start time',
+
+      customerTitle: 'The customer',
+      firstName: 'First name',
+      lastName: 'Last name',
+      email: 'Email',
+      emailHelp:
+        'This is what identifies the customer: if they already exist, we reuse their record instead of creating a second one.',
+      phone: 'Phone',
+
+      addressTitle: 'Where',
+      line1: 'Street address',
+      city: 'City',
+      postalCode: 'ZIP code',
+      accessNotes: 'Access instructions (door code, key, dog)',
+      customerNotes: 'Notes for the team',
+
+      overridesTitle: 'Rules you are skipping',
+      allowOutsideHours:
+        'Book it even if it is outside business hours or inside the 24-hour notice',
+      allowOverlap: 'Book it anyway: I know there is a crew free',
+      notifyCustomer: 'Email the customer their confirmation',
+      agreedPrice: 'Agreed price, in dollars (leave empty for the standard price)',
+      agreedPricePlaceholder: '150',
+      reason: 'Why',
+      reasonMissing: 'Write why before creating it: it goes in the audit log.',
+    },
+
     showPassword: 'Show password',
     hidePassword: 'Hide password',
 
@@ -1213,6 +1273,7 @@ export const en = {
         },
         booking: {
           created: 'Booking placed',
+          created_manually: 'Booking added by hand',
           team_changed: 'Team changed',
           adjustment: {
             proposed: 'Reported the job is not what was booked',
@@ -1570,6 +1631,9 @@ export const en = {
     errorBalanceNotCompleted:
       'The balance is charged once the job is finished. Mark it as completed first.',
     errorBalanceNothingToCharge: 'There is no balance left to charge on this booking.',
+    /* Coordinacion agenda; cambiar lo que se cobra es de administracion. */
+    errorPriceNeedsAdmin:
+      'Only administration can set an agreed price. Book it at the standard price and ask them to adjust it.',
     errorNoCardOnFile:
       'No card was saved for this booking. Charge the customer another way: bookings made before we started saving cards do not have one.',
     errorCardNeedsCustomer:
@@ -1784,6 +1848,12 @@ export const en = {
       minimumAdjustment: 'Service minimum (${{minimum}})',
       zoneSurcharge: 'Travel surcharge · zone {{zone}} ({{miles}} mi)',
 
+      /*
+       * EL PRECIO PACTADO, cuando una reserva del panel no usa el del motor.
+       * Se ensena como una linea mas para que el desglose siga sumando el
+       * total y se vea de donde sale la diferencia.
+       */
+      agreedPrice: 'Agreed price adjustment',
       salesTax: 'Sales tax ({{percent}}%)',
     },
     disclaimer: {
@@ -1909,7 +1979,7 @@ export const en = {
     },
     q2: {
       q: 'What exactly is the travel deposit?',
-      a: 'It is a refundable hold based on how far your home is from our base. It is authorised on your card at booking, credited against your final invoice, and only charged if you cancel once our team is already travelling to you.',
+      a: 'It is a flat $35 hold, not an extra cost: it is authorised on your card when you book and credited in full against your final invoice. Cancel more than 24 hours ahead and we release it. We only charge it if you cancel within 24 hours of the appointment, or once our team is already on the way.',
     },
     q3: {
       q: 'Do I need to be home during the cleaning?',
@@ -1925,7 +1995,7 @@ export const en = {
     },
     q6: {
       q: 'How do I reschedule or cancel?',
-      a: 'Contact us at least 24 hours before your appointment and we will move it at no cost.',
+      a: 'Contact us at least 24 hours before your appointment and we will move it at no cost. Within 24 hours, or once our team is on the way, we charge the $35 deposit and nothing more.',
     },
   },
 

@@ -224,6 +224,60 @@ export const es: TranslationResources = {
     retry: 'Reintentar',
     agenda: 'Agenda',
     toastClose: 'Descartar aviso',
+
+    /* ---------------------- Meter una reserva a mano ------------------- */
+    newBooking: {
+      open: 'Añadir una reserva',
+      title: 'Añadir una reserva a mano',
+      subtitle:
+        'Para la clienta que llamó. Ocupa la franja, así que la web ya no puede volver a venderla.',
+      close: 'Cerrar',
+      saving: 'Guardando…',
+      submit: 'Crear la reserva',
+
+      jobTitle: 'El trabajo',
+      service: 'Servicio',
+      frequency: 'Cada cuánto',
+      frequencyOption: {
+        ONE_TIME: 'Una vez',
+        WEEKLY: 'Semanal',
+        BIWEEKLY: 'Cada dos semanas',
+        MONTHLY: 'Mensual',
+      },
+      bedrooms: 'Habitaciones',
+      bathrooms: 'Baños',
+      squareFeet: 'Pies cuadrados',
+      addOns: 'Extras',
+
+      whenTitle: 'Cuándo',
+      date: 'Fecha',
+      time: 'Hora de inicio',
+
+      customerTitle: 'La clienta',
+      firstName: 'Nombre',
+      lastName: 'Apellido',
+      email: 'Correo',
+      emailHelp:
+        'Es lo que identifica a la clienta: si ya existe, se reutiliza su ficha en vez de crear una segunda.',
+      phone: 'Teléfono',
+
+      addressTitle: 'Dónde',
+      line1: 'Dirección',
+      city: 'Ciudad',
+      postalCode: 'Código postal',
+      accessNotes: 'Instrucciones de acceso (código, llave, perro)',
+      customerNotes: 'Indicaciones para el equipo',
+
+      overridesTitle: 'Normas que te estás saltando',
+      allowOutsideHours: 'Reservar aunque sea fuera de horario o dentro de las 24 horas de aviso',
+      allowOverlap: 'Reservar igualmente: sé que hay un equipo libre',
+      notifyCustomer: 'Mandarle la confirmación por correo',
+      agreedPrice: 'Precio pactado, en dólares (vacío = el precio normal)',
+      agreedPricePlaceholder: '150',
+      reason: 'Por qué',
+      reasonMissing: 'Escribe por qué antes de crearla: queda en la auditoría.',
+    },
+
     showPassword: 'Mostrar la contraseña',
     hidePassword: 'Ocultar la contraseña',
 
@@ -1134,6 +1188,7 @@ export const es: TranslationResources = {
         },
         booking: {
           created: 'Reserva realizada',
+          created_manually: 'Reserva metida a mano',
           team_changed: 'Cambió el equipo',
           adjustment: {
             proposed: 'Avisó de que el trabajo no es el contratado',
@@ -1426,6 +1481,8 @@ export const es: TranslationResources = {
     errorBalanceNotCompleted:
       'El saldo se cobra con el trabajo terminado. Márcalo como completado primero.',
     errorBalanceNothingToCharge: 'En esta reserva no queda saldo por cobrar.',
+    errorPriceNeedsAdmin:
+      'Solo administración puede poner un precio pactado. Agéndala al precio normal y pide que lo ajusten.',
     errorNoCardOnFile:
       'En esta reserva no se guardó ninguna tarjeta. Cóbrale por otra vía: las reservas anteriores a que empezáramos a guardarlas no la tienen.',
     errorCardNeedsCustomer:
@@ -1629,6 +1686,7 @@ export const es: TranslationResources = {
       minimumAdjustment: 'Mínimo del servicio (${{minimum}})',
       zoneSurcharge: 'Recargo por traslado · zona {{zone}} ({{miles}} millas)',
 
+      agreedPrice: 'Ajuste por precio pactado',
       salesTax: 'Impuesto sobre ventas ({{percent}}%)',
     },
     disclaimer: {
@@ -1752,7 +1810,7 @@ export const es: TranslationResources = {
     },
     q2: {
       q: '¿Qué es exactamente el depósito de traslado?',
-      a: 'Es una retención reembolsable calculada según la distancia entre tu casa y nuestra base. Se autoriza en tu tarjeta al reservar, se descuenta de la factura final y solo se cobra si cancelas cuando el equipo ya va en camino.',
+      a: 'Son 35 dólares fijos retenidos, no un cargo extra: se autorizan en tu tarjeta al reservar y se descuentan íntegros de la factura final. Si cancelas con más de 24 horas de antelación, los liberamos. Solo los cobramos si cancelas dentro de las 24 horas previas a la cita, o cuando el equipo ya va en camino.',
     },
     q3: {
       q: '¿Debo estar en casa durante la limpieza?',
@@ -1768,7 +1826,7 @@ export const es: TranslationResources = {
     },
     q6: {
       q: '¿Cómo reprogramo o cancelo?',
-      a: 'Contáctanos al menos 24 horas antes de tu cita y la movemos sin costo.',
+      a: 'Contáctanos al menos 24 horas antes de tu cita y la movemos sin costo. Dentro de las 24 horas, o con el equipo ya en camino, cobramos el depósito de 35 dólares y nada más.',
     },
   },
 

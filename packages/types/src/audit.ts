@@ -85,6 +85,16 @@ const ACCIONES_FIJAS = [
   /* --- Reservas -------------------------------------------------------- */
   /** Un cliente reservo desde el sitio publico. */
   'booking.created',
+  /**
+   * ALGUIEN DEL PANEL METIO UNA RESERVA A MANO: la clienta de siempre que
+   * llama y dice «el martes como siempre».
+   *
+   * Es una accion aparte y no `booking.created` con otra superficie porque
+   * responde a una pregunta distinta —quien la metio y que normas se salto—
+   * y es la que se mira cuando una franja aparece doblada o cuando un precio
+   * no cuadra con la tarifa vigente.
+   */
+  'booking.created_manually',
   'booking.team_changed',
   /**
    * AJUSTES DE CAMPO. Son tres acciones y no una porque responden a

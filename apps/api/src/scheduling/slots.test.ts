@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { generateSlots, isSlotStillAvailable, type OccupiedInterval } from './slots';
+import {
+  equiposOcupadosEn,
+  generateSlots,
+  isSlotStillAvailable,
+  type OccupiedInterval,
+} from './slots';
 import { defaultSchedulingConfig } from './scheduling.config';
 
 const config = defaultSchedulingConfig;
@@ -155,5 +160,55 @@ describe('validacion de una franja concreta al reservar', () => {
   it('rechaza un domingo', () => {
     const domingo = new Date('2026-10-04T13:00:00Z');
     expect(isSlotStillAvailable(domingo, { ...base, occupied: [] })).toBe(false);
+  });
+});
+
+/* ========================================================================== */
+
+/**
+ * LO QUE MIRA LA RESERVA DEL PANEL.
+ *
+ * No puede usar `isSlotStillAvailable` porque aquella exige ademas que la
+ * hora sea una de las franjas ofrecidas, y eso —horario, antelacion, rejilla—
+ * es justo lo que el panel puede saltarse. Lo que no se salta es que no haya
+ * equipo libre.
+ */
+describe('equiposOcupadosEn', () => {
+  const inicio = new Date('2026-10-05T13:00:00Z');
+  const fin = new Date('2026-10-05T15:00:00Z');
+
+  it('sin nada ocupado, cero', () => {
+    expect(equiposOcupadosEn(inicio, fin, [])).toBe(0);
+  });
+
+  it('cuenta los que se solapan aunque sea en parte', () => {
+    const ocupado = [
+      { startsAt: new Date('2026-10-05T14:00:00Z'), endsAt: new Date('2026-10-05T16:00:00Z') },
+      { startsAt: new Date('2026-10-05T12:00:00Z'), endsAt: new Date('2026-10-05T13:30:00Z') },
+    ];
+
+    expect(equiposOcupadosEn(inicio, fin, ocupado)).toBe(2);
+  });
+
+  /*
+   * PEGADO NO ES SOLAPADO. Un trabajo que acaba justo cuando empieza el
+   * siguiente deja el equipo libre; con desigualdades no estrictas, la
+   * agenda perderia un hueco de cada dos.
+   */
+  it('un trabajo que acaba justo al empezar este no cuenta', () => {
+    const pegado = [
+      { startsAt: new Date('2026-10-05T11:00:00Z'), endsAt: new Date('2026-10-05T13:00:00Z') },
+      { startsAt: new Date('2026-10-05T15:00:00Z'), endsAt: new Date('2026-10-05T17:00:00Z') },
+    ];
+
+    expect(equiposOcupadosEn(inicio, fin, pegado)).toBe(0);
+  });
+
+  it('uno que lo envuelve entero si cuenta', () => {
+    const envuelve = [
+      { startsAt: new Date('2026-10-05T10:00:00Z'), endsAt: new Date('2026-10-05T20:00:00Z') },
+    ];
+
+    expect(equiposOcupadosEn(inicio, fin, envuelve)).toBe(1);
   });
 });

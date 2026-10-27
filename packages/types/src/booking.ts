@@ -162,3 +162,116 @@ export const BookingResponseSchema = z.strictObject({
   payment: PaymentIntentSchema.nullable(),
 });
 export type BookingResponse = z.infer<typeof BookingResponseSchema>;
+
+/* ========================================================================== */
+/*  LA RESERVA QUE CREA EL PANEL                                              */
+/* ========================================================================== */
+
+/**
+ * LAS CLIENTAS DE SIEMPRE NO PASAN POR EL FORMULARIO
+ * ==================================================
+ * Llaman, mandan un mensaje, dicen «el martes a las nueve como siempre». Y
+ * hasta ahora el sistema no se enteraba, con una consecuencia que no es
+ * administrativa sino operativa: `findOccupied` solo cuenta reservas de la
+ * base, asi que ese martes a las nueve el cotizador publico lo sigue
+ * ofreciendo. Dos clientas, un equipo, la misma hora.
+ *
+ * Por eso esto no es «apuntar un recordatorio»: es crear una reserva de
+ * verdad, con su precio, su equipo, su lista de tareas y su factura. La
+ * unica diferencia es por donde entro.
+ *
+ * ==========================================================================
+ * LO QUE EL PANEL PUEDE SALTARSE, Y POR QUE EL FORMULARIO NO
+ * ==========================================================================
+ * Las reglas del sitio publico protegen de un desconocido. Quien entra al
+ * panel no es un desconocido: es quien conoce su agenda, sus equipos y a sus
+ * clientas. Cada salto va en su campo, con motivo, y queda en la auditoria.
+ */
+export const ADMIN_BOOKING_SOURCES = ['PHONE', 'ADMIN'] as const;
+export const AdminBookingSourceSchema = z.enum(ADMIN_BOOKING_SOURCES);
+export type AdminBookingSource = z.infer<typeof AdminBookingSourceSchema>;
+
+/** Codigo de la linea que aparece cuando se pacta un precio distinto. */
+export const AGREED_PRICE_LINE_CODE = 'AGREED_PRICE';
+
+export const AdminBookingOverridesSchema = z
+  .strictObject({
+    /** Por donde llego el encargo. Se guarda en la cotizacion de origen. */
+    source: AdminBookingSourceSchema.default('PHONE'),
+
+    /**
+     * Reservar fuera del horario o sin la antelacion minima.
+     *
+     * Las 24 horas de margen existen para que de tiempo a organizar al
+     * equipo, y el horario para no prometer lo que no se puede cumplir. Las
+     * dos son suposiciones razonables sobre un desconocido y ninguna lo es
+     * sobre quien mira su propia agenda: si dice que manana a las nueve se
+     * puede, se puede.
+     */
+    allowOutsideHours: z.boolean().default(false),
+
+    /**
+     * Reservar aunque la franja ya este llena.
+     *
+     * El limite de equipos simultaneos sale de la configuracion, y la
+     * configuracion puede estar desactualizada un martes concreto en que
+     * entra alguien a echar una mano. AVISA PRIMERO: la primera peticion
+     * falla con el choque y solo la segunda, ya con esto marcado, lo pasa
+     * por alto. Nunca se solapa sin que alguien lo haya visto.
+     */
+    allowOverlap: z.boolean().default(false),
+
+    /**
+     * El precio pactado, en centavos, cuando no es el del motor.
+     *
+     * Una clienta de siempre puede tener una tarifa de hace dos anos. Nulo
+     * = manda el motor, que es lo normal y lo que no hay que justificar.
+     */
+    priceOverrideCents: z.int().nonnegative().max(10_000_00).nullable().default(null),
+
+    /**
+     * Si se le manda la confirmacion por correo.
+     *
+     * Encendido por defecto, porque un cliente con una cita y sin nada por
+     * escrito es el problema que estos avisos vinieron a resolver. Pero a
+     * una clienta que acaba de colgar el telefono y no usa el correo,
+     * mandarselo no aporta nada.
+     */
+    notifyCustomer: z.boolean().default(true),
+
+    /**
+     * Por que se hizo asi. Obligatorio EN CUANTO SE SALTA ALGO.
+     *
+     * Es la misma regla que al cancelar: lo que cuesta dinero o rompe una
+     * norma se explica en el momento, no se reconstruye medio ano despues
+     * mirando una fila que solo dice que alguien lo hizo.
+     */
+    reason: z.string().trim().max(300).default(''),
+  })
+  .refine(
+    (valor) =>
+      valor.reason.length >= 3 ||
+      (!valor.allowOutsideHours && !valor.allowOverlap && valor.priceOverrideCents === null),
+    {
+      message: 'Hace falta escribir por que se salta la norma',
+      path: ['reason'],
+    },
+  );
+export type AdminBookingOverrides = z.infer<typeof AdminBookingOverridesSchema>;
+export type AdminBookingOverridesInput = z.input<typeof AdminBookingOverridesSchema>;
+
+/**
+ * La reserva del panel: la misma de siempre, mas lo que se salta.
+ *
+ * ANIDADA Y NO FUNDIDA EN UN SOLO OBJETO a proposito. Asi el contrato
+ * publico —el que valida lo que manda un desconocido— sigue siendo
+ * exactamente el mismo objeto, sin un solo campo mas que alguien pudiera
+ * colar desde fuera. Un `allowOverlap` que viaje en la misma forma que usa
+ * el sitio publico es un campo que algun dia se acepta por descuido.
+ */
+export const AdminBookingRequestSchema = z.strictObject({
+  booking: BookingRequestSchema,
+  overrides: AdminBookingOverridesSchema,
+});
+export type AdminBookingRequest = z.infer<typeof AdminBookingRequestSchema>;
+export type AdminBookingRequestInput = z.input<typeof AdminBookingRequestSchema>;

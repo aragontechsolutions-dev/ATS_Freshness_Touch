@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  ForbiddenException,
   Get,
   HttpCode,
   HttpStatus,
@@ -16,8 +17,10 @@ import {
 } from '@nestjs/common';
 import { SkipThrottle } from '@nestjs/throttler';
 import {
+  API_ERROR_CODES,
   AdminAssignmentsUpdateSchema,
   AdminBookingQuerySchema,
+  AdminBookingRequestSchema,
   AdminCaptureDepositSchema,
   AdminChargeBalanceSchema,
   AdminRefundPaymentSchema,
@@ -28,6 +31,8 @@ import {
   type AdminBookingDetail,
   type AdminBookingList,
   type AdminBookingQuery,
+  type AdminBookingRequest,
+  type BookingResponse,
   type AdminCaptureDeposit,
   type AdminChargeBalance,
   type AdminRefundPayment,
@@ -39,6 +44,7 @@ import {
 } from '@freshness/types';
 import type { Request } from 'express';
 import { ADMIN_ROUTE, CurrentStaff, Roles } from '../auth/auth.decorators';
+import { BookingsService } from '../bookings/bookings.service';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
 import { SKIP_QUOTE_THROTTLER } from '../common/throttling';
 import { AssignmentsService } from './assignments.service';
@@ -55,7 +61,60 @@ import { FieldAdjustmentsService } from './field-adjustments.service';
 @SkipThrottle(SKIP_QUOTE_THROTTLER)
 @Controller(`${ADMIN_ROUTE}/bookings`)
 export class BookingsAdminController {
-  constructor(private readonly bookings: BookingsAdminService) {}
+  constructor(
+    private readonly bookings: BookingsAdminService,
+    /**
+     * EL MISMO SERVICIO QUE EL SITIO PUBLICO, no uno paralelo. Si hubiera
+     * dos, el dia que cambie el calculo del precio o el bloqueo del dia solo
+     * cambiaria uno de los dos.
+     */
+    private readonly creacion: BookingsService,
+  ) {}
+
+  /**
+   * CREA UNA RESERVA A MANO: la clienta de siempre que llama por telefono.
+   *
+   * No es un recordatorio ni una nota: es una reserva igual que las demas,
+   * con su precio, su equipo, su lista de tareas y su factura. Y sobre todo,
+   * OCUPA LA FRANJA — que es lo que hasta ahora no pasaba y hacia que el
+   * cotizador publico vendiera por segunda vez un martes ya comprometido.
+   *
+   * Nace CONFIRMED y sin retencion en tarjeta: ver `OpcionesDeAdministracion`.
+   */
+  @Post()
+  @HttpCode(HttpStatus.CREATED)
+  @Roles('ADMIN', 'DISPATCHER')
+  crear(
+    /*
+     * EL ESQUEMA SE APLICA AL CUERPO, no al metodo entero: con `@UsePipes` a
+     * nivel de metodo, Nest tambien se lo aplica a la sesion y a la IP, y
+     * todo responde 400 sin llegar nunca aqui. Ver el mismo comentario en
+     * `cambiarEstado`.
+     */
+    @Body(new ZodValidationPipe<AdminBookingRequest>(AdminBookingRequestSchema))
+    peticion: AdminBookingRequest,
+    @CurrentStaff() staff: AuthenticatedStaff,
+    @Ip() ip: string,
+  ): Promise<BookingResponse> {
+    /*
+     * EL PRECIO PACTADO ES SOLO DE ADMINISTRACION.
+     *
+     * Coordinacion agenda, y para agendar no hace falta poder cambiar lo que
+     * se cobra. Separarlo aqui es la misma linea que ya separa «mover una
+     * cita» de «mover dinero» en el controlador de abajo.
+     */
+    if (peticion.overrides.priceOverrideCents !== null && staff.role !== 'ADMIN') {
+      throw new ForbiddenException({
+        code: API_ERROR_CODES.FORBIDDEN,
+        messageKey: 'admin.errorPriceNeedsAdmin',
+      });
+    }
+
+    return this.creacion.create(peticion.booking, new Date(), ip, {
+      staff,
+      overrides: peticion.overrides,
+    });
+  }
 
   /**
    * Listado filtrable.
