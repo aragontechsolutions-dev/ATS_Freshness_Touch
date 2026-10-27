@@ -42,9 +42,17 @@ import { equiposOcupadosEn, isSlotStillAvailable } from '../scheduling/slots';
  * auditoria, y el dia que uno de los dos cambie, el otro no.
  */
 export interface OpcionesDeAdministracion {
-  /** Quien la crea. Va a la auditoria; sin esto no hay a quien preguntar. */
-  staff: AuthenticatedStaff;
+  /**
+   * Quien la crea.
+   *
+   * NULO CUANDO LA CREA UNA SERIE: ahi no hay nadie delante, y poner a la
+   * ultima persona que toco la serie diria que lo hizo ella hoy. El rastro
+   * dice SYSTEM, que es la verdad.
+   */
+  staff: AuthenticatedStaff | null;
   overrides: AdminBookingOverrides;
+  /** La serie que la genero, si vino de una. */
+  seriesId?: string;
 }
 
 @Injectable()
@@ -615,6 +623,7 @@ export class BookingsService {
             customerId: customer.id,
             addressId: address.id,
             quoteId: savedQuote.id,
+            ...(admin?.seriesId ? { seriesId: admin.seriesId } : {}),
             status: requierePago ? 'PENDING_PAYMENT' : 'CONFIRMED',
             service: request.service,
             frequency: request.frequency,
@@ -671,34 +680,56 @@ export class BookingsService {
          */
         await this.audit.record(
           admin
-            ? {
-                /*
-                 * LA DEL PANEL ES OTRA ACCION, no la misma con otro actor.
-                 * Responde a una pregunta distinta —quien metio a mano este
-                 * trabajo y por que se salto lo que se salto— y es la que se
-                 * mira cuando una franja aparece doblada o un precio no
-                 * cuadra con la tarifa.
-                 */
-                staff: admin.staff,
-                surface: 'PANEL',
-                action: 'booking.created_manually',
-                entityType: 'booking',
-                entityId: booking.id,
-                metadata: {
-                  reference: booking.reference,
-                  service: request.service,
-                  zone: quote.distance.zone,
-                  totalCents: quote.totals.totalCents,
-                  scheduledStart: startsAt.toISOString(),
-                  source: admin.overrides.source,
-                  /* Los saltos, uno a uno: es lo que hay que poder auditar. */
-                  outsideHours: admin.overrides.allowOutsideHours,
-                  overlapped: admin.overrides.allowOverlap,
-                  agreedPrice: admin.overrides.priceOverrideCents !== null,
-                  ...(admin.overrides.reason ? { reason: admin.overrides.reason } : {}),
-                },
-                ipAddress: ip,
-              }
+            ? admin.staff === null
+              ? {
+                  /*
+                   * LA QUE CREA UNA SERIE NO LA CREA NADIE. Es un barrido, y
+                   * decir que la metio la ultima persona que toco la serie
+                   * seria senalar a alguien que ese dia ni entro al panel.
+                   */
+                  staff: null,
+                  surface: 'SYSTEM',
+                  action: 'booking.created_from_series',
+                  entityType: 'booking',
+                  entityId: booking.id,
+                  metadata: {
+                    reference: booking.reference,
+                    service: request.service,
+                    zone: quote.distance.zone,
+                    totalCents: quote.totals.totalCents,
+                    scheduledStart: startsAt.toISOString(),
+                    ...(admin.seriesId ? { seriesId: admin.seriesId } : {}),
+                  },
+                  ipAddress: null,
+                }
+              : {
+                  /*
+                   * LA DEL PANEL ES OTRA ACCION, no la misma con otro actor.
+                   * Responde a una pregunta distinta —quien metio a mano este
+                   * trabajo y por que se salto lo que se salto— y es la que se
+                   * mira cuando una franja aparece doblada o un precio no
+                   * cuadra con la tarifa.
+                   */
+                  staff: admin.staff,
+                  surface: 'PANEL',
+                  action: 'booking.created_manually',
+                  entityType: 'booking',
+                  entityId: booking.id,
+                  metadata: {
+                    reference: booking.reference,
+                    service: request.service,
+                    zone: quote.distance.zone,
+                    totalCents: quote.totals.totalCents,
+                    scheduledStart: startsAt.toISOString(),
+                    source: admin.overrides.source,
+                    /* Los saltos, uno a uno: es lo que hay que poder auditar. */
+                    outsideHours: admin.overrides.allowOutsideHours,
+                    overlapped: admin.overrides.allowOverlap,
+                    agreedPrice: admin.overrides.priceOverrideCents !== null,
+                    ...(admin.overrides.reason ? { reason: admin.overrides.reason } : {}),
+                  },
+                  ipAddress: ip,
+                }
             : {
                 staff: null,
                 actorType: 'CUSTOMER',

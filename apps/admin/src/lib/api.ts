@@ -18,9 +18,15 @@ import {
   ApiErrorSchema,
   AuthenticatedStaffSchema,
   BookingResponseSchema,
+  SeriesItemSchema,
+  SeriesListSchema,
   StaffNotificationListSchema,
   type AdminBookingRequestInput,
   type BookingResponse,
+  type SeriesFromBookingInput,
+  type SeriesItem,
+  type SeriesList,
+  type SeriesStatus,
   type StaffNotificationList,
   type AdminBookingDetail,
   type AdminBookingList,
@@ -1042,6 +1048,52 @@ export function createAdminBooking(peticion: AdminBookingRequestInput): Promise<
       return parsed.data;
     },
     { method: 'POST', body: peticion },
+  );
+}
+
+/* ------------------------------------------------------------------------ */
+/*  Las clientas de siempre                                                  */
+/* ------------------------------------------------------------------------ */
+
+/**
+ * Convierte una reserva en serie.
+ *
+ * Cuelga de la reserva y no de `/series` porque eso es lo que es: no se crea
+ * una serie de la nada, se dice de una cita concreta que se repite.
+ */
+export function createSeriesFromBooking(
+  bookingId: string,
+  peticion: SeriesFromBookingInput,
+): Promise<SeriesItem> {
+  return request(
+    `/admin/bookings/${bookingId}/series`,
+    (payload) => {
+      const parsed = SeriesItemSchema.safeParse(payload);
+      if (!parsed.success) throw contractError('serie', parsed.error.issues);
+      return parsed.data;
+    },
+    { method: 'POST', body: peticion },
+  );
+}
+
+export function fetchSeries(): Promise<SeriesList> {
+  return request('/admin/series', (payload) => {
+    const parsed = SeriesListSchema.safeParse(payload);
+    if (!parsed.success) throw contractError('lista de series', parsed.error.issues);
+    return parsed.data;
+  });
+}
+
+/** Pausar, reanudar o terminar. No toca las citas que ya estan creadas. */
+export function updateSeries(id: string, status: SeriesStatus): Promise<SeriesItem> {
+  return request(
+    `/admin/series/${id}`,
+    (payload) => {
+      const parsed = SeriesItemSchema.safeParse(payload);
+      if (!parsed.success) throw contractError('serie', parsed.error.issues);
+      return parsed.data;
+    },
+    { method: 'PATCH', body: { status } },
   );
 }
 

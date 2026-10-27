@@ -15,6 +15,7 @@ import {
   CalendarIcon,
   PlusIcon,
   RefreshIcon,
+  RepeatIcon,
   SearchIcon,
   UsersIcon,
 } from '../components/Icons';
@@ -35,6 +36,8 @@ interface AgendaProps {
   /** Para saber si puede pactar precios al meter una reserva a mano. */
   staff: AuthenticatedStaff;
   onOpenBooking: (bookingId: string) => void;
+  /** Para abrir la lista de clientas fijas. */
+  onVerSeries: () => void;
   onSessionLost: (reason?: 'expired' | 'noAccess') => void;
 }
 
@@ -47,7 +50,7 @@ interface AgendaProps {
  * La lista no muestra la calle ni las instrucciones de acceso porque la API no
  * las envía aquí (ver `docs/13-panel-y-permisos.md`). Están en el detalle.
  */
-export function Agenda({ locale, staff, onOpenBooking, onSessionLost }: AgendaProps) {
+export function Agenda({ locale, staff, onOpenBooking, onVerSeries, onSessionLost }: AgendaProps) {
   const { t } = useTranslation();
 
   const [date, setDate] = useState(() => todayInTimezone(TIMEZONE_EMPRESA));
@@ -111,7 +114,11 @@ export function Agenda({ locale, staff, onOpenBooking, onSessionLost }: AgendaPr
           onSessionLost={onSessionLost}
         />
       ) : (
-        <div className="flex justify-end">
+        <div className="flex flex-wrap justify-end gap-2">
+          <button type="button" className="ft-btn-ghost" onClick={onVerSeries}>
+            <RepeatIcon className="h-4 w-4" aria-hidden="true" />
+            {t('admin.series.open')}
+          </button>
           <button
             type="button"
             className="ft-btn-primary"

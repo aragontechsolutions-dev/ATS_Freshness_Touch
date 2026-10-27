@@ -14,6 +14,7 @@ import { DistanceModule } from './distance/distance.module';
 import { HealthModule } from './health/health.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { StaffNotificationsModule } from './staff-notifications/staff-notifications.module';
+import { SeriesModule } from './series/series.module';
 import { PaymentsModule } from './payments/payments.module';
 import { QuotesModule } from './quotes/quotes.module';
 import { SchedulingModule } from './scheduling/scheduling.module';
@@ -63,6 +64,7 @@ import { SettingsModule } from './settings/settings.module';
      * que su proveedor global este registrado cuando lo pidan.
      */
     StaffNotificationsModule,
+    SeriesModule,
     QuotesModule,
     SchedulingModule,
     PaymentsModule,

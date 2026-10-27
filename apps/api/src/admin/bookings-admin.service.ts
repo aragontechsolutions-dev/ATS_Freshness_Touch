@@ -22,6 +22,7 @@ import { JOB_CHECKLIST_CATALOG_TOKEN, montarChecklist } from './job-checklist.he
 const LIST_SELECT = {
   id: true,
   reference: true,
+  seriesId: true,
   status: true,
   scheduledStart: true,
   scheduledEnd: true,
@@ -262,6 +263,7 @@ export class BookingsAdminService {
 
     return {
       ...toListItem(booking),
+      seriesId: booking.seriesId,
       bedrooms: booking.bedrooms,
       bathrooms: booking.bathrooms,
       squareFeet: booking.squareFeet,

@@ -12,6 +12,7 @@ import { MyJobs } from './pages/MyJobs';
 import { SetPassword } from './pages/SetPassword';
 import { SettingsPage } from './pages/Settings';
 import { NotificationsPage } from './pages/Notifications';
+import { SeriesPage } from './pages/Series';
 import { NotificationsBell } from './components/NotificationsBell';
 import {
   AlertIcon,
@@ -30,7 +31,7 @@ import { persistLocale } from './i18n';
 import { readPasswordLink, type PasswordLink } from './lib/password-link';
 
 /** Las tres pantallas del panel. El detalle de una reserva se abre sobre la agenda. */
-type Vista = 'agenda' | 'myJobs' | 'settings' | 'notifications';
+type Vista = 'agenda' | 'myJobs' | 'settings' | 'notifications' | 'series';
 
 /**
  * PANEL DE ADMINISTRACION
@@ -392,6 +393,17 @@ export default function App() {
          * desde una notificacion, y quedarse en la lista despues de pulsar
          * «abrir la reserva» seria no haber abierto nada.
          */
+        actual === 'series' && !openBookingId ? (
+          <SeriesPage
+            locale={locale}
+            onSessionLost={() => {
+              alPerderSesion('expired');
+            }}
+          />
+        ) : /*
+         * LA BANDEJA SE APARTA SI HAY UNA RESERVA ABIERTA, igual que las
+         * series: a las dos se llega para acabar abriendo una reserva.
+         */
         actual === 'notifications' && !openBookingId ? (
           <NotificationsPage
             locale={locale}
@@ -416,6 +428,9 @@ export default function App() {
             locale={locale}
             staff={state.staff}
             onOpenBooking={setOpenBookingId}
+            onVerSeries={() => {
+              irA('series');
+            }}
             onSessionLost={alPerderSesion}
           />
         )}

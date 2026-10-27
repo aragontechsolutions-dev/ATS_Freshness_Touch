@@ -47,6 +47,7 @@ export const BARRIDOS = [
   'auditPurge',
   'removalDeadlines',
   'expiredHolds',
+  'recurringSeries',
 ] as const;
 export type Barrido = (typeof BARRIDOS)[number];
 

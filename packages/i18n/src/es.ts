@@ -225,6 +225,56 @@ export const es: TranslationResources = {
     agenda: 'Agenda',
     toastClose: 'Descartar aviso',
 
+    /* --------------------- Las clientas de siempre --------------------- */
+    repeat: {
+      title: '¿Esto se repite?',
+      subtitle:
+        'Convierte esta reserva en una serie. Mantenemos reservadas las próximas semanas para que la web no pueda vender esas franjas.',
+      frequency: 'Cada cuánto',
+      monthlyNote: 'Mensual son cuatro semanas, así siempre cae en el mismo día de la semana.',
+      endDate: 'Hasta (opcional)',
+      agreedPrice: 'Precio pactado con esta clienta, en dólares (opcional)',
+      agreedPriceHelp:
+        'Se queda en la serie, así que una subida de tarifas no le llega a ella salvo que alguien lo decida.',
+      submit: 'Repetir esta reserva',
+      alreadyInSeries: 'Esta reserva ya forma parte de una serie.',
+    },
+
+    series: {
+      open: 'Clientas fijas',
+      title: 'Clientas fijas',
+      subtitle:
+        'Quién viene cada semana, cada dos o cada mes. Mantenemos reservadas las próximas seis semanas.',
+      empty: 'Todavía no hay ninguna serie. Abre una reserva y usa «¿Esto se repite?».',
+      when: '{{day}} a las {{time}} · {{frequency}}',
+      agreedPrice: 'Precio pactado: {{amount}}',
+      until: 'Hasta el {{date}}',
+      upcoming_one: '1 visita reservada. La siguiente: {{next}}',
+      upcoming_other: '{{count}} visitas reservadas. La siguiente: {{next}}',
+      noUpcoming: 'Todavía no hay ninguna visita reservada.',
+      pause: 'Pausar',
+      resume: 'Reanudar',
+      end: 'Terminarla',
+      pauseWarning_one:
+        'Pausar o terminar deja de crear visitas NUEVAS. La visita que ya está en la agenda se queda: cancélala desde la propia reserva.',
+      pauseWarning_other:
+        'Pausar o terminar deja de crear visitas NUEVAS. Las {{count}} visitas que ya están en la agenda se quedan: cancélalas desde cada reserva.',
+      status: {
+        ACTIVE: 'Activa',
+        PAUSED: 'Pausada',
+        ENDED: 'Terminada',
+      },
+      day: {
+        sunday: 'Los domingos',
+        monday: 'Los lunes',
+        tuesday: 'Los martes',
+        wednesday: 'Los miércoles',
+        thursday: 'Los jueves',
+        friday: 'Los viernes',
+        saturday: 'Los sábados',
+      },
+    },
+
     /* ---------------------- Meter una reserva a mano ------------------- */
     newBooking: {
       open: 'Añadir una reserva',
@@ -373,6 +423,12 @@ export const es: TranslationResources = {
           assigned: {
             title: 'Tienes un trabajo asignado',
             body: 'Reserva {{reference}}, {{when}}.',
+          },
+        },
+        series: {
+          slot_taken: {
+            title: 'Una cita recurrente no se pudo crear',
+            body: 'La franja de las {{time}} del {{when}} ya estaba llena, así que esa visita no se reservó. Abre la agenda y arréglalo.',
           },
         },
       },
@@ -1186,9 +1242,14 @@ export const es: TranslationResources = {
           closed: 'Cerró sesión',
           denied: 'Acceso denegado',
         },
+        series: {
+          created: 'Serie creada',
+          updated: 'Serie modificada',
+        },
         booking: {
           created: 'Reserva realizada',
           created_manually: 'Reserva metida a mano',
+          created_from_series: 'Reserva generada por una serie',
           team_changed: 'Cambió el equipo',
           adjustment: {
             proposed: 'Avisó de que el trabajo no es el contratado',
@@ -1481,6 +1542,10 @@ export const es: TranslationResources = {
     errorBalanceNotCompleted:
       'El saldo se cobra con el trabajo terminado. Márcalo como completado primero.',
     errorBalanceNothingToCharge: 'En esta reserva no queda saldo por cobrar.',
+    errorSeriesNotFound: 'Esa serie ya no existe.',
+    errorAlreadyInSeries: 'Esta reserva ya forma parte de una serie.',
+    errorSeriesEnded:
+      'Esta serie está terminada y no se puede reanudar. Crea una nueva desde una reserva.',
     errorPriceNeedsAdmin:
       'Solo administración puede poner un precio pactado. Agéndala al precio normal y pide que lo ajusten.',
     errorNoCardOnFile:

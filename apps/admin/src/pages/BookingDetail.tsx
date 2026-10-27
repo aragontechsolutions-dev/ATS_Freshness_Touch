@@ -9,6 +9,7 @@ import {
   sessionLostReason,
 } from '../lib/api';
 import { BookingActions } from '../components/BookingActions';
+import { RepetirReserva } from '../components/RepetirReserva';
 import { StatusChip } from '../components/StatusChip';
 import { TeamSection } from '../components/TeamSection';
 import { ClockInsSection } from '../components/ClockInsSection';
@@ -267,6 +268,22 @@ export function BookingDetailPage({
           </div>
         </dl>
       </section>
+
+      {/*
+        «¿ESTO SE REPITE?» VA ANTES DE LAS ACCIONES y despues del equipo: se
+        decide mirando la cita, no mirando el dinero, y lo que viene debajo
+        —cobrar, cancelar— es de otra conversacion.
+      */}
+      <RepetirReserva
+        booking={booking}
+        staff={staff}
+        onCreada={() => {
+          void fetchBookingDetail(bookingId).then(setBooking);
+        }}
+        onSessionLost={() => {
+          onSessionLost('expired');
+        }}
+      />
 
       <BookingActions
         booking={booking}
