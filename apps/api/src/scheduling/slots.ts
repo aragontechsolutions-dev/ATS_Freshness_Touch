@@ -123,3 +123,24 @@ export function isSlotStillAvailable(
 
   return slots.some((slot) => slot.startsAt === target && slot.available);
 }
+
+/**
+ * CUANTOS EQUIPOS ESTAN OCUPADOS EN UN INTERVALO CONCRETO.
+ *
+ * Existe para la reserva que crea el panel, que no puede usar
+ * `isSlotStillAvailable`: aquella exige ademas que la hora sea una de las
+ * franjas ofrecidas —dentro del horario, con la antelacion minima y en la
+ * rejilla—, y esas tres cosas son justo las que el panel puede saltarse.
+ *
+ * Lo que NO se salta es esto: si no hay equipo libre, no hay equipo libre, y
+ * eso no depende de quien lo reserve. Se devuelve el numero y no un booleano
+ * para que quien llama lo compare con los equipos que tenga configurados y
+ * pueda ademas decir cuantos hay.
+ */
+export function equiposOcupadosEn(
+  startsAt: Date,
+  endsAt: Date,
+  occupied: readonly OccupiedInterval[],
+): number {
+  return occupied.filter((busy) => busy.startsAt < endsAt && busy.endsAt > startsAt).length;
+}

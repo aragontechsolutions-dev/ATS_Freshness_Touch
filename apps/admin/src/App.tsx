@@ -412,7 +412,12 @@ export default function App() {
             onSessionLost={alPerderSesion}
           />
         ) : (
-          <Agenda locale={locale} onOpenBooking={setOpenBookingId} onSessionLost={alPerderSesion} />
+          <Agenda
+            locale={locale}
+            staff={state.staff}
+            onOpenBooking={setOpenBookingId}
+            onSessionLost={alPerderSesion}
+          />
         )}
       </main>
     </div>

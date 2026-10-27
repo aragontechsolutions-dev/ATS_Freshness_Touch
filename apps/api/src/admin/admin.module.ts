@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { JOB_CHECKLIST_CATALOG } from '@freshness/types';
 import { ConfigService } from '@nestjs/config';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { BookingsModule } from '../bookings/bookings.module';
 import { PaymentsModule } from '../payments/payments.module';
 import { SettingsModule } from '../settings/settings.module';
 import { AssignmentsService } from './assignments.service';
@@ -37,7 +38,7 @@ import {
 import type { Env } from '../common/config/env';
 
 @Module({
-  imports: [PaymentsModule, SettingsModule, NotificationsModule],
+  imports: [PaymentsModule, SettingsModule, NotificationsModule, BookingsModule],
   controllers: [
     SessionController,
     BookingsAdminController,

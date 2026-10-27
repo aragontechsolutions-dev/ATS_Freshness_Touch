@@ -27,16 +27,15 @@ dice cada documento en su última sección.
 Están escritos entre corchetes y en mayúsculas, así que se encuentran con
 `grep -rn "\[.*\]" docs/legal/`. **Ninguno lo puede inventar el sistema.**
 
-| Hueco                       | Qué es                                                | Dónde se consigue                                         |
-| --------------------------- | ----------------------------------------------------- | --------------------------------------------------------- |
-| `[LEGAL NAME]`              | La razón social exacta, con su sufijo (LLC, Inc.)     | El certificado de constitución de la Secretaría de Estado |
-| `[MAILING ADDRESS]`         | Dirección postal física                               | La de la empresa. **CAN-SPAM la exige en los correos**    |
-| `[PHONE]`                   | Teléfono de contacto                                  | El mismo que el panel publica                             |
-| `[PRIVACY EMAIL]`           | Buzón para peticiones de privacidad                   | Puede ser el general, pero mejor uno dedicado             |
-| `[EMAIL]`                   | Buzón general de contacto, el que ya publica el panel | El mismo que el sitio                                     |
-| `[EFFECTIVE DATE]`          | Fecha de entrada en vigor                             | El día que se publiquen                                   |
-| `[COUNTY]`                  | Condado de Georgia donde está la empresa              | Para la cláusula de jurisdicción                          |
-| `[CANCELLATION WINDOW FEE]` | Qué se cobra si se cancela dentro de las 24 h         | **Lo decide la dueña.** Ver `docs/40` §6                  |
+| Hueco               | Qué es                                                | Dónde se consigue                                         |
+| ------------------- | ----------------------------------------------------- | --------------------------------------------------------- |
+| `[LEGAL NAME]`      | La razón social exacta, con su sufijo (LLC, Inc.)     | El certificado de constitución de la Secretaría de Estado |
+| `[MAILING ADDRESS]` | Dirección postal física                               | La de la empresa. **CAN-SPAM la exige en los correos**    |
+| `[PHONE]`           | Teléfono de contacto                                  | El mismo que el panel publica                             |
+| `[PRIVACY EMAIL]`   | Buzón para peticiones de privacidad                   | Puede ser el general, pero mejor uno dedicado             |
+| `[EMAIL]`           | Buzón general de contacto, el que ya publica el panel | El mismo que el sitio                                     |
+| `[EFFECTIVE DATE]`  | Fecha de entrada en vigor                             | El día que se publiquen                                   |
+| `[COUNTY]`          | Condado de Georgia donde está la empresa              | Para la cláusula de jurisdicción                          |
 
 Además hay **tres cláusulas marcadas y no redactadas** porque son decisiones de
 negocio, no huecos de datos: `[RECURRING RATE RULE]` (Términos §9),

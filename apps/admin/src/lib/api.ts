@@ -17,7 +17,10 @@ import {
   NotificationSettingsSchema,
   ApiErrorSchema,
   AuthenticatedStaffSchema,
+  BookingResponseSchema,
   StaffNotificationListSchema,
+  type AdminBookingRequestInput,
+  type BookingResponse,
   type StaffNotificationList,
   type AdminBookingDetail,
   type AdminBookingList,
@@ -1013,6 +1016,33 @@ export async function requestPasswordRecovery(email: string): Promise<void> {
   } catch {
     // A propósito: ni se relanza ni se registra. Ver el comentario de arriba.
   }
+}
+
+/* ------------------------------------------------------------------------ */
+/*  Crear una reserva a mano                                                 */
+/* ------------------------------------------------------------------------ */
+
+/**
+ * La reserva que se mete desde el panel: la clienta de siempre que llama.
+ *
+ * NO ES UN RECORDATORIO: crea una reserva igual que las del sitio, con su
+ * precio y su equipo, y sobre todo OCUPA LA FRANJA, que es lo que impide que
+ * el cotizador publico vuelva a vender ese mismo martes.
+ *
+ * La respuesta se valida con el MISMO esquema que usa el sitio publico,
+ * porque es la misma respuesta: el servidor crea las dos con el mismo
+ * servicio.
+ */
+export function createAdminBooking(peticion: AdminBookingRequestInput): Promise<BookingResponse> {
+  return request(
+    '/admin/bookings',
+    (payload) => {
+      const parsed = BookingResponseSchema.safeParse(payload);
+      if (!parsed.success) throw contractError('reserva creada', parsed.error.issues);
+      return parsed.data;
+    },
+    { method: 'POST', body: peticion },
+  );
 }
 
 /* ------------------------------------------------------------------------ */

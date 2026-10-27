@@ -73,7 +73,7 @@ Si quiere dejar una, es enteramente su decisión.
 | Cuándo nos lo dice                                     | Qué pasa                                                                                    |
 | ------------------------------------------------------ | ------------------------------------------------------------------------------------------- |
 | **Con más de 24 horas de antelación**                  | La movemos o cancelamos **sin coste**, y la retención se libera                             |
-| **Con menos de 24 horas**                              | [CANCELLATION WINDOW FEE]                                                                   |
+| **Con menos de 24 horas**                              | Cobramos el depósito de 35,00 USD. La cita se cancela y no se debe nada más                 |
 | **Después de que el equipo haya salido** hacia su casa | Cobramos el depósito de 35,00 USD. Nada más                                                 |
 | **No podemos entrar** al llegar y nadie responde       | Se trata como una cancelación con el equipo ya en camino: se cobra el depósito de 35,00 USD |
 

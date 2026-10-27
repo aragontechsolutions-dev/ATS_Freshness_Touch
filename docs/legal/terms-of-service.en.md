@@ -69,12 +69,12 @@ it is entirely up to you.
 
 ## 5. Changing or cancelling an appointment
 
-| When you tell us                                        | What happens                                                                    |
-| ------------------------------------------------------- | ------------------------------------------------------------------------------- |
-| **More than 24 hours before** the appointment           | We move or cancel it **at no cost**, and the deposit hold is released           |
-| **Less than 24 hours before**                           | [CANCELLATION WINDOW FEE]                                                       |
-| **After our team has set out** for your home            | We charge the $35.00 deposit. Nothing more                                      |
-| **We cannot get in** when we arrive, and nobody answers | Treated as a cancellation after the team set out: the $35.00 deposit is charged |
+| When you tell us                                        | What happens                                                                           |
+| ------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| **More than 24 hours before** the appointment           | We move or cancel it **at no cost**, and the deposit hold is released                  |
+| **Less than 24 hours before**                           | We charge the $35.00 deposit. The appointment is cancelled and nothing further is owed |
+| **After our team has set out** for your home            | We charge the $35.00 deposit. Nothing more                                             |
+| **We cannot get in** when we arrive, and nobody answers | Treated as a cancellation after the team set out: the $35.00 deposit is charged        |
 
 To change or cancel, call [PHONE] or write to [EMAIL]. Please do not rely on a
 message sent in the last hour before the appointment; if the team has already

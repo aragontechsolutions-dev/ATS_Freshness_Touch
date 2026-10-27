@@ -3,13 +3,22 @@ import { useTranslation } from 'react-i18next';
 import type {
   AdminBookingListItem,
   AdminBookingQueryInput,
+  AuthenticatedStaff,
   BookingStatus,
   Locale,
 } from '@freshness/types';
 import { ApiClientError, fetchBookings, isSessionError, sessionLostReason } from '../lib/api';
 import { StatusChip } from '../components/StatusChip';
 import { SkeletonListaReservas } from '../components/Skeletons';
-import { AlertIcon, CalendarIcon, RefreshIcon, SearchIcon, UsersIcon } from '../components/Icons';
+import {
+  AlertIcon,
+  CalendarIcon,
+  PlusIcon,
+  RefreshIcon,
+  SearchIcon,
+  UsersIcon,
+} from '../components/Icons';
+import { NuevaReserva } from '../components/NuevaReserva';
 import { TIMEZONE_EMPRESA, formatCents, formatDateTime, todayInTimezone } from '../lib/format';
 
 const ESTADOS: BookingStatus[] = [
@@ -23,6 +32,8 @@ const ESTADOS: BookingStatus[] = [
 
 interface AgendaProps {
   locale: Locale;
+  /** Para saber si puede pactar precios al meter una reserva a mano. */
+  staff: AuthenticatedStaff;
   onOpenBooking: (bookingId: string) => void;
   onSessionLost: (reason?: 'expired' | 'noAccess') => void;
 }
@@ -36,13 +47,14 @@ interface AgendaProps {
  * La lista no muestra la calle ni las instrucciones de acceso porque la API no
  * las envía aquí (ver `docs/13-panel-y-permisos.md`). Están en el detalle.
  */
-export function Agenda({ locale, onOpenBooking, onSessionLost }: AgendaProps) {
+export function Agenda({ locale, staff, onOpenBooking, onSessionLost }: AgendaProps) {
   const { t } = useTranslation();
 
   const [date, setDate] = useState(() => todayInTimezone(TIMEZONE_EMPRESA));
   const [status, setStatus] = useState<BookingStatus | ''>('');
   const [search, setSearch] = useState('');
 
+  const [creando, setCreando] = useState(false);
   const [items, setItems] = useState<AdminBookingListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorKey, setErrorKey] = useState<string | null>(null);
@@ -80,6 +92,39 @@ export function Agenda({ locale, onOpenBooking, onSessionLost }: AgendaProps) {
 
   return (
     <div className="space-y-6">
+      {/*
+        AÑADIR UNA RESERVA VA ARRIBA DEL TODO y no escondido en un menú: es la
+        puerta por la que entran al sistema los trabajos que la dueña agenda
+        por teléfono, que hasta ahora no entraban por ninguna.
+      */}
+      {creando ? (
+        <NuevaReserva
+          staff={staff}
+          onCreada={(bookingId) => {
+            setCreando(false);
+            void cargar();
+            onOpenBooking(bookingId);
+          }}
+          onCerrar={() => {
+            setCreando(false);
+          }}
+          onSessionLost={onSessionLost}
+        />
+      ) : (
+        <div className="flex justify-end">
+          <button
+            type="button"
+            className="ft-btn-primary"
+            onClick={() => {
+              setCreando(true);
+            }}
+          >
+            <PlusIcon className="h-4 w-4" aria-hidden="true" />
+            {t('admin.newBooking.open')}
+          </button>
+        </div>
+      )}
+
       {/* ------------------------------- Filtros ------------------------------- */}
       <div className="ft-card grid gap-4 p-4 sm:grid-cols-3">
         <div>

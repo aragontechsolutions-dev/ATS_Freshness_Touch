@@ -197,11 +197,26 @@ de la distancia»_. Se cambió en su día y **la pregunta frecuente se quedó
 atrás**.
 
 No es grave —35 dólares fijos son menos de lo que un cliente lejano esperaría
-leyendo esa frase— pero es una afirmación falsa sobre un cargo, y en el momento
-en que los Términos digan «35,00 USD» las dos cosas no pueden convivir. Los
-borradores dicen el importe fijo, que es lo que el sistema hace. **Hay que
-corregir `faq.q2.a` en los dos idiomas antes de publicarlos**, y está anotado
-en §6 como decisión 8.
+leyendo esa frase— pero es una afirmación falsa sobre un cargo.
+
+Y al decidirse la política de cancelación apareció una **segunda**
+contradicción en la misma frase, ésta sí importante: decía que el depósito
+_«solo se cobra si cancelas cuando el equipo ya va en camino»_, y la política
+acordada el 27 de octubre de 2026 es que **también se cobra al cancelar dentro
+de las 24 horas previas**. Un cliente que lea la pregunta frecuente y cancele
+nueve horas antes esperando no pagar nada tiene razón: eso es lo que le
+dijimos.
+
+**Las dos quedaron corregidas**, en inglés y en español, y de paso `faq.q6.a`,
+que hablaba de mover la cita con 24 horas «sin costo» y se callaba qué pasa
+dentro de ese margen.
+
+> ⚠️ **OJO CON EL PANEL**, igual que pasó con la fianza. Las claves `faq.*`
+> **son editables** desde _Datos del negocio → Textos del sitio_
+> (`SITE_COPY_KEYS` las incluye), y **lo guardado ahí gana sobre el código**.
+> Corregir estos textos arregla el respaldo; si alguien había guardado su
+> propia versión, el sitio seguirá enseñando la vieja. **Hay que mirarlo en el
+> panel.**
 
 La fianza merece un párrafo propio. El 11 de octubre de 2026 se retiró del
 sitio porque **la empresa no la tiene contratada** (ver
@@ -366,16 +381,16 @@ casilla nazca desmarcada (si alguien la marca por defecto, la prueba falla).
 
 Están marcados entre corchetes en los borradores.
 
-| #   | Decisión                                                                                                 | Por qué no la puede tomar el sistema                                                                                                                                                                              |
-| --- | -------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | **Razón social, dirección postal, teléfono, correo y condado**                                           | Son datos de la empresa. La dirección postal **la exige CAN-SPAM** en el correo comercial                                                                                                                         |
-| 2   | **`[CANCELLATION WINDOW FEE]`: qué se cobra al cancelar con menos de 24 h**                              | Es política comercial. Las opciones razonables: (a) nada, solo se pierde el hueco; (b) el depósito de 35 USD; (c) un porcentaje. **Hoy el sistema no cobra nada** en ese caso, así que (a) es lo que ya es verdad |
-| 3   | **`[RECURRING RATE RULE]`: el descuento por frecuencia sin recurrencia garantizada**                     | El sistema aplica el descuento de «semanal» a una cita única. Hay que decidir si se reajusta el precio cuando alguien deja el plan, o si se acepta como coste de captación                                        |
-| 4   | **`[NON-SOLICITATION]`: contratar a nuestro personal directamente**                                      | Es común en el sector y es de las cláusulas que un tribunal mira con lupa. Decisión de la dueña **con el abogado**                                                                                                |
-| 5   | **`[ARBITRATION]`: arbitraje obligatorio y renuncia a acción colectiva**                                 | Se dejó **fuera** a propósito. Para un negocio local de servicios añade poco y atrae escrutinio; la cláusula de ley y jurisdicción de Georgia ya resuelve el caso normal. Si el abogado la quiere, se añade       |
-| 6   | **Cuántos años se conservan reservas y pagos**                                                           | Lo dice el contador (CPA), no el programador. Hoy la política dice «el tiempo necesario a efectos fiscales, contables, de seguro y legales», que es cierto pero vago                                              |
-| 7   | **Quién atiende las peticiones de privacidad**                                                           | La política promete responder en 30 días. Alguien tiene que leer ese buzón                                                                                                                                        |
-| 8   | **Corregir `faq.q2.a`**: dice que el depósito depende de la distancia y hace tiempo que son 35 USD fijos | Es un texto de código, no una decisión, pero **hay que hacerlo antes de publicar** los Términos, que dicen el importe fijo. Ver §3.3.1                                                                            |
+| #   | Decisión                                                                             | Por qué no la puede tomar el sistema                                                                                                                                                                        |
+| --- | ------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | **Razón social, dirección postal, teléfono, correo y condado**                       | Son datos de la empresa. La dirección postal **la exige CAN-SPAM** en el correo comercial                                                                                                                   |
+| 2   | ~~**Qué se cobra al cancelar con menos de 24 h**~~                                   | **DECIDIDO (27/10/2026): se cobra el depósito de 35 USD.** Ya está escrito en los Términos §5 y el panel ya tiene el botón de capturar la retención. Obligó a corregir dos textos del sitio: ver §3.3.1     |
+| 3   | **`[RECURRING RATE RULE]`: el descuento por frecuencia sin recurrencia garantizada** | El sistema aplica el descuento de «semanal» a una cita única. Hay que decidir si se reajusta el precio cuando alguien deja el plan, o si se acepta como coste de captación                                  |
+| 4   | **`[NON-SOLICITATION]`: contratar a nuestro personal directamente**                  | Es común en el sector y es de las cláusulas que un tribunal mira con lupa. Decisión de la dueña **con el abogado**                                                                                          |
+| 5   | **`[ARBITRATION]`: arbitraje obligatorio y renuncia a acción colectiva**             | Se dejó **fuera** a propósito. Para un negocio local de servicios añade poco y atrae escrutinio; la cláusula de ley y jurisdicción de Georgia ya resuelve el caso normal. Si el abogado la quiere, se añade |
+| 6   | **Cuántos años se conservan reservas y pagos**                                       | Lo dice el contador (CPA), no el programador. Hoy la política dice «el tiempo necesario a efectos fiscales, contables, de seguro y legales», que es cierto pero vago                                        |
+| 7   | **Quién atiende las peticiones de privacidad**                                       | La política promete responder en 30 días. Alguien tiene que leer ese buzón                                                                                                                                  |
+| 8   | ~~**Corregir `faq.q2.a`**~~                                                          | **HECHO (27/10/2026)**, junto con `faq.q6.a`, que tampoco decía qué pasa dentro de las 24 h. Ver §3.3.1                                                                                                     |
 
 Y dos verificaciones previas que ya estaban pendientes en
 `docs/07-cumplimiento-georgia.md` y que estos documentos vuelven a afirmar por

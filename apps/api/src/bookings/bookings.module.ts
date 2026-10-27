@@ -20,5 +20,11 @@ import { DoorPinSweepService } from './door-pin-sweep.service';
   ],
   controllers: [BookingsController],
   providers: [BookingsService, DoorPinSweepService],
+  /*
+   * Se exporta para que el panel pueda crear reservas con EL MISMO servicio
+   * que el sitio publico. Un servicio paralelo para el panel significaria
+   * dos calculos de precio y dos bloqueos de agenda que se separan solos.
+   */
+  exports: [BookingsService],
 })
 export class BookingsModule {}
