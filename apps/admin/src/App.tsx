@@ -11,6 +11,8 @@ import { Login } from './pages/Login';
 import { MyJobs } from './pages/MyJobs';
 import { SetPassword } from './pages/SetPassword';
 import { SettingsPage } from './pages/Settings';
+import { NotificationsPage } from './pages/Notifications';
+import { NotificationsBell } from './components/NotificationsBell';
 import {
   AlertIcon,
   BriefcaseIcon,
@@ -28,7 +30,7 @@ import { persistLocale } from './i18n';
 import { readPasswordLink, type PasswordLink } from './lib/password-link';
 
 /** Las tres pantallas del panel. El detalle de una reserva se abre sobre la agenda. */
-type Vista = 'agenda' | 'myJobs' | 'settings';
+type Vista = 'agenda' | 'myJobs' | 'settings' | 'notifications';
 
 /**
  * PANEL DE ADMINISTRACION
@@ -51,6 +53,12 @@ export default function App() {
   const [vista, setVista] = useState<Vista>('agenda');
   const [openBookingId, setOpenBookingId] = useState<string | null>(null);
   const [pidiendoEnlace, setPidiendoEnlace] = useState(false);
+  /*
+   * Sube cada vez que algo cambia la bandeja. La campana se monta de nuevo y
+   * vuelve a contar: sin esto, marcar todas como leidas dejaria el globo con
+   * el numero viejo hasta recargar la pagina.
+   */
+  const [refrescoDeLaBandeja, setRefrescoDeLaBandeja] = useState(0);
 
   /*
    * El enlace de correo se lee UNA SOLA VEZ, al arrancar, y se guarda.
@@ -274,6 +282,27 @@ export default function App() {
 
             <div className="flex shrink-0 items-center gap-2">
               {/*
+                LA CAMPANA VA LA PRIMERA del grupo, y no al final junto a tema
+                e idioma: esos se tocan una vez y no se vuelven a mirar; esto
+                es lo que se mira al entrar.
+
+                `key` con el contador para que al volver de la lista completa
+                se vuelva a pedir: sin eso, marcar todas como leidas dejaria
+                el globo con el numero viejo hasta recargar la pagina.
+              */}
+              <NotificationsBell
+                key={refrescoDeLaBandeja}
+                locale={locale}
+                onVerTodas={() => {
+                  irA('notifications');
+                }}
+                onAbrirReserva={setOpenBookingId}
+                onSessionLost={() => {
+                  alPerderSesion('expired');
+                }}
+              />
+
+              {/*
                 Tema e idioma son botones de solo icono: se usan una vez y
                 luego no se vuelven a tocar, asi que ocupar ancho con su texto
                 iria en contra de lo que de verdad se pulsa a diario. Llevan
@@ -358,6 +387,22 @@ export default function App() {
           />
         ) : actual === 'settings' && puedeConfigurar ? (
           <SettingsPage staff={state.staff} locale={locale} onSessionLost={alPerderSesion} />
+        ) : /*
+         * LA BANDEJA SE APARTA SI HAY UNA RESERVA ABIERTA. Se llega a ella
+         * desde una notificacion, y quedarse en la lista despues de pulsar
+         * «abrir la reserva» seria no haber abierto nada.
+         */
+        actual === 'notifications' && !openBookingId ? (
+          <NotificationsPage
+            locale={locale}
+            onAbrirReserva={setOpenBookingId}
+            onSessionLost={() => {
+              alPerderSesion('expired');
+            }}
+            onCambio={() => {
+              setRefrescoDeLaBandeja((n) => n + 1);
+            }}
+          />
         ) : openBookingId ? (
           <BookingDetailPage
             bookingId={openBookingId}

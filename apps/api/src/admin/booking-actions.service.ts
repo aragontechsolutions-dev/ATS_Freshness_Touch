@@ -18,6 +18,7 @@ import {
   type BookingStatus,
 } from '@freshness/types';
 import { AuditService } from '../audit/audit.service';
+import { StaffNotificationsService } from '../staff-notifications/staff-notifications.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../database/prisma.service';
 import { PaymentsService } from '../payments/payments.service';
@@ -39,6 +40,7 @@ export class BookingActionsService {
     private readonly payments: PaymentsService,
     private readonly audit: AuditService,
     private readonly notifications: NotificationsService,
+    private readonly bandeja: StaffNotificationsService,
   ) {}
 
   /**
@@ -118,6 +120,35 @@ export class BookingActionsService {
      */
     if (change.status === 'CANCELLED') {
       await this.notifications.bookingCancelled(bookingId);
+
+      /*
+       * SI LA RETENCION SIGUE VIVA, NO SE PUEDE DEJAR AHI SIN DECIRLO.
+       *
+       * Cancelar no toca el dinero, y es deliberado: son dos decisiones.
+       * Pero a partir de aqui nadie va a volver a abrir esa ficha, asi que
+       * una retencion viva detras es dinero bloqueado en la tarjeta de
+       * alguien que nadie va a mirar.
+       *
+       * Caduca sola a los 7 dias y el dinero vuelve al cliente —el olvido
+       * falla a favor de el— pero lo que se pierde es el cobro al que la
+       * empresa tenia derecho.
+       */
+      const retencion = await this.prisma.db.payment.findFirst({
+        where: { bookingId, kind: 'DEPOSIT_HOLD', status: 'REQUIRES_CAPTURE' },
+        select: { amountAuthorizedCents: true, expiresAt: true },
+      });
+
+      if (retencion) {
+        await this.bandeja.emitir({
+          kind: 'booking.hold_open',
+          entityType: 'booking',
+          entityId: bookingId,
+          params: {
+            amountCents: retencion.amountAuthorizedCents,
+            ...(retencion.expiresAt ? { expiresAt: retencion.expiresAt.toISOString() } : {}),
+          },
+        });
+      }
     }
   }
 

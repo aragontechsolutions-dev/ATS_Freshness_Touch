@@ -328,3 +328,18 @@ recordatorio se reintenta en la pasada siguiente.
 
 **Del contrato** (10 nuevas): se rechazan 0, 1, −5 y 96 horas, y las medias
 horas.
+
+---
+
+## 12. Y además, la bandeja del panel
+
+Este módulo **interrumpe**: un grupo de Telegram suena en el bolsillo de
+alguien, y es exactamente lo que se quiere para «ha entrado una reserva».
+
+Lo que no hace es **recordar**. Un mensaje se archiva, se silencia y se pierde,
+y nadie sabe qué quedó sin atender. Para eso está la bandeja del panel
+(`docs/39-la-bandeja-del-equipo.md`): una fila por aviso, dirigida al puesto al
+que le toca, con cuenta de lo no leído por persona.
+
+Son complementarios y **no se sustituyen**: Telegram avisa, la bandeja
+recuerda. Un aviso importante va por los dos sitios.

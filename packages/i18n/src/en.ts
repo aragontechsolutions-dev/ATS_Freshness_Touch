@@ -318,6 +318,85 @@ export const en = {
     reasonPlaceholder: 'Why are you doing this?',
     reasonHelp: 'It is saved with your name in the audit log.',
     reasonRequired: 'Add a reason first.',
+
+    /**
+     * LA BANDEJA DEL EQUIPO.
+     *
+     * El texto NO se guarda en la base: alli van `kind` y `params`, y la
+     * frase se compone aqui, en el idioma de quien mira. Por eso cada clase
+     * tiene su titulo y su cuerpo, y el cuerpo usa los parametros.
+     */
+    inbox: {
+      title: 'Notifications',
+      open: 'Notifications',
+      empty: 'Nothing new.',
+      showAll: 'Show all',
+      markAllRead: 'Mark all as read',
+      unread: 'Unread',
+      openEntity: 'Open the booking',
+      /* Lo que pone el icono para quien usa un lector de pantalla. */
+      badgeLabel_one: '1 unread notification',
+      badgeLabel_other: '{{count}} unread notifications',
+      /*
+       * ANIDADA IGUAL QUE LA CLASE («booking.confirmed»), como las acciones
+       * de auditoria: la clave se construye pegando el `kind` tal cual y no
+       * hay tabla de equivalencias que mantener.
+       *
+       * Y con punto NO FUNCIONARIA: i18next separa por puntos, asi que una
+       * clave literal «booking.confirmed» no se puede alcanzar.
+       */
+      kind: {
+        booking: {
+          confirmed: {
+            title: 'New booking to assign',
+            body: 'Booking {{reference}} is confirmed and has no team yet.',
+          },
+          hold_open: {
+            title: 'Cancelled booking with the deposit still held',
+            body: '{{amount}} is still held on the card. Decide: charge it or release it, or it expires on its own.',
+          },
+        },
+        payment: {
+          refund_failed: {
+            title: 'A refund was rejected',
+            body: 'The {{amount}} refund on {{reference}} failed. The money is still here and the customer is waiting for it.',
+          },
+        },
+        media_consent: {
+          self_revoked: {
+            title: 'A customer took their photos down',
+            body: 'Release {{reference}} was withdrawn from the link in their email. Their photos are off the website.',
+          },
+        },
+        job: {
+          assigned: {
+            title: 'You have a job assigned',
+            body: 'Booking {{reference}}, {{when}}.',
+          },
+        },
+      },
+    },
+    /*
+     * EL MISMO AVISO, PERO A LA VISTA. `reasonRequired` vive en un `title`,
+     * que solo aparece si el raton se queda quieto encima y que en movil NO
+     * APARECE NUNCA. El resultado es un boton gris que no explica nada y una
+     * persona convencida de que el sistema no deja cancelar.
+     */
+    reasonMissing:
+      'Write the reason above to enable “Cancel the booking” and “The customer was not there”.',
+    /*
+     * CANCELAR NO TOCA EL DINERO, a proposito: son dos decisiones. Pero sin
+     * decirlo, una retencion se queda viva detras de una reserva que ya nadie
+     * va a mirar.
+     */
+    holdStillOpen_one:
+      'This booking is cancelled and {{amount}} is still held on the card. Decide: charge it or release it. It expires on its own in 1 day.',
+    holdStillOpen_other:
+      'This booking is cancelled and {{amount}} is still held on the card. Decide: charge it or release it. It expires on its own in {{count}} days.',
+    holdStillOpenToday:
+      'This booking is cancelled and {{amount}} is still held on the card. It expires TODAY: after that it can no longer be charged.',
+    holdStillOpenExpired:
+      'This booking is cancelled and the hold of {{amount}} has expired: it can no longer be charged, and the money goes back to the customer on its own.',
     depositHeld: '{{amount}} is held on the card, not charged.',
     captureDeposit: 'Charge the deposit',
     releaseDeposit: 'Release the hold',

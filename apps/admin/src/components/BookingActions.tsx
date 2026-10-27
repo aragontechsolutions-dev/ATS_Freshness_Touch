@@ -19,6 +19,7 @@ import {
 } from '../lib/api';
 import { useToast } from './ToastProvider';
 import { centavosADevolver } from '../lib/devolucion';
+import { claveDeRetencion, diasDeRetencion } from '../lib/retencion';
 import { SpinnerIcon } from './Icons';
 import { formatCents } from '../lib/format';
 
@@ -149,6 +150,20 @@ export function BookingActions({
     puedeDevolver ||
     puedeDevolverSaldo;
 
+  /** Hay botones que piden motivo y el campo esta vacio. */
+  const faltaMotivo =
+    transiciones.some((estado) => NEEDS_REASON.includes(estado)) && reason.trim().length === 0;
+
+  /*
+   * La reserva ya esta cerrada: nadie va a volver a entrar en ella por su
+   * cuenta, asi que una retencion viva aqui es dinero que se queda olvidado.
+   */
+  const cerrada = booking.status === 'CANCELLED' || booking.status === 'NO_SHOW';
+
+  /* La cuenta y sus dos bordes viven en `lib/retencion.ts`, con sus pruebas. */
+  const diasQueQuedan = diasDeRetencion(booking.payment?.expiresAt ?? null);
+  const textoDeRetencion = claveDeRetencion(diasQueQuedan);
+
   return (
     <section className="ft-card space-y-4 p-5">
       <h2 className="text-sm font-bold text-slate-900 dark:text-white">{t('admin.actions')}</h2>
@@ -167,7 +182,50 @@ export function BookingActions({
             onChange={(event) => setReason(event.target.value)}
           />
           <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{t('admin.reasonHelp')}</p>
+
+          {/*
+           * EL AVISO, A LA VISTA Y NO EN UN `title`.
+           *
+           * El tooltip solo aparece si el raton se queda quieto encima, y en
+           * movil NO APARECE NUNCA. El resultado era un boton gris que no
+           * explicaba nada y una persona convencida de que el sistema no
+           * dejaba cancelar.
+           */}
+          {faltaMotivo && (
+            <p className="mt-2 text-xs font-medium text-amber-800 dark:text-amber-200">
+              {t('admin.reasonMissing')}
+            </p>
+          )}
         </div>
+      )}
+
+      {/*
+       * CANCELAR NO TOCA EL DINERO, y es deliberado: son dos decisiones. Lo
+       * que no puede ser es que nadie lo diga — una retencion viva detras de
+       * una reserva que ya nadie va a mirar es dinero bloqueado en la
+       * tarjeta de alguien.
+       *
+       * Caduca sola a los 7 dias y el dinero vuelve al cliente, asi que el
+       * olvido falla a favor de el. Lo que se pierde es el cobro al que la
+       * empresa tenia derecho, y por eso se avisa con los dias que quedan.
+       */}
+      {retencionViva && cerrada && booking.payment && (
+        <p
+          className={
+            'rounded-md px-3 py-2 text-xs font-medium ' +
+            (diasQueQuedan !== null && diasQueQuedan <= 0
+              ? 'bg-red-100 text-red-900 dark:bg-red-900/40 dark:text-red-100'
+              : 'bg-amber-100 text-amber-900 dark:bg-amber-900/40 dark:text-amber-100')
+          }
+        >
+          {t(textoDeRetencion, {
+            count: Math.max(diasQueQuedan ?? 0, 0),
+            amount: formatCents(
+              booking.payment.amountAuthorizedCents - booking.payment.amountCapturedCents,
+              locale,
+            ),
+          })}
+        </p>
       )}
 
       {transiciones.length > 0 && (

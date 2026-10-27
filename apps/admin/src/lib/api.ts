@@ -17,6 +17,8 @@ import {
   NotificationSettingsSchema,
   ApiErrorSchema,
   AuthenticatedStaffSchema,
+  StaffNotificationListSchema,
+  type StaffNotificationList,
   type AdminBookingDetail,
   type AdminBookingList,
   type AdminAssignment,
@@ -1011,4 +1013,39 @@ export async function requestPasswordRecovery(email: string): Promise<void> {
   } catch {
     // A propósito: ni se relanza ni se registra. Ver el comentario de arriba.
   }
+}
+
+/* ------------------------------------------------------------------------ */
+/*  La bandeja del equipo                                                    */
+/* ------------------------------------------------------------------------ */
+
+const BANDEJA = '/admin/notifications';
+
+/**
+ * Lo que hay en la bandeja de quien pregunta.
+ *
+ * SIN `@Roles` al otro lado: no es de un puesto, es de todos. Lo que cambia
+ * no es el permiso sino el contenido, y eso lo decide el servidor.
+ */
+export function fetchNotifications(limit: number): Promise<StaffNotificationList> {
+  return request(`${BANDEJA}?limit=${String(limit)}`, (payload) => {
+    const parsed = StaffNotificationListSchema.safeParse(payload);
+    if (!parsed.success) throw contractError('bandeja de notificaciones', parsed.error.issues);
+    return parsed.data;
+  });
+}
+
+/**
+ * Marca como leidas. Para quien pregunta, no para su puesto entero: una
+ * notificacion del puesto la ven varias personas y cada una lleva su cuenta.
+ */
+export function markNotificationsRead(ids: readonly string[]): Promise<void> {
+  return request(`${BANDEJA}/read`, () => undefined, {
+    method: 'POST',
+    body: { ids: [...ids] },
+  });
+}
+
+export function markAllNotificationsRead(): Promise<void> {
+  return request(`${BANDEJA}/read-all`, () => undefined, { method: 'POST' });
 }

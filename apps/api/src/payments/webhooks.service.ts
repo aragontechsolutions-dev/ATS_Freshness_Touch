@@ -1,6 +1,7 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { telegramChatForAudience, telegramChatForSystemAlerts } from '@freshness/types';
 import { PrismaService } from '../database/prisma.service';
+import { StaffNotificationsService } from '../staff-notifications/staff-notifications.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { NotificationSettingsService } from '../notifications/notification-settings.service';
 import { TELEGRAM_PROVIDER, type TelegramProvider } from '../notifications/notifications.types';
@@ -18,6 +19,8 @@ export type WebhookOutcome = 'processed' | 'duplicate' | 'ignored';
 interface BookingTransition {
   bookingId: string;
   to: 'CONFIRMED' | 'CANCELLED';
+  /** La referencia legible, para el aviso que se deja en la bandeja. */
+  reference: string;
 }
 
 /** Una devolucion que el proveedor acabo rechazando. Ver `avisarDevolucion`. */
@@ -54,6 +57,8 @@ export class WebhooksService {
     private readonly prisma: PrismaService,
     private readonly notifications: NotificationsService,
     private readonly ajustes: NotificationSettingsService,
+    /** La bandeja del equipo: lo que hay que mirar al entrar al panel. */
+    private readonly bandeja: StaffNotificationsService,
     @Inject(TELEGRAM_PROVIDER) private readonly telegram: TelegramProvider,
   ) {}
 
@@ -132,12 +137,37 @@ export class WebhooksService {
        */
       if (procesado.transicion?.to === 'CONFIRMED') {
         await this.notifications.bookingConfirmed(procesado.transicion.bookingId);
+
+        /*
+         * Y A LA BANDEJA DE COORDINACION: una reserva confirmada es una que
+         * hay que asignar. Va FUERA de la transaccion, con el resto de los
+         * avisos, porque un fallo al dejarla no puede deshacer una reserva
+         * cuyo deposito ya esta retenido en una tarjeta.
+         */
+        await this.bandeja.emitir({
+          kind: 'booking.confirmed',
+          entityType: 'booking',
+          entityId: procesado.transicion.bookingId,
+          params: { reference: procesado.transicion.reference },
+        });
       } else if (procesado.transicion?.to === 'CANCELLED') {
         await this.notifications.bookingCancelled(procesado.transicion.bookingId);
       }
 
       if (procesado.devolucion) {
         await this.avisarDevolucionFallida(procesado.devolucion);
+
+        /*
+         * El dinero sigue en la cuenta de la empresa y el cliente lo espera.
+         * Es de administracion, que es quien puede volver a intentarlo.
+         */
+        await this.bandeja.emitir({
+          kind: 'payment.refund_failed',
+          params: {
+            reference: procesado.devolucion.reference,
+            amountCents: procesado.devolucion.amountCents,
+          },
+        });
       }
 
       return procesado.outcome;
@@ -169,7 +199,7 @@ export class WebhooksService {
       });
       if (count > 0) {
         this.logger.log(`Reserva ${bookingId} confirmada: deposito retenido`);
-        return { bookingId, to: 'CONFIRMED' };
+        return { bookingId, to: 'CONFIRMED', reference: await this.referencia(tx, bookingId) };
       }
       return null;
     }
@@ -187,11 +217,26 @@ export class WebhooksService {
       });
       if (count > 0) {
         this.logger.warn(`Reserva ${bookingId} cancelada: el deposito no se retuvo`);
-        return { bookingId, to: 'CANCELLED' };
+        return { bookingId, to: 'CANCELLED', reference: await this.referencia(tx, bookingId) };
       }
     }
 
     return null;
+  }
+
+  /**
+   * La referencia legible de una reserva.
+   *
+   * SE LEE AQUI Y NO SE ARRASTRA desde arriba porque a este metodo solo le
+   * llega el identificador. Es una consulta por clave primaria dentro de una
+   * transaccion que ya esta abierta: cuesta lo que cuesta no tenerla.
+   */
+  private async referencia(tx: Prisma.TransactionClient, bookingId: string): Promise<string> {
+    const fila = await tx.booking.findUnique({
+      where: { id: bookingId },
+      select: { reference: true },
+    });
+    return fila?.reference ?? '';
   }
 
   /**
