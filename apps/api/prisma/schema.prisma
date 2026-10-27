@@ -489,6 +489,20 @@ model RecurringSeries {
   startDate DateTime  @db.Date
   endDate   DateTime? @db.Date
 
+  /// EL PRECIO PACTADO DE ESTA CLIENTA, en centavos. Nulo = manda el motor.
+  ///
+  /// Vive en la serie y no en cada cita a proposito: si se recalculara en
+  /// cada una, el dia que se suban las tarifas se le subirian tambien a ella
+  /// sin que nadie lo decidiera.
+  priceOverrideCents Int?
+
+  /// De que fecha ya se aviso que la franja estaba llena.
+  ///
+  /// El barrido pasa cada hora; sin esto, una franja ocupada generaria un
+  /// aviso cada hora hasta que alguien la arreglara. Se guarda LA FECHA y no
+  /// un booleano para que un choque distinto mas adelante si avise.
+  conflictNotifiedFor DateTime? @db.Date
+
   bookings  Booking[]
   createdAt DateTime  @default(now()) @db.Timestamptz(3)
   updatedAt DateTime  @updatedAt @db.Timestamptz(3)

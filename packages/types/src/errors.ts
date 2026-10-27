@@ -105,6 +105,13 @@ export const API_ERROR_CODES = {
   BOOKING_NOT_QUOTABLE: 'BOOKING_NOT_QUOTABLE',
   INTERNAL_ERROR: 'INTERNAL_ERROR',
   NOT_FOUND: 'NOT_FOUND',
+  /**
+   * La serie no admite lo que se le pide: la reserva ya pertenece a una, o
+   * se intenta revivir una terminada. Uno solo con dos mensajes y no dos
+   * codigos, porque quien llama hace lo mismo en los dos casos —ensenar el
+   * mensaje— y es la clave de texto la que explica cual es.
+   */
+  SERIES_CONFLICT: 'SERIES_CONFLICT',
 } as const;
 
 export type ApiErrorCode = (typeof API_ERROR_CODES)[keyof typeof API_ERROR_CODES];

@@ -90,6 +90,14 @@ export type AdminBookingList = z.infer<typeof AdminBookingListSchema>;
 
 /** Detalle completo de una reserva. */
 export const AdminBookingDetailSchema = AdminBookingListItemSchema.extend({
+  /**
+   * La serie que la genero o a la que pertenece, si pertenece a alguna.
+   *
+   * El panel lo necesita para no ofrecer «esto se repite» en una cita que ya
+   * se repite: sin esto, el unico aviso llegaria como un error 409 despues
+   * de rellenar el formulario entero.
+   */
+  seriesId: z.uuid().nullable().default(null),
   bedrooms: z.int(),
   bathrooms: z.int(),
   squareFeet: z.int(),

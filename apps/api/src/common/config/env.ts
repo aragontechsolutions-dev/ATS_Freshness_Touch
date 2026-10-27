@@ -307,6 +307,17 @@ export const EnvSchema = z
     HOLD_SWEEP_MINUTES: z.coerce.number().int().min(0).default(15),
 
     /**
+     * Cada cuantos minutos se generan las citas de las clientas de siempre.
+     *
+     * SESENTA, y no quince como los otros. Lo que esto crea son citas de
+     * dentro de semanas: que aparezcan una hora mas tarde no cambia nada
+     * para nadie, y cada pasada recorre todas las series activas.
+     *
+     * Cero lo apaga, que es lo que usan las pruebas para llamarlo a mano.
+     */
+    SERIES_SWEEP_MINUTES: z.coerce.number().int().min(0).default(60),
+
+    /**
      * La direccion del SITIO PUBLICO, para componer el enlace con el que un
      * cliente retira sus fotos.
      *

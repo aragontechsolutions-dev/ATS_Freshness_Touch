@@ -95,6 +95,14 @@ const ACCIONES_FIJAS = [
    * no cuadra con la tarifa vigente.
    */
   'booking.created_manually',
+  /**
+   * UNA CITA QUE GENERO UNA SERIE. No la creo nadie: la creo el barrido de
+   * las clientas de siempre. Por eso es SYSTEM y no lleva persona.
+   */
+  'booking.created_from_series',
+  /** Alguien convirtio una reserva en serie, o la paro. */
+  'series.created',
+  'series.updated',
   'booking.team_changed',
   /**
    * AJUSTES DE CAMPO. Son tres acciones y no una porque responden a

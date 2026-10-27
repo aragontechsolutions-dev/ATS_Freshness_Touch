@@ -198,8 +198,9 @@ desigualdades no estrictas, la agenda perdería un hueco de cada dos.
 
 ## 8. Lo que queda fuera, y por qué
 
-- **Las series recurrentes.** `RecurringSeries` **existe en el esquema y no la
-  usa ningún servicio**. Está diseñada justo para esto —cliente, dirección,
+- ~~**Las series recurrentes.**~~ **HECHO en la etapa 3.27**, ver
+  `docs/42-las-clientas-de-siempre.md`. `RecurringSeries` **existía en el
+  esquema y no la usaba ningún servicio**. Está diseñada justo para esto —cliente, dirección,
   frecuencia, día de la semana, hora y duración— y es lo que convierte «Ana,
   todos los martes a las nueve» en algo que se genera solo. Va en una etapa
   aparte, y en este orden a propósito: una serie **genera reservas**, así que

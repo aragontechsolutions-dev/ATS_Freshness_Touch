@@ -53,6 +53,14 @@ export const STAFF_NOTIFICATION_KINDS = [
   'media_consent.self_revoked',
   /** Un trabajo asignado a quien lo va a hacer. */
   'job.assigned',
+  /**
+   * Una serie no pudo crear su cita porque la franja estaba llena.
+   *
+   * El barrido NO dobla equipos por su cuenta, asi que esa semana la clienta
+   * de siempre se queda sin cita hasta que alguien lo mire. Es de las pocas
+   * cosas que de verdad hay que mirar hoy.
+   */
+  'series.slot_taken',
 ] as const;
 export const StaffNotificationKindSchema = z.enum(STAFF_NOTIFICATION_KINDS);
 export type StaffNotificationKind = z.infer<typeof StaffNotificationKindSchema>;
@@ -129,4 +137,5 @@ export const NOTIFICATION_AUDIENCE: Record<
   'payment.refund_failed': 'ADMIN',
   'media_consent.self_revoked': 'ADMIN',
   'job.assigned': 'CLEANER',
+  'series.slot_taken': 'DISPATCHER',
 };
