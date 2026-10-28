@@ -1,3 +1,4 @@
+import { PRIVACY_VERSION, TERMS_VERSION } from '@freshness/types';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { Controller, Get, Module } from '@nestjs/common';
@@ -376,6 +377,7 @@ describe('listado y detalle de reservas', () => {
           postalCode: '30303',
           accessNotes: 'Codigo del porton 4477',
         },
+        legal: { termsVersion: TERMS_VERSION, privacyVersion: PRIVACY_VERSION },
         contact: {
           firstName: 'Ana',
           lastName: 'Perez',
@@ -568,6 +570,7 @@ describe('acciones sobre la reserva', () => {
         squareFeet: 1100,
         startsAt: franja.startsAt,
         address: { line1: '5 Auburn Ave', city: 'Atlanta', state: 'GA', postalCode: '30303' },
+        legal: { termsVersion: TERMS_VERSION, privacyVersion: PRIVACY_VERSION },
         contact: {
           firstName: 'Luis',
           lastName: 'Ramos',

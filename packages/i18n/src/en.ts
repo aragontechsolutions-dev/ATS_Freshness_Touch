@@ -559,6 +559,14 @@ export const en = {
     accessNotes: 'Access instructions',
     accessNotesWarning:
       'Sensitive: do not read aloud in front of others and close this page when you step away.',
+    legal: {
+      title: 'Terms and privacy',
+      accepted: 'Accepted on {{when}} — Terms v{{terms}}.0, Privacy v{{privacy}}.0',
+      /* «No consta» es un estado legitimo: ver el comentario en la pantalla. */
+      none: 'Not recorded. Booked before this existed, or taken by phone from the panel.',
+      outdated:
+        'This is not the version published today. If there is a dispute, it is about the older text.',
+    },
     customerNotes: 'Customer notes',
     /* ---------------------------- Equipo ---------------------------- */
     team: 'Team',
@@ -616,6 +624,15 @@ export const en = {
       intro:
         'These details appear on the public website. Changes show up there within a few minutes.',
 
+      legal: 'Legal details',
+      legalHelp:
+        'These appear in the Terms and the Privacy Policy on the website. Anything left empty is simply not shown there.',
+      legalName: 'Registered company name',
+      mailingAddress: 'Mailing address',
+      mailingAddressHelp:
+        'A physical address is required by law in any marketing email, so without it we cannot send offers.',
+      county: 'County',
+      countyHelp: 'Used by the Terms for the court that would hear a dispute.',
       contact: 'Contact',
       phone: 'Phone number',
       phoneSaved: 'Will be saved as {{value}}',
@@ -1793,6 +1810,12 @@ export const en = {
       mediaConsentTenant: 'Someone other than me lives in this home.',
       mediaConsentTenantHelp:
         'Then we also need their release before anything is published: the belongings in shot are theirs, and we will be in touch about it.',
+      /*
+       * LA UNICA CASILLA OBLIGATORIA. Los enlaces abren en pestana nueva
+       * para que leer las condiciones no cueste perder la reserva.
+       */
+      legalAccept:
+        'I have read and accept the <terms>Terms of Service</terms> and the <privacy>Privacy Policy</privacy>.',
       priceNotice:
         'Your final price is confirmed with the full address, so it may differ slightly from the estimate.',
     },
@@ -1854,6 +1877,14 @@ export const en = {
     errorDateRequired: 'Pick a date.',
     errorSlotRequired: 'Pick a time.',
     errorSlotTaken: 'That time was just taken. Please pick another slot.',
+    errorLegalRequired: 'You have to accept the Terms and the Privacy Policy to book.',
+    /*
+     * NO ES UN FORMULARIO MAL RELLENADO: es una pestana abierta de antes de
+     * que la casilla existiera. Por eso dice que recargue, y dice tambien
+     * que no se ha cobrado nada, que es lo primero que uno piensa.
+     */
+    errorLegalNotAccepted:
+      'This page is out of date and could not accept your booking. Reload it and try again: nothing was charged.',
     errorAlreadyBooked: 'You already have a booking at that time.',
     errorRequiresWalkthrough:
       'Commercial jobs are scheduled after a free on-site walkthrough. Contact us and we will arrange it.',
@@ -2142,6 +2173,19 @@ export const en = {
     serviceArea: 'Based in {{city}}, {{state}} - Serving Metro Atlanta',
   },
 
+  /* ------------------- Las dos paginas legales ------------------- */
+  legal: {
+    effective: 'In effect since {{date}} · Version {{version}}',
+    /* Lo que se pone cuando un dato de la empresa no esta configurado. */
+    fallbackContact: 'the contact details at the end of this page',
+    fallbackCounty: 'the county where our business is based',
+    contact: {
+      company: 'Company',
+      mail: 'Mail',
+      phone: 'Phone',
+      email: 'Email',
+    },
+  },
   footer: {
     rights: 'All rights reserved.',
     legalNote: 'Prices shown are estimates and are confirmed before any work begins.',

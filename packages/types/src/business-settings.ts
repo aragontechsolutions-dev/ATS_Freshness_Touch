@@ -128,6 +128,33 @@ export const BusinessSettingsSchema = z.strictObject({
    */
   whatsapp: PhoneE164Schema.nullable().default(null),
   email: z.string().trim().toLowerCase().email().max(160).nullable(),
+
+  /*
+   * ====================================================================
+   * LOS DATOS QUE PIDEN LOS DOCUMENTOS LEGALES
+   * ====================================================================
+   * Razon social, direccion postal y condado. No estan en el codigo de las
+   * paginas legales a proposito: si estuvieran, cambiar una direccion seria
+   * tocar codigo y desplegar, y el sitio ya aprendio esa leccion con los
+   * telefonos de relleno.
+   *
+   * LOS TRES CON VALOR POR DEFECTO NULO, y nulo significa «todavia no se ha
+   * configurado». Las paginas legales NO PINTAN lo que falta en vez de
+   * publicar un corchete, y el estado del sistema avisa de que faltan.
+   */
+
+  /** La razon social exacta, con su sufijo: «Freshness Touch LLC». */
+  legalName: z.string().trim().max(160).nullable().default(null),
+  /**
+   * La direccion postal fisica.
+   *
+   * NO ES UN CAPRICHO LEGAL: CAN-SPAM la exige en el correo comercial, asi
+   * que sin ella no se puede mandar una oferta a nadie.
+   */
+  mailingAddress: z.string().trim().max(240).nullable().default(null),
+  /** El condado de Georgia, para la clausula de jurisdiccion. */
+  county: z.string().trim().max(80).nullable().default(null),
+
   hours: WeeklyHoursSchema,
 });
 export type BusinessSettings = z.infer<typeof BusinessSettingsSchema>;
@@ -142,6 +169,9 @@ export const DEFAULT_BUSINESS_SETTINGS: BusinessSettings = {
   phone: null,
   whatsapp: null,
   email: null,
+  legalName: null,
+  mailingAddress: null,
+  county: null,
   hours: {
     1: { open: '08:00', close: '18:00' },
     2: { open: '08:00', close: '18:00' },

@@ -16,6 +16,8 @@ const COMPLETO: BookingDetailsForm = {
   line1: '123 Peachtree St NE',
   city: 'Atlanta',
   postalCode: '30303',
+  /* Sin esto no hay reserva: es la unica casilla obligatoria. */
+  legalAccepted: true,
 };
 
 describe('validacion del formulario de reserva', () => {
@@ -32,10 +34,28 @@ describe('validacion del formulario de reserva', () => {
       'email',
       'firstName',
       'lastName',
+      'legalAccepted',
       'line1',
       'phone',
       'postalCode',
     ]);
+  });
+
+  /*
+   * LA CASILLA DE LAS CONDICIONES ES OBLIGATORIA Y NACE SIN MARCAR.
+   *
+   * Las dos mitades importan. Que sea obligatoria es la regla; que nazca sin
+   * marcar es lo que hace que marcarla sea un acto de alguien, y es el fallo
+   * que mas acuerdos en linea tumba (`docs/40` §5).
+   */
+  it('sin aceptar las condiciones no se puede reservar', () => {
+    expect(validateDetails({ ...COMPLETO, legalAccepted: false }).legalAccepted).toBe(
+      'booking.errorLegalRequired',
+    );
+  });
+
+  it('la casilla de las condiciones nace sin marcar', () => {
+    expect(EMPTY_DETAILS.legalAccepted).toBe(false);
   });
 
   it('no acepta un espacio en blanco como nombre', () => {

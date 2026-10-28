@@ -23,6 +23,9 @@ const LIST_SELECT = {
   id: true,
   reference: true,
   seriesId: true,
+  termsVersion: true,
+  privacyVersion: true,
+  legalAcceptedAt: true,
   status: true,
   scheduledStart: true,
   scheduledEnd: true,
@@ -264,6 +267,21 @@ export class BookingsAdminService {
     return {
       ...toListItem(booking),
       seriesId: booking.seriesId,
+      /*
+       * LAS TRES COLUMNAS O NINGUNA. Se escriben juntas en la misma
+       * transaccion, asi que si falta una el dato esta roto y es mejor
+       * decir «no consta» que ensenar media aceptacion.
+       */
+      legal:
+        booking.termsVersion !== null &&
+        booking.privacyVersion !== null &&
+        booking.legalAcceptedAt !== null
+          ? {
+              termsVersion: booking.termsVersion,
+              privacyVersion: booking.privacyVersion,
+              acceptedAt: booking.legalAcceptedAt.toISOString(),
+            }
+          : null,
       bedrooms: booking.bedrooms,
       bathrooms: booking.bathrooms,
       squareFeet: booking.squareFeet,

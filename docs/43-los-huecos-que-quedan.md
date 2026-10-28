@@ -31,9 +31,12 @@ zonas de precio (`docs/36`).
 Son las primeras porque no son deuda técnica: son cosas que ya se le dicen a
 alguien.
 
-### A1. Los textos legales están escritos y no están publicados
+### A1. ~~Los textos legales están escritos y no están publicados~~ — HECHO (etapa 3.28)
 
-`docs/legal/` tiene las cuatro versiones y `docs/40` §5 tiene el plan de la
+> **Tapado en la etapa 3.28**, ver `docs/44-publicar-los-textos-legales.md`.
+> Lo que sigue describe cómo estaba.
+
+`docs/legal/` tenía las cuatro versiones y `docs/40` §5 el plan de la
 aceptación. Nada de eso está en el sitio: **no hay `/terms`, no hay
 `/privacy`, no hay casilla, y el pie no enlaza nada** —las claves
 `footer.privacy` y `footer.terms` existen en los dos idiomas y `Footer.tsx` no

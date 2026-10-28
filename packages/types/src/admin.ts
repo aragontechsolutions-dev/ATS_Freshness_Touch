@@ -98,6 +98,21 @@ export const AdminBookingDetailSchema = AdminBookingListItemSchema.extend({
    * de rellenar el formulario entero.
    */
   seriesId: z.uuid().nullable().default(null),
+  /**
+   * QUE ACEPTO AL RESERVAR, y cuando.
+   *
+   * NULO SIGNIFICA «NADIE MARCO NADA» y es un estado legitimo: las reservas
+   * anteriores a que esto existiera y las que mete el panel por telefono. El
+   * panel lo dice con esas palabras en vez de dejar un hueco.
+   */
+  legal: z
+    .strictObject({
+      termsVersion: z.int(),
+      privacyVersion: z.int(),
+      acceptedAt: z.iso.datetime(),
+    })
+    .nullable()
+    .default(null),
   bedrooms: z.int(),
   bathrooms: z.int(),
   squareFeet: z.int(),

@@ -294,6 +294,13 @@ function BusinessSettingsForm({ locale, onSessionLost }: SettingsPageProps) {
   const [phone, setPhone] = useState('');
   const [whatsapp, setWhatsapp] = useState('');
   const [email, setEmail] = useState('');
+  /*
+   * LOS DATOS QUE PIDEN LOS DOCUMENTOS LEGALES. Van aqui y no en el codigo
+   * de las paginas: cambiar una direccion no puede exigir un despliegue.
+   */
+  const [legalName, setLegalName] = useState('');
+  const [mailingAddress, setMailingAddress] = useState('');
+  const [county, setCounty] = useState('');
   const [hours, setHours] = useState(DEFAULT_BUSINESS_SETTINGS.hours);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
@@ -308,6 +315,9 @@ function BusinessSettingsForm({ locale, onSessionLost }: SettingsPageProps) {
       setPhone(datos.settings.phone ?? '');
       setWhatsapp(datos.settings.whatsapp ?? '');
       setEmail(datos.settings.email ?? '');
+      setLegalName(datos.settings.legalName ?? '');
+      setMailingAddress(datos.settings.mailingAddress ?? '');
+      setCounty(datos.settings.county ?? '');
       setHours(datos.settings.hours);
       setAutoria({ updatedAt: datos.updatedAt, updatedBy: datos.updatedBy });
     } catch (error) {
@@ -343,6 +353,9 @@ function BusinessSettingsForm({ locale, onSessionLost }: SettingsPageProps) {
       phone: phone.trim() === '' ? null : normalizePhoneInput(phone),
       whatsapp: whatsapp.trim() === '' ? null : normalizePhoneInput(whatsapp),
       email: email.trim() === '' ? null : email.trim(),
+      legalName: legalName.trim() === '' ? null : legalName.trim(),
+      mailingAddress: mailingAddress.trim() === '' ? null : mailingAddress.trim(),
+      county: county.trim() === '' ? null : county.trim(),
       hours,
     };
 
@@ -359,6 +372,9 @@ function BusinessSettingsForm({ locale, onSessionLost }: SettingsPageProps) {
       setPhone(datos.settings.phone ?? '');
       setWhatsapp(datos.settings.whatsapp ?? '');
       setEmail(datos.settings.email ?? '');
+      setLegalName(datos.settings.legalName ?? '');
+      setMailingAddress(datos.settings.mailingAddress ?? '');
+      setCounty(datos.settings.county ?? '');
       setHours(datos.settings.hours);
       setAutoria({ updatedAt: datos.updatedAt, updatedBy: datos.updatedBy });
       toast.success('admin.settings.saved');
@@ -411,6 +427,89 @@ function BusinessSettingsForm({ locale, onSessionLost }: SettingsPageProps) {
           {t('admin.settings.intro')}
         </p>
       </div>
+
+      {/* ----------------------- Datos legales ---------------------------- */}
+      {/*
+        LOS TRES DATOS QUE PIDEN LAS CONDICIONES Y LA PRIVACIDAD.
+        Lo que falte NO SE PINTA en las paginas publicas: antes un hueco que
+        un «[RAZON SOCIAL]» publicado en un contrato.
+      */}
+      <section className="ft-card space-y-4 p-4">
+        <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+          {t('admin.settings.legal')}
+        </h3>
+        <p className="text-xs text-slate-600 dark:text-slate-400">
+          {t('admin.settings.legalHelp')}
+        </p>
+
+        <div>
+          <label className="ft-label" htmlFor="ajuste-razon-social">
+            {t('admin.settings.legalName')}
+          </label>
+          <input
+            id="ajuste-razon-social"
+            className="ft-input"
+            maxLength={160}
+            value={legalName}
+            placeholder="Freshness Touch LLC"
+            onChange={(evento) => {
+              setLegalName(evento.target.value);
+            }}
+          />
+          {fieldErrors.legalName && (
+            <p className="mt-1 text-xs text-red-700">{t(fieldErrors.legalName)}</p>
+          )}
+        </div>
+
+        <div>
+          <label className="ft-label" htmlFor="ajuste-direccion-postal">
+            {t('admin.settings.mailingAddress')}
+          </label>
+          <input
+            id="ajuste-direccion-postal"
+            className="ft-input"
+            maxLength={240}
+            value={mailingAddress}
+            onChange={(evento) => {
+              setMailingAddress(evento.target.value);
+            }}
+            aria-describedby="ajuste-direccion-postal-ayuda"
+          />
+          {/* CAN-SPAM la exige en el correo comercial: no es decorativa. */}
+          <p
+            id="ajuste-direccion-postal-ayuda"
+            className="mt-1 text-xs text-slate-600 dark:text-slate-400"
+          >
+            {t('admin.settings.mailingAddressHelp')}
+          </p>
+          {fieldErrors.mailingAddress && (
+            <p className="mt-1 text-xs text-red-700">{t(fieldErrors.mailingAddress)}</p>
+          )}
+        </div>
+
+        <div>
+          <label className="ft-label" htmlFor="ajuste-condado">
+            {t('admin.settings.county')}
+          </label>
+          <input
+            id="ajuste-condado"
+            className="ft-input"
+            maxLength={80}
+            value={county}
+            placeholder="Cobb County"
+            onChange={(evento) => {
+              setCounty(evento.target.value);
+            }}
+            aria-describedby="ajuste-condado-ayuda"
+          />
+          <p id="ajuste-condado-ayuda" className="mt-1 text-xs text-slate-600 dark:text-slate-400">
+            {t('admin.settings.countyHelp')}
+          </p>
+          {fieldErrors.county && (
+            <p className="mt-1 text-xs text-red-700">{t(fieldErrors.county)}</p>
+          )}
+        </div>
+      </section>
 
       {/* ---------------------------- Contacto ---------------------------- */}
       <section className="ft-card space-y-4 p-4">

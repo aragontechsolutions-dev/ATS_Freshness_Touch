@@ -112,6 +112,14 @@ export const API_ERROR_CODES = {
    * mensaje— y es la clave de texto la que explica cual es.
    */
   SERIES_CONFLICT: 'SERIES_CONFLICT',
+  /**
+   * Se intento reservar sin aceptar las condiciones y la privacidad.
+   *
+   * Tiene codigo propio y no es un VALIDATION_ERROR porque el caso realista
+   * no es un formulario mal rellenado, sino una pestana abierta de antes de
+   * que la casilla existiera. A esa persona hay que decirle que recargue.
+   */
+  LEGAL_NOT_ACCEPTED: 'LEGAL_NOT_ACCEPTED',
 } as const;
 
 export type ApiErrorCode = (typeof API_ERROR_CODES)[keyof typeof API_ERROR_CODES];

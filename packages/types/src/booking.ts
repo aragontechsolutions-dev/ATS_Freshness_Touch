@@ -3,6 +3,7 @@ import { FrequencySchema, LocaleSchema, ServiceTypeSchema } from './enums';
 import { PaymentIntentSchema } from './payment';
 import { DoorPinSchema } from './door-pin';
 import { BOOKING_CONSENT_NONE, BookingMediaConsentSchema } from './media-consent';
+import { LegalAcceptanceSchema } from './legal';
 import { QuoteAddOnInputSchema, QuoteDepositSchema, QuoteTotalsSchema } from './quote';
 
 /**
@@ -113,6 +114,31 @@ export const BookingRequestSchema = z
      * permiso.
      */
     mediaConsent: BookingMediaConsentSchema.default(BOOKING_CONSENT_NONE),
+
+    /**
+     * LO QUE ACEPTO: condiciones y privacidad, con su version.
+     *
+     * ======================================================================
+     * OPCIONAL AQUI Y OBLIGATORIO EN EL SITIO PUBLICO
+     * ======================================================================
+     * Es la unica parte del contrato que depende de QUIEN reserva, y por eso
+     * la regla no vive en el esquema sino en el servicio:
+     *
+     *   - Desde el sitio publico ES OBLIGATORIA. Sin casilla marcada no hay
+     *     reserva, y el servicio responde con su propio error en vez de un
+     *     fallo de validacion generico, para poder decirle a quien tenga una
+     *     pestana vieja abierta que recargue.
+     *
+     *   - Desde el panel NO EXISTE. Una clienta que llama por telefono no
+     *     marca ninguna casilla; inventarle una aceptacion seria escribir
+     *     que hizo algo que no hizo, y eso es peor que no tener el dato.
+     *     Esas reservas se guardan SIN aceptacion, y el panel lo dice.
+     *
+     * Si estuviera obligatoria en el esquema, el panel tendria que fabricar
+     * una. Si tuviera valor por defecto, un fallo del formulario reservaria
+     * sin que nadie aceptara nada y la fila diria que si.
+     */
+    legal: LegalAcceptanceSchema.optional(),
   })
   .refine(
     (value) => new Set(value.addOns.map((addOn) => addOn.code)).size === value.addOns.length,

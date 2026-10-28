@@ -117,6 +117,24 @@ export class BookingsService {
     /** Presente solo cuando la crea el panel. Ver `OpcionesDeAdministracion`. */
     admin: OpcionesDeAdministracion | null = null,
   ): Promise<BookingResponse> {
+    /*
+     * SIN ACEPTAR, NO SE RESERVA — pero solo desde el sitio publico.
+     *
+     * La regla vive aqui y no en el esquema porque depende de QUIEN reserva:
+     * una clienta que llama por telefono no marca ninguna casilla, y el panel
+     * no puede fabricarle una aceptacion que no dio.
+     *
+     * Error propio y no un fallo de validacion generico: el caso realista es
+     * una pestana abierta de antes del despliegue, y a esa persona hay que
+     * decirle que recargue, no «peticion invalida».
+     */
+    if (admin === null && request.legal === undefined) {
+      throw new BadRequestException({
+        code: API_ERROR_CODES.LEGAL_NOT_ACCEPTED,
+        messageKey: 'booking.errorLegalNotAccepted',
+      });
+    }
+
     const durationMinutes = this.availability.durationFor(request);
     const startsAt = new Date(request.startsAt);
     const schedulingConfig = await this.availability.schedulingConfig();
@@ -658,6 +676,15 @@ export class BookingsService {
              */
             doorPinLatitude: request.doorPin?.latitude ?? null,
             doorPinLongitude: request.doorPin?.longitude ?? null,
+            /*
+             * LO QUE ACEPTO, dentro de la misma transaccion que la reserva:
+             * o quedan las dos cosas o no queda ninguna. Una reserva sin
+             * constancia de lo aceptado es exactamente lo que esto viene a
+             * impedir.
+             */
+            termsVersion: request.legal?.termsVersion ?? null,
+            privacyVersion: request.legal?.privacyVersion ?? null,
+            legalAcceptedAt: request.legal === undefined ? null : now,
           },
         });
 

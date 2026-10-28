@@ -406,6 +406,16 @@ model Booking {
   /// Indicaciones que deja el cliente al reservar.
   customerNotes String?
 
+  /// QUE VERSION DE LAS CONDICIONES Y DE LA PRIVACIDAD ACEPTO, y cuando.
+  ///
+  /// NULO SIGNIFICA «NADIE MARCO NADA», no «falta el dato»: pasa en las
+  /// reservas anteriores a que esto existiera y en las que mete el panel por
+  /// telefono, donde no hay formulario. Sin valor por defecto a proposito: un
+  /// defecto convertiria «no consta» en «acepto la version 1».
+  termsVersion    Int?
+  privacyVersion  Int?
+  legalAcceptedAt DateTime? @db.Timestamptz(3)
+
   // --- Cierre ---
   /// EL PIN DE LA PUERTA, si el cliente lo marco al reservar.
   ///
