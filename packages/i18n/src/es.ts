@@ -2024,6 +2024,15 @@ export const es: TranslationResources = {
       email: 'Correo',
     },
   },
+
+  /* ------------------------ La pagina que no existe ------------------------ */
+  notFound: {
+    title: 'No encontramos esa página',
+    body: 'Puede que el enlace sea antiguo o que haya una errata en la dirección. Todo lo demás sigue aquí.',
+    home: 'Volver al inicio',
+    quote: 'Pedir precio gratis',
+    writeUs: 'O escríbenos por',
+  },
   footer: {
     rights: 'Todos los derechos reservados.',
     legalNote:

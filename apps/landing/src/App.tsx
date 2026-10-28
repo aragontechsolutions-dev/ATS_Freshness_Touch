@@ -1,5 +1,6 @@
-import { LEGAL_PATHS, REMOVAL_LINK_PATH } from '@freshness/types';
 import { PaginaLegal } from './components/PaginaLegal';
+import { PaginaNoEncontrada } from './components/PaginaNoEncontrada';
+import { pantallaPara } from './lib/rutas';
 import { RetirarFotos } from './components/RetirarFotos';
 import { Header } from './components/Header';
 import { Footer } from './components/Footer';
@@ -19,47 +20,50 @@ import { SiteCopyProvider } from './hooks/useSiteCopy';
 /**
  * LAS PANTALLAS QUE NO SON EL SITIO.
  *
- * Tres: retirar las fotos, las condiciones y la privacidad. Ninguna es una
- * seccion de la portada. Quien llega a cualquiera de ellas viene a hacer UNA
- * cosa, y pintarle debajo el cotizador y el formulario de reserva seria
- * intentar venderle mientras lee un contrato.
+ * Retirar las fotos, las condiciones, la privacidad y el 404. Ninguna es una
+ * seccion de la portada: quien llega a ellas viene a hacer UNA cosa, y
+ * pintarle debajo el cotizador seria intentar venderle mientras lee un
+ * contrato.
+ *
+ * ========================================================================
+ * QUE DIRECCION ES CADA UNA SE DECIDE EN `lib/rutas.ts`
+ * ========================================================================
+ * Fuera de aqui y como funcion pura, porque esa lista llego a estar mal en
+ * produccion —`/terms` y `/privacy` devolvian el 404 de Vercel— y ahora hay
+ * una prueba que la recorre. Aqui solo queda QUE SE PINTA con cada una.
  *
  * ========================================================================
  * SIGUE SIN HABER LIBRERIA DE RUTAS, Y AHORA HAY QUE EXPLICARLO
  * ========================================================================
  * El comentario que habia aqui decia «el dia que haya tres, se mete». Hay
- * tres. Y sigue sin meterse, porque al llegar el momento la cuenta no salio:
- * un enrutador aporta rutas con parametros, navegacion sin recargar e
- * historial, y estas tres son direcciones fijas a las que se llega desde
- * fuera —un correo, el pie, una pestana nueva— y de las que no se vuelve.
- * Pagar cuarenta kilobytes en el sitio que genera los ingresos por un `switch`
- * de tres casos no es una decision tecnica, es una costumbre.
+ * cuatro. Y sigue sin meterse, porque al llegar el momento la cuenta no
+ * salio: un enrutador aporta rutas con parametros, navegacion sin recargar e
+ * historial, y estas son direcciones fijas a las que se llega desde fuera —un
+ * correo, el pie, una pestana nueva— y de las que no se vuelve. Pagar
+ * cuarenta kilobytes en el sitio que genera los ingresos por un `switch` de
+ * cuatro casos no es una decision tecnica, es una costumbre.
  *
  * LA LINEA QUE SI LO CAMBIA: el dia que una de estas pantallas necesite
  * enlazar a otra sin recargar, o lleve un identificador dentro de la ruta.
  */
-const PANTALLAS: Record<string, () => React.JSX.Element> = {
-  [REMOVAL_LINK_PATH]: () => <RetirarFotos />,
-  [LEGAL_PATHS.terms]: () => <PaginaLegal cual="terms" />,
-  [LEGAL_PATHS.privacy]: () => <PaginaLegal cual="privacy" />,
-};
-
 export default function App() {
-  const ruta = window.location.pathname.replace(/\/$/, '');
-  const pantalla = PANTALLAS[ruta];
+  const pantalla = pantallaPara(window.location.pathname);
 
   /*
-   * LAS LEGALES LLEVAN CABECERA Y PIE, la de retirar fotos no. Quien lee las
-   * condiciones puede querer volver al sitio o llamar; quien retira sus
-   * fotos viene a una sola cosa y no hay que ofrecerle nada mas.
+   * QUIEN RETIRA SUS FOTOS NO VE NADA MAS: ni cabecera, ni pie, ni una
+   * invitacion a pedir precio. Vino a una sola cosa.
    */
-  if (pantalla) {
-    if (ruta === REMOVAL_LINK_PATH) return pantalla();
+  if (pantalla === 'retirarFotos') return <RetirarFotos />;
 
+  /*
+   * LAS DEMAS LLEVAN CABECERA Y PIE. Quien lee las condiciones puede querer
+   * volver al sitio o llamar, y quien ha caido en un enlace roto, mas.
+   */
+  if (pantalla !== 'sitio') {
     return (
       <BusinessSettingsProvider>
         <Header />
-        {pantalla()}
+        {pantalla === 'noEncontrada' ? <PaginaNoEncontrada /> : <PaginaLegal cual={pantalla} />}
         <Footer />
       </BusinessSettingsProvider>
     );

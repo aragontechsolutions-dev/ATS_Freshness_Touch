@@ -2232,6 +2232,15 @@ export const en = {
       email: 'Email',
     },
   },
+
+  /* ------------------------ La pagina que no existe ------------------------ */
+  notFound: {
+    title: 'We could not find that page',
+    body: 'The link may be old, or there may be a typo in the address. Everything else is still here.',
+    home: 'Back to the homepage',
+    quote: 'Get a free quote',
+    writeUs: 'Or write to us on',
+  },
   footer: {
     rights: 'All rights reserved.',
     legalNote: 'Prices shown are estimates and are confirmed before any work begins.',

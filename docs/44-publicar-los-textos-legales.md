@@ -182,7 +182,65 @@ verdad.
    documentos lo dicen.
 3. **Decidir las tres cláusulas abiertas** de `docs/40` §6.
 
-## 10. Al desplegar
+## 10. El fallo que se escapó: las páginas daban 404 en producción
+
+> Añadido el 28 de octubre de 2026, después de desplegar.
+
+`/terms` y `/privacy` existían en el código, pasaban los tipos y las pruebas,
+y **en el sitio real devolvían el 404 de Vercel**.
+
+La causa no estaba en la aplicación: estaba delante de ella.
+`apps/landing/vercel.json` tenía una sola reescritura, la de `/retirar-fotos`,
+y sin una para las rutas nuevas **Vercel busca un archivo llamado `terms`, no
+lo encuentra y contesta su propio 404**. El JavaScript no llega a ejecutarse.
+
+**En local no se ve**, porque el servidor de Vite sirve `index.html` para
+cualquier ruta. Y ninguna prueba de interfaz lo habría pillado, por lo mismo.
+
+### Lo que se hizo
+
+1. **Reescritura general**: `/(.*)` → `/index.html`. Vercel sirve primero los
+   archivos que existen, así que los recursos siguen saliendo de disco. Añadir
+   una regla por ruta era volver a dejar la trampa puesta para la siguiente.
+2. **La decisión de qué pantalla toca sale del componente** y vive en
+   `apps/landing/src/lib/rutas.ts`, como función pura, **con una prueba que
+   recorre la lista**. Es la mitad del fallo que sí depende del código.
+3. Y como ahora el servidor contesta 200 a cualquier dirección, **el 404 es
+   nuestro** (§11).
+
+---
+
+## 11. La página que no existe
+
+Antes, una dirección equivocada devolvía el 404 gris de Vercel: letra negra
+sobre blanco, un código de error y **ni una forma de volver**.
+
+Ahora es una pantalla del sitio, con su cabecera y su pie, y con el siguiente
+paso en vez del diagnóstico: volver a la portada, pedir precio —que es lo que
+la mayoría venía a hacer— y escribir por WhatsApp.
+
+Dos cosas que las pruebas del proyecto corrigieron sobre la marcha:
+
+- **El sitio no pone enlaces `tel:`.** El primer borrador tenía uno. Hay una
+  prueba que lo prohíbe desde `docs/33`: un `tel:` abre Skype en un ordenador,
+  no funciona de noche y, sobre todo, **no deja rastro de que alguien estuvo
+  ahí**. WhatsApp sí deja la conversación abierta.
+- **`ft-btn-ghost` no existe en el sitio público**, es una clase del panel.
+  Otra prueba compara las clases usadas con las declaradas.
+
+### El `noindex` no es decorativo
+
+Con la reescritura general, el servidor contesta **200** a cualquier dirección
+y es la pantalla la que dice que no existe. Para un buscador eso es un _soft
+404_: una página que responde bien y no tiene nada. Sin la etiqueta, Google
+indexaría cada enlace roto que encuentre como una página más del sitio.
+
+Se pone al montar y **se quita al salir**: si se quedara puesta, navegar de
+aquí a la portada dejaría la portada marcada como no indexable.
+
+---
+
+## 12. Al desplegar
 
 Hay migración: `20261028150000_lo_que_el_cliente_acepto`.
 
