@@ -103,6 +103,16 @@ const ACCIONES_FIJAS = [
   /** Alguien convirtio una reserva en serie, o la paro. */
   'series.created',
   'series.updated',
+
+  /* --- Los derechos de privacidad -------------------------------------- */
+  /**
+   * SE AUDITA LA LECTURA, al contrario que casi todo lo demas: descargarse el
+   * expediente completo de una persona no es consultar una pantalla.
+   */
+  'customer.exported',
+  'customer.updated',
+  /** Irreversible. Es de las pocas filas que nadie quiere tener que buscar. */
+  'customer.anonymized',
   'booking.team_changed',
   /**
    * AJUSTES DE CAMPO. Son tres acciones y no una porque responden a
@@ -306,6 +316,14 @@ export type AuditAction = (typeof AUDIT_ACTIONS)[number];
  */
 export const AuditEntityTypeSchema = z.enum([
   'booking',
+  /**
+   * LA FICHA DE UNA PERSONA, como sujeto de sus derechos de privacidad.
+   *
+   * Entidad propia y no `booking`: lo que se exporta o se anonimiza no es una
+   * cita, es todo lo que tenemos de alguien. Y es lo que hay que poder
+   * filtrar el dia que haya que demostrar que una peticion se atendio.
+   */
+  'customer',
   'staff',
   'business_settings',
   /** El propio registro, cuando alguien lo consulta. */

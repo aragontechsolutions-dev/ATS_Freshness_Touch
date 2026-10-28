@@ -13,12 +13,14 @@ import { SetPassword } from './pages/SetPassword';
 import { SettingsPage } from './pages/Settings';
 import { NotificationsPage } from './pages/Notifications';
 import { SeriesPage } from './pages/Series';
+import { Privacidad } from './pages/Privacidad';
 import { NotificationsBell } from './components/NotificationsBell';
 import {
   AlertIcon,
   BriefcaseIcon,
   CalendarIcon,
   GearIcon,
+  ShieldIcon,
   GlobeIcon,
   MoonIcon,
   RefreshIcon,
@@ -31,7 +33,7 @@ import { persistLocale } from './i18n';
 import { readPasswordLink, type PasswordLink } from './lib/password-link';
 
 /** Las tres pantallas del panel. El detalle de una reserva se abre sobre la agenda. */
-type Vista = 'agenda' | 'myJobs' | 'settings' | 'notifications' | 'series';
+type Vista = 'agenda' | 'myJobs' | 'settings' | 'notifications' | 'series' | 'privacy';
 
 /**
  * PANEL DE ADMINISTRACION
@@ -374,6 +376,22 @@ export default function App() {
                   {t('admin.settings.title')}
                 </Pestana>
               )}
+              {/*
+                PRIVACIDAD ES SU PROPIA PESTANA y no una seccion de ajustes:
+                ajustes es lo que se configura una vez, y esto se abre cuando
+                alguien escribe pidiendo sus datos. Solo administracion, igual
+                que la ruta: aqui se descarga el expediente de una persona y
+                se borra.
+              */}
+              {puedeConfigurar && (
+                <Pestana
+                  activa={actual === 'privacy'}
+                  onClick={() => irA('privacy')}
+                  icono={<ShieldIcon className="h-4 w-4" />}
+                >
+                  {t('admin.privacy.open')}
+                </Pestana>
+              )}
             </nav>
           )}
         </div>
@@ -393,7 +411,14 @@ export default function App() {
          * desde una notificacion, y quedarse en la lista despues de pulsar
          * «abrir la reserva» seria no haber abierto nada.
          */
-        actual === 'series' && !openBookingId ? (
+        actual === 'privacy' && puedeConfigurar ? (
+          <Privacidad
+            locale={locale}
+            onSessionLost={() => {
+              alPerderSesion('expired');
+            }}
+          />
+        ) : actual === 'series' && !openBookingId ? (
           <SeriesPage
             locale={locale}
             onSessionLost={() => {

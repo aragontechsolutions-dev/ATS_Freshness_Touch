@@ -225,6 +225,45 @@ export const es: TranslationResources = {
     agenda: 'Agenda',
     toastClose: 'Descartar aviso',
 
+    /* ------------------- Los derechos de privacidad ------------------- */
+    privacy: {
+      open: 'Peticiones de privacidad',
+      title: 'Peticiones de privacidad',
+      subtitle:
+        'Alguien pidió una copia de sus datos, una corrección o que los borremos. Nuestra política promete responder en 30 días.',
+      email: 'Su correo electrónico',
+      emailHelp: 'Tiene que coincidir exacto. En esta pantalla no se busca por nombre.',
+      search: 'Buscarla',
+      searching: 'Buscando…',
+      notFound: 'No hay nadie con ese correo.',
+      since: 'Clienta desde el {{date}} · {{count}} reservas',
+      alreadyErased: 'Esta ficha ya se borró.',
+      download: 'Descargar su copia (JSON)',
+
+      correctTitle: 'Corregir sus datos',
+      marketing: 'Quiere recibir ofertas',
+      reason: 'Por qué (queda en la auditoría)',
+      correct: 'Guardar la corrección',
+      corrected: 'Corregido.',
+
+      eraseTitle: 'Borrar sus datos',
+      eraseWhat:
+        'Quita su nombre, correo, teléfono, calle, instrucciones de acceso, punto del mapa, notas y el nombre de cualquier permiso de imagen — y retira sus fotos.',
+      eraseKept:
+        'Se conserva, porque la ley lo exige: las referencias e importes de las reservas, la ciudad y el código postal, y la marca y los últimos cuatro dígitos de la tarjeta.',
+      confirmEmail: 'Escribe su correo para confirmar',
+      erase: 'Borrar definitivamente',
+      erased: 'Hecho. Sus datos ya no están.',
+      erasedDetail:
+        '{{bookings}} reservas y {{addresses}} direcciones limpiadas, {{consents}} permisos de imagen anonimizados, {{revoked}} de ellos retirados.',
+      erasedKept:
+        'Dile qué se conservó: referencias e importes de las reservas, ciudad y código postal, y marca y últimos cuatro dígitos de la tarjeta — estamos obligados a guardarlos.',
+
+      errorNotFound: 'Esa clienta ya no existe.',
+      errorConfirmMismatch:
+        'El correo que escribiste no coincide con esta clienta. No se ha borrado nada: comprueba que es la persona correcta.',
+    },
+
     /* --------------------- Las clientas de siempre --------------------- */
     repeat: {
       title: '¿Esto se repite?',
@@ -1245,6 +1284,7 @@ export const es: TranslationResources = {
         audit: 'Registro de actividad',
         session: 'Sesión',
         media_consent: 'Permiso de imagen',
+        customer: 'Cliente',
       },
 
       /*
@@ -1261,6 +1301,11 @@ export const es: TranslationResources = {
         series: {
           created: 'Serie creada',
           updated: 'Serie modificada',
+        },
+        customer: {
+          exported: 'Copia de los datos de un cliente',
+          updated: 'Datos de un cliente corregidos',
+          anonymized: 'Datos de un cliente borrados',
         },
         booking: {
           created: 'Reserva realizada',
@@ -1978,6 +2023,15 @@ export const es: TranslationResources = {
       phone: 'Teléfono',
       email: 'Correo',
     },
+  },
+
+  /* ------------------------ La pagina que no existe ------------------------ */
+  notFound: {
+    title: 'No encontramos esa página',
+    body: 'Puede que el enlace sea antiguo o que haya una errata en la dirección. Todo lo demás sigue aquí.',
+    home: 'Volver al inicio',
+    quote: 'Pedir precio gratis',
+    writeUs: 'O escríbenos por',
   },
   footer: {
     rights: 'Todos los derechos reservados.',

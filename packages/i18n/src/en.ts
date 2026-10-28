@@ -256,6 +256,45 @@ export const en = {
     agenda: 'Agenda',
     toastClose: 'Dismiss',
 
+    /* ------------------- Los derechos de privacidad ------------------- */
+    privacy: {
+      open: 'Privacy requests',
+      title: 'Privacy requests',
+      subtitle:
+        'Someone asked for a copy of their data, a correction, or to be erased. Our policy promises an answer within 30 days.',
+      email: 'Their email address',
+      emailHelp: 'It has to match exactly. We do not search by name on this screen.',
+      search: 'Find them',
+      searching: 'Looking…',
+      notFound: 'Nobody with that email address.',
+      since: 'Customer since {{date}} · {{count}} bookings',
+      alreadyErased: 'This record was already erased.',
+      download: 'Download their copy (JSON)',
+
+      correctTitle: 'Correct their details',
+      marketing: 'They want to receive offers',
+      reason: 'Why (goes in the activity log)',
+      correct: 'Save the correction',
+      corrected: 'Corrected.',
+
+      eraseTitle: 'Erase their data',
+      eraseWhat:
+        'Removes their name, email, phone, street address, access instructions, map pin, notes and the name on any photo permission — and takes their photos down.',
+      eraseKept:
+        'Kept, because the law requires it: booking references and amounts, city and ZIP code, and the card brand and last four digits.',
+      confirmEmail: 'Type their email address to confirm',
+      erase: 'Erase for good',
+      erased: 'Done. Their data is gone.',
+      erasedDetail:
+        '{{bookings}} bookings and {{addresses}} addresses cleaned, {{consents}} photo permissions anonymised, {{revoked}} of them withdrawn.',
+      erasedKept:
+        'Tell them what we kept: booking references and amounts, city and ZIP, and the card brand and last four digits — we are required to keep those.',
+
+      errorNotFound: 'That customer no longer exists.',
+      errorConfirmMismatch:
+        'The email you typed does not match this customer. Nothing was erased — check you have the right person.',
+    },
+
     /* --------------------- Las clientas de siempre --------------------- */
     repeat: {
       title: 'Does this repeat?',
@@ -1331,6 +1370,7 @@ export const en = {
         audit: 'Activity log',
         session: 'Session',
         media_consent: 'Image release',
+        customer: 'Customer',
       },
 
       /*
@@ -1348,6 +1388,12 @@ export const en = {
         series: {
           created: 'Repeat schedule created',
           updated: 'Repeat schedule changed',
+        },
+        /* Los derechos de privacidad: copia, correccion y borrado. */
+        customer: {
+          exported: 'Customer file exported',
+          updated: 'Customer details corrected',
+          anonymized: 'Customer data erased',
         },
         booking: {
           created: 'Booking placed',
@@ -2185,6 +2231,15 @@ export const en = {
       phone: 'Phone',
       email: 'Email',
     },
+  },
+
+  /* ------------------------ La pagina que no existe ------------------------ */
+  notFound: {
+    title: 'We could not find that page',
+    body: 'The link may be old, or there may be a typo in the address. Everything else is still here.',
+    home: 'Back to the homepage',
+    quote: 'Get a free quote',
+    writeUs: 'Or write to us on',
   },
   footer: {
     rights: 'All rights reserved.',

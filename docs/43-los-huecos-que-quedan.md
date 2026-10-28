@@ -48,7 +48,10 @@ publicada** que informe del uso de sus API.
 
 Falta rellenar los siete huecos entre corchetes, que son decisión de la dueña.
 
-### A2. Se prometen derechos de privacidad que no se pueden ejercer
+### A2. ~~Se prometen derechos de privacidad que no se pueden ejercer~~ — HECHO (etapa 3.29)
+
+> **Tapado**, ver `docs/45-los-derechos-de-privacidad.md`. Lo que sigue
+> describe cómo estaba.
 
 La política promete acceso, corrección y **borrado** en 30 días. En el sistema:
 
@@ -169,7 +172,7 @@ esté completa.
 
 ## E. Deuda pequeña y papeles desactualizados
 
-### E1. `Customer.internalNotes` no lo usa nadie
+### E1. ~~`Customer.internalNotes` no lo usa nadie~~ — RETIRADA (etapa 3.29)
 
 Cero apariciones en todo el repositorio fuera del esquema y del cliente
 generado. Es el patrón de `RecurringSeries` en pequeño: una columna que

@@ -46,7 +46,7 @@
   ],
   "rewrites": [
     {
-      "source": "/retirar-fotos",
+      "source": "/(.*)",
       "destination": "/index.html"
     }
   ]
