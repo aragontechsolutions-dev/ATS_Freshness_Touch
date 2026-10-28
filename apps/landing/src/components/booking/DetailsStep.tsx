@@ -1,4 +1,5 @@
-import { useTranslation } from 'react-i18next';
+import { Trans, useTranslation } from 'react-i18next';
+import { LEGAL_PATHS } from '@freshness/types';
 import { useCatalog } from '../../hooks/useCatalog';
 import { DoorPinMap } from '../DoorPinMap';
 import {
@@ -304,6 +305,58 @@ export function DetailsStep({ form, errors, onChange }: DetailsStepProps) {
           </div>
         )}
       </fieldset>
+
+      {/*
+        LA ACEPTACION, LA ULTIMA Y SIN MARCAR.
+        - SIN MARCAR y sin forma de nacer marcada: una casilla premarcada no
+          es un acto de nadie, y es el fallo que mas acuerdos en linea tumba.
+        - LOS ENLACES ABREN EN UNA PESTANA NUEVA: quien quiera leer las
+          condiciones no puede perder la reserva a medio rellenar.
+        - EL ERROR VA DEBAJO, no arriba del formulario: tiene que verse donde
+          esta la casilla.
+      */}
+      <div>
+        <label className="flex items-start gap-2 text-sm text-slate-700 dark:text-slate-300">
+          <input
+            type="checkbox"
+            className="mt-0.5 h-4 w-4 rounded border-slate-400 text-brand-700 focus:ring-brand-600
+                       dark:border-night-600"
+            checked={form.legalAccepted}
+            onChange={(event) => set('legalAccepted', event.target.checked)}
+            aria-invalid={errors.legalAccepted !== undefined}
+            aria-describedby={errors.legalAccepted === undefined ? undefined : 'legal-error'}
+          />
+          <span>
+            <Trans
+              i18nKey="booking.details.legalAccept"
+              components={{
+                terms: (
+                  <a
+                    className="underline"
+                    href={LEGAL_PATHS.terms}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  />
+                ),
+                privacy: (
+                  <a
+                    className="underline"
+                    href={LEGAL_PATHS.privacy}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  />
+                ),
+              }}
+            />
+          </span>
+        </label>
+
+        {errors.legalAccepted !== undefined && (
+          <p id="legal-error" className="mt-1 text-xs font-medium text-red-700 dark:text-red-400">
+            {t(errors.legalAccepted)}
+          </p>
+        )}
+      </div>
 
       <p className="text-xs text-slate-500 dark:text-slate-400">
         {t('booking.details.priceNotice')}

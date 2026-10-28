@@ -296,7 +296,12 @@ Dos claves de `localStorage`: idioma (`i18n.ts`) y tema (`useTheme.ts`).
 
 ---
 
-## 5. Cómo se registra la aceptación (plan, etapa siguiente)
+## 5. Cómo se registra la aceptación
+
+> **HECHO en la etapa 3.28.** Lo que sigue era el plan y ahora describe lo
+> construido. Los cambios respecto al plan van marcados.
+
+### El plan, tal y como se ejecutó
 
 Los borradores no sirven de nada si no se puede demostrar que el cliente los
 aceptó. Esto es lo que exige un _clickwrap_ para ser ejecutable y cómo se va a

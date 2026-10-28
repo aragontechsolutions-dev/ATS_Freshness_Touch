@@ -1,3 +1,4 @@
+import { PRIVACY_VERSION, TERMS_VERSION } from '@freshness/types';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { PGlite } from '@electric-sql/pglite';
@@ -99,15 +100,29 @@ async function reservar(permiso?: Record<string, boolean>) {
     .query({ date: proximoDiaLaborable(), ...TRABAJO_SIN_CADENCIA, addOns: [] })
     .expect(200);
 
-  const franja = (disponibilidad.body.slots as { available: boolean; startsAt: string }[]).filter(
+  /*
+   * SIEMPRE LA PRIMERA LIBRE, no la enesima.
+   *
+   * Antes se cogia `[contador - 1]`, una franja distinta por llamada, y eso
+   * ataba la prueba al numero de huecos que tiene el dia. El 28 de octubre de
+   * 2026 lo rompio: `proximoDiaLaborable()` suma tres dias, cayo en sabado
+   * —que abre de 09:00 a 16:00 en vez de 08:00 a 18:00— y a la cuarta reserva
+   * ya no quedaban franjas. El fallo no estaba en el codigo ni en la prueba:
+   * estaba en el calendario, que es la peor clase de fallo intermitente.
+   *
+   * La primera libre siempre existe mientras quede sitio, y cada reserva usa
+   * un correo distinto, asi que el indice unico de (cliente, hora) no estorba.
+   */
+  const franja = (disponibilidad.body.slots as { available: boolean; startsAt: string }[]).find(
     (slot) => slot.available,
-  )[contador - 1]?.startsAt;
+  )?.startsAt;
 
   return request(app.getHttpServer())
     .post('/api/v1/bookings')
     .send({
       ...TRABAJO,
       startsAt: franja,
+      legal: { termsVersion: TERMS_VERSION, privacyVersion: PRIVACY_VERSION },
       contact: { ...CONTACTO, email: `permiso-${String(contador)}@example.com` },
       address: DIRECCION,
       ...(permiso ? { mediaConsent: permiso } : {}),

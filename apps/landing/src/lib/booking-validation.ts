@@ -31,6 +31,15 @@ export interface BookingDetailsForm {
   marketingOptIn: boolean;
 
   /**
+   * HA LEIDO Y ACEPTA las condiciones y la privacidad.
+   *
+   * ES LA UNICA CASILLA OBLIGATORIA DEL FORMULARIO, y la unica que no se
+   * puede premarcar: una casilla ya marcada no es un acto de nadie, y es el
+   * fallo que mas acuerdos en linea tumba. Ver `docs/40` §5.
+   */
+  legalAccepted: boolean;
+
+  /**
    * EL PERMISO DE IMAGEN, en tres casillas y no en una.
    *
    * `mediaConsent` es si se puede publicar la casa; `mediaConsentBefore`, si
@@ -63,6 +72,8 @@ export const EMPTY_DETAILS: BookingDetailsForm = {
   doorPin: null,
   customerNotes: '',
   marketingOptIn: false,
+  // Sin marcar, y no hay forma de que nazca marcada: ver el campo.
+  legalAccepted: false,
   // Las tres en falso: una casilla premarcada no es un permiso.
   mediaConsent: false,
   mediaConsentBefore: false,
@@ -100,6 +111,16 @@ export function validateDetails(form: BookingDetailsForm): DetailsErrors {
   if (form.city.trim().length < 2) errors.city = 'booking.errorRequired';
   if (!/^\d{5}$/.test(form.postalCode.trim())) errors.postalCode = 'booking.errorPostalCode';
   if (!/^[A-Za-z]{2}$/.test(form.state.trim())) errors.state = 'booking.errorRequired';
+
+  /*
+   * SIN ACEPTAR, NO SE RESERVA. Va al final a proposito: es lo ultimo que se
+   * marca y lo ultimo que se comprueba, y asi el error aparece donde esta la
+   * casilla y no arriba del todo.
+   *
+   * El servidor lo vuelve a comprobar. Esto es para no dejar enviar algo que
+   * se va a rechazar; lo que hace que la regla sea una regla esta en la API.
+   */
+  if (!form.legalAccepted) errors.legalAccepted = 'booking.errorLegalRequired';
 
   return errors;
 }

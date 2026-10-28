@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next';
+import { LEGAL_PATHS } from '@freshness/types';
 import { company } from '../config/company';
 import { Logo } from './Logo';
 
@@ -21,6 +22,28 @@ export function Footer() {
           </p>
         </div>
         <p className="max-w-3xl text-xs leading-relaxed">{t('footer.legalNote')}</p>
+
+        {/*
+          LOS DOS DOCUMENTOS, EN EL PIE Y EN TODAS LAS PAGINAS.
+          Las claves llevaban meses escritas en los dos idiomas sin que nadie
+          las usara. Van aqui y no escondidas porque un enlace que no se ve no
+          cuenta como aviso: lo dijo el Noveno Circuito en Nguyen contra
+          Barnes & Noble y lo recoge `docs/40` §5.
+        */}
+        <nav className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
+          <a
+            className="underline hover:text-brand-700 dark:hover:text-brand-300"
+            href={LEGAL_PATHS.terms}
+          >
+            {t('footer.terms')}
+          </a>
+          <a
+            className="underline hover:text-brand-700 dark:hover:text-brand-300"
+            href={LEGAL_PATHS.privacy}
+          >
+            {t('footer.privacy')}
+          </a>
+        </nav>
       </div>
     </footer>
   );

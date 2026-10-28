@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { currentAcceptance } from '@freshness/types';
 import type {
   BookingRequestInput,
   BookingResponse,
@@ -197,6 +198,17 @@ export function BookingDialog({ open, job, quote, locale, onClose }: BookingDial
             allowsBefore: details.mediaConsent && details.mediaConsentBefore,
             occupiedByOthers: details.mediaConsent && details.mediaConsentTenant,
           },
+
+          /*
+           * LO QUE ACEPTO, con la version publicada en el momento de
+           * marcarlo.
+           *
+           * Se manda siempre que se llegue aqui, porque llegar aqui exige
+           * pasar la validacion y la validacion exige la casilla. Si algun
+           * dia se pudiera llegar sin marcarla, la API responde con su
+           * propio error en vez de guardar una reserva sin constancia.
+           */
+          legal: currentAcceptance(),
         },
         controller.signal,
       );

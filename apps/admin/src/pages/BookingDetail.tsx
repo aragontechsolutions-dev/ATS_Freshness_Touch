@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { acceptanceIsCurrent } from '@freshness/types';
 import type { AdminBookingDetail, AuthenticatedStaff, Locale } from '@freshness/types';
 import {
   ApiClientError,
@@ -176,6 +177,38 @@ export function BookingDetailPage({
             <p className="text-sm text-slate-700 dark:text-slate-300">{booking.customerNotes}</p>
           </div>
         )}
+
+        {/*
+          QUE ACEPTO Y CUANDO.
+          Es lo primero que se mira ante una reclamacion, y lo segundo es si
+          lo que acepto sigue siendo lo que hay publicado: si no lo es, la
+          conversacion va sobre el texto viejo. Por eso se avisa.
+
+          «No consta» es un estado legitimo y se dice con esas palabras: las
+          reservas de antes de que esto existiera y las que mete el panel por
+          telefono no tienen casilla que marcar.
+        */}
+        <div className="mt-4">
+          <p className="ft-label">{t('admin.legal.title')}</p>
+          {booking.legal === null ? (
+            <p className="text-sm text-slate-600 dark:text-slate-400">{t('admin.legal.none')}</p>
+          ) : (
+            <>
+              <p className="text-sm text-slate-700 dark:text-slate-300">
+                {t('admin.legal.accepted', {
+                  terms: booking.legal.termsVersion,
+                  privacy: booking.legal.privacyVersion,
+                  when: formatDateTime(booking.legal.acceptedAt, booking.timezone, locale),
+                })}
+              </p>
+              {!acceptanceIsCurrent(booking.legal) && (
+                <p className="mt-1 text-xs font-medium text-amber-800 dark:text-amber-300">
+                  {t('admin.legal.outdated')}
+                </p>
+              )}
+            </>
+          )}
+        </div>
       </section>
 
       {/*

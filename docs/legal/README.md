@@ -1,57 +1,67 @@
-# Textos legales del sitio
+# Textos legales
 
-> ⚠️ **BORRADOR. NO ES ASESORÍA LEGAL.** Estos cuatro documentos los redactó
-> el equipo de desarrollo a partir de (a) una investigación de lo que exige la
-> ley federal de EE. UU. y la de Georgia y (b) el inventario de lo que el
-> sistema hace de verdad, leído del código. **Antes de publicarlos los tiene
-> que revisar un abogado de Georgia.** El porqué de cada decisión y la
-> investigación completa están en `docs/40-politica-de-privacidad-y-condiciones.md`.
+> ⚠️ **BORRADOR. NO ES ASESORÍA LEGAL.** Los redactó el equipo de desarrollo
+> a partir de una investigación de la ley federal y la de Georgia y del
+> inventario de lo que el sistema hace de verdad, leído del código.
+> **Antes de darlos por buenos los tiene que revisar un abogado de Georgia.**
+> El porqué de cada decisión está en
+> `docs/40-politica-de-privacidad-y-condiciones.md`.
 
-## Qué hay aquí
+## Dónde está el texto
 
-| Archivo                  | Qué es                                    |
-| ------------------------ | ----------------------------------------- |
-| `privacy-policy.en.md`   | Política de privacidad — **inglés, rige** |
-| `privacy-policy.es.md`   | Traducción al español, de cortesía        |
-| `terms-of-service.en.md` | Términos y condiciones — **inglés, rige** |
-| `terms-of-service.es.md` | Traducción al español, de cortesía        |
+**Aquí ya no.** Hubo cuatro archivos Markdown en esta carpeta y se retiraron
+a propósito: durante un rato existieron dos copias de cada documento —una en
+Markdown y otra en la aplicación— y es exactamente la clase de duplicado que
+se separa solo. Se corrige una, la otra se queda mintiendo, y la que el
+cliente acepta es la que nadie corrigió.
 
-**La versión inglesa es la que gobierna.** El servicio se presta en Georgia,
-el contrato se rige por la ley de Georgia y un tribunal de Georgia trabaja en
-inglés. La española existe porque buena parte de la clientela lee en español y
-no se puede pedir a alguien que acepte un contrato que no entiende; así lo
-dice cada documento en su última sección.
+**Lo que el cliente acepta es lo que la página enseña, así que la página es el
+documento:**
 
-## Huecos que hay que rellenar antes de publicar
+| Documento                      | Archivo                                |
+| ------------------------------ | -------------------------------------- |
+| Condiciones — **inglés, rige** | `apps/landing/src/legal/terms-en.ts`   |
+| Condiciones — español          | `apps/landing/src/legal/terms-es.ts`   |
+| Privacidad — **inglés, rige**  | `apps/landing/src/legal/privacy-en.ts` |
+| Privacidad — español           | `apps/landing/src/legal/privacy-es.ts` |
+| El formato y por qué           | `apps/landing/src/legal/documento.ts`  |
 
-Están escritos entre corchetes y en mayúsculas, así que se encuentran con
-`grep -rn "\[.*\]" docs/legal/`. **Ninguno lo puede inventar el sistema.**
+Son listas de bloques con el texto dentro: se leen sin saber programar, y el
+abogado puede revisar directamente **la página publicada**, que es lo que de
+verdad importa.
 
-| Hueco               | Qué es                                                | Dónde se consigue                                         |
-| ------------------- | ----------------------------------------------------- | --------------------------------------------------------- |
-| `[LEGAL NAME]`      | La razón social exacta, con su sufijo (LLC, Inc.)     | El certificado de constitución de la Secretaría de Estado |
-| `[MAILING ADDRESS]` | Dirección postal física                               | La de la empresa. **CAN-SPAM la exige en los correos**    |
-| `[PHONE]`           | Teléfono de contacto                                  | El mismo que el panel publica                             |
-| `[PRIVACY EMAIL]`   | Buzón para peticiones de privacidad                   | Puede ser el general, pero mejor uno dedicado             |
-| `[EMAIL]`           | Buzón general de contacto, el que ya publica el panel | El mismo que el sitio                                     |
-| `[EFFECTIVE DATE]`  | Fecha de entrada en vigor                             | El día que se publiquen                                   |
-| `[COUNTY]`          | Condado de Georgia donde está la empresa              | Para la cláusula de jurisdicción                          |
+La versión inglesa es la que gobierna: el servicio se presta en Georgia, el
+contrato se rige por la ley de Georgia y un tribunal de Georgia trabaja en
+inglés. Cada documento lo dice en su penúltima sección.
 
-Además hay **tres cláusulas marcadas y no redactadas** porque son decisiones de
-negocio, no huecos de datos: `[RECURRING RATE RULE]` (Términos §9),
-`[NON-SOLICITATION]` (§14) y `[ARBITRATION]` (§16). Cada marca dice qué hay que
-decidir y remite a `docs/40` §6.
+## La regla que no se puede romper
 
-## Reglas para mantenerlos
+**Cambiar el fondo de un documento obliga a subir su versión** en
+`packages/types/src/legal.ts` (`TERMS_VERSION`, `PRIVACY_VERSION`).
 
-1. **Si cambia lo que hace el sistema, cambia el documento.** Una política de
-   privacidad que describe un tratamiento que ya no existe —o que se calla uno
-   nuevo— es peor que no tenerla: es una afirmación falsa por escrito.
-2. **La versión se sube al cambiar el fondo**, no la ortografía. Lo que el
-   cliente aceptó queda guardado con su número de versión, y dos clientes que
-   aceptaron textos distintos tienen que poder distinguirse.
-3. **Lo que se promete aquí tiene que ser verdad en el sitio y al revés.** Las
-   preguntas frecuentes ya prometen cosas concretas (el depósito solo se cobra
-   si se cancela con el equipo en camino, 24 h para mover una cita sin coste,
-   repaso gratis avisando en 24 h). Estos documentos repiten esas mismas
-   promesas a propósito. Si una cambia, cambian las dos.
+En cada reserva se guarda **el número**, no el texto. Si se edita un documento
+publicado sin subir la versión, lo guardado apunta a un texto que ya no es el
+que esa persona aceptó, y el registro entero deja de servir para lo único que
+existe. Se sube al cambiar el fondo, no una errata ni una coma.
+
+## Los datos de la empresa no están en el texto
+
+Razón social, dirección postal, teléfono, correo y condado salen de **Datos
+del negocio** en el panel. Si estuvieran escritos en el documento, cambiar un
+teléfono exigiría tocar código y desplegar.
+
+**Lo que no esté configurado no se pinta**: antes un hueco que un
+«[RAZÓN SOCIAL]» publicado dentro de un contrato. Faltan por rellenar:
+
+| Dato             | Para qué                                                                      |
+| ---------------- | ----------------------------------------------------------------------------- |
+| Razón social     | El nombre con el que se firma. Sin él, los documentos dicen «Freshness Touch» |
+| Dirección postal | **La exige CAN-SPAM** en todo correo comercial                                |
+| Condado          | La cláusula de jurisdicción de las condiciones                                |
+
+## Decisiones de negocio que siguen abiertas
+
+Están marcadas dentro del texto y explicadas en `docs/40` §6: la tarifa con
+descuento cuando no hay recurrencia, la no competencia de personal y el
+arbitraje (dejado fuera a propósito). La política de cancelación dentro de las
+24 h ya está decidida y escrita.

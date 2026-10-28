@@ -1,3 +1,4 @@
+import { PRIVACY_VERSION, TERMS_VERSION } from '@freshness/types';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { PGlite } from '@electric-sql/pglite';
@@ -38,6 +39,12 @@ function proximoDiaLaborable(): string {
   }
   return day.toFormat('yyyy-MM-dd');
 }
+
+/**
+ * LO QUE EL CLIENTE ACEPTA. Sin esto el sitio publico no deja reservar, que
+ * es justo lo que comprueba la prueba del final de este archivo.
+ */
+const ACEPTADO = { termsVersion: TERMS_VERSION, privacyVersion: PRIVACY_VERSION };
 
 const CONTACTO = {
   firstName: 'Ana',
@@ -209,7 +216,13 @@ describe('creacion de reserva', () => {
 
     const response = await request(app.getHttpServer())
       .post('/api/v1/bookings')
-      .send({ ...TRABAJO, startsAt: franja, contact: CONTACTO, address: DIRECCION })
+      .send({
+        ...TRABAJO,
+        startsAt: franja,
+        contact: CONTACTO,
+        address: DIRECCION,
+        legal: ACEPTADO,
+      })
       .expect(201);
 
     expect(response.body.reference).toMatch(/^FT-\d{4}-\d{4}$/);
@@ -326,7 +339,13 @@ describe('creacion de reserva', () => {
     // Doble clic, reintento del navegador o pulsar "atras" y reenviar.
     const response = await request(app.getHttpServer())
       .post('/api/v1/bookings')
-      .send({ ...TRABAJO, startsAt: franja, contact: CONTACTO, address: DIRECCION });
+      .send({
+        ...TRABAJO,
+        startsAt: franja,
+        contact: CONTACTO,
+        address: DIRECCION,
+        legal: ACEPTADO,
+      });
 
     // Un conflicto claro, no un error interno: el doble clic es previsible.
     expect(response.status).toBe(409);
@@ -342,6 +361,7 @@ describe('creacion de reserva', () => {
       .send({
         ...TRABAJO,
         startsAt: franja,
+        legal: ACEPTADO,
         contact: { ...CONTACTO, email: 'otro@example.com' },
         address: DIRECCION,
         totalCents: 1,
@@ -358,6 +378,7 @@ describe('creacion de reserva', () => {
       .send({
         ...TRABAJO,
         startsAt: franja,
+        legal: ACEPTADO,
         contact: { ...CONTACTO, email: 'lejos@example.com' },
         address: { ...DIRECCION, postalCode: '31401', city: 'Savannah' },
       });
@@ -374,6 +395,7 @@ describe('creacion de reserva', () => {
       .send({
         ...TRABAJO,
         startsAt: invalida,
+        legal: ACEPTADO,
         contact: { ...CONTACTO, email: 'otrahora@example.com' },
         address: DIRECCION,
       });

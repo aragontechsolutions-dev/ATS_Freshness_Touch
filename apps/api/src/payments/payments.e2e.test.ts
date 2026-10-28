@@ -1,3 +1,4 @@
+import { PRIVACY_VERSION, TERMS_VERSION } from '@freshness/types';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { PGlite } from '@electric-sql/pglite';
@@ -95,6 +96,7 @@ async function reservar(email: string, dia: string): Promise<request.Response> {
       ...TRABAJO,
       startsAt: franja,
       address: DIRECCION,
+      legal: { termsVersion: TERMS_VERSION, privacyVersion: PRIVACY_VERSION },
       contact: {
         firstName: 'Ana',
         lastName: 'Perez',

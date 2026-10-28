@@ -489,6 +489,13 @@ export const es: TranslationResources = {
     accessNotes: 'Instrucciones de acceso',
     accessNotesWarning:
       'Dato sensible: no lo leas en alto delante de terceros y cierra esta página al levantarte.',
+    legal: {
+      title: 'Términos y privacidad',
+      accepted: 'Aceptados el {{when}} — Términos v{{terms}}.0, Privacidad v{{privacy}}.0',
+      none: 'No consta. Reserva anterior a que esto existiera, o metida por teléfono desde el panel.',
+      outdated:
+        'No es la versión publicada hoy. Si hay una reclamación, va sobre el texto antiguo.',
+    },
     customerNotes: 'Notas del cliente',
     /* ---------------------------- Equipo ---------------------------- */
     team: 'Equipo',
@@ -545,6 +552,15 @@ export const es: TranslationResources = {
       title: 'Datos del negocio',
       intro: 'Estos datos salen en la web publica. Los cambios aparecen alli en unos minutos.',
 
+      legal: 'Datos legales',
+      legalHelp:
+        'Salen en los Términos y en la Política de Privacidad del sitio. Lo que se deje vacío simplemente no se enseña allí.',
+      legalName: 'Razón social',
+      mailingAddress: 'Dirección postal',
+      mailingAddressHelp:
+        'La ley exige una dirección física en todo correo comercial, así que sin ella no se pueden mandar ofertas.',
+      county: 'Condado',
+      countyHelp: 'Los Términos la usan para el tribunal que vería una disputa.',
       contact: 'Contacto',
       phone: 'Telefono',
       phoneSaved: 'Se guardara como {{value}}',
@@ -1632,6 +1648,8 @@ export const es: TranslationResources = {
       mediaConsentTenant: 'En esta vivienda vive alguien que no soy yo.',
       mediaConsentTenantHelp:
         'Entonces necesitamos también su permiso antes de publicar nada: los objetos que salen en el plano son suyos. Nos pondremos en contacto para eso.',
+      legalAccept:
+        'He leído y acepto los <terms>Términos y Condiciones</terms> y la <privacy>Política de Privacidad</privacy>.',
       priceNotice:
         'El precio final se confirma con la dirección completa, así que puede variar ligeramente respecto a la estimación.',
     },
@@ -1691,6 +1709,10 @@ export const es: TranslationResources = {
     errorDateRequired: 'Elige una fecha.',
     errorSlotRequired: 'Elige una hora.',
     errorSlotTaken: 'Acaban de ocupar esa hora. Elige otra franja, por favor.',
+    errorLegalRequired:
+      'Tienes que aceptar los Términos y la Política de Privacidad para reservar.',
+    errorLegalNotAccepted:
+      'Esta página está desactualizada y no se pudo aceptar tu reserva. Recárgala y vuelve a intentarlo: no se ha cobrado nada.',
     errorAlreadyBooked: 'Ya tienes una reserva a esa hora.',
     errorRequiresWalkthrough:
       'Los trabajos comerciales se agendan tras una visita gratuita. Contáctanos y la organizamos.',
@@ -1945,6 +1967,18 @@ export const es: TranslationResources = {
     serviceArea: 'Con base en {{city}}, {{state}} - Servicio en el área metropolitana de Atlanta',
   },
 
+  /* ------------------- Las dos paginas legales ------------------- */
+  legal: {
+    effective: 'En vigor desde el {{date}} · Versión {{version}}',
+    fallbackContact: 'los datos de contacto del final de esta página',
+    fallbackCounty: 'el condado donde está nuestra empresa',
+    contact: {
+      company: 'Empresa',
+      mail: 'Dirección',
+      phone: 'Teléfono',
+      email: 'Correo',
+    },
+  },
   footer: {
     rights: 'Todos los derechos reservados.',
     legalNote:

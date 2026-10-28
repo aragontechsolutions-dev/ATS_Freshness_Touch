@@ -1,4 +1,5 @@
-import { REMOVAL_LINK_PATH } from '@freshness/types';
+import { LEGAL_PATHS, REMOVAL_LINK_PATH } from '@freshness/types';
+import { PaginaLegal } from './components/PaginaLegal';
 import { RetirarFotos } from './components/RetirarFotos';
 import { Header } from './components/Header';
 import { Footer } from './components/Footer';
@@ -16,20 +17,52 @@ import { BusinessSettingsProvider } from './hooks/useBusinessSettings';
 import { SiteCopyProvider } from './hooks/useSiteCopy';
 
 /**
- * LA PAGINA DE RETIRADA NO ES UNA SECCION DEL SITIO, ES OTRA PANTALLA.
+ * LAS PANTALLAS QUE NO SON EL SITIO.
  *
- * Quien llega aqui viene de un enlace de su correo para hacer UNA cosa, y
- * pintarle debajo el cotizador, los precios y el formulario de reserva seria
- * intentar venderle mientras retira sus fotos. Se le ensena lo que vino a
- * hacer y nada mas.
+ * Tres: retirar las fotos, las condiciones y la privacidad. Ninguna es una
+ * seccion de la portada. Quien llega a cualquiera de ellas viene a hacer UNA
+ * cosa, y pintarle debajo el cotizador y el formulario de reserva seria
+ * intentar venderle mientras lee un contrato.
  *
- * SIN LIBRERIA DE RUTAS. Es la unica ruta aparte que tiene este sitio: meter
- * un enrutador entero —y su peso— para una comparacion de cadenas seria
- * pagar por un problema que no existe. El dia que haya tres, se mete.
+ * ========================================================================
+ * SIGUE SIN HABER LIBRERIA DE RUTAS, Y AHORA HAY QUE EXPLICARLO
+ * ========================================================================
+ * El comentario que habia aqui decia «el dia que haya tres, se mete». Hay
+ * tres. Y sigue sin meterse, porque al llegar el momento la cuenta no salio:
+ * un enrutador aporta rutas con parametros, navegacion sin recargar e
+ * historial, y estas tres son direcciones fijas a las que se llega desde
+ * fuera —un correo, el pie, una pestana nueva— y de las que no se vuelve.
+ * Pagar cuarenta kilobytes en el sitio que genera los ingresos por un `switch`
+ * de tres casos no es una decision tecnica, es una costumbre.
+ *
+ * LA LINEA QUE SI LO CAMBIA: el dia que una de estas pantallas necesite
+ * enlazar a otra sin recargar, o lleve un identificador dentro de la ruta.
  */
+const PANTALLAS: Record<string, () => React.JSX.Element> = {
+  [REMOVAL_LINK_PATH]: () => <RetirarFotos />,
+  [LEGAL_PATHS.terms]: () => <PaginaLegal cual="terms" />,
+  [LEGAL_PATHS.privacy]: () => <PaginaLegal cual="privacy" />,
+};
+
 export default function App() {
-  if (window.location.pathname.replace(/\/$/, '') === REMOVAL_LINK_PATH) {
-    return <RetirarFotos />;
+  const ruta = window.location.pathname.replace(/\/$/, '');
+  const pantalla = PANTALLAS[ruta];
+
+  /*
+   * LAS LEGALES LLEVAN CABECERA Y PIE, la de retirar fotos no. Quien lee las
+   * condiciones puede querer volver al sitio o llamar; quien retira sus
+   * fotos viene a una sola cosa y no hay que ofrecerle nada mas.
+   */
+  if (pantalla) {
+    if (ruta === REMOVAL_LINK_PATH) return pantalla();
+
+    return (
+      <BusinessSettingsProvider>
+        <Header />
+        {pantalla()}
+        <Footer />
+      </BusinessSettingsProvider>
+    );
   }
 
   return (
