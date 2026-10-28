@@ -15,6 +15,7 @@ import { HealthModule } from './health/health.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { StaffNotificationsModule } from './staff-notifications/staff-notifications.module';
 import { SeriesModule } from './series/series.module';
+import { PrivacyModule } from './privacy/privacy.module';
 import { PaymentsModule } from './payments/payments.module';
 import { QuotesModule } from './quotes/quotes.module';
 import { SchedulingModule } from './scheduling/scheduling.module';
@@ -65,6 +66,7 @@ import { SettingsModule } from './settings/settings.module';
      */
     StaffNotificationsModule,
     SeriesModule,
+    PrivacyModule,
     QuotesModule,
     SchedulingModule,
     PaymentsModule,

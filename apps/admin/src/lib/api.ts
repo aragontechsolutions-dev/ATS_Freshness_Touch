@@ -18,11 +18,17 @@ import {
   ApiErrorSchema,
   AuthenticatedStaffSchema,
   BookingResponseSchema,
+  PrivacyErasureResultSchema,
+  PrivacySearchResultSchema,
   SeriesItemSchema,
   SeriesListSchema,
   StaffNotificationListSchema,
   type AdminBookingRequestInput,
   type BookingResponse,
+  type PrivacyCorrection,
+  type PrivacyErasure,
+  type PrivacyErasureResult,
+  type PrivacySearchResult,
   type SeriesFromBookingInput,
   type SeriesItem,
   type SeriesList,
@@ -1045,6 +1051,57 @@ export function createAdminBooking(peticion: AdminBookingRequestInput): Promise<
     (payload) => {
       const parsed = BookingResponseSchema.safeParse(payload);
       if (!parsed.success) throw contractError('reserva creada', parsed.error.issues);
+      return parsed.data;
+    },
+    { method: 'POST', body: peticion },
+  );
+}
+
+/* ------------------------------------------------------------------------ */
+/*  Los derechos de privacidad                                               */
+/* ------------------------------------------------------------------------ */
+
+/** Busca por correo EXACTO. Ver el comentario del servicio. */
+export function searchPrivacyCustomer(email: string): Promise<PrivacySearchResult> {
+  return request(`/admin/privacy/customers?email=${encodeURIComponent(email)}`, (payload) => {
+    const parsed = PrivacySearchResultSchema.safeParse(payload);
+    if (!parsed.success) throw contractError('busqueda de privacidad', parsed.error.issues);
+    return parsed.data;
+  });
+}
+
+/**
+ * La copia de todo lo que tenemos sobre esa persona.
+ *
+ * SIN VALIDAR CONTRA EL ESQUEMA AQUI, al contrario que el resto: esto no se
+ * pinta, se descarga tal cual lo mando el servidor, que es quien ya lo valido
+ * con `PrivacyExportSchema`. Volver a parsearlo en el navegador solo anadiria
+ * un sitio donde un campo nuevo rompe una descarga.
+ */
+export function exportPrivacyCustomer(customerId: string): Promise<unknown> {
+  return request(`/admin/privacy/customers/${customerId}/export`, (payload) => payload);
+}
+
+export function correctPrivacyCustomer(
+  customerId: string,
+  cambio: PrivacyCorrection,
+): Promise<void> {
+  return request(`/admin/privacy/customers/${customerId}`, () => undefined, {
+    method: 'PATCH',
+    body: cambio,
+  });
+}
+
+/** IRREVERSIBLE. Anonimiza: ver `docs/45`. */
+export function erasePrivacyCustomer(
+  customerId: string,
+  peticion: PrivacyErasure,
+): Promise<PrivacyErasureResult> {
+  return request(
+    `/admin/privacy/customers/${customerId}/erase`,
+    (payload) => {
+      const parsed = PrivacyErasureResultSchema.safeParse(payload);
+      if (!parsed.success) throw contractError('borrado de privacidad', parsed.error.issues);
       return parsed.data;
     },
     { method: 'POST', body: peticion },

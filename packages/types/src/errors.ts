@@ -120,6 +120,14 @@ export const API_ERROR_CODES = {
    * que la casilla existiera. A esa persona hay que decirle que recargue.
    */
   LEGAL_NOT_ACCEPTED: 'LEGAL_NOT_ACCEPTED',
+  /**
+   * El correo escrito a mano para confirmar un borrado no coincide.
+   *
+   * No es un fallo de validacion: el formato era correcto, lo que no cuadra
+   * es A QUIEN se iba a borrar. Codigo propio para poder decirlo con esas
+   * palabras.
+   */
+  PRIVACY_CONFIRM_MISMATCH: 'PRIVACY_CONFIRM_MISMATCH',
 } as const;
 
 export type ApiErrorCode = (typeof API_ERROR_CODES)[keyof typeof API_ERROR_CODES];

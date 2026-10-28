@@ -30,13 +30,13 @@ import { z } from 'zod';
  * texto, y un texto que se publico el 28 no puede decir que rige desde el 30
  * porque alguien cambio un campo.
  */
-export const LEGAL_EFFECTIVE_DATE = '2026-10-28';
+export const LEGAL_EFFECTIVE_DATE = '2026-10-29';
 
 /** Version vigente de los Terminos y Condiciones. Ver la regla de arriba. */
 export const TERMS_VERSION = 1;
 
 /** Version vigente de la Politica de Privacidad. Ver la regla de arriba. */
-export const PRIVACY_VERSION = 1;
+export const PRIVACY_VERSION = 2;
 
 /** Las dos paginas publicas. El pie y la casilla enlazan aqui. */
 export const LEGAL_PATHS = {

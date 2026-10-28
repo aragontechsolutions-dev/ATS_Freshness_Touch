@@ -1,0 +1,23 @@
+-- ===========================================================================
+-- LOS DERECHOS DE PRIVACIDAD: SE RETIRA UNA COLUMNA QUE NADIE USABA
+-- ===========================================================================
+-- `customers.internalNotes` existia desde la etapa 1 y NO LA LEIA NI LA
+-- ESCRIBIA NADIE: cero apariciones en todo el repositorio fuera del esquema y
+-- del cliente generado. La auditoria de `docs/43` la encontro.
+--
+-- Se podria haber dejado y empezar a usarla, que era la otra salida. No se
+-- hace, y el motivo es esta misma etapa:
+--
+--   1. Unas notas internas SOBRE UNA PERSONA son datos personales suyos, y la
+--      politica promete entregarle una copia de todo lo que tenemos. Habria
+--      que exportarlas. Un campo libre pensado para que el equipo escriba
+--      «cliente dificil» y que despues hay que ensenarle a esa persona es un
+--      pasivo, no una funcion.
+--
+--   2. Nadie la ha echado de menos en un ano.
+--
+-- No hay nada que migrar: la columna esta vacia en todas las filas porque
+-- ningun codigo escribio nunca en ella.
+-- ===========================================================================
+
+ALTER TABLE "customers" DROP COLUMN "internalNotes";

@@ -14,6 +14,7 @@ export * from './media-consent';
 export * from './staff-notification';
 export * from './recurring-series';
 export * from './legal';
+export * from './privacy';
 export * from './service-area';
 export * from './geo-distance';
 export * from './clock-in';

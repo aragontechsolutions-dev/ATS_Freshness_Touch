@@ -256,7 +256,7 @@ export const PRIVACY_ES: Documento = {
         ],
         [
           'Nuestro registro interno de quién hizo qué en el sistema',
-          'Se conserva como registro de seguridad y responsabilidad. A propósito **no** contiene datos de tarjeta, contraseñas ni códigos de puerta',
+          '**Un año**, y después se borra solo. A propósito **no** contiene datos de tarjeta, contraseñas, códigos de puerta, nombres ni direcciones',
         ],
       ],
     },
@@ -345,7 +345,7 @@ export const PRIVACY_ES: Documento = {
       items: [
         '**Preguntar qué tenemos sobre usted** y obtener una copia.',
         '**Corregir** lo que esté mal.',
-        '**Borrar** su información. Lo haremos salvo en lo que estemos obligados a conservar —registros fiscales y contables, y lo necesario para una reclamación de seguro o un asunto legal abierto—. Le diremos qué guardamos y por qué.',
+        '**Borrar** su información. Quitamos su nombre, correo, teléfono, calle, instrucciones de acceso, el punto del mapa, sus indicaciones y su nombre de cualquier permiso de imagen — y retiramos esas fotos a la vez. Conservamos lo que la ley exige: las referencias e importes de las reservas, la ciudad y el código postal, y la marca y los últimos cuatro dígitos de la tarjeta. Se lo diremos con esas palabras.',
         '**Retirar su permiso** para fotos y vídeo (sección 7).',
         '**Darse de baja** del correo comercial en cualquier momento.',
         '**Pedirnos que no le llamemos ni le escribamos** en absoluto, caso en el que ya no podremos prestarle el servicio, y se lo diremos claramente.',

@@ -213,9 +213,6 @@ model Customer {
   /// correo transaccional, que no necesita consentimiento.
   marketingOptIn Boolean @default(false)
 
-  /// Notas internas del equipo. Nunca se muestran al cliente.
-  internalNotes String?
-
   addresses Address[]
   quotes    Quote[]
   bookings  Booking[]

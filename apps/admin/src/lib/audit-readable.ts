@@ -481,6 +481,12 @@ export type Grupo = (typeof GRUPOS)[number];
  */
 export function grupoDe(accion: string): Grupo {
   if (accion === 'booking.viewed' || accion === 'access_notes.viewed') return 'sensitive';
+  /*
+   * LOS DERECHOS DE PRIVACIDAD VAN CON LO SENSIBLE, no en «otros». Exportar
+   * el expediente de una persona o borrarlo es lo mas delicado que se puede
+   * hacer en el panel, y tiene que poder filtrarse aparte.
+   */
+  if (accion.startsWith('customer.')) return 'sensitive';
   if (accion.startsWith('session.')) return 'access';
   if (accion.startsWith('booking.')) return 'bookings';
   if (accion.startsWith('payment.')) return 'money';

@@ -247,7 +247,7 @@ export const PRIVACY_EN: Documento = {
         ],
         [
           'Our internal record of who did what in the system',
-          'Kept as a security and accountability record. It deliberately contains **no** card data, passwords or door codes',
+          '**One year**, then deleted automatically. It deliberately contains **no** card data, passwords, door codes, names or addresses',
         ],
       ],
     },
@@ -336,7 +336,7 @@ export const PRIVACY_EN: Documento = {
       items: [
         '**Ask what we hold about you**, and get a copy.',
         '**Correct** anything that is wrong.',
-        '**Delete** your information. We will do so except where we are required to keep it — tax and accounting records, and anything needed for an open insurance claim or legal matter. We will tell you what we kept and why.',
+        '**Delete** your information. We remove your name, email, phone, street address, access instructions, the map pin, your notes, and your name from any photo permission — and we take those photos down at the same time. We keep what the law requires: the booking references and amounts, the city and ZIP code, and the card brand and last four digits. We will tell you exactly that.',
         '**Withdraw your permission** for photos and video (section 7).',
         '**Unsubscribe** from marketing email at any time.',
         '**Ask us not to call or write to you** at all, in which case we can no longer provide service, and we will say so plainly.',
