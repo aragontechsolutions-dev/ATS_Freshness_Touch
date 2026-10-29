@@ -9,6 +9,7 @@ import {
 import { ThrottlerException } from '@nestjs/throttler';
 import { API_ERROR_CODES, type ApiError } from '@freshness/types';
 import type { Request, Response } from 'express';
+import type { ErrorRecorder } from './error-recorder';
 
 interface StructuredErrorBody {
   code?: string;
@@ -38,6 +39,18 @@ function asBodyParserError(exception: unknown): BodyParserError | null {
 }
 
 /**
+ * El patron de la ruta que Express resolvio, si llego a resolverla.
+ *
+ * `request.route` no esta en los tipos de Express con una forma util —es
+ * `any`— y lo que hay dentro depende de la version. Se lee a mano y con
+ * cuidado: si no es una cadena, no hay patron.
+ */
+function patronDeRuta(request: Request): string | undefined {
+  const ruta = (request as Request & { route?: { path?: unknown } }).route;
+  return typeof ruta?.path === 'string' ? ruta.path : undefined;
+}
+
+/**
  * Convierte cualquier excepcion en la respuesta de error unica de la API.
  *
  * SEGURIDAD: al cliente nunca se le envian stack traces, rutas del servidor
@@ -47,6 +60,20 @@ function asBodyParserError(exception: unknown): BodyParserError | null {
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {
   private readonly logger = new Logger(AllExceptionsFilter.name);
+
+  /**
+   * SE RECIBE POR CONSTRUCTOR Y ADMITE `null` A PROPOSITO.
+   *
+   * Este filtro se construye a mano (`new AllExceptionsFilter(...)`) en
+   * `main.ts` y en las pruebas, no por inyeccion: es la unica forma de
+   * registrarlo antes de que exista el contenedor. Exigir una dependencia
+   * obligatoria convertiria cada `new` de cada prueba en un montaje de
+   * modulo, y la respuesta de error —que es lo que este archivo garantiza—
+   * dejaria de poder probarse sola.
+   *
+   * Sin contador el filtro responde igual. Lo que no hay es cuenta.
+   */
+  constructor(private readonly contador: ErrorRecorder | null = null) {}
 
   catch(exception: unknown, host: ArgumentsHost): void {
     const ctx = host.switchToHttp();
@@ -103,6 +130,29 @@ export class AllExceptionsFilter implements ExceptionFilter {
         `[${requestId ?? 'sin-id'}] ${request.method} ${request.url} -> ${status}`,
         exception instanceof Error ? exception.stack : String(exception),
       );
+
+      /*
+       * Y ADEMAS SE CUENTA, que es lo que hace que alguien se entere sin
+       * entrar a leer el log. Ver `health/error-monitor.service.ts`.
+       *
+       * ENVUELTO, Y NO POR DESCONFIANZA: esto corre dentro del manejador de
+       * errores, antes de responder. Una excepcion aqui dejaria la peticion
+       * SIN RESPUESTA —el cliente esperando hasta que el proxy corte— por no
+       * haber podido apuntar un numero. El contador que rompe lo que cuenta.
+       */
+      try {
+        this.contador?.anotar({
+          status,
+          method: request.method,
+          // El PATRON, nunca `request.url`: la URL real lleva dentro el
+          // identificador de la reserva y la cadena de consulta.
+          routePath: patronDeRuta(request),
+          errorName: exception instanceof Error ? exception.name : undefined,
+        });
+      } catch {
+        // Ni un log: si el contador falla, lo unico que importa es que la
+        // respuesta salga.
+      }
     } else {
       this.logger.warn(`[${requestId ?? 'sin-id'}] ${request.method} ${request.url} -> ${status}`);
     }

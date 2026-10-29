@@ -11,11 +11,12 @@ import {
 import type { Env } from '../common/config/env';
 import { PrismaService } from '../database/prisma.service';
 import { PricingRatesService } from '../settings/pricing-rates.service';
+import { ErrorMonitorService } from './error-monitor.service';
 import { SweepHeartbeatService } from './sweep-heartbeat.service';
 
 /**
- * LAS CINCO PREGUNTAS
- * ===================
+ * LAS SEIS PREGUNTAS
+ * ==================
  * Cada una de estas comprobaciones existe porque algo se rompio de verdad, o
  * porque puede romperse sin dar la cara. No hay ninguna «por completitud».
  *
@@ -59,6 +60,7 @@ export class SystemChecksService {
     private readonly prisma: PrismaService,
     private readonly rates: PricingRatesService,
     private readonly latidos: SweepHeartbeatService,
+    private readonly errores: ErrorMonitorService,
     private readonly config: ConfigService<Env, true>,
   ) {}
 
@@ -88,6 +90,18 @@ export class SystemChecksService {
         : [desconocido('migrations'), desconocido('pricingRates')]),
       await this.comprobar('paymentProvider', () => Promise.resolve(this.paymentProvider())),
       await this.comprobar('sweeps', () => Promise.resolve(this.sweeps())),
+      /*
+       * LA SEXTA NO SE CALLA CUANDO LA BASE ESTA CAIDA, al contrario que
+       * `migrations` y `pricingRates`.
+       *
+       * Alli el silencio esta bien porque esas dos comprobaciones no PUEDEN
+       * ejecutarse sin base: su mensaje no anadiria nada al de la base
+       * caida. Aqui si anade, y mucho: «database: unreachable» dice que la
+       * base no responde; «errors: many (23)» dice que veintitres peticiones
+       * de personas de verdad se han estrellado contra eso mientras pasaba.
+       * Lo segundo es lo que decide si hay que parar el coche.
+       */
+      await this.comprobar('errors', () => Promise.resolve(this.errores.comprobacion())),
     ];
 
     const informe: SystemHealth = {

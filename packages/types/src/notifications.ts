@@ -365,3 +365,62 @@ export function maskEmail(email: string): string {
 export function maskChatId(chatId: string): string {
   return chatId.length <= 4 ? '…' : `…${chatId.slice(-4)}`;
 }
+
+/* ========================================================================== */
+/*  CUANDO UN AVISO AL CLIENTE NO SALE                                        */
+/* ========================================================================== */
+
+/**
+ * EL FALLO QUE NO SE VEIA
+ * =======================
+ * Hasta la etapa 3.30, un correo que fallaba se guardaba con `status:
+ * 'FAILED'` y su motivo, y ahi se quedaba. No habia reintento y no habia
+ * aviso.
+ *
+ * Si el proveedor de correo estaba caido el minuto en que alguien confirmaba
+ * su reserva, esa persona HABIA PAGADO Y NO TENIA NADA POR ESCRITO, y nadie
+ * se enteraba hasta que alguien mirase el registro de envios — que no tiene
+ * pantalla.
+ *
+ * El recordatorio de la vispera si se reintentaba, porque lo manda un barrido
+ * que vuelve a pasar. La confirmacion no vuelve a pasar nunca.
+ *
+ * ========================================================================
+ * SOLO SE REINTENTA LO QUE TIENE A ALGUIEN ESPERANDO QUE NO SEAMOS NOSOTROS
+ * ========================================================================
+ * El correo al CLIENTE si. Los avisos a Telegram no: son nuestros, los lee el
+ * equipo, y cuando fallan suele ser por configuracion —un grupo que no
+ * existe— asi que reintentarlos cuatro veces no arregla nada y llena el
+ * registro. De esos avisa el estado del sistema.
+ */
+
+/**
+ * Cuanto se espera antes de cada reintento, en minutos.
+ *
+ * CRECIENTE Y CORTO AL PRINCIPIO: la mayoria de los fallos de un proveedor de
+ * correo duran segundos, asi que el primer reintento a los cinco minutos
+ * resuelve casi todos sin que el cliente note nada. Los siguientes se
+ * espacian porque, si a la media hora sigue fallando, no es un hipo: o el
+ * proveedor esta caido de verdad o la direccion no existe, y en los dos casos
+ * insistir cada cinco minutos solo gasta cuota.
+ *
+ * CUATRO Y SE ACABA. Un reintento infinito sobre una direccion mal escrita no
+ * entrega nada y esconde el problema para siempre; al cuarto se deja de
+ * intentar y se avisa a una persona, que es quien puede llamar por telefono.
+ */
+export const NOTIFICATION_RETRY_DELAYS_MINUTES = [5, 30, 120, 360] as const;
+
+/** Cuantas veces se intenta en total: el primer envio mas los reintentos. */
+export const NOTIFICATION_MAX_ATTEMPTS = NOTIFICATION_RETRY_DELAYS_MINUTES.length + 1;
+
+/**
+ * Cuando toca el siguiente intento, o `null` si ya no hay mas.
+ *
+ * `intentos` es cuantos van hechos, incluido el primero. Con uno hecho toca
+ * esperar cinco minutos; con cinco, ya no se intenta mas.
+ */
+export function nextRetryAt(intentos: number, ahora: Date): Date | null {
+  const espera = NOTIFICATION_RETRY_DELAYS_MINUTES[intentos - 1];
+  if (espera === undefined) return null;
+  return new Date(ahora.getTime() + espera * 60_000);
+}

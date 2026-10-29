@@ -35,7 +35,7 @@ que el sistema venga a buscarte.
 | Meterlo en la auditoría     | La auditoría responde «¿quién hizo qué?» y se guarda un año para disputas legales. Esto responde «¿la máquina está sana?». Mezclarlos ensucia un registro legal con ruido de máquina |
 | Retención propia de logs    | Render ya los guarda. Si hace falta más historial, un servicio externo se conecta sin escribir código                                                                                |
 
-## 3. Las cinco comprobaciones
+## 3. Las seis comprobaciones
 
 Contrato en `packages/types/src/system-health.ts`, implementación en
 `apps/api/src/health/system-checks.service.ts`.
@@ -47,6 +47,21 @@ Contrato en `packages/types/src/system-health.ts`, implementación en
 | `pricingRates`    | ¿Las tarifas salen de la tabla o del respaldo?    | **La caída de los precios**       |
 | `paymentProvider` | ¿Se retiene dinero de verdad, o está en simulado? | El fallo más silencioso que hay   |
 | `sweeps`          | ¿Siguen pasando los procesos automáticos?         | Un barrido muerto no se queja     |
+| `errors`          | ¿Ha reventado alguna petición en la última hora?  | **Etapa 3.31**, ver `docs/47`     |
+
+La sexta se añadió después y es la única que **no mira un estado, sino lo que
+ha pasado**. Las otras cinco pueden decir «todo bien» mientras una ruta
+devuelve 500 en cada petición: una excepción no deja la base caída ni las
+migraciones pendientes, deja a una persona sin poder reservar. Cumple la regla
+de abajo porque un 500 **no se nota desde dentro** —el cliente ve un mensaje
+genérico y se va—. Cuenta y detalle en `docs/47-el-error-que-nadie-ve.md`.
+
+**No se calla cuando la base está caída**, al contrario que `migrations` y
+`pricingRates`. Allí el silencio está bien porque esas dos no _pueden_
+ejecutarse sin base y su mensaje no añadiría nada. Aquí añade, y mucho:
+«database: unreachable» dice que la base no responde; «errors: many (23)» dice
+que veintitrés peticiones de personas de verdad se han estrellado contra eso
+mientras pasaba. Lo segundo es lo que decide si hay que parar el coche.
 
 ### La regla para añadir una comprobación nueva
 
@@ -220,6 +235,14 @@ Tres decisiones que no se ven leyendo el componente:
 3. **La hora de la comprobación va siempre a la vista.** Sin ella, una pantalla
    congelada por un fallo de red se ve exactamente igual que un sistema sano.
 
+Desde la etapa 3.31 hay una **segunda tarjeta** debajo,
+`ErroresRecientes.tsx`, con las huellas de los errores del servidor de las
+últimas 24 horas. Son dos tarjetas y no una para que el fallo de una no apague
+a la otra. Ver `docs/47-el-error-que-nadie-ve.md` §7, que cuenta además la
+trampa de despliegue que destapó esa fila nueva: el panel validaba el informe
+con una enumeración cerrada, así que **añadir una comprobación apagaba la
+pantalla** de los paneles sin desplegar.
+
 ## 10. Variables de entorno
 
 | Variable                     | Defecto | Qué hace                                        |
@@ -228,6 +251,12 @@ Tres decisiones que no se ven leyendo el componente:
 | `SYSTEM_ALERT_SILENCE_HOURS` | `6`     | Silencio mínimo entre avisos del mismo problema |
 
 Ninguna es un secreto: van en `render.yaml` sin `sync: false`.
+
+**La comprobación `errors` no añadió ninguna.** Sus dos plazos y su umbral son
+constantes del contrato (`error-monitor.ts`): una variable de entorno más es
+una cosa más que se puede dejar mal puesta en Render, y aquí no hay ninguna
+decisión que dependa del entorno. Se apaga con `SYSTEM_ALERT_MINUTES=0`, como
+el resto.
 
 ## 11. Lo que esto NO sustituye
 

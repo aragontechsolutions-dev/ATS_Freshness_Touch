@@ -6,11 +6,17 @@ import { Test } from '@nestjs/testing';
 import type { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { SystemHealthSchema, type SystemCheck, type SystemCheckId } from '@freshness/types';
+import {
+  ApiErrorReportSchema,
+  SystemHealthSchema,
+  type SystemCheck,
+  type SystemCheckId,
+} from '@freshness/types';
 import { AppModule } from '../app.module';
 import { AUTH_PROVIDER } from '../auth/auth.types';
 import type { LocalAuthProvider } from '../auth/providers/local-auth.provider';
 import { PricingRatesService } from '../settings/pricing-rates.service';
+import { ErrorMonitorService } from './error-monitor.service';
 import { SweepHeartbeatService } from './sweep-heartbeat.service';
 import { SystemChecksService } from './system-checks.service';
 
@@ -42,6 +48,7 @@ vi.hoisted(() => {
 const PUERTO = 55487;
 const MIGRATIONS_DIR = join(import.meta.dirname, '../../prisma/migrations');
 const RUTA = '/api/v1/admin/system-health';
+const RUTA_ERRORES = '/api/v1/admin/system-health/errors';
 
 const ADA = 'aaa93000-0000-4000-8000-000000000001';
 const DIEGO = 'ddd93000-0000-4000-8000-000000000002';
@@ -53,6 +60,7 @@ let socket: PGLiteSocketServer;
 let app: INestApplication;
 let checks: SystemChecksService;
 let latidos: SweepHeartbeatService;
+let errores: ErrorMonitorService;
 let provider: LocalAuthProvider;
 
 const comoAda = (): Promise<string> => provider.issue(ADA_AUTH, 'ada@example.com', 3600);
@@ -130,6 +138,7 @@ beforeAll(async () => {
 
   checks = app.get(SystemChecksService);
   latidos = app.get(SweepHeartbeatService);
+  errores = app.get(ErrorMonitorService);
   provider = app.get<LocalAuthProvider>(AUTH_PROVIDER);
 }, 120_000);
 
@@ -143,6 +152,7 @@ beforeEach(async () => {
   await db.exec('DELETE FROM pricing_tables;');
   await registrarMigraciones(migracionesDelRepo());
   app.get(PricingRatesService).invalidate();
+  errores.reset();
   checks.invalidate();
 });
 
@@ -336,6 +346,82 @@ describe('el diagnostico del sistema', () => {
     });
   });
 
+  describe('los errores del servidor', () => {
+    /*
+     * LA SEXTA PREGUNTA, LA QUE NO MIRA UN ESTADO SINO LO QUE PASO.
+     *
+     * Las otras cinco pueden decir «todo bien» mientras una ruta revienta en
+     * cada peticion: una excepcion no deja la base caida ni las migraciones
+     * pendientes. Deja a una persona sin poder reservar, y de eso solo se
+     * entera quien lea el log.
+     *
+     * Que el cable funciona con peticiones de verdad se prueba en
+     * `error-monitor.e2e.test.ts`. Aqui se mira lo que sale POR LA API: la
+     * fila del informe y quien puede leer la lista.
+     */
+    it('sin errores la fila esta en verde', async () => {
+      expect(await comprobacion('errors')).toEqual({
+        id: 'errors',
+        state: 'ok',
+        detailKey: null,
+        count: null,
+      });
+    });
+
+    it('un fallo reciente sale en el informe con su clave del contrato', async () => {
+      errores.anotar({
+        status: 500,
+        method: 'POST',
+        routePath: '/api/v1/bookings',
+        errorName: 'TypeError',
+      });
+
+      const check = await comprobacion('errors');
+
+      expect(check.state).toBe('degraded');
+      expect(check.detailKey).toBe('errors.recent');
+      expect(check.count).toBe(1);
+    });
+
+    it('la lista de huellas se sirve para administracion', async () => {
+      errores.anotar({
+        status: 500,
+        method: 'POST',
+        routePath: '/api/v1/bookings',
+        errorName: 'TypeError',
+      });
+
+      const respuesta = await request(app.getHttpServer())
+        .get(RUTA_ERRORES)
+        .set('authorization', `Bearer ${await comoAda()}`);
+
+      expect(respuesta.status).toBe(200);
+
+      const parsed = ApiErrorReportSchema.safeParse(respuesta.body);
+      expect(parsed.success).toBe(true);
+      if (!parsed.success) return;
+
+      expect(parsed.data.inWindow).toBe(1);
+      expect(parsed.data.samples[0]?.fingerprint).toBe('POST /api/v1/bookings TypeError');
+    });
+
+    it('COORDINACION NO puede leerla', async () => {
+      /*
+       * Mismo criterio que el informe de estado: saber que ruta de la API
+       * esta reventando es media invitacion, y coordinacion mueve citas.
+       */
+      const respuesta = await request(app.getHttpServer())
+        .get(RUTA_ERRORES)
+        .set('authorization', `Bearer ${await comoDiego()}`);
+
+      expect(respuesta.status).toBe(403);
+    });
+
+    it('sin sesion tampoco', async () => {
+      expect((await request(app.getHttpServer()).get(RUTA_ERRORES)).status).toBe(401);
+    });
+  });
+
   describe('quien puede verlo', () => {
     it('administracion si', async () => {
       const respuesta = await request(app.getHttpServer())
@@ -379,7 +465,13 @@ describe('el diagnostico del sistema', () => {
       expect(lista.status).toBe(200);
 
       const publico = JSON.stringify([vida.body, lista.body]);
-      for (const filtrado of ['migrations', 'pricingRates', 'paymentProvider', 'sweeps']) {
+      for (const filtrado of [
+        'migrations',
+        'pricingRates',
+        'paymentProvider',
+        'sweeps',
+        'errors',
+      ]) {
         expect(publico).not.toContain(filtrado);
       }
     });

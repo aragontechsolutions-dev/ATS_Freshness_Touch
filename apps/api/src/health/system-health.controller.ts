@@ -1,8 +1,9 @@
 import { Controller, Get } from '@nestjs/common';
 import { SkipThrottle } from '@nestjs/throttler';
-import type { SystemHealth } from '@freshness/types';
+import type { ApiErrorReport, SystemHealth } from '@freshness/types';
 import { ADMIN_ROUTE, Roles } from '../auth/auth.decorators';
 import { SKIP_QUOTE_THROTTLER } from '../common/throttling';
+import { ErrorMonitorService } from './error-monitor.service';
 import { SystemChecksService } from './system-checks.service';
 
 /**
@@ -39,7 +40,10 @@ import { SystemChecksService } from './system-checks.service';
 @SkipThrottle(SKIP_QUOTE_THROTTLER)
 @Controller(`${ADMIN_ROUTE}/system-health`)
 export class SystemHealthController {
-  constructor(private readonly checks: SystemChecksService) {}
+  constructor(
+    private readonly checks: SystemChecksService,
+    private readonly errores: ErrorMonitorService,
+  ) {}
 
   @Get()
   @Roles('ADMIN')
@@ -57,5 +61,37 @@ export class SystemHealthController {
      * Lo cacheado se devuelve tal cual: ver `SystemChecksService`.
      */
     return this.checks.run();
+  }
+
+  /**
+   * QUE ha reventado, no solo cuanto.
+   *
+   * ======================================================================
+   * ESTO ES LO QUE SUSTITUYE A ENTRAR EN RENDER A LEER EL LOG
+   * ======================================================================
+   * La fila de estado dice «tres errores en la ultima hora», que sirve para
+   * saber que hay que mirar y para nada mas. Esta lista dice en que ruta y
+   * con que clase de fallo, que es lo primero que se pregunta despues.
+   *
+   * ======================================================================
+   * LO QUE DEVUELVE NO LLEVA DATOS DE NADIE, Y NO POR CONFIANZA
+   * ======================================================================
+   * Cada linea es una HUELLA saneada: metodo, patron de ruta y nombre de la
+   * clase del error. Ni la URL que se pidio —que lleva el identificador de
+   * la reserva dentro— ni el mensaje del error —que lleva el nombre del
+   * servidor de la base o el de un cobro de Stripe—. El saneado y la prueba
+   * que lo demuestra estan en `@freshness/types`.
+   *
+   * Aun asi es solo para administracion, por el mismo motivo que el resto de
+   * este controlador: saber que ruta de la API esta reventando es media
+   * invitacion.
+   *
+   * SE SIRVE DE MEMORIA: no hay consulta a la base, no hay cache que
+   * caducar, y por eso no se cachea como el informe de estado.
+   */
+  @Get('errors')
+  @Roles('ADMIN')
+  errors(): ApiErrorReport {
+    return this.errores.informe();
   }
 }

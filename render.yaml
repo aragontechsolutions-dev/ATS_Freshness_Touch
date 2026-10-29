@@ -213,6 +213,13 @@ services:
       - key: SERIES_SWEEP_MINUTES
         value: '60'
 
+      # Cada cuantos minutos se reintentan los correos al cliente que
+      # fallaron. Es el barrido mas rapido a proposito: lo que arregla es que
+      # alguien que acaba de pagar no tiene su confirmacion, y el primer
+      # reintento se programa a los cinco minutos. Cero lo apaga.
+      - key: NOTIFICATION_RETRY_MINUTES
+        value: '5'
+
       # La direccion del SITIO PUBLICO, para componer el enlace con el que un
       # cliente retira sus fotos el solo. La API no lo sabe por su cuenta: se
       # despliegan por separado y en dominios distintos.

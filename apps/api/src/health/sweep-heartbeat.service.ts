@@ -48,6 +48,7 @@ export const BARRIDOS = [
   'removalDeadlines',
   'expiredHolds',
   'recurringSeries',
+  'notificationRetries',
 ] as const;
 export type Barrido = (typeof BARRIDOS)[number];
 

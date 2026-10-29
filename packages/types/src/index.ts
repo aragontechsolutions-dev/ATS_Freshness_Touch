@@ -32,5 +32,6 @@ export * from './panel-password';
 export * from './pricing-size-bands';
 export * from './pricing-rates';
 export * from './audit';
+export * from './error-monitor';
 export * from './system-health';
 export * from './errors';

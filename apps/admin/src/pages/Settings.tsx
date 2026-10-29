@@ -14,6 +14,7 @@ import {
 import { ApiClientError, fetchSettings, saveSettings } from '../lib/api';
 import { AuditLog } from '../components/AuditLog';
 import { SystemHealthPanel } from '../components/SystemHealthPanel';
+import { ErroresRecientes } from '../components/ErroresRecientes';
 import { PricingRatesForm } from '../components/PricingRatesForm';
 import { ServiceAreaForm } from '../components/ServiceAreaForm';
 import { CompanyLocationForm } from '../components/CompanyLocationForm';
@@ -246,7 +247,19 @@ export function SettingsPage({ staff, locale, onSessionLost }: SettingsShellProp
       ) : seccion === 'staff' ? (
         <StaffDirectory staff={staff} locale={locale} onSessionLost={onSessionLost} />
       ) : seccion === 'systemHealth' ? (
-        <SystemHealthPanel onSessionLost={onSessionLost} />
+        /*
+         * LAS DOS TARJETAS, Y EN ESTE ORDEN. Arriba el estado —si el sistema
+         * puede trabajar— y debajo lo que ha fallado, que es lo que se mira
+         * cuando la fila de errores esta en ambar o en rojo.
+         *
+         * Son dos tarjetas y no una para que el fallo de una no apague a la
+         * otra: si el contador de errores no se pudiera leer, el estado del
+         * sistema se sigue viendo.
+         */
+        <div className="space-y-4">
+          <SystemHealthPanel onSessionLost={onSessionLost} />
+          <ErroresRecientes onSessionLost={onSessionLost} />
+        </div>
       ) : (
         <AuditLog locale={locale} onSessionLost={onSessionLost} />
       )}

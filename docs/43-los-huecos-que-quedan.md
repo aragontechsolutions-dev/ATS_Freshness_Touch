@@ -66,14 +66,30 @@ La política promete acceso, corrección y **borrado** en 30 días. En el sistem
 Es el hueco más incómodo de la lista, porque lo abrió el propio documento que
 redactamos.
 
-### A3. Las propinas se mencionan y no se pueden dar
+### A3. ~~Las propinas se mencionan y no se pueden dar~~ — CERRADO, no era un hueco
+
+**Decisión de la dueña (29/10/2026): las propinas no pasan por el sistema.**
+Quien quiera dar una se la da en mano a quien limpió. El sitio ya dice que no
+son obligatorias y no promete cobrarlas, así que no hay nada que contradiga.
+
+Se deja escrito para que nadie lo vuelva a abrir como si fuera deuda: no lo
+es, es el modelo elegido.
 
 La pregunta frecuente dice que no son obligatorias y sugiere 15-20 %;
 `docs/07` las planificó como «opcionales y configurables» para la etapa 2. En
 el código **no hay nada**: ni campo, ni línea de precio, ni cobro. Se pagan en
 efectivo, que es legítimo, pero el sistema no lo registra.
 
-### A4. El cobro real nunca se ha probado
+### A4. ~~El cobro real nunca se ha probado~~ — PROBADO en parte (29/10/2026)
+
+**Se probó con una tarjeta real y la retención de 35 USD funcionó.** Eso
+cubre lo que más miedo daba: las claves de producción, el webhook, la
+retención y que la reserva quede confirmada.
+
+**Lo que sigue sin probarse**, y conviene no darlo por hecho: el cobro del
+saldo final, la devolución, una tarjeta rechazada y una que pida 3D Secure.
+Son los caminos que solo se recorren cuando algo va mal, que es justo cuando
+nadie quiere descubrir un fallo.
 
 `docs/12` §10 lo dice y sigue siendo verdad: las claves de producción están
 puestas y **el flujo nunca se ha ejecutado con una tarjeta**. Faltan las tres
@@ -84,7 +100,10 @@ pruebas de siempre: `4242…` feliz, `4000 0000 0000 0002` rechazo y
 
 ## B. Lo que muerde el día que algo va mal
 
-### B1. Un correo que falla se pierde en silencio
+### B1. ~~Un correo que falla se pierde en silencio~~ — HECHO (etapa 3.30)
+
+> **Tapado**, ver `docs/46-el-correo-que-fallo.md`. Lo que sigue describe
+> cómo estaba.
 
 `NotificationsService` guarda la fila con `status: 'FAILED'` y el motivo. Y
 hasta ahí.
@@ -101,7 +120,10 @@ Lo que hace que esto sea arreglable hoy y no antes: **ya existe la bandeja**
 (`docs/39`). Un `notification.failed` dirigido a administración es media hora
 de trabajo y convierte un fallo mudo en una cosa que alguien ve al entrar.
 
-### B2. No hay monitorización de errores
+### B2. ~~No hay monitorización de errores~~ — HECHO (etapa 3.31)
+
+> **Tapado**, ver `docs/47-el-error-que-nadie-ve.md`. Lo que sigue describe
+> cómo estaba.
 
 No hay Sentry ni equivalente: lo comprobé, no hay ninguna dependencia de ese
 tipo. Una excepción no controlada en producción vive en los logs de Render y
@@ -110,6 +132,15 @@ nadie los lee.
 Es exactamente el problema que `SystemAlertService` resolvió para la **salud**
 —se creó porque «dos caídas reales estuvieron escritas en el log durante horas
 y días sin que nadie las leyera»— pero las excepciones siguen sin cubrir.
+
+**Cómo se tapó, y lo que se decidió de paso:** no con Sentry. Un monitor de
+terceros recibe stacks que pueden llevar datos de cliente dentro, lo que lo
+convierte en subencargado del tratamiento, obliga a nombrarlo en la política
+de privacidad y a subir `PRIVACY_VERSION` —invalidando las aceptaciones ya
+guardadas—. Se colgó de la alarma que ya existía: una sexta comprobación
+(`errors`), un contador en memoria con huellas saneadas y una tarjeta en el
+panel que dice **qué** falló. `docs/47` §3 deja escrito qué cambiaría la
+decisión.
 
 ### B3. No hay copias de seguridad documentadas ni probadas
 
@@ -207,17 +238,17 @@ fila lleva, y conviene que siga siendo una decisión y no un olvido.
 
 Ordenado por lo que cuesta si no se hace, no por lo que cuesta hacerlo:
 
-1. **B1**, el correo que falla en silencio. Es el único de la lista donde
-   alguien ya pagó y se queda sin nada, y hoy se arregla con una notificación
-   en una bandeja que ya existe.
-2. **A1**, publicar los textos legales. El trabajo está hecho; falta rellenar
-   siete huecos y construir la casilla.
-3. **B3**, saber qué copias de seguridad hay y restaurar una para comprobarlo.
-   Media mañana, y es la diferencia entre tener negocio o no tenerlo el día
-   malo.
-4. **A4**, probar el cobro con tarjetas de prueba. El código lleva semanas
-   escrito y nadie lo ha visto funcionar.
-5. **B4**, mover una cita, porque es lo que el sitio promete y lo que más se
+Tachados ya **A1**, **A2**, **A3**, **A4** (en parte), **B1**, **B2** y
+**E1**. De lo que queda:
+
+1. **B3**, saber qué copias de seguridad hay y restaurar una para
+   comprobarlo. Media mañana, y es la diferencia entre tener negocio o no
+   tenerlo el día malo.
+2. **B4**, mover una cita, porque es lo que el sitio promete y lo que más se
    pide.
+3. **A4**, lo que falta: cobro del saldo, devolución, tarjeta rechazada y 3D
+   Secure. Son los caminos que solo se recorren cuando algo va mal.
+4. **C2**, la factura descargable, en cuanto haya un cliente `COMMERCIAL` que
+   la pida.
 
 El resto puede esperar a que lo pida el negocio.

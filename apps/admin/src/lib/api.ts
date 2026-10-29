@@ -1,7 +1,9 @@
 import { z } from 'zod';
 import {
-  SystemHealthSchema,
+  SystemHealthReadSchema,
   type SystemHealth,
+  ApiErrorReportSchema,
+  type ApiErrorReport,
   AdminBookingDetailSchema,
   AdminBookingListSchema,
   AdminStaffListSchema,
@@ -624,11 +626,41 @@ export function fetchAuditLog(query: AuditQueryInput = {}): Promise<AuditPage> {
  * SE PUEDE LLAMAR A MENUDO, al reves que el registro de auditoria: esto no
  * escribe nada y la respuesta viene cacheada treinta segundos en el
  * servidor, asi que la pantalla puede refrescarse sola sin pesar.
+ *
+ * ======================================================================
+ * SE LEE CON EL CONTRATO TOLERANTE, Y NO ES UN DETALLE
+ * ======================================================================
+ * `SystemHealthSchema` lleva una enumeracion CERRADA de comprobaciones. El
+ * dia que la API empezo a devolver la comprobacion `errors`, este panel
+ * —todavia sin desplegar— habria recibido un identificador desconocido,
+ * `safeParse` habria descartado la respuesta ENTERA y la pantalla habria
+ * dicho «no se pudo leer el estado del sistema». La pantalla que existe
+ * para decir si el sistema esta sano, apagada por haber anadido una
+ * comprobacion.
+ *
+ * `SystemHealthReadSchema` descarta lo que no entiende y conserva el resto.
+ * Ver `lo-que-lee-la-web-tolera-campos-nuevos.test.ts`.
  */
 export function fetchSystemHealth(): Promise<SystemHealth> {
   return request('/admin/system-health', (payload) => {
-    const parsed = SystemHealthSchema.safeParse(payload);
+    const parsed = SystemHealthReadSchema.safeParse(payload);
     if (!parsed.success) throw contractError('/admin/system-health', parsed.error.issues);
+    return parsed.data;
+  });
+}
+
+/**
+ * Los errores del servidor de las ultimas horas, agrupados.
+ *
+ * NO HAY NADA DE NADIE AQUI: cada linea es una huella saneada —metodo,
+ * patron de ruta y clase del error— construida en el servidor. Ni la URL
+ * que se pidio ni el mensaje del error salen de la API. Ver
+ * `error-monitor.ts` en `@freshness/types`.
+ */
+export function fetchApiErrors(): Promise<ApiErrorReport> {
+  return request('/admin/system-health/errors', (payload) => {
+    const parsed = ApiErrorReportSchema.safeParse(payload);
+    if (!parsed.success) throw contractError('/admin/system-health/errors', parsed.error.issues);
     return parsed.data;
   });
 }

@@ -8,6 +8,7 @@ import { AppModule } from './app.module';
 import { applyBodyParsers } from './common/body-parsers';
 import type { Env } from './common/config/env';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
+import { ErrorMonitorService } from './health/error-monitor.service';
 
 async function bootstrap(): Promise<void> {
   const logger = new Logger('Bootstrap');
@@ -76,7 +77,16 @@ async function bootstrap(): Promise<void> {
     exclude: ['health', 'health/ready'],
   });
 
-  app.useGlobalFilters(new AllExceptionsFilter());
+  /*
+   * EL FILTRO LLEVA EL CONTADOR DE ERRORES DENTRO.
+   *
+   * Es el unico sitio por el que pasan todas las excepciones de la API, asi
+   * que es el unico desde el que se pueden contar. Quien lleva la cuenta
+   * vive en el modulo de estado, junto a la alarma que la mira, y se le pide
+   * aqui porque el filtro se construye a mano: se registra antes de que
+   * Nest resuelva nada por inyeccion.
+   */
+  app.useGlobalFilters(new AllExceptionsFilter(app.get(ErrorMonitorService)));
   app.enableShutdownHooks();
 
   await app.listen(port, '0.0.0.0');

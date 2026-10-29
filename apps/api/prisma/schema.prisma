@@ -781,6 +781,22 @@ model Notification {
   /// Identificador del proveedor, para buscar el envio en su panel.
   providerMessageId String? @db.VarChar(200)
 
+  /// Cuantos envios se han intentado, contando el primero.
+  ///
+  /// La fila SE REESCRIBE en cada reintento en vez de duplicarse, asi que
+  /// `failureReason` guarda el motivo del ULTIMO intento, no el de todos.
+  attempts Int @default(0)
+
+  /// Cuando toca el siguiente intento.
+  ///
+  /// NULO = no hay nada programado, que es el estado de lo enviado, lo
+  /// omitido, lo que agoto sus reintentos y lo anterior a la etapa 3.30.
+  ///
+  /// Ademas existe un indice PARCIAL sobre (nextAttemptAt) limitado a las
+  /// fallidas con fecha, creado en la migracion 20261029160000: Prisma no
+  /// sabe expresar indices parciales.
+  nextAttemptAt DateTime? @db.Timestamptz(3)
+
   createdAt DateTime @default(now()) @db.Timestamptz(3)
 
   /// Ademas existe un indice UNICO PARCIAL sobre
