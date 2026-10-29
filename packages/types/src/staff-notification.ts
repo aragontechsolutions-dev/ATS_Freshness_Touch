@@ -61,6 +61,15 @@ export const STAFF_NOTIFICATION_KINDS = [
    * cosas que de verdad hay que mirar hoy.
    */
   'series.slot_taken',
+  /**
+   * Un aviso al cliente no salio, y ya no se va a reintentar mas.
+   *
+   * Es el unico aviso de la bandeja que significa que ALGUIEN QUE PAGO SE HA
+   * QUEDADO SIN NADA POR ESCRITO. Se emite al agotar los reintentos, no al
+   * primer fallo: avisar del primero seria avisar de casi todos los hipos de
+   * un proveedor de correo, y la bandeja dejaria de leerse.
+   */
+  'notification.failed',
 ] as const;
 export const StaffNotificationKindSchema = z.enum(STAFF_NOTIFICATION_KINDS);
 export type StaffNotificationKind = z.infer<typeof StaffNotificationKindSchema>;
@@ -138,4 +147,6 @@ export const NOTIFICATION_AUDIENCE: Record<
   'media_consent.self_revoked': 'ADMIN',
   'job.assigned': 'CLEANER',
   'series.slot_taken': 'DISPATCHER',
+  /* A administracion: quien puede llamar al cliente y rehacer el envio. */
+  'notification.failed': 'ADMIN',
 };

@@ -464,6 +464,12 @@ export const es: TranslationResources = {
             body: 'Reserva {{reference}}, {{when}}.',
           },
         },
+        notification: {
+          failed: {
+            title: 'Una clienta se quedó sin su correo',
+            body: 'Intentamos cinco veces mandar el correo de {{event}} de la reserva {{reference}} y siguió fallando. Ha pagado y no tiene nada por escrito: llámala.',
+          },
+        },
         series: {
           slot_taken: {
             title: 'Una cita recurrente no se pudo crear',

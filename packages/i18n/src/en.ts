@@ -523,6 +523,12 @@ export const en = {
             body: 'Booking {{reference}}, {{when}}.',
           },
         },
+        notification: {
+          failed: {
+            title: 'A customer never got their email',
+            body: 'We tried five times to send the {{event}} email for booking {{reference}} and it kept failing. They have paid and have nothing in writing: call them.',
+          },
+        },
         series: {
           slot_taken: {
             title: 'A repeat booking could not be created',

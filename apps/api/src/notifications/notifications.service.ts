@@ -1,5 +1,6 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import {
+  nextRetryAt,
   maskChatId,
   maskEmail,
   telegramChatForAudience,
@@ -308,6 +309,100 @@ export class NotificationsService {
     }
   }
 
+  /**
+   * VUELVE A INTENTAR UN CORREO AL CLIENTE QUE FALLO.
+   *
+   * ======================================================================
+   * REENVIA SOLO ESE CORREO, NO VUELVE A DESPACHAR EL AVISO ENTERO
+   * ======================================================================
+   * Llamar otra vez a `despachar` reharia tambien la copia interna y el
+   * aviso de Telegram, que casi siempre SI salieron. Aqui se reintenta la
+   * pieza que fallo y nada mas.
+   *
+   * ======================================================================
+   * EL DESTINATARIO SE VUELVE A LEER DE LA RESERVA
+   * ======================================================================
+   * No se puede usar el `target` guardado: se guarda ENMASCARADO a
+   * proposito, para que el registro de envios no sea una lista de correos.
+   * Y hay un efecto util: si entre el fallo y el reintento alguien corrigio
+   * la direccion del cliente, el reintento va a la buena.
+   *
+   * Devuelve si salio, para que el barrido decida si programa otro.
+   */
+  async reintentarCorreoAlCliente(
+    notificationId: string,
+    bookingId: string,
+    event: EmailNotificationEvent,
+    intentosPrevios: number,
+    ahora: Date = new Date(),
+  ): Promise<boolean> {
+    const reserva = await this.cargar(bookingId);
+
+    if (!reserva) {
+      /*
+       * La reserva ya no esta. No es un fallo del envio: no hay a quien
+       * avisar. Se cierra el reintento para que el barrido no vuelva.
+       */
+      await this.cerrarReintento(notificationId, 'La reserva ya no existe');
+      return false;
+    }
+
+    const negocio = await this.business.get();
+
+    const mensaje = this.componer(event, reserva.customer.email, {
+      locale: reserva.customer.locale,
+      customerFirstName: reserva.customer.firstName,
+      reference: reserva.reference,
+      scheduledStart: reserva.scheduledStart,
+      timezone: reserva.timezone,
+      addressLine: reserva.address.line1,
+      city: reserva.address.city,
+      state: reserva.address.state,
+      depositCents: reserva.depositCents,
+      balanceDueCents: reserva.balanceDueCents,
+      currency: reserva.currency,
+      companyPhone: negocio.phone,
+      companyEmail: negocio.email,
+      logoUrl: this.marca.logoUrl,
+    });
+
+    const resultado = await this.enviarSinLanzar(() => this.email.send(mensaje));
+    const intentos = intentosPrevios + 1;
+
+    await this.prisma.db.notification.update({
+      where: { id: notificationId },
+      data: {
+        status: resultado.ok ? 'SENT' : 'FAILED',
+        target: maskEmail(reserva.customer.email),
+        failureReason: resultado.failureReason,
+        providerMessageId: resultado.providerMessageId,
+        attempts: intentos,
+        /*
+         * LA FILA SE REESCRIBE, no se duplica. El registro contesta «salio o
+         * no salio, y cuanto costo», no «aqui tienes cuatro filas casi
+         * iguales». La contrapartida esta dicha en el esquema: el motivo que
+         * queda es el del ultimo intento.
+         */
+        nextAttemptAt: resultado.ok ? null : nextRetryAt(intentos, ahora),
+      },
+    });
+
+    this.logger.log(
+      `Reintento ${String(intentos)} de ${event} en ${reserva.reference}: ` +
+        (resultado.ok ? 'entregado' : 'vuelve a fallar'),
+    );
+
+    return resultado.ok;
+  }
+
+  /** Deja de reintentar, con el motivo. Sin tocar el estado de envio. */
+  private async cerrarReintento(notificationId: string, motivo: string): Promise<void> {
+    await this.prisma.db.notification.update({
+      where: { id: notificationId },
+      data: { nextAttemptAt: null, failureReason: motivo },
+    });
+  }
+
   /** Confirmacion o cancelacion, al correo del cliente. */
   private async correoAlCliente(
     bookingId: string,
@@ -351,6 +446,16 @@ export class NotificationsService {
       target: maskEmail(destinatario),
       failureReason: resultado.failureReason,
       providerMessageId: resultado.providerMessageId,
+      /*
+       * SI FALLA, SE PROGRAMA EL REINTENTO AQUI MISMO.
+       *
+       * Es el unico aviso que se reintenta, y el motivo es que es el unico
+       * donde alguien que acaba de pagar se queda sin nada por escrito. Los
+       * de Telegram son nuestros y suelen fallar por configuracion: insistir
+       * cuatro veces no arregla un grupo que no existe.
+       */
+      attempts: 1,
+      nextAttemptAt: resultado.ok ? null : nextRetryAt(1, new Date()),
     });
 
     /*
@@ -526,6 +631,14 @@ export class NotificationsService {
     target: string | null;
     failureReason: string | null;
     providerMessageId: string | null;
+    /**
+     * Cuantos envios van y cuando toca el siguiente.
+     *
+     * Solo lo pone el correo al cliente: es el unico aviso que se reintenta,
+     * porque es el unico con alguien esperando que no seamos nosotros.
+     */
+    attempts?: number;
+    nextAttemptAt?: Date | null;
   }): Promise<void> {
     try {
       await this.prisma.db.notification.create({ data: entrada });

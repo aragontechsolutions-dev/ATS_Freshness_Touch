@@ -7,6 +7,7 @@ import { EmailBrandingService } from './email-branding.service';
 import { NotificationsService } from './notifications.service';
 import { ConsentReceiptService } from './consent-receipt.service';
 import { ReminderSweepService } from './reminder-sweep.service';
+import { NotificationRetrySweepService } from './notification-retry-sweep.service';
 import { RemovalDeadlineSweepService } from './removal-deadline-sweep.service';
 import {
   EMAIL_PROVIDER,
@@ -89,6 +90,7 @@ import { NoopTelegramProvider } from './providers/noop-telegram.provider';
     NotificationsService,
     ConsentReceiptService,
     ReminderSweepService,
+    NotificationRetrySweepService,
     /*
      * El aviso de los plazos de retirada vive AQUI y no en `settings`, con
      * el resto del registro de permisos, por una razon de dependencias: este
@@ -119,7 +121,8 @@ import { NoopTelegramProvider } from './providers/noop-telegram.provider';
      */
     ConsentReceiptService,
     ReminderSweepService,
-    /* Se exporta para que las pruebas llamen a la pasada a mano. */
+    /* Se exportan para que las pruebas llamen a la pasada a mano. */
+    NotificationRetrySweepService,
     RemovalDeadlineSweepService,
     EMAIL_PROVIDER,
     /*

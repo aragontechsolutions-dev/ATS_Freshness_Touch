@@ -318,6 +318,19 @@ export const EnvSchema = z
     SERIES_SWEEP_MINUTES: z.coerce.number().int().min(0).default(60),
 
     /**
+     * Cada cuantos minutos se reintentan los correos al cliente que fallaron.
+     *
+     * CINCO, y es el mas rapido de todos los barridos a proposito: lo que
+     * esto arregla es que alguien que acaba de pagar no tiene su
+     * confirmacion. El primer reintento se programa a los cinco minutos, asi
+     * que barrer cada cinco es lo que hace que esa espera sea de verdad de
+     * cinco y no de veinte.
+     *
+     * Cero lo apaga, que es lo que usan las pruebas para llamarlo a mano.
+     */
+    NOTIFICATION_RETRY_MINUTES: z.coerce.number().int().min(0).default(5),
+
+    /**
      * La direccion del SITIO PUBLICO, para componer el enlace con el que un
      * cliente retira sus fotos.
      *
