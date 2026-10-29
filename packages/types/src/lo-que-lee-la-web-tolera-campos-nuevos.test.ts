@@ -8,6 +8,7 @@ import {
   CatalogZoneSchema,
 } from './catalog';
 import { GallerySchema, PublicGallerySchema } from './gallery';
+import { SYSTEM_CHECK_IDS, SystemHealthReadSchema, SystemHealthSchema } from './system-health';
 
 /**
  * LO QUE LEE LA WEB TOLERA CAMPOS NUEVOS; LO QUE SE GUARDA, NO
@@ -178,5 +179,75 @@ describe('lo que se GUARDA sigue rechazando lo que no conoce', () => {
         ],
       }).success,
     ).toBe(false);
+  });
+});
+
+describe('y el panel tolera una comprobacion de estado que todavia no conoce', () => {
+  /*
+   * ESTE CASO NO ES UNA CLAVE DE SOBRA, ES UN VALOR DE SOBRA, y por eso
+   * estaba fuera de lo que vigilaba este archivo hasta que se anadio la
+   * comprobacion `errors`.
+   *
+   * El panel validaba el informe con `SystemHealthSchema`, que lleva una
+   * enumeracion CERRADA de identificadores. Un panel sin desplegar que
+   * recibe de la API un identificador nuevo no se queda sin esa fila: se
+   * queda sin la pantalla entera, porque `safeParse` descarta la respuesta
+   * completa. La pantalla que existe para decir si el sistema esta sano,
+   * apagada por haber anadido una comprobacion mas.
+   */
+  const deUnaApiMasNueva = {
+    state: 'degraded',
+    checks: [
+      { id: 'database', state: 'ok', detailKey: null, count: null },
+      // La comprobacion que este panel todavia no conoce.
+      { id: 'laQueVendra', state: 'down', detailKey: 'laQueVendra.rota', count: 3 },
+      // Y una que si conoce, con un detalle y un campo que no.
+      { id: 'sweeps', state: 'degraded', detailKey: 'sweeps.stalled', count: 1, desde: 'ayer' },
+    ],
+    checkedAt: new Date().toISOString(),
+    pico: 7,
+  };
+
+  it('el informe se lee, sin la comprobacion desconocida', () => {
+    const parsed = SystemHealthReadSchema.safeParse(deUnaApiMasNueva);
+
+    expect(parsed.success).toBe(true);
+    if (!parsed.success) return;
+
+    expect(parsed.data.checks.map((c) => c.id)).toEqual(['database', 'sweeps']);
+    expect(parsed.data.checks[1]?.detailKey).toBe('sweeps.stalled');
+    expect(parsed.data.checks[1]?.count).toBe(1);
+  });
+
+  it('un detalle que no conoce pierde la frase, no la fila', () => {
+    const parsed = SystemHealthReadSchema.safeParse({
+      state: 'degraded',
+      checks: [{ id: 'database', state: 'degraded', detailKey: 'database.loQueVendra', count: 2 }],
+      checkedAt: new Date().toISOString(),
+    });
+
+    expect(parsed.success).toBe(true);
+    if (!parsed.success) return;
+    expect(parsed.data.checks).toHaveLength(1);
+    expect(parsed.data.checks[0]?.detailKey).toBeNull();
+    expect(parsed.data.checks[0]?.state).toBe('degraded');
+  });
+
+  it('pero el informe que CONSTRUYE la API sigue siendo estricto', () => {
+    /*
+     * La tolerancia es de la lectura y de nada mas. Lo que sale de la API se
+     * construye con el contrato cerrado: una clave de detalle inventada —por
+     * donde se colaria un mensaje de error con el nombre del servidor
+     * dentro— sigue sin poder salir.
+     */
+    expect(
+      SystemHealthSchema.safeParse({
+        state: 'ok',
+        checks: [{ id: 'database', state: 'down', detailKey: 'db.abcdefgh', count: null }],
+        checkedAt: new Date().toISOString(),
+      }).success,
+    ).toBe(false);
+
+    expect(SYSTEM_CHECK_IDS).toContain('errors');
   });
 });

@@ -1176,6 +1176,7 @@ export const en = {
         pricingRates: 'Pricing table',
         paymentProvider: 'Card payments',
         sweeps: 'Scheduled jobs',
+        errors: 'Server errors',
       },
 
       /*
@@ -1219,6 +1220,35 @@ export const en = {
         sweeps: {
           stalled: 'A scheduled job has stopped running. Jobs affected:',
         },
+        errors: {
+          recent:
+            'Some requests ended in a server error in the last hour. Someone could not finish what they were doing. See "What failed" below. Failures:',
+          many: 'Many requests are failing right now. Something is broken. Failures:',
+        },
+      },
+
+      /*
+       * LA TARJETA QUE SUSTITUYE A ENTRAR EN RENDER A LEER EL LOG.
+       *
+       * La fila de estado dice cuantos; esto dice cuales. Sin esta mitad, el
+       * aviso solo serviria para saber que hay que pedirle a alguien que
+       * mire el log, que es media solucion.
+       */
+      recentErrors: {
+        title: 'What failed',
+        intro:
+          'Requests that ended in a server error. One line per kind of failure, not per request: ten customers hitting the same bug are one line.',
+        empty: 'No server errors in the last {{hours}} hours.',
+        window: '{{total}} in the last {{minutes}} minutes',
+        times: '{{total}} times',
+        lastAt: 'Last: {{time}}',
+        /*
+         * Se dice en pantalla, y no solo en el codigo: quien lo lee tiene que
+         * saber que esta lista NO es el log, para que no espere encontrar
+         * aqui el mensaje del error ni a quien le paso.
+         */
+        note: 'The error message and the request stay in the server log: this list never shows customer data. The count resets when the API restarts.',
+        errorLoad: 'Could not read the recent errors.',
       },
     },
 

@@ -1096,6 +1096,7 @@ export const es: TranslationResources = {
         pricingRates: 'Tabla de tarifas',
         paymentProvider: 'Cobros con tarjeta',
         sweeps: 'Procesos automáticos',
+        errors: 'Errores del servidor',
       },
 
       /*
@@ -1132,6 +1133,23 @@ export const es: TranslationResources = {
         sweeps: {
           stalled: 'Un proceso automático ha dejado de pasar. Procesos afectados:',
         },
+        errors: {
+          recent:
+            'Algunas peticiones acabaron en error del servidor en la última hora. Alguien no pudo terminar lo que estaba haciendo. Ver «Qué ha fallado», más abajo. Fallos:',
+          many: 'Muchas peticiones están fallando ahora mismo. Algo está roto. Fallos:',
+        },
+      },
+
+      recentErrors: {
+        title: 'Qué ha fallado',
+        intro:
+          'Peticiones que acabaron en un error del servidor. Una línea por clase de fallo, no por petición: diez clientes con el mismo error son una línea.',
+        empty: 'Ningún error del servidor en las últimas {{hours}} horas.',
+        window: '{{total}} en los últimos {{minutes}} minutos',
+        times: '{{total}} veces',
+        lastAt: 'Última vez: {{time}}',
+        note: 'El mensaje del error y la petición se quedan en el registro del servidor: esta lista no muestra datos de clientes. La cuenta vuelve a cero cuando la API se reinicia.',
+        errorLoad: 'No se pudieron leer los errores recientes.',
       },
     },
 

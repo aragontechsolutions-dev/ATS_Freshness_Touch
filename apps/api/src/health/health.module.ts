@@ -3,6 +3,7 @@ import { SettingsModule } from '../settings/settings.module';
 import { HealthController } from './health.controller';
 import { SystemHealthController } from './system-health.controller';
 import { SystemAlertService } from './system-alert.service';
+import { ErrorMonitorService } from './error-monitor.service';
 import { SweepHeartbeatService } from './sweep-heartbeat.service';
 import { SystemChecksService } from './system-checks.service';
 
@@ -23,6 +24,10 @@ import { SystemChecksService } from './system-checks.service';
  *
  * El mismo patron que `DatabaseModule`, `AuditModule` y `NotificationsModule`
  * ya usan en este proyecto.
+ *
+ * `ErrorMonitorService` se suma por lo mismo: lo escribe el filtro de
+ * excepciones, que vive en `common/` y no puede importar este modulo, y lo
+ * lee la alarma, que vive aqui.
  */
 @Global()
 @Module({
@@ -30,7 +35,7 @@ import { SystemChecksService } from './system-checks.service';
   // no sabe nada de esto.
   imports: [SettingsModule],
   controllers: [HealthController, SystemHealthController],
-  providers: [SweepHeartbeatService, SystemChecksService, SystemAlertService],
-  exports: [SweepHeartbeatService, SystemChecksService, SystemAlertService],
+  providers: [SweepHeartbeatService, SystemChecksService, SystemAlertService, ErrorMonitorService],
+  exports: [SweepHeartbeatService, SystemChecksService, SystemAlertService, ErrorMonitorService],
 })
 export class HealthModule {}

@@ -76,6 +76,20 @@ export const SYSTEM_CHECK_IDS = [
    * o de mandar recordatorios, y todo lo demas sigue igual.
    */
   'sweeps',
+  /**
+   * La API no esta devolviendo errores del servidor.
+   *
+   * ES LA UNICA DE LA LISTA QUE NO MIRA UN ESTADO, SINO LO QUE HA PASADO, y
+   * se anadio por eso: las otras cinco preguntas pueden contestar «todo
+   * bien» mientras una ruta revienta en cada peticion. Una excepcion no deja
+   * la base caida ni las migraciones pendientes; deja a una persona sin
+   * poder reservar, y solo se entera quien lea el log.
+   *
+   * Cumple la regla de la cabecera —puede romperse sola, sin que nadie toque
+   * nada, y no notarse— porque un 500 no se nota desde dentro: el cliente ve
+   * un mensaje generico y se va. Ver `error-monitor.ts`.
+   */
+  'errors',
 ] as const;
 
 export const SystemCheckIdSchema = z.enum(SYSTEM_CHECK_IDS);
@@ -157,6 +171,10 @@ export const SYSTEM_DETAIL_KEYS = [
   'paymentProvider.simulated',
   /** Un barrido lleva demasiado tiempo sin pasar. */
   'sweeps.stalled',
+  /** Hubo errores del servidor en la ultima ventana. Alguno, no muchos. */
+  'errors.recent',
+  /** Hubo tantos que algo esta roto ahora mismo. Ver ERROR_DOWN_THRESHOLD. */
+  'errors.many',
 ] as const;
 
 export const SystemDetailKeySchema = z.enum(SYSTEM_DETAIL_KEYS);
@@ -226,3 +244,56 @@ export function peorEstado(checks: readonly SystemCheck[]): SystemCheckState {
     'ok',
   );
 }
+
+/* -------------------------------------------------------------------------- */
+/*  El mismo informe, tal como lo LEE el panel                                */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * EL INFORME QUE LEE EL NAVEGADOR, QUE NO PUEDE SER EL ESTRICTO
+ * =============================================================
+ * `SystemHealthSchema` es `strictObject` con enumeraciones cerradas, y para
+ * construir la respuesta en el servidor es lo correcto. Para LEERLA desde el
+ * panel es una trampa, y la misma que ya costo un incidente con la galeria
+ * (ver `lo-que-lee-la-web-tolera-campos-nuevos.test.ts`): el panel y la API
+ * se despliegan por separado.
+ *
+ * Esta vez el campo nuevo no es una clave de sobra, es un VALOR de sobra. El
+ * dia que se anadio la comprobacion `errors`, un panel todavia sin
+ * desplegar habria recibido un identificador que su enumeracion no conocia,
+ * `safeParse` habria fallado y la pantalla de estado entera habria mostrado
+ * «no se pudo cargar». La pantalla que existe para decir si el sistema esta
+ * sano, apagada por haber anadido una comprobacion mas.
+ *
+ * Asi que al leer:
+ *
+ *   - una comprobacion con un identificador desconocido SE DESCARTA, y la
+ *     pantalla la pinta como «no se sabe», porque recorre la lista del
+ *     contrato y no la de la respuesta;
+ *   - un `detailKey` desconocido se queda en `null`: se pierde la frase, no
+ *     la fila;
+ *   - un estado desconocido pasa a `unknown`, que es exactamente lo que es;
+ *   - las claves de sobra se ignoran.
+ *
+ * LA LISTA CERRADA DE `detailKey` SIGUE MANDANDO EN EL SERVIDOR. Esto no la
+ * relaja: lo que no esta en el contrato sigue sin poder salir de la API,
+ * porque la respuesta se construye con `SystemCheck`. Aqui solo se decide
+ * que hacer con lo que llega.
+ */
+const SystemCheckReadSchema = z.object({
+  id: SystemCheckIdSchema,
+  state: SystemCheckStateSchema.catch('unknown'),
+  detailKey: SystemDetailKeySchema.nullable().catch(null),
+  count: z.number().int().min(0).nullable().catch(null),
+});
+
+export const SystemHealthReadSchema = z.object({
+  state: SystemCheckStateSchema.catch('unknown'),
+  checks: z.array(z.unknown()).transform((filas) =>
+    filas.flatMap((fila) => {
+      const parsed = SystemCheckReadSchema.safeParse(fila);
+      return parsed.success ? [parsed.data] : [];
+    }),
+  ),
+  checkedAt: z.string(),
+});
