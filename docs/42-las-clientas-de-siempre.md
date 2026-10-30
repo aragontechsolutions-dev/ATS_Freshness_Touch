@@ -116,6 +116,24 @@ llena de compromisos que nadie ha confirmado.
 | ---------------------- | ----- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `SERIES_SWEEP_MINUTES` | 60    | Lo que crea son citas de dentro de semanas: que aparezcan una hora más tarde no cambia nada, y cada pasada recorre todas las series activas. Cero lo apaga |
 
+### Qué cuenta como «esa cita ya existe»
+
+**La ocurrencia, no el día en que se hace.** La diferencia no existía cuando se
+escribió esto y apareció al poder mover una cita (etapa 3.32).
+
+El barrido compara las fechas del calendario con las de las citas que ya hay.
+Mientras nadie mueve nada, «qué día le tocaba» y «cuándo se hace» son el mismo
+día, y la comparación funciona con cualquiera de los dos. Desde que se puede
+mover una cita dejan de serlo: comparando por `scheduledStart`, mover la del
+**martes 3** al **jueves 5** deja el martes 3 sin cubrir, y a la hora siguiente
+este barrido **crea otra cita el martes 3**. La clienta acaba con dos citas esa
+semana.
+
+`bookings.seriesOccurrenceDate` guarda el día que le tocaba y **no se mueve
+nunca**. Detalle completo y la prueba que lo demuestra —comprobada al revés, sin
+la columna, para ver que de verdad caza el fallo— en `docs/48-mover-la-cita.md`
+§4.
+
 ---
 
 ## 6. Lo que el barrido NO hace: pisar nada
@@ -235,6 +253,11 @@ igual que el resto de barridos del proyecto.
   hora o la frecuencia es terminarla y crear otra desde la siguiente cita. Es
   deliberado de momento: cambiar la hora de una serie plantea qué hacer con las
   seis citas ya creadas, y esa pregunta merece su propia decisión.
+
+  Lo que **sí** se puede desde la etapa 3.32 es **mover una cita suelta de la
+  serie** (`docs/48`): la semana que la clienta no puede el martes se resuelve
+  sin tocar la serie, y el barrido no vuelve a crear la del martes.
+
 - **Series sin cita previa.** Siempre nacen de una reserva. Es el flujo
   natural y evita el segundo formulario (§3).
 - **Saltarse un día concreto** (festivos, vacaciones de la clienta). Hoy se

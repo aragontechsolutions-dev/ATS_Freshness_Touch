@@ -445,6 +445,10 @@ export const es: TranslationResources = {
             title: 'Reserva cancelada con el depósito retenido',
             body: 'Quedan {{amount}} retenidos en la tarjeta. Decide: cóbralos o libéralos, o caducarán solos.',
           },
+          team_clash: {
+            title: 'Una cita movida deja a alguien con dos trabajos',
+            body: 'Esta cita se movió al {{when}} y {{count}} de las personas que la llevan ya trabajan a esa hora. No se ha desasignado a nadie: ábrela y reparte los equipos.',
+          },
         },
         payment: {
           refund_failed: {
@@ -478,6 +482,31 @@ export const es: TranslationResources = {
         },
       },
     },
+    /* ---- Mover la cita (etapa 3.32) ---- */
+    reschedule: {
+      title: 'Mover esta cita',
+      subtitle:
+        'La misma reserva, la misma referencia y el mismo precio: solo cambia la hora. Desde aquí no se cobra ni se devuelve nada.',
+      date: 'Fecha nueva',
+      time: 'Hora nueva',
+      sameDuration: 'El trabajo dura lo mismo, así que la hora de fin se mueve con él.',
+      lateWarning:
+        'Quedan menos de {{hours}} horas para esta cita. Moverla ahora da derecho a cobrar el depósito de 35 $ — lo que promete la web es que mover sale gratis con más antelación que esa. Dilo en la llamada.',
+      lateNotAdmin:
+        'Cobrar el depósito lo hace administración, no se hace desde aquí. Avísales de que esta se movió tarde.',
+      outsideHours: 'Fuera del horario, o dentro de las 24 h de antelación',
+      allowOverlap: 'Aunque todos los equipos estén ya ocupados a la hora nueva',
+      notify: 'Mandarle al cliente la fecha nueva por correo',
+      notifyOffWarning:
+        'Entonces cuéntaselo tú. Una hora que cambia sin que el cliente lo sepa es una casa vacía cuando llega el equipo, o alguien esperando una mañana entera.',
+      reasonRequired: 'Por qué se mueve (obligatorio)',
+      reasonOptional: 'Por qué se mueve (opcional)',
+      reasonPlaceholder: 'La clienta pidió el jueves',
+      reasonMissing: 'Escribe arriba por qué.',
+      submit: 'Moverla',
+      done: 'Cita movida. La {{reference}} es ahora el {{when}}.',
+    },
+
     reasonMissing:
       'Escribe arriba el motivo para poder usar «Cancelar la reserva» y «El cliente no estaba».',
     holdStillOpen_one:
@@ -1335,6 +1364,7 @@ export const es: TranslationResources = {
           created: 'Reserva realizada',
           created_manually: 'Reserva metida a mano',
           created_from_series: 'Reserva generada por una serie',
+          rescheduled: 'Cita movida a otra hora',
           team_changed: 'Cambió el equipo',
           adjustment: {
             proposed: 'Avisó de que el trabajo no es el contratado',
@@ -1629,6 +1659,14 @@ export const es: TranslationResources = {
     errorBalanceNothingToCharge: 'En esta reserva no queda saldo por cobrar.',
     errorSeriesNotFound: 'Esa serie ya no existe.',
     errorAlreadyInSeries: 'Esta reserva ya forma parte de una serie.',
+
+    /* ---- Mover la cita (etapa 3.32) ---- */
+    errorCannotReschedule:
+      'Esta reserva ya no se puede mover: ha empezado, ha terminado o está cancelada. Recarga la página para ver cómo está.',
+    errorSameSchedule: 'Esa es la hora que ya tiene. Elige otra.',
+    errorLateRescheduleNeedsReason:
+      'Quedan menos de 24 horas para esta cita, así que moverla da derecho a cobrar el depósito de 35 $. Escribe por qué se mueve.',
+    errorCustomerAlreadyBooked: 'Este cliente ya tiene otra reserva a esa misma hora. Elige otra.',
     errorSeriesEnded:
       'Esta serie está terminada y no se puede reanudar. Crea una nueva desde una reserva.',
     errorPriceNeedsAdmin:

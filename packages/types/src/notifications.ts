@@ -34,6 +34,15 @@ export const NOTIFICATION_EVENTS = [
   'TEAM_ARRIVED_FAR',
   /** Se asigno equipo a una reserva, o se cambio el que habia. */
   'JOB_ASSIGNED',
+  /**
+   * La cita cambio de fecha o de hora.
+   *
+   * SE PUEDE REPETIR, como `JOB_ASSIGNED` y por el mismo motivo: una cita se
+   * mueve del martes al jueves y el jueves al sabado, y el segundo correo
+   * hace mas falta que el primero. La migracion 20261030100100 lo saca del
+   * indice unico de envios.
+   */
+  'BOOKING_RESCHEDULED',
 ] as const;
 /**
  * LOS QUE ADEMAS VAN POR CORREO.
@@ -52,6 +61,7 @@ export const EMAIL_NOTIFICATION_EVENTS = [
   'BOOKING_CONFIRMED',
   'BOOKING_CANCELLED',
   'BOOKING_REMINDER',
+  'BOOKING_RESCHEDULED',
 ] as const;
 export type EmailNotificationEvent = (typeof EMAIL_NOTIFICATION_EVENTS)[number];
 

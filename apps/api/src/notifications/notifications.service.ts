@@ -28,6 +28,7 @@ import {
   bookingCancelledEmail,
   bookingConfirmedEmail,
   bookingReminderEmail,
+  bookingRescheduledEmail,
   newBookingTelegramMessage,
   jobAssignedTelegramMessage,
   teamArrivedFarTelegramMessage,
@@ -112,6 +113,18 @@ export class NotificationsService {
   /** Recordatorio la vispera. Lo dispara el barrido, no un hecho puntual. */
   async bookingReminder(bookingId: string): Promise<void> {
     await this.despachar(bookingId, 'BOOKING_REMINDER');
+  }
+
+  /**
+   * La cita cambio de fecha u hora.
+   *
+   * Se le pasa CUANDO ESTABA PREVISTA ANTES porque la reserva ya se
+   * actualizo: en la base solo queda la fecha nueva, y un correo que dice
+   * «tu limpieza es el jueves» sin decir que antes era el martes no se
+   * distingue de un recordatorio.
+   */
+  async bookingRescheduled(bookingId: string, previousStart: Date): Promise<void> {
+    await this.despachar(bookingId, 'BOOKING_RESCHEDULED', previousStart);
   }
 
   /* ---------------------------------------------------------------------- */
@@ -264,7 +277,12 @@ export class NotificationsService {
     }
   }
 
-  private async despachar(bookingId: string, event: EmailNotificationEvent): Promise<void> {
+  private async despachar(
+    bookingId: string,
+    event: EmailNotificationEvent,
+    /** Solo lo usa `BOOKING_RESCHEDULED`. Ver `bookingRescheduled`. */
+    previousStart?: Date,
+  ): Promise<void> {
     try {
       const reserva = await this.cargar(bookingId);
       if (!reserva) {
@@ -290,6 +308,7 @@ export class NotificationsService {
         companyPhone: negocio.phone,
         companyEmail: negocio.email,
         logoUrl: this.marca.logoUrl,
+        ...(previousStart === undefined ? {} : { previousStart }),
       };
 
       await this.correoAlCliente(bookingId, event, ajustes, reserva.customer.email, datos);
@@ -415,6 +434,21 @@ export class NotificationsService {
       BOOKING_CONFIRMED: ajustes.emailBookingConfirmed,
       BOOKING_CANCELLED: ajustes.emailBookingCancelled,
       BOOKING_REMINDER: ajustes.emailBookingReminder,
+      /*
+       * EL DE LA FECHA NUEVA NO TIENE INTERRUPTOR, Y ES A PROPOSITO.
+       *
+       * Los otros tres se pueden apagar porque un negocio puede decidir que
+       * no quiere mandar confirmaciones o recordatorios. Este no: una cita
+       * que cambia de hora sin que el cliente lo sepa es una casa vacia
+       * cuando llega el equipo, o alguien esperando una manana entera. Un
+       * interruptor global aqui seria una casilla que alguien desmarca una
+       * tarde y que empieza a costar dinero meses despues.
+       *
+       * Donde si se decide es en cada movimiento: `notifyCustomer`, que
+       * sirve para la clienta de siempre que lo acaba de pactar por
+       * telefono y no usa el correo.
+       */
+      BOOKING_RESCHEDULED: true,
     }[event];
 
     if (!encendido) {
@@ -551,6 +585,7 @@ export class NotificationsService {
       BOOKING_CONFIRMED: bookingConfirmedEmail,
       BOOKING_CANCELLED: bookingCancelledEmail,
       BOOKING_REMINDER: bookingReminderEmail,
+      BOOKING_RESCHEDULED: bookingRescheduledEmail,
     }[event];
 
     return plantilla(destinatario, datos);

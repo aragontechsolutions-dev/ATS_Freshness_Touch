@@ -30,6 +30,7 @@ import { GeocodingService } from '../geocoding/geocoding.service';
 import { AuditService } from '../audit/audit.service';
 import { AvailabilityService } from '../scheduling/availability.service';
 import type { SchedulingConfig } from '../scheduling/scheduling.config';
+import { comoFecha } from '../common/fechas';
 import { equiposOcupadosEn, isSlotStillAvailable } from '../scheduling/slots';
 
 /**
@@ -53,6 +54,15 @@ export interface OpcionesDeAdministracion {
   overrides: AdminBookingOverrides;
   /** La serie que la genero, si vino de una. */
   seriesId?: string;
+  /**
+   * QUE DIA LE TOCABA en el calendario de la serie, «AAAA-MM-DD».
+   *
+   * Hoy es el mismo dia en que se crea, pero no tiene que seguir siendolo:
+   * desde que una cita se puede mover, esto es lo que impide que el barrido
+   * de series vuelva a crear la del martes porque alguien la movio al
+   * jueves. Ver la migracion 20261030100000.
+   */
+  seriesOccurrenceDate?: string;
 }
 
 @Injectable()
@@ -642,6 +652,9 @@ export class BookingsService {
             addressId: address.id,
             quoteId: savedQuote.id,
             ...(admin?.seriesId ? { seriesId: admin.seriesId } : {}),
+            ...(admin?.seriesOccurrenceDate
+              ? { seriesOccurrenceDate: comoFecha(admin.seriesOccurrenceDate) }
+              : {}),
             status: requierePago ? 'PENDING_PAYMENT' : 'CONFIRMED',
             service: request.service,
             frequency: request.frequency,

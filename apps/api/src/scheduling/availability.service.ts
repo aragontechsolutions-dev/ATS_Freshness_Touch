@@ -138,6 +138,15 @@ export class AvailabilityService {
      * la comprobacion vea lo mismo que la escritura y el bloqueo sirva de algo.
      */
     client?: Prisma.TransactionClient,
+    /**
+     * UNA RESERVA QUE NO CUENTA COMO OCUPADA. La usa mover una cita.
+     *
+     * Sin esto, mover la cita de las 9:00 a las 10:00 del mismo dia se
+     * choca CONSIGO MISMA: su intervalo viejo todavia esta en la base, se
+     * solapa con el nuevo y, con un solo equipo configurado, el movimiento
+     * se rechaza por falta de equipo. El equipo que falta es el suyo.
+     */
+    excludeBookingId?: string,
   ): Promise<OccupiedInterval[]> {
     const day = DateTime.fromISO(date, { zone: this.config.timezone });
     const dayStart = day.startOf('day').toJSDate();
@@ -147,6 +156,7 @@ export class AvailabilityService {
     const db = client ?? this.prisma.db;
     const bookings = await db.booking.findMany({
       where: {
+        ...(excludeBookingId === undefined ? {} : { id: { not: excludeBookingId } }),
         scheduledStart: { lt: dayEnd },
         scheduledEnd: { gt: dayStart },
         OR: [

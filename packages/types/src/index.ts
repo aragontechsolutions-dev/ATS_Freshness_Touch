@@ -13,6 +13,7 @@ export * from './gallery';
 export * from './media-consent';
 export * from './staff-notification';
 export * from './recurring-series';
+export * from './reschedule';
 export * from './legal';
 export * from './privacy';
 export * from './service-area';

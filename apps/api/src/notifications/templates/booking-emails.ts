@@ -49,6 +49,15 @@ export interface BookingEmailData {
    * sin entorno que preparar.
    */
   logoUrl: string | null;
+  /**
+   * CUANDO ESTABA PREVISTA ANTES, solo en el correo de «hemos movido tu
+   * cita». El resto de plantillas no lo miran.
+   *
+   * Va porque sin el, ese correo dice «tu limpieza es el jueves a las diez»
+   * y el cliente no sabe si eso es el cambio o un recordatorio mas. Las dos
+   * fechas juntas se leen de un vistazo.
+   */
+  previousStart?: Date;
 }
 
 const ETIQUETA_LOCALE: Record<Locale, string> = { en: 'en-US', es: 'es-US' };
@@ -143,6 +152,75 @@ export function bookingCancelledEmail(to: string, data: BookingEmailData): Email
     subject: es
       ? `Limpieza cancelada · ${data.reference}`
       : `Cleaning cancelled · ${data.reference}`,
+    text: comoTexto(titulo, parrafos, datos, nota, data),
+    html: comoHtml(titulo, parrafos, datos, nota, data),
+  };
+}
+
+/**
+ * Correo de «hemos movido tu cita».
+ *
+ * ========================================================================
+ * ES EL CORREO MAS IMPORTANTE DE LOS CUATRO
+ * ========================================================================
+ * Una confirmacion que no llega se nota al dia siguiente; un recordatorio que
+ * no llega cuesta una ausencia. Una cita que cambia de hora sin que el
+ * cliente lo sepa es una casa vacia cuando llega el equipo, o alguien
+ * esperando una manana entera a nadie. Y las dos cosas pasan sin que nadie
+ * las vea venir.
+ *
+ * Por eso lleva LAS DOS FECHAS. Decir solo la nueva obliga a quien lo lee a
+ * recordar la vieja para entender que ha cambiado algo, y lo normal es que
+ * no la recuerde.
+ *
+ * NO LLEVA EL MOTIVO. Lo escribe el equipo en el panel para el registro
+ * —«el equipo esta en otro trabajo», «la clienta lo pidio por telefono»— y
+ * es una nota interna. Misma regla que la cancelacion, en la cabecera.
+ */
+export function bookingRescheduledEmail(to: string, data: BookingEmailData): EmailMessage {
+  const es = data.locale === 'es';
+  const nuevo = formatearFecha(data.scheduledStart, data.timezone, data.locale);
+  const anterior =
+    data.previousStart === undefined
+      ? null
+      : formatearFecha(data.previousStart, data.timezone, data.locale);
+
+  const titulo = es ? 'Tu limpieza ha cambiado de fecha' : 'Your cleaning has been moved';
+
+  const parrafos = es
+    ? [
+        `Hola ${data.customerFirstName}:`,
+        'Hemos movido tu limpieza. El precio no cambia y no hace falta que hagas nada: si la fecha nueva no te sirve, contesta a este correo o llámanos.',
+      ]
+    : [
+        `Hi ${data.customerFirstName},`,
+        'We have moved your cleaning. The price does not change and there is nothing you need to do: if the new date does not work for you, reply to this email or give us a call.',
+      ];
+
+  const datos: [string, string][] = es
+    ? [
+        ['Referencia', data.reference],
+        ...(anterior === null ? [] : ([['Antes era', anterior]] as [string, string][])),
+        ['Ahora es', nuevo],
+      ]
+    : [
+        ['Reference', data.reference],
+        ...(anterior === null ? [] : ([['Was', anterior]] as [string, string][])),
+        ['Now', nuevo],
+      ];
+
+  /*
+   * El resto por pagar se repite aqui porque es lo segundo que se pregunta
+   * al leer que algo ha cambiado: si el cambio de fecha cambia la cuenta. No.
+   */
+  const resto = formatearDinero(data.balanceDueCents, data.currency, data.locale);
+  const nota = es
+    ? `El día del servicio quedan ${resto} por pagar, igual que antes.`
+    : `There is still ${resto} due on the day, the same as before.`;
+
+  return {
+    to,
+    subject: es ? `Nueva fecha · ${data.reference}` : `New date · ${data.reference}`,
     text: comoTexto(titulo, parrafos, datos, nota, data),
     html: comoHtml(titulo, parrafos, datos, nota, data),
   };

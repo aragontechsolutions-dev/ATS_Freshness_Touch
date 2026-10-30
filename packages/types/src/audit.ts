@@ -103,6 +103,16 @@ const ACCIONES_FIJAS = [
   /** Alguien convirtio una reserva en serie, o la paro. */
   'series.created',
   'series.updated',
+  /**
+   * SE MOVIO UNA CITA DE FECHA U HORA.
+   *
+   * Es una accion propia y no un cambio de estado porque la pregunta que
+   * contesta es otra: cuantas veces se ha movido esta cita, y cuales de esos
+   * movimientos llegaron con menos de 24 horas. Lo segundo es lo que da
+   * derecho a cobrar el deposito, asi que tiene que poder leerse de la fila
+   * sin reconstruir nada.
+   */
+  'booking.rescheduled',
 
   /* --- Los derechos de privacidad -------------------------------------- */
   /**

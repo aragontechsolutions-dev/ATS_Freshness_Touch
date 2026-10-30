@@ -70,6 +70,16 @@ export const STAFF_NOTIFICATION_KINDS = [
    * un proveedor de correo, y la bandeja dejaria de leerse.
    */
   'notification.failed',
+  /**
+   * Una cita se movio y el equipo que tenia asignado ya trabaja a esa hora.
+   *
+   * MOVER NO DESASIGNA A NADIE, y por eso hace falta este aviso: quitar el
+   * equipo por su cuenta dejaria el trabajo sin nadie y nadie se enteraria
+   * hasta la manana del servicio. Lo que se hace es moverla igual —que es lo
+   * que pidio quien lo pidio— y decir que hay una persona con dos trabajos a
+   * la vez, que es una decision de coordinacion y no de un servicio.
+   */
+  'booking.team_clash',
 ] as const;
 export const StaffNotificationKindSchema = z.enum(STAFF_NOTIFICATION_KINDS);
 export type StaffNotificationKind = z.infer<typeof StaffNotificationKindSchema>;
@@ -149,4 +159,6 @@ export const NOTIFICATION_AUDIENCE: Record<
   'series.slot_taken': 'DISPATCHER',
   /* A administracion: quien puede llamar al cliente y rehacer el envio. */
   'notification.failed': 'ADMIN',
+  /* A coordinacion, que es quien reparte los equipos. */
+  'booking.team_clash': 'DISPATCHER',
 };
