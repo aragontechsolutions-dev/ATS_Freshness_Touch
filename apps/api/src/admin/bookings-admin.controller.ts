@@ -25,6 +25,7 @@ import {
   AdminChargeBalanceSchema,
   AdminRefundPaymentSchema,
   AdminReleaseDepositSchema,
+  AdminRescheduleSchema,
   AdminStatusChangeSchema,
   FieldAdjustmentDecisionSchema,
   type AdminAssignmentsUpdate,
@@ -38,6 +39,7 @@ import {
   type AdminRefundPayment,
   type AdminReleaseDeposit,
   type AdminStaffList,
+  type AdminReschedule,
   type AdminStatusChange,
   type AuthenticatedStaff,
   type FieldAdjustmentDecision,
@@ -235,6 +237,37 @@ export class BookingActionsController {
     await this.actions.changeStatus(bookingId, change, staff, request.ip ?? null);
     // Se devuelve la reserva ya actualizada: asi el panel no tiene que
     // adivinar el nuevo estado ni hacer una segunda peticion.
+    return this.bookings.detail(bookingId);
+  }
+
+  /**
+   * MUEVE LA CITA A OTRA HORA.
+   *
+   * ======================================================================
+   * ADMINISTRACION Y COORDINACION, y es la frontera entera de esta etapa
+   * ======================================================================
+   * Mover la agenda es el trabajo de coordinacion: es quien habla con el
+   * cliente que no puede el martes. Lo que NO puede hacer es cobrar, y mover
+   * no cobra —ni cuando llega tarde y la promesa del sitio da derecho a
+   * cobrar el deposito—. Ese boton es el de abajo y es solo de
+   * administracion.
+   *
+   * Si mover cobrara, esta linea de permisos se habria roto sin que nadie
+   * cambiara una sola anotacion.
+   */
+  @Patch('schedule')
+  @Roles('ADMIN', 'DISPATCHER')
+  async reschedule(
+    @Param('bookingId', new ParseUUIDPipe({ version: '4' })) bookingId: string,
+    /* Al cuerpo, no al metodo. Ver la nota de `changeStatus`. */
+    @Body(new ZodValidationPipe<AdminReschedule>(AdminRescheduleSchema))
+    cambio: AdminReschedule,
+    @CurrentStaff() staff: AuthenticatedStaff,
+    @Req() request: Request,
+  ): Promise<AdminBookingDetail> {
+    await this.actions.reschedule(bookingId, cambio, staff, request.ip ?? null);
+    // La ficha ya movida, como el resto de acciones: el panel pinta lo que
+    // decidio el servidor en vez de suponer que hizo lo que se le pidio.
     return this.bookings.detail(bookingId);
   }
 

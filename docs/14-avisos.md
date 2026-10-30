@@ -216,10 +216,13 @@ Correos simulados                   cliente (en español) + copia interna
 
 ## 10. Lo que queda fuera
 
-**Reintentos automáticos.** Un envío fallido queda anotado y se puede repetir,
-pero nadie lo repite solo. Con el volumen actual es más sensato verlo en el
-panel y decidir; una cola de reintentos es infraestructura que todavía no se
-justifica.
+**~~Reintentos automáticos.~~** Ya existen desde la etapa 3.30:
+`docs/46-el-correo-que-fallo.md`. Lo que sigue describe cómo estaba cuando se
+escribió esto.
+
+Un envío fallido queda anotado y se puede repetir, pero nadie lo repite solo.
+Con el volumen actual es más sensato verlo en el panel y decidir; una cola de
+reintentos es infraestructura que todavía no se justifica.
 
 **Ver los avisos en el detalle de la reserva.** La tabla ya lo registra todo y
 el contrato del panel existe; falta la pantalla que lo muestre.
@@ -343,3 +346,52 @@ que le toca, con cuenta de lo no leído por persona.
 
 Son complementarios y **no se sustituyen**: Telegram avisa, la bandeja
 recuerda. Un aviso importante va por los dos sitios.
+
+---
+
+## 13. El cuarto correo: la cita se ha movido
+
+> Etapa 3.32. Código: `bookingRescheduledEmail` en
+> `templates/booking-emails.ts`. Detalle completo en
+> `docs/48-mover-la-cita.md` §6.
+
+`BOOKING_RESCHEDULED` se manda cuando una cita cambia de fecha o de hora, y es
+**el más importante de los cuatro**. Una confirmación que no llega se nota al
+día siguiente; un recordatorio que no llega cuesta una ausencia. Una cita que
+cambia de hora sin que el cliente lo sepa es **una casa vacía cuando llega el
+equipo**, o alguien esperando una mañana entera.
+
+Tres cosas lo distinguen de los otros tres:
+
+1. **Lleva las dos fechas**, la vieja y la nueva. Decir solo la nueva obliga a
+   quien lo lee a recordar la vieja para entender que algo ha cambiado, y lo
+   normal es que no la recuerde. Es el único correo que recibe un dato que ya
+   no está en la base: `previousStart` se le pasa a la plantilla porque la fila
+   ya se actualizó.
+2. **No se puede apagar desde los ajustes.** Los otros tres sí, porque un
+   negocio puede decidir que no quiere mandar confirmaciones ni recordatorios.
+   Este sería una casilla que alguien desmarca una tarde y que empieza a costar
+   dinero meses después. Donde sí se decide es en cada movimiento
+   (`notifyCustomer`), para la clienta de siempre que lo acaba de pactar por
+   teléfono y no usa el correo.
+3. **Se puede repetir**, como `JOB_ASSIGNED` y por el mismo motivo: una cita se
+   mueve del martes al jueves y el jueves al sábado, y el segundo correo hace
+   más falta que el primero. La migración `20261030100100` lo saca del índice
+   único de envíos — antes, el segundo envío chocaba con el índice **después**
+   de que el correo ya hubiera salido, dejando al cliente avisado y al registro
+   diciendo que no.
+
+**No lleva el motivo del movimiento.** Lo escribe el equipo en el panel para el
+registro —«el equipo está en otro trabajo»— y es una nota interna: la misma
+regla que la cancelación (§4).
+
+### Y el recordatorio se vuelve a armar
+
+Al mover una cita **se borra su fila de `BOOKING_REMINDER`**. Sin eso, una cita
+que ya recibió el recordatorio de la víspera y se mueve a la semana siguiente
+se queda fuera del barrido para siempre (§11), y el cliente no recibe aviso de
+la fecha nueva, que es justo la que no tiene en la cabeza.
+
+La contrapartida: se pierde la constancia de que aquel recordatorio salió. Se
+acepta porque un recordatorio de un día que ya no existe no es prueba de nada
+útil. Queda anotado en la auditoría con `reminderReset`.

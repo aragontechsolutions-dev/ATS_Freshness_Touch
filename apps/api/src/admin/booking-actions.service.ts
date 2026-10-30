@@ -5,23 +5,29 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
+import { DateTime } from 'luxon';
 import {
   API_ERROR_CODES,
+  canReschedule,
   canTransition,
   chargeableBalanceCents,
   refundableCents,
   type AdminCaptureDeposit,
   type AdminRefundPayment,
   type AdminReleaseDeposit,
+  type AdminReschedule,
   type AdminStatusChange,
   type AuthenticatedStaff,
   type BookingStatus,
+  isLateReschedule,
 } from '@freshness/types';
 import { AuditService } from '../audit/audit.service';
 import { StaffNotificationsService } from '../staff-notifications/staff-notifications.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../database/prisma.service';
 import { PaymentsService } from '../payments/payments.service';
+import { AvailabilityService } from '../scheduling/availability.service';
+import { equiposOcupadosEn } from '../scheduling/slots';
 import { PaymentProviderError } from '../payments/payments.types';
 
 /** Marcas de tiempo que acompañan a cada estado. */
@@ -41,6 +47,7 @@ export class BookingActionsService {
     private readonly audit: AuditService,
     private readonly notifications: NotificationsService,
     private readonly bandeja: StaffNotificationsService,
+    private readonly availability: AvailabilityService,
   ) {}
 
   /**
@@ -149,6 +156,299 @@ export class BookingActionsService {
           },
         });
       }
+    }
+  }
+
+  /**
+   * MUEVE LA CITA. La misma fila, otra hora.
+   *
+   * ======================================================================
+   * POR QUE ESTO NO ES «CANCELAR Y CREAR OTRA»
+   * ======================================================================
+   * Hasta esta etapa era lo unico que se podia hacer, y no es un atajo
+   * incomodo: es otra cosa. Cancelar y crear deja dos filas donde hubo un
+   * servicio, cambia la referencia que el cliente tiene por escrito, y deja
+   * la retencion de 35 dolares colgando de una cita cancelada mientras la
+   * nueva nace sin deposito.
+   *
+   * Aqui no cambia nada de eso: ni la referencia, ni el precio, ni los pagos,
+   * ni el historial. Cambian dos columnas.
+   *
+   * ======================================================================
+   * NO COBRA NADA, AUNQUE LLEGUE TARDE
+   * ======================================================================
+   * La promesa del sitio es que mover con 24 horas de antelacion es gratis y
+   * que por debajo de eso se cobra el deposito. Esto SABE si el movimiento
+   * llega tarde —lo anota en la auditoria— pero no toca la tarjeta de nadie:
+   * son dos decisiones, igual que al cancelar. Mover la agenda lo hace
+   * coordinacion; cobrar lo hace administracion con el boton que ya existe.
+   *
+   * Si mover cobrara, quien lleva la agenda estaria cobrandole a un cliente
+   * sin pulsar nunca un boton de cobro.
+   *
+   * ======================================================================
+   * LO QUE SE ARRASTRA DETRAS, Y QUE SE HACE CON CADA COSA
+   * ======================================================================
+   *   - EL RECORDATORIO. Si ya salio el de la vispera, su fila deja a la
+   *     reserva fuera del barrido para siempre. Se borra: ver abajo.
+   *   - LA OCURRENCIA DE LA SERIE. No se toca, y es lo que impide que el
+   *     barrido vuelva a crear la cita del dia que se acaba de dejar libre.
+   *   - EL EQUIPO ASIGNADO. Se queda. Si ahora choca, se avisa a la bandeja.
+   *   - EL PIN DE LA PUERTA. Caduca 24 h despues del final del trabajo y ese
+   *     final se calcula, no se guarda: se mueve solo con la cita.
+   */
+  async reschedule(
+    bookingId: string,
+    cambio: AdminReschedule,
+    staff: AuthenticatedStaff,
+    ipAddress: string | null,
+    now: Date = new Date(),
+  ): Promise<void> {
+    const nuevoInicio = new Date(cambio.startsAt);
+
+    const config = await this.availability.schedulingConfig();
+    const localDate = DateTime.fromJSDate(nuevoInicio)
+      .setZone(config.timezone)
+      .toFormat('yyyy-MM-dd');
+
+    /*
+     * Ni al mes pasado ni a dentro de dos anos. Es la misma guardia que usa
+     * el cotizador publico, y aqui tapa el error de teclear el ano viejo:
+     * una cita movida a una fecha pasada desaparece de la agenda sin que
+     * nadie la cancele.
+     */
+    this.availability.assertDateInRange(localDate, now);
+
+    const anterior = await this.prisma.db.$transaction(async (tx) => {
+      const reserva = await tx.booking.findUnique({
+        where: { id: bookingId },
+        select: {
+          id: true,
+          status: true,
+          reference: true,
+          customerId: true,
+          scheduledStart: true,
+          scheduledEnd: true,
+        },
+      });
+
+      if (!reserva) throw this.notFound();
+
+      if (!canReschedule(reserva.status)) {
+        /*
+         * 409 y no 400: la peticion esta bien escrita, lo que pasa es que la
+         * cita ya empezo o ya termino. Normalmente significa que alguien la
+         * cambio desde otra pantalla mientras esta estaba abierta.
+         */
+        throw new ConflictException({
+          code: API_ERROR_CODES.INVALID_TRANSITION,
+          messageKey: 'admin.errorCannotReschedule',
+        });
+      }
+
+      if (nuevoInicio.getTime() === reserva.scheduledStart.getTime()) {
+        throw new BadRequestException({
+          code: API_ERROR_CODES.VALIDATION_ERROR,
+          messageKey: 'admin.errorSameSchedule',
+        });
+      }
+
+      const tarde = isLateReschedule(reserva.scheduledStart, now);
+
+      /*
+       * LA SEGUNDA MITAD DE LA REGLA DEL MOTIVO, la que el esquema no puede
+       * comprobar: saltarse el horario o doblar un equipo ya lo exige, pero
+       * «llega tarde» depende de cuando era la cita vieja, y eso solo se sabe
+       * aqui. Un movimiento tardio da derecho a cobrar 35 dolares, y lo que
+       * cuesta dinero se explica en el momento.
+       */
+      if (tarde && cambio.reason.length < 3) {
+        throw new BadRequestException({
+          code: API_ERROR_CODES.VALIDATION_ERROR,
+          messageKey: 'admin.errorLateRescheduleNeedsReason',
+        });
+      }
+
+      /* La duracion no cambia: lo que se mueve es el principio. */
+      const duracionMs = reserva.scheduledEnd.getTime() - reserva.scheduledStart.getTime();
+      const nuevoFin = new Date(nuevoInicio.getTime() + duracionMs);
+
+      /* El mismo bloqueo por dia que usa crear, y por lo mismo. */
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`booking:${localDate}`}))`;
+
+      /*
+       * SE EXCLUYE ELLA MISMA, que es el detalle que no se ve venir: mover
+       * una cita de las 9:00 a las 10:00 del mismo dia la haria chocar con
+       * su propio intervalo viejo, que todavia esta en la base.
+       */
+      const occupied = await this.availability.findOccupied(localDate, now, tx, bookingId);
+
+      const libre =
+        cambio.allowOverlap || equiposOcupadosEn(nuevoInicio, nuevoFin, occupied) < config.crews;
+
+      if (!libre) {
+        throw new ConflictException({
+          code: API_ERROR_CODES.SLOT_UNAVAILABLE,
+          messageKey: 'booking.errorSlotTaken',
+        });
+      }
+
+      /*
+       * Y EL MISMO CLIENTE NO PUEDE TENER DOS CITAS A LA MISMA HORA.
+       *
+       * Hay un indice unico parcial sobre (customerId, scheduledStart) para
+       * las no canceladas (migracion 20260920180000). Sin esta comprobacion
+       * el movimiento reventaria contra el indice y saldria un 500 generico
+       * donde lo que hay es un caso perfectamente entendible: la clienta de
+       * siempre ya tenia otra cita ese dia a esa hora.
+       */
+      const choque = await tx.booking.findFirst({
+        where: {
+          id: { not: bookingId },
+          customerId: reserva.customerId,
+          scheduledStart: nuevoInicio,
+          status: { not: 'CANCELLED' },
+        },
+        select: { id: true },
+      });
+
+      if (choque) {
+        throw new ConflictException({
+          code: API_ERROR_CODES.SLOT_UNAVAILABLE,
+          messageKey: 'admin.errorCustomerAlreadyBooked',
+        });
+      }
+
+      await tx.booking.update({
+        where: { id: bookingId },
+        data: { scheduledStart: nuevoInicio, scheduledEnd: nuevoFin },
+      });
+
+      /*
+       * EL RECORDATORIO VUELVE A ARMARSE, Y SE BORRA LA FILA PARA ELLO.
+       *
+       * El barrido de la vispera busca reservas SIN una fila
+       * `BOOKING_REMINDER` enviada. Si la cita del martes ya recibio su
+       * recordatorio y se mueve a la semana siguiente, esa fila la deja
+       * fuera para siempre: el cliente se queda sin aviso de la fecha nueva,
+       * que es justo la que no tiene en la cabeza.
+       *
+       * Se borra en vez de marcarse, y es una decision con contrapartida: se
+       * pierde la constancia de que aquel recordatorio salio. Se acepta
+       * porque un recordatorio de un dia que ya no existe no es prueba de
+       * nada util, mientras que el correo de la fecha nueva —ese se
+       * conserva— cuenta lo que de verdad paso. Queda anotado en la
+       * auditoria con `reminderReset`.
+       */
+      const recordatorios = await tx.notification.deleteMany({
+        where: { bookingId, event: 'BOOKING_REMINDER' },
+      });
+
+      await this.audit.record(
+        {
+          staff,
+          surface: 'PANEL',
+          action: 'booking.rescheduled',
+          entityType: 'booking',
+          entityId: bookingId,
+          /*
+           * LAS DOS FECHAS Y SI LLEGO TARDE. Lo tardio es lo que da derecho
+           * a cobrar el deposito, asi que al revisar el mes hay que poder
+           * ver cual de los movimientos lo era sin reconstruirlo a mano.
+           *
+           * Ni el nombre del cliente ni su direccion: la referencia abre la
+           * ficha, y ahi esta todo.
+           */
+          metadata: {
+            reference: reserva.reference,
+            from: reserva.scheduledStart.toISOString(),
+            to: nuevoInicio.toISOString(),
+            late: tarde,
+            outsideHours: cambio.allowOutsideHours,
+            overlapped: cambio.allowOverlap,
+            notified: cambio.notifyCustomer,
+            reminderReset: recordatorios.count > 0,
+            reason: cambio.reason === '' ? null : cambio.reason,
+          },
+          ipAddress,
+        },
+        tx,
+      );
+
+      this.logger.log(
+        `Reserva ${reserva.reference} movida a ${nuevoInicio.toISOString()} por ${staff.email}` +
+          (tarde ? ' (con menos de 24 h de antelacion)' : ''),
+      );
+
+      return reserva.scheduledStart;
+    });
+
+    /*
+     * EL CORREO SALE DESPUES DE CONSOLIDAR, igual que en el cambio de estado:
+     * dentro, un fallo del proveedor desharia un movimiento que el equipo ya
+     * dio por hecho. Y si el correo falla, ahora se reintenta solo (etapa
+     * 3.30).
+     */
+    if (cambio.notifyCustomer) {
+      await this.notifications.bookingRescheduled(bookingId, anterior);
+    }
+
+    await this.avisarSiElEquipoChoca(bookingId, nuevoInicio);
+  }
+
+  /**
+   * ¿Alguien del equipo asignado trabaja ya a la hora nueva?
+   *
+   * MOVER NO DESASIGNA A NADIE. Quitar el equipo por su cuenta dejaria el
+   * trabajo sin nadie, y nadie se enteraria hasta la manana del servicio.
+   * Lo que se hace es mover la cita —que es lo que pidieron— y decir que hay
+   * una persona con dos trabajos a la vez, que es una decision de
+   * coordinacion.
+   *
+   * NO LANZA. El movimiento ya esta guardado y vale mas que su aviso.
+   */
+  private async avisarSiElEquipoChoca(bookingId: string, nuevoInicio: Date): Promise<void> {
+    try {
+      const reserva = await this.prisma.db.booking.findUnique({
+        where: { id: bookingId },
+        select: {
+          scheduledEnd: true,
+          assignments: { select: { staffId: true } },
+        },
+      });
+
+      if (!reserva || reserva.assignments.length === 0) return;
+
+      const choques = await this.prisma.db.bookingAssignment.count({
+        where: {
+          bookingId: { not: bookingId },
+          staffId: { in: reserva.assignments.map((fila) => fila.staffId) },
+          booking: {
+            status: { notIn: ['CANCELLED', 'COMPLETED', 'NO_SHOW'] },
+            scheduledStart: { lt: reserva.scheduledEnd },
+            scheduledEnd: { gt: nuevoInicio },
+          },
+        },
+      });
+
+      if (choques === 0) return;
+
+      await this.bandeja.emitir({
+        kind: 'booking.team_clash',
+        entityType: 'booking',
+        entityId: bookingId,
+        /*
+         * CUANTAS, no quienes: la bandeja se mira en un movil y el nombre de
+         * quien limpia no hace falta para decidir que hay que abrir la ficha.
+         * Dentro estan los nombres.
+         */
+        params: { count: choques, startsAt: nuevoInicio.toISOString() },
+      });
+    } catch (error) {
+      this.logger.error(
+        `No se pudo comprobar el choque de equipo al mover ${bookingId}: ` +
+          (error instanceof Error ? error.message : 'error desconocido'),
+      );
     }
   }
 

@@ -87,6 +87,8 @@ enum NotificationEvent {
   TEAM_ARRIVED_FAR
   /// Se asigno equipo a una reserva, o se cambio el que habia.
   JOB_ASSIGNED
+  /// La cita cambio de fecha u hora. Se puede repetir: ver 20261030100100.
+  BOOKING_RESCHEDULED
 }
 
 enum NotificationChannel {
@@ -368,6 +370,18 @@ model Booking {
   seriesId String?          @db.Uuid
   series   RecurringSeries? @relation(fields: [seriesId], references: [id], onDelete: SetNull)
 
+  /// QUE DIA LE TOCABA EN EL CALENDARIO DE LA SERIE. Nulo en las citas sueltas.
+  ///
+  /// No es lo mismo que `scheduledStart`, y confundirlos duplicaba citas.
+  /// El barrido de series decide que falta comparando el calendario con las
+  /// citas que ya existen; si esa comparacion usa el dia en que la cita se
+  /// hace, mover la del martes al jueves deja el martes sin cubrir y a la
+  /// hora siguiente nace otra cita en el hueco que se acababa de dejar.
+  ///
+  /// Esto es INMUTABLE: la cita se puede mover tres veces y sigue siendo la
+  /// ocurrencia del martes 3. Ver la migracion 20261030100000.
+  seriesOccurrenceDate DateTime? @db.Date
+
   status BookingStatus @default(PENDING_PAYMENT)
 
   // --- Fotografia del servicio contratado ---
@@ -463,6 +477,9 @@ model Booking {
   @@index([customerId])
   @@index([status])
   @@index([zone, scheduledStart])
+  /// Por donde entra el barrido de las series al preguntar que ocurrencias
+  /// ya tienen cita. Creado en la migracion 20261030100000.
+  @@index([seriesId, seriesOccurrenceDate], map: "bookings_serie_ocurrencia")
   @@map("bookings")
 }
 
@@ -808,6 +825,10 @@ model Notification {
   /// JOB_ASSIGNED QUEDA FUERA de esa restriccion desde la migracion
   /// 20261011120100. Una reasignacion tiene que poder volver a avisar: si no,
   /// el grupo del equipo seguiria creyendo que va quien ya no va.
+  ///
+  /// Y BOOKING_RESCHEDULED tambien, desde la 20261030100100: una cita se
+  /// puede mover del martes al jueves y el jueves al sabado, y el segundo
+  /// correo hace mas falta que el primero.
   @@index([bookingId, createdAt(sort: Desc)])
   @@map("notifications")
 }

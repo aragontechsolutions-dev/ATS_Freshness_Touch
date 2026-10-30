@@ -12,6 +12,7 @@ import {
   type SeriesUpdate,
 } from '@freshness/types';
 import { AuditService } from '../audit/audit.service';
+import { comoFecha } from '../common/fechas';
 import { PrismaService } from '../database/prisma.service';
 import { AvailabilityService } from '../scheduling/availability.service';
 
@@ -126,8 +127,18 @@ export class SeriesService {
         },
       });
 
-      /* La cita que la origino pasa a ser la primera de la serie. */
-      await tx.booking.update({ where: { id: bookingId }, data: { seriesId: creada.id } });
+      /*
+       * La cita que la origino pasa a ser la primera de la serie, y con ella
+       * la ocurrencia que ocupa: su propio dia. Sin esto, mover esa primera
+       * cita haria que el barrido generara otra en su sitio.
+       */
+      await tx.booking.update({
+        where: { id: bookingId },
+        data: {
+          seriesId: creada.id,
+          seriesOccurrenceDate: comoFecha(inicio.toFormat('yyyy-MM-dd')),
+        },
+      });
 
       await this.audit.record(
         {
@@ -285,16 +296,4 @@ export class SeriesService {
       nextAt: fila.bookings[0]?.scheduledStart.toISOString() ?? null,
     });
   }
-}
-
-/**
- * De «AAAA-MM-DD» a lo que admite una columna `date`.
- *
- * Prisma exige un ISO-8601 completo aunque la columna solo guarde el dia, y
- * con la cadena corta responde «premature end of input». Se fija a mediodia
- * UTC y no a medianoche para que ningun desfase horario de una hora mueva la
- * fecha al dia anterior.
- */
-export function comoFecha(dia: string): Date {
-  return new Date(`${dia}T12:00:00.000Z`);
 }

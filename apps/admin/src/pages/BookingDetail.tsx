@@ -10,6 +10,7 @@ import {
   sessionLostReason,
 } from '../lib/api';
 import { BookingActions } from '../components/BookingActions';
+import { MoverCita } from '../components/MoverCita';
 import { RepetirReserva } from '../components/RepetirReserva';
 import { StatusChip } from '../components/StatusChip';
 import { TeamSection } from '../components/TeamSection';
@@ -301,6 +302,22 @@ export function BookingDetailPage({
           </div>
         </dl>
       </section>
+
+      {/*
+        MOVER LA CITA VA PRIMERO de las tres, porque es la pregunta que trae
+        la llamada: «no puedo el martes». Lo de repetirla y lo de cobrarla
+        son conversaciones distintas, y las dos vienen despues de resolver
+        esa.
+      */}
+      <MoverCita
+        booking={booking}
+        staff={staff}
+        // La respuesta trae la ficha ya movida: no hace falta otra peticion.
+        onMovida={setBooking}
+        onSessionLost={() => {
+          onSessionLost('expired');
+        }}
+      />
 
       {/*
         «¿ESTO SE REPITE?» VA ANTES DE LAS ACCIONES y despues del equipo: se

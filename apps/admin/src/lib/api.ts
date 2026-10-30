@@ -59,6 +59,7 @@ import {
   type MyJobs,
   type StaffCreate,
   type StaffUpdate,
+  type AdminRescheduleInput,
   type AdminStatusChangeInput,
   type ApiError,
   type BusinessSettings,
@@ -300,6 +301,25 @@ export function changeBookingStatus(
   return request(`/admin/bookings/${bookingId}/status`, parseDetail('cambio de estado'), {
     method: 'PATCH',
     body: change,
+  });
+}
+
+/**
+ * MUEVE LA CITA a otra fecha u hora.
+ *
+ * Administracion y coordinacion. Mover la agenda es el trabajo de
+ * coordinacion; lo que no puede hacer es cobrar, y esto NO COBRA —ni cuando
+ * el movimiento llega con menos de 24 horas y la promesa del sitio da
+ * derecho a cobrar el deposito—. Ese boton es `captureDeposit`, aqui abajo,
+ * y es solo de administracion.
+ */
+export function rescheduleBooking(
+  bookingId: string,
+  cambio: AdminRescheduleInput,
+): Promise<AdminBookingDetail> {
+  return request(`/admin/bookings/${bookingId}/schedule`, parseDetail('mover la cita'), {
+    method: 'PATCH',
+    body: cambio,
   });
 }
 

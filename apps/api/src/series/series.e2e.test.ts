@@ -327,6 +327,80 @@ describe('el barrido crea las citas', () => {
   });
 });
 
+describe('mover una cita de la serie', () => {
+  /*
+   * ESTA ES LA PRUEBA QUE JUSTIFICA LA COLUMNA `seriesOccurrenceDate`, y el
+   * fallo que evita no se habria visto hasta tener a una clienta con dos
+   * citas la misma semana.
+   *
+   * El barrido decide que falta comparando el calendario de la serie con las
+   * citas que ya existen. Mientras nadie mueve nada, «el dia que le tocaba» y
+   * «el dia en que se hace» son el mismo y la comparacion funciona con
+   * cualquiera de los dos. Desde que una cita se puede mover (etapa 3.32)
+   * dejan de serlo: si se compara el dia en que se hace, mover la del martes
+   * al jueves deja el martes sin cubrir, y a la hora siguiente el barrido
+   * crea otra cita en el hueco que se acababa de dejar libre.
+   */
+  it('NO HACE QUE EL BARRIDO CREE OTRA EN SU SITIO', async () => {
+    const martes = proximoMartes();
+    const bookingId = await reservaDe('ana.mover1@example.com', martes);
+    const seriesId = (await serieDe(bookingId)).body.id as string;
+
+    await barrido().pasada();
+    const antes = await citasDeLaSerie(seriesId);
+
+    /* Del martes al jueves de la misma semana, a la misma hora. */
+    const jueves = martes.plus({ days: 2 });
+    const movida = await request(app.getHttpServer())
+      .patch(`${RESERVAS}/${bookingId}/schedule`)
+      .set('authorization', `Bearer ${await comoAda()}`)
+      .send({ startsAt: jueves.toUTC().toISO(), reason: 'La clienta pidio el jueves' });
+
+    expect(movida.status).toBe(200);
+
+    await barrido().pasada();
+    const despues = await citasDeLaSerie(seriesId);
+
+    /* El mismo numero de citas: ni una mas. */
+    expect(despues.length).toBe(antes.length);
+
+    /* Y la que se movio esta el jueves, no el martes. */
+    const jueveses = despues.filter(
+      (cita) => DateTime.fromJSDate(cita).setZone(ZONA).weekday === 4,
+    );
+    expect(jueveses).toHaveLength(1);
+  });
+
+  it('la ocurrencia que ocupa no cambia al moverla', async () => {
+    /*
+     * Es lo que hace cierto lo anterior: la cita sigue siendo «la del martes
+     * 3» aunque se haga el jueves 5. Si esta columna se moviera con la cita,
+     * la prueba de arriba volveria a fallar sola.
+     */
+    const martes = proximoMartes();
+    const bookingId = await reservaDe('ana.mover2@example.com', martes);
+    await serieDe(bookingId);
+
+    const ocurrenciaAntes = await db.query<{ seriesOccurrenceDate: Date | null }>(
+      `SELECT "seriesOccurrenceDate" FROM bookings WHERE id = '${bookingId}'`,
+    );
+
+    await request(app.getHttpServer())
+      .patch(`${RESERVAS}/${bookingId}/schedule`)
+      .set('authorization', `Bearer ${await comoAda()}`)
+      .send({ startsAt: martes.plus({ days: 2 }).toUTC().toISO(), reason: 'Lo pidio la clienta' });
+
+    const ocurrenciaDespues = await db.query<{ seriesOccurrenceDate: Date | null }>(
+      `SELECT "seriesOccurrenceDate" FROM bookings WHERE id = '${bookingId}'`,
+    );
+
+    expect(ocurrenciaAntes.rows[0]?.seriesOccurrenceDate).not.toBeNull();
+    expect(ocurrenciaDespues.rows[0]?.seriesOccurrenceDate).toEqual(
+      ocurrenciaAntes.rows[0]?.seriesOccurrenceDate,
+    );
+  });
+});
+
 describe('cuando la franja esta llena', () => {
   /*
    * NO DOBLA EL EQUIPO POR SU CUENTA. Un barrido que decide doblar turnos es

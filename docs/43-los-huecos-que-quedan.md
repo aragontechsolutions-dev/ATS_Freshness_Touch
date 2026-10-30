@@ -151,12 +151,25 @@ ha restaurado nunca una.
 
 Una copia que no se ha restaurado nunca no es una copia: es una suposición.
 
-### B4. No se puede mover una cita
+### B4. ~~No se puede mover una cita~~ — HECHO (etapa 3.32)
+
+> **Tapado**, ver `docs/48-mover-la-cita.md`. Lo que sigue describe cómo
+> estaba.
 
 Hoy reprogramar es **cancelar y crear otra**. Eso pierde el historial, obliga a
 decidir qué hacer con la retención y deja dos filas donde hubo un servicio.
 Siendo que la pregunta frecuente promete mover una cita sin coste con 24 h de
 antelación, es la operación que más se va a pedir.
+
+**Cómo se tapó:** la misma fila cambia de hora, con la referencia, el precio y
+los pagos intactos. Mover **no cobra** —lo señala, lo anota y deja el cobro a
+administración, que es quien tiene ese botón—, el correo de la fecha nueva
+lleva las dos fechas, y el recordatorio ya enviado se re-arma. De paso destapó
+un fallo que no tenía que ver con mover: el barrido de series habría **creado
+otra cita** en el hueco que la movida acababa de dejar libre. Queda una
+pregunta de negocio abierta en `docs/48` §9: si se cobra el depósito como
+penalización por un movimiento tardío, la cita movida se queda sin depósito
+para su fecha nueva.
 
 ---
 
@@ -238,17 +251,17 @@ fila lleva, y conviene que siga siendo una decisión y no un olvido.
 
 Ordenado por lo que cuesta si no se hace, no por lo que cuesta hacerlo:
 
-Tachados ya **A1**, **A2**, **A3**, **A4** (en parte), **B1**, **B2** y
+Tachados ya **A1**, **A2**, **A3**, **A4** (en parte), **B1**, **B2**, **B4** y
 **E1**. De lo que queda:
 
 1. **B3**, saber qué copias de seguridad hay y restaurar una para
    comprobarlo. Media mañana, y es la diferencia entre tener negocio o no
-   tenerlo el día malo.
-2. **B4**, mover una cita, porque es lo que el sitio promete y lo que más se
-   pide.
-3. **A4**, lo que falta: cobro del saldo, devolución, tarjeta rechazada y 3D
+   tenerlo el día malo. **Es el único de la sección B que queda.**
+2. **A4**, lo que falta: cobro del saldo, devolución, tarjeta rechazada y 3D
    Secure. Son los caminos que solo se recorren cuando algo va mal.
-4. **C2**, la factura descargable, en cuanto haya un cliente `COMMERCIAL` que
+3. **C2**, la factura descargable, en cuanto haya un cliente `COMMERCIAL` que
    la pida.
+4. **C1**, que el cliente tenga algo después de reservar. Es lo que haría que
+   mover una cita no necesitara una llamada.
 
 El resto puede esperar a que lo pida el negocio.

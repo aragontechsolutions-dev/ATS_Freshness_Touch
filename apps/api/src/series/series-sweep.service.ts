@@ -7,7 +7,8 @@ import { BookingsService } from '../bookings/bookings.service';
 import { PrismaService } from '../database/prisma.service';
 import { SweepHeartbeatService } from '../health/sweep-heartbeat.service';
 import { StaffNotificationsService } from '../staff-notifications/staff-notifications.service';
-import { comoFecha, SeriesService } from './series.service';
+import { comoFecha } from '../common/fechas';
+import { SeriesService } from './series.service';
 
 /** Retraso de la primera pasada tras arrancar, para no competir con el arranque. */
 const RETRASO_INICIAL_MS = 210_000;
@@ -152,14 +153,32 @@ export class SeriesSweepService implements OnModuleInit, OnModuleDestroy {
      * semanas de una serie semanal son seis consultas por clienta y por
      * pasada para, casi siempre, no encontrar nada que hacer.
      */
+    const existentes = await this.prisma.db.booking.findMany({
+      where: { seriesId: serie.id, status: { not: 'CANCELLED' } },
+      select: { scheduledStart: true, seriesOccurrenceDate: true },
+    });
+
+    /*
+     * SE PREGUNTA POR LA OCURRENCIA, NO POR EL DIA EN QUE SE HACE, Y ES LA
+     * DIFERENCIA ENTRE UNA CITA Y DOS.
+     *
+     * Mientras nadie mueva nada las dos fechas coinciden y esto parece una
+     * vuelta inutil. Desde que se puede mover una cita (etapa 3.32) deja de
+     * serlo: si se compara el dia en que la cita se hace, mover la del
+     * martes 3 al jueves 5 deja el martes 3 sin cubrir, y en la pasada
+     * siguiente este barrido crea otra cita el martes 3. La clienta acaba
+     * con dos citas esa semana, la que pidio mover y una recien nacida en el
+     * hueco que acababa de dejar.
+     *
+     * `seriesOccurrenceDate` no se mueve nunca. Para las citas creadas antes
+     * de que existiera la columna se cae a su propia fecha, que es lo que
+     * eran: nadie las habia podido mover.
+     */
     const yaCreadas = new Set(
-      (
-        await this.prisma.db.booking.findMany({
-          where: { seriesId: serie.id, status: { not: 'CANCELLED' } },
-          select: { scheduledStart: true },
-        })
-      ).map((fila) =>
-        DateTime.fromJSDate(fila.scheduledStart).setZone(zona).toFormat('yyyy-MM-dd'),
+      existentes.map((fila) =>
+        DateTime.fromJSDate(fila.seriesOccurrenceDate ?? fila.scheduledStart)
+          .setZone(fila.seriesOccurrenceDate === null ? zona : 'utc')
+          .toFormat('yyyy-MM-dd'),
       ),
     );
 
@@ -206,6 +225,12 @@ export class SeriesSweepService implements OnModuleInit, OnModuleDestroy {
           {
             staff: null,
             seriesId: serie.id,
+            /*
+             * EL DIA QUE LE TOCABA, que es el que se esta generando. A partir
+             * de aqui la cita se puede mover sin que este barrido crea que
+             * esta semana se quedo sin cita.
+             */
+            seriesOccurrenceDate: fecha,
             overrides: {
               source: 'ADMIN',
               /*

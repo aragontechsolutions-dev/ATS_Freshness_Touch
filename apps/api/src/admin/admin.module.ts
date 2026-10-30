@@ -4,6 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { BookingsModule } from '../bookings/bookings.module';
 import { PaymentsModule } from '../payments/payments.module';
+import { SchedulingModule } from '../scheduling/scheduling.module';
 import { SettingsModule } from '../settings/settings.module';
 import { AssignmentsService } from './assignments.service';
 import { BookingActionsService } from './booking-actions.service';
@@ -38,7 +39,13 @@ import {
 import type { Env } from '../common/config/env';
 
 @Module({
-  imports: [PaymentsModule, SettingsModule, NotificationsModule, BookingsModule],
+  /*
+   * `SchedulingModule` entra por mover una cita: comprobar si hay equipo
+   * libre a la hora nueva es la misma pregunta que al crearla, y se contesta
+   * con el mismo servicio. Un segundo calculo de huecos para el panel seria
+   * una agenda paralela que se separa sola.
+   */
+  imports: [PaymentsModule, SettingsModule, NotificationsModule, BookingsModule, SchedulingModule],
   controllers: [
     SessionController,
     BookingsAdminController,
