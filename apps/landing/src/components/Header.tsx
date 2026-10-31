@@ -67,7 +67,23 @@ export function Header() {
         <a
           href="#top"
           aria-label={company.name}
-          className="min-w-0 shrink"
+          /*
+           * EL LOGOTIPO NO CEDE. Antes era `min-w-0 shrink`, y eso parecia
+           * lo educado: si la fila se queda sin sitio, que se encoja la
+           * marca y no los enlaces.
+           *
+           * Lo que hace al encogerse es PARTIRSE EN DOS LINEAS y montarse
+           * sobre si mismo: «Freshness / Touch» encima de «CLEANING /
+           * SERVICES». No se lee como una cabecera apretada, se lee como una
+           * web rota, y es lo primero que ve quien entra.
+           *
+           * Paso de verdad al anadir «Historia» al menu: en espanol la fila
+           * pedia 1110 px y el contenedor da 1088, asi que el logotipo cedio
+           * los 22 que faltaban. Con `shrink-0`, si algun dia vuelve a no
+           * caber, lo que se sale es el menu — un fallo que se ve en cuanto
+           * pasa, en vez de uno que parece un error de diseno.
+           */
+          className="shrink-0"
           /*
            * PUERTA DE SERVICIO: Shift + Ctrl (o Cmd) + clic abre el panel.
            * No es una medida de seguridad, solo evita enseñar una puerta de

@@ -135,7 +135,64 @@ título. Hay una prueba que lo fija.
 
 ---
 
-## 6. Seguridad
+## 6. Y aun así la cabecera dejó de caber
+
+**La etiqueta corta no bastó, y el fallo llegó a producción.** Conviene dejarlo
+escrito entero, porque la forma de no verlo es instructiva.
+
+En español, con las siete entradas, la fila de la cabecera pedía **1110 px** y
+el contenedor da **1088**. El enlace del logotipo tenía `min-w-0 shrink`, así
+que cedió los 22 que faltaban: «Freshness / Touch» se partió en dos líneas y
+«CLEANING / SERVICES» se montó encima. No se lee como una cabecera apretada,
+se lee como una web rota.
+
+### Por qué no se vio
+
+Tres cosas a la vez, y ninguna se nota leyendo el código:
+
+1. **Solo en español.** En inglés sobraban 79 px; en español faltaban 22.
+2. **Solo con teléfono configurado.** El número de WhatsApp ocupa 156 px y en
+   desarrollo no está puesto — en local se veía perfecto.
+3. **En todos los anchos de escritorio**, no en uno raro. El contenedor topa en
+   `max-w-6xl` (1152 px), así que 1280, 1366 y 1920 dan exactamente el mismo
+   sitio. Mirar «en una pantalla grande» no habría enseñado nada.
+
+### El arreglo, en dos mitades
+
+**El logotipo no cede: `shrink-0`.** Es la parte que importa. Aunque algún día
+vuelva a no caber, lo que no puede pasar es que se deforme la marca; lo que se
+saldrá entonces es el menú, que es un fallo que se ve en cuanto ocurre en vez de
+uno que parece un error de diseño. El nombre lleva además `whitespace-nowrap`,
+porque el logotipo se usa en más sitios.
+
+**«Por qué nosotros» pasa a «Ventajas».** 114 px → 62. Es la misma regla de
+antes aplicada donde hacía falta; el título de la sección sigue siendo
+«¿Por qué Freshness Touch?».
+
+Medido con un navegador de verdad, a 1366 px y con el teléfono puesto:
+
+| Antes (ES)                                       | Después (ES)                    |
+| ------------------------------------------------ | ------------------------------- |
+| Fila: 1110 px contra 1088                        | Fila: 1053 px contra 1088       |
+| Logotipo: 173 px, **80 px de alto** (dos líneas) | Logotipo: 211 px, 43 px de alto |
+| Holgura: **−22 px**                              | Holgura: **+34 px**             |
+
+En inglés quedan 79 px de holgura.
+
+### La prueba que faltaba
+
+`la-cabecera-cabe.test.ts`. No mide píxeles —las pruebas de este sitio corren en
+Node a propósito— sino las dos cosas que hicieron que dejara de caber: **cuánto
+texto hay** y **cuántas entradas**, contra un presupuesto calibrado con la
+medición de arriba.
+
+Lleva los números dentro con su aritmética, y una advertencia: si falla, no se
+sube el número — se vuelve a medir con un navegador. Vigila también que el
+logotipo siga con `shrink-0`. Las dos mitades se comprobaron rompiéndolas.
+
+---
+
+## 7. Seguridad
 
 Poca cosa, y conviene decir por qué:
 
@@ -154,7 +211,7 @@ obligación que las condiciones no cubran ya.
 
 ---
 
-## 7. Lo que queda fuera
+## 8. Lo que queda fuera
 
 - **Una foto de Carmen.** Haría más por esta sección que cualquier ajuste de
   tipografía, y no se inventa ninguna. El día que haya una, entra en la columna

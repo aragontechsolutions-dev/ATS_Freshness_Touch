@@ -36,7 +36,17 @@ export const es: TranslationResources = {
     scope: 'Qué incluye',
     quote: 'Cotización',
     areas: 'Zonas',
-    whyUs: 'Por qué nosotros',
+    /*
+     * «Ventajas» y no «Por qué nosotros», que es lo que decia: con siete
+     * entradas, el menu en espanol pedia 632 px y la fila entera 1110,
+     * contra los 1088 que da el contenedor. El logotipo cedia los 22 que
+     * faltaban y se partia en dos lineas.
+     *
+     * Es la regla de arriba aplicada donde hacia falta: la etiqueta corta en
+     * el menu, la frase entera en el titulo de la seccion, que sigue siendo
+     * «¿Por qué Freshness Touch?».
+     */
+    whyUs: 'Ventajas',
     /*
      * «Historia» y no «Nuestra historia»: con esta entrada el menú pasa a
      * siete, y la regla de arriba manda. El rótulo completo está en el
