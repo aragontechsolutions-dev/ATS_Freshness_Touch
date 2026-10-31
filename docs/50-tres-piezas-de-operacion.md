@@ -246,6 +246,7 @@ para el correo, que es el canal que faltaba.
 | Que la fecha de alta la manipule el navegador    | La sella el servidor y conserva la anterior. Prueba de que reguardar no la toca |
 | Que el aviso de la bandeja se vuelva ruido       | Tres días de gracia y un aviso por ventana, con la tabla como memoria           |
 | Que un barrido tumbe la API                      | No propaga: registra y sigue                                                    |
+| Un botón de copiar que falla en silencio         | Devuelve si pudo; si no, enseña el texto. Prueba sin portapapeles               |
 
 ---
 

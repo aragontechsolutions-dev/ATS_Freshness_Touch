@@ -1009,6 +1009,13 @@ export const es: TranslationResources = {
       uncoveredHelp:
         'Nada sale en la web sin un permiso firmado anotado. Anótalo en Permisos de imagen y enlázalo con la pieza.',
       notPublished: 'No sale en la web: falta el permiso',
+
+      copyPath: 'Copiar ruta',
+      copyUncoveredPhotos: 'Copiar las {{count}} rutas de fotos sin permiso',
+      copyUncoveredVideos: 'Copiar los {{count}} identificadores de vídeo sin permiso',
+      copied: 'Copiado. Pégalo en «Fotos que ampara», en Permisos de imagen.',
+      copyManual: 'El navegador no dejó copiar. Selecciona este texto y cópialo a mano:',
+      copyClose: 'Listo',
     },
 
     location: {
