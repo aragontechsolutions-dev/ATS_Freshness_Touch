@@ -15,6 +15,7 @@ const NAV_ITEMS = [
   { href: '#quote', key: 'nav.quote' },
   { href: '#areas', key: 'nav.areas' },
   { href: '#why-us', key: 'nav.whyUs' },
+  { href: '#about', key: 'nav.about' },
   { href: '#faq', key: 'nav.faq' },
 ] as const;
 

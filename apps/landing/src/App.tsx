@@ -11,6 +11,7 @@ import { ScopeOfWork } from './sections/ScopeOfWork';
 import { Gallery } from './sections/Gallery';
 import { QuoteCalculator } from './sections/QuoteCalculator';
 import { WhyUs } from './sections/WhyUs';
+import { About } from './sections/About';
 import { ServiceAreas } from './sections/ServiceAreas';
 import { Faq } from './sections/Faq';
 import { Contact } from './sections/Contact';
@@ -89,6 +90,15 @@ export default function App() {
           <ScopeOfWork />
           <QuoteCalculator />
           <WhyUs />
+          {/*
+            LA HISTORIA VA DESPUES DE LAS PROMESAS Y ANTES DE LAS FOTOS.
+            «Por que nosotros» son cuatro promesas cortas; esto es quien las
+            hace. Puesta antes, el visitante lee una carta personal de alguien
+            que todavia no le ha dicho a que se dedica; puesta al final, no la
+            lee nadie. Aqui cierra el argumento de confianza justo antes de
+            que las fotos lo demuestren.
+          */}
+          <About />
           {/*
             El antes y despues va DESPUES de por que nosotros y antes de las
             zonas: a esta altura el visitante ya sabe que ofrecemos y que
