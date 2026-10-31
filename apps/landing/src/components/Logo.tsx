@@ -69,7 +69,14 @@ export function Logo({ size = 'sm', withTagline = false, className = '' }: LogoP
       <LogoMark className={`${scale.mark} shrink-0`} />
 
       <span className="flex flex-col leading-none">
-        <span className={`font-display font-extrabold tracking-tight ${scale.name}`}>
+        {/*
+          NI AUNQUE ALGUIEN LE QUITE EL SITIO. `shrink-0` en la cabecera ya
+          lo impide, pero el logotipo se usa en mas de un sitio y la marca
+          partida en dos lineas no es una opcion en ninguno.
+        */}
+        <span
+          className={`font-display font-extrabold tracking-tight whitespace-nowrap ${scale.name}`}
+        >
           <span className="text-brand-700 dark:text-brand-300">Freshness</span>{' '}
           <span className="text-ink dark:text-white">Touch</span>
         </span>
