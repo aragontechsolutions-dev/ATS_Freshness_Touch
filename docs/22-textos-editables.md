@@ -24,6 +24,14 @@ Los nombres y descripciones de los servicios ya se gobiernan desde el catálogo
 y las tarifas, que es donde deben estar. Los rótulos de sección («Servicios»,
 «Preguntas frecuentes») tampoco: no prometen nada.
 
+**Y tampoco la carta de «Nuestra historia»** (etapa 3.33,
+`docs/49-nuestra-historia.md`), por los dos motivos: es identidad de marca
+—como el titular— y además **no cabría**. Estos campos topan en 600 caracteres
+y el contrato rechaza los saltos de línea, porque se pintan dentro de una
+tarjeta; la carta son unas 1.900 letras en diez párrafos. Hacerla editable no
+es cambiar una clave de sitio: es un tipo de campo nuevo, con párrafos y con
+su propia pantalla.
+
 ## 2. La decisión que sostiene todo el diseño
 
 > **La clave que se guarda ES la clave de traducción.**

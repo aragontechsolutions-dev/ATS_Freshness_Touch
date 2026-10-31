@@ -35,6 +35,7 @@ export const en = {
     quote: 'Quote',
     areas: 'Areas',
     whyUs: 'Why us',
+    about: 'Our story',
     faq: 'FAQ',
     contact: 'Contact',
     menu: 'Menu',
@@ -2142,6 +2143,52 @@ export const en = {
       title: 'Re-clean guarantee',
       body: 'Not happy with something? Tell us within 24 hours and we come back to fix it.',
     },
+  },
+
+  /*
+   * NUESTRA HISTORIA
+   * ================
+   * La carta de la fundadora, tal y como la escribio ella. Esta aqui y no en
+   * los textos editables del panel por dos motivos, y el primero es tecnico:
+   * `SITE_COPY_LONG_MAX` son 600 caracteres y el contrato RECHAZA los saltos
+   * de linea, porque esos textos se pintan dentro de una tarjeta. Esto son
+   * unas 1.900 letras en diez parrafos.
+   *
+   * El segundo es de criterio, y es el que ya gobierna `site-copy.ts`: ahi
+   * van las PROMESAS de operacion —la poliza, el plazo para cancelar, como
+   * se explica el deposito— porque cambian cuando cambia el negocio. El
+   * titular de la portada no esta, y esto es lo mismo: identidad de marca.
+   * Cambiarla es una decision, no un ajuste, y pasa por un despliegue.
+   *
+   * CADA PARRAFO ES UNA CLAVE, no un solo texto con `\n` dentro. Asi el
+   * espanol y el ingles se pueden comparar parrafo a parrafo, y la prueba de
+   * i18n caza el dia que falte uno en un idioma.
+   */
+  about: {
+    /** Rotulo de la seccion. El mismo del menu. */
+    title: 'Our Story',
+    /**
+     * El subtitulo es la frase larga de la fundadora, y va como subtitulo y
+     * no como titulo a proposito: un `h2` de catorce palabras no se lee en
+     * un movil y pelea con el resto de los rotulos de la pagina.
+     */
+    lead: 'Freshness Touch Cleaning Service — A Family Dream Built with Love, Dedication & Hard Work',
+
+    p1: 'My name is Carmen, and I am the founder of Freshness Touch Cleaning Service.',
+    p2: 'Ten years ago, I came to the United States from Cuba with dreams, determination, and the hope of building a better future for my family.',
+    p3: 'For the past seven years, I have worked in the cleaning industry, gaining valuable experience and learning that a truly clean home is about more than appearance. It’s about comfort, peace of mind, trust, and attention to every detail.',
+    p4: 'Over time, what began as a job became a passion and eventually a dream: creating my own cleaning company.',
+    p5: 'Today, with the help of my daughter and my cousin, and the unconditional love and support of my parents, that dream is becoming a reality.',
+    p6: 'Freshness Touch Cleaning Service is more than a business to me. It is a family dream, built on years of hard work, sacrifice, perseverance, and love.',
+    p7: 'As a mother, I understand how valuable time with family is. That’s why my goal is to help other families enjoy clean, comfortable, and welcoming homes without the stress of keeping up with everything themselves.',
+    p8: 'We believe in honesty, reliability, respect, and treating every home with the same care and attention we would give our own.',
+    p9: 'Every home we clean is an opportunity to earn someone’s trust and make their day a little brighter.',
+    p10: 'Thank you for supporting my dream and allowing Freshness Touch Cleaning Service to be part of your home.',
+
+    /** La firma. Se pinta aparte porque no es un parrafo mas: es el cierre. */
+    closing: 'With gratitude,',
+    signature: 'Carmen',
+    role: 'Founder, Freshness Touch Cleaning Service 🌻',
   },
 
   areas: {

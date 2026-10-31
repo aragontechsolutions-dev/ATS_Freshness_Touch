@@ -37,6 +37,12 @@ export const es: TranslationResources = {
     quote: 'Cotización',
     areas: 'Zonas',
     whyUs: 'Por qué nosotros',
+    /*
+     * «Historia» y no «Nuestra historia»: con esta entrada el menú pasa a
+     * siete, y la regla de arriba manda. El rótulo completo está en el
+     * título de la sección, que es donde hace falta la frase entera.
+     */
+    about: 'Historia',
     faq: 'Preguntas',
     contact: 'Contacto',
     menu: 'Menú',
@@ -1944,6 +1950,36 @@ export const es: TranslationResources = {
       title: 'Garantía de repaso',
       body: '¿Algo no quedó bien? Avísanos dentro de 24 horas y volvemos a corregirlo.',
     },
+  },
+
+  /*
+   * La carta de la fundadora. Ver la nota larga en `en.ts`: vive aquí y no en
+   * los textos editables del panel porque son diez párrafos con saltos de
+   * línea —que el contrato de esos textos rechaza— y porque es identidad de
+   * marca, no un dato de operación.
+   *
+   * TRADUCIDA, NO REESCRITA. Es una carta en primera persona: se conserva su
+   * voz, el orden de las ideas y la firma. Lo único que cambia de forma es lo
+   * que en español no se puede decir igual.
+   */
+  about: {
+    title: 'Nuestra historia',
+    lead: 'Freshness Touch Cleaning Service: un sueño familiar construido con amor, dedicación y mucho trabajo',
+
+    p1: 'Me llamo Carmen y soy la fundadora de Freshness Touch Cleaning Service.',
+    p2: 'Hace diez años llegué a Estados Unidos desde Cuba con sueños, con determinación y con la esperanza de construir un futuro mejor para mi familia.',
+    p3: 'Durante los últimos siete años he trabajado en el sector de la limpieza. Ahí gané experiencia y aprendí que una casa de verdad limpia es mucho más que una casa que se ve bien: es comodidad, tranquilidad, confianza y atención a cada detalle.',
+    p4: 'Con el tiempo, lo que empezó como un trabajo se convirtió en una pasión y, al final, en un sueño: crear mi propia empresa de limpieza.',
+    p5: 'Hoy, con la ayuda de mi hija y de mi prima, y con el amor y el apoyo incondicional de mis padres, ese sueño se está haciendo realidad.',
+    p6: 'Para mí, Freshness Touch Cleaning Service es más que un negocio. Es un sueño familiar construido sobre años de trabajo, sacrificio, perseverancia y amor.',
+    p7: 'Como madre, sé lo que vale el tiempo en familia. Por eso mi objetivo es que otras familias disfruten de una casa limpia, cómoda y acogedora sin el agobio de tener que estar al día de todo.',
+    p8: 'Creemos en la honestidad, en cumplir lo que prometemos, en el respeto y en tratar cada casa con el mismo cuidado y la misma atención que le daríamos a la nuestra.',
+    p9: 'Cada casa que limpiamos es una oportunidad de ganarnos la confianza de alguien y de alegrarle un poco el día.',
+    p10: 'Gracias por apoyar mi sueño y por dejar que Freshness Touch Cleaning Service forme parte de tu casa.',
+
+    closing: 'Con gratitud,',
+    signature: 'Carmen',
+    role: 'Fundadora de Freshness Touch Cleaning Service 🌻',
   },
 
   areas: {
