@@ -451,6 +451,25 @@ export const en = {
       noAccess: 'This account does not have access to the admin panel.',
     },
 
+    /*
+     * ======================================================================
+     * LA SESION QUE SE ACABA, AVISADA ANTES
+     * ======================================================================
+     * Lo lee quien puede estar de pie en la puerta de una casa a punto de
+     * fichar. Por eso dice QUE PASA si no hace nada —tendra que volver a
+     * entrar— y no solo que la sesion caduca: «caduca» no explica el coste.
+     *
+     * Y por eso el boton dice «Seguir conectada» y no «Renovar»: lo primero
+     * es lo que la persona quiere; lo segundo es lo que hace el sistema.
+     */
+    session: {
+      expiringSoon_one: 'Your session ends in 1 minute. Tap to stay in.',
+      expiringSoon_other: 'Your session ends in {{count}} minutes. Tap to stay in.',
+      /* Ya caducada: no se esconde, es el caso mas urgente de los dos. */
+      expired: 'Your session has ended. Tap to sign back in without losing this screen.',
+      stayIn: 'Stay signed in',
+    },
+
     /* --------------------------- Agenda ---------------------------- */
     filterDate: 'Date',
     filterStatus: 'Status',
@@ -484,6 +503,14 @@ export const en = {
       markAllRead: 'Mark all as read',
       unread: 'Unread',
       openEntity: 'Open the booking',
+      /*
+       * EL MISMO BOTON, OTRO DESTINO. Para limpieza el aviso no lleva a la
+       * ficha de la reserva —cerrada por rol en la API— sino a su trabajo en
+       * «Mis trabajos». El boton dice a donde lleva de verdad.
+       */
+      openMyJob: 'Go to this job',
+      /* Para limpieza, que no tiene pestanas en la cabecera. */
+      back: 'Back to my jobs',
       /* Lo que pone el icono para quien usa un lector de pantalla. */
       badgeLabel_one: '1 unread notification',
       badgeLabel_other: '{{count}} unread notifications',
@@ -1659,6 +1686,38 @@ export const en = {
       finished: 'Finished',
       finishHint:
         'Tap "I have arrived" when you enter the house. The time is recorded, and it is what backs up your work if anyone asks.',
+      /*
+       * ======================================================================
+       * LA CONFIRMACION DE «HE TERMINADO»
+       * ======================================================================
+       * El unico boton de esta pantalla que pregunta antes de hacer. No es
+       * desconfianza: `COMPLETED` es un estado FINAL y un toque sin querer
+       * —el movil en el bolsillo, las manos mojadas— cerraba un trabajo a
+       * mitad sin remedio.
+       *
+       * El texto dice QUE NO SE PUEDE DESHACER y quien lo arregla si pasa.
+       * «¿Seguro?» a secas es la pregunta que todo el mundo ha aprendido a
+       * contestar sin leer.
+       */
+      finishTitle: 'Finish this job?',
+      finishWarning:
+        'Your leaving time is recorded and the job closes. This cannot be undone from your phone: if you tap it by mistake, call the office.',
+      finishPending_one: 'You still have {{count}} task not ticked on the list.',
+      finishPending_other: 'You still have {{count}} tasks not ticked on the list.',
+      finishConfirm: 'Yes, I have finished',
+      /* Corto y sin disculpas: decir que no tiene que costar un toque. */
+      finishCancel: 'Not yet',
+      /*
+       * ======================================================================
+       * SE LLEGO AQUI DESDE UN AVISO Y EL TRABAJO NO ESTA
+       * ======================================================================
+       * La lista empieza hoy, asi que un aviso sin leer de la semana pasada
+       * senala un trabajo que ya no se sirve. Dice QUE PASO y no «error»: el
+       * aviso es correcto, lo que ha cambiado es el dia.
+       */
+      highlightGone:
+        'That job is no longer on your list. Jobs show from today onwards, so it has already been and gone.',
+      highlightDismiss: 'Close',
       noActions: 'Dispatch handles the rest.',
 
       /*

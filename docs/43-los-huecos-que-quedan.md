@@ -247,6 +247,22 @@ fila lleva, y conviene que siga siendo una decisión y no un olvido.
 
 ---
 
+## El PWA del equipo de limpieza, aparte
+
+Esta lista mira el sistema entero. El móvil de quien limpia tiene la suya
+propia, hecha el 31/10/2026 leyendo su código: **`docs/51-los-huecos-del-equipo-de-limpieza.md`**.
+
+De los ocho huecos que encontró, el mayor es que **la lista de verificación
+está construida entera y vacía** (`JOB_CHECKLIST_CATALOG = []`), que es la
+mitad de **D** de aquí vista desde el otro lado.
+
+Tres de los ocho se cerraron el mismo día —confirmar «he terminado», los dos
+botones muertos de la campana y el aviso de sesión que caduca— en
+**`docs/52-tres-huecos-del-equipo-cerrados.md`**. De los cinco que quedan,
+tres esperan una decisión de la dueña y no código.
+
+---
+
 ## Por dónde empezar, si hubiera que elegir
 
 Ordenado por lo que cuesta si no se hace, no por lo que cuesta hacerlo:

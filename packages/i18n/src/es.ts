@@ -423,6 +423,13 @@ export const es: TranslationResources = {
       noAccess: 'Esta cuenta no tiene acceso al panel de administración.',
     },
 
+    session: {
+      expiringSoon_one: 'Tu sesión se acaba en 1 minuto. Pulsa para seguir dentro.',
+      expiringSoon_other: 'Tu sesión se acaba en {{count}} minutos. Pulsa para seguir dentro.',
+      expired: 'Tu sesión ha terminado. Pulsa para volver a entrar sin perder esta pantalla.',
+      stayIn: 'Seguir conectada',
+    },
+
     /* --------------------------- Agenda ---------------------------- */
     filterDate: 'Fecha',
     filterStatus: 'Estado',
@@ -449,6 +456,8 @@ export const es: TranslationResources = {
       markAllRead: 'Marcar todas como leídas',
       unread: 'Sin leer',
       openEntity: 'Abrir la reserva',
+      openMyJob: 'Ir a este trabajo',
+      back: 'Volver a mis trabajos',
       badgeLabel_one: '1 notificación sin leer',
       badgeLabel_other: '{{count}} notificaciones sin leer',
       kind: {
@@ -1546,6 +1555,16 @@ export const es: TranslationResources = {
       finished: 'Terminado',
       finishHint:
         'Marca «He llegado» al entrar en la casa. Queda la hora, y es lo que respalda tu trabajo si alguien pregunta.',
+      finishTitle: '¿Doy por terminado este trabajo?',
+      finishWarning:
+        'Queda registrada tu hora de salida y el trabajo se cierra. Esto no se puede deshacer desde el móvil: si lo pulsas sin querer, llama a la oficina.',
+      finishPending_one: 'Todavía te queda {{count}} tarea sin marcar en la lista.',
+      finishPending_other: 'Todavía te quedan {{count}} tareas sin marcar en la lista.',
+      finishConfirm: 'Sí, he terminado',
+      finishCancel: 'Todavía no',
+      highlightGone:
+        'Ese trabajo ya no está en tu lista. Los trabajos se ven desde hoy en adelante, así que ya pasó.',
+      highlightDismiss: 'Cerrar',
       noActions: 'Coordinación se encarga del resto.',
 
       adjustment: {
