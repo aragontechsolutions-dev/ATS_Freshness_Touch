@@ -55,6 +55,7 @@ export function useStaffSession(): {
   state: SessionState;
   signOut: (reason?: SignOutReason) => Promise<void>;
   refresh: () => Promise<void>;
+  renovar: () => Promise<void>;
 } {
   const [state, setState] = useState<SessionState>({ status: 'loading' });
 
@@ -169,6 +170,34 @@ export function useStaffSession(): {
     }
   }, [unaPasada]);
 
+  /**
+   * RENUEVA EL TOKEN AHORA, PORQUE ALGUIEN LO HA PEDIDO.
+   *
+   * ======================================================================
+   * POR QUE NO BASTA CON `refresh()`
+   * ======================================================================
+   * `refresh()` llama a `getSession()`, que devuelve el token que ya hay y
+   * solo lo renueva si la librería lo considera vencido. Pulsando «seguir
+   * conectada» con cuatro minutos por delante, eso NO renovaría nada: se
+   * volvería a preguntar a la API con el mismo token y el aviso seguiría en
+   * pantalla contando hacia atrás. Un botón que no hace lo que dice.
+   *
+   * `refreshSession()` pide un token nuevo de verdad. Después se vuelve a
+   * comprobar la sesión contra el servidor, que es lo que trae el nuevo
+   * `sessionExpiresAt` y lo que hace desaparecer el aviso.
+   *
+   * SI FALLA NO SE CIERRA LA SESIÓN. Lo normal es que falle por no haber
+   * cobertura, y echar fuera a quien está en una casa por no haber podido
+   * renovar sería hacer el daño que esto venía a evitar: la sesión sigue
+   * viva hasta que caduque de verdad, y se puede volver a pulsar.
+   */
+  const renovar = useCallback(async (): Promise<void> => {
+    if (!auth) return;
+
+    await auth.refreshSession().catch(() => undefined);
+    await refresh();
+  }, [refresh]);
+
   useEffect(() => {
     void refresh();
 
@@ -180,11 +209,29 @@ export function useStaffSession(): {
         setState({ status: 'signed-out', reason: null });
         return;
       }
+      /*
+       * `TOKEN_REFRESHED` NO ESTABA ATENDIDO, Y ERA UN FALLO LATENTE.
+       *
+       * El cliente renueva el token solo cada ~55 min. El panel no se
+       * enteraba, así que `state.staff.sessionExpiresAt` se quedaba con el
+       * valor de la PRIMERA comprobación para siempre. Mientras nadie lo
+       * mirase, no se notaba; en cuanto se usa para avisar, el aviso saldría
+       * a la hora de entrar —falso, porque el token ya se renovó— y un aviso
+       * que miente es peor que no tener aviso.
+       *
+       * Se vuelve a preguntar a la API, que además revalida que la cuenta
+       * sigue siendo personal activo: una baja deja de esperar a que caduque
+       * el token.
+       */
+      if (evento === 'TOKEN_REFRESHED') {
+        void refresh();
+        return;
+      }
       if (evento === 'SIGNED_IN') void refresh();
     }) ?? { subscription: null };
 
     return () => data?.subscription?.unsubscribe();
   }, [refresh]);
 
-  return { state, signOut, refresh };
+  return { state, signOut, refresh, renovar };
 }

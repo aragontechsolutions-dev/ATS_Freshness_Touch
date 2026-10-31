@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { CLOCK_IN_STATE_TEXT_KEY, canEditChecklist } from '@freshness/types';
+import { CLOCK_IN_STATE_TEXT_KEY, canEditChecklist, pendingChecklistCount } from '@freshness/types';
 import type {
   ClockInKind,
   FieldAdjustmentInput,
@@ -49,6 +49,7 @@ import {
   recordarNavegacion,
 } from '../lib/vuelta-de-navegacion';
 import { DialogoLlegada } from '../components/DialogoLlegada';
+import { DialogoFinal } from '../components/DialogoFinal';
 import { useRefrescoVisible } from '../lib/use-refresco';
 
 /**
@@ -74,6 +75,27 @@ interface MyJobsProps {
    * Sin el, la linea aparece un segundo despues y da un salto en pantalla.
    */
   staffFirstName: string;
+  /**
+   * EL TRABAJO QUE SENALABA UNA NOTIFICACION, SI SE LLEGO AQUI DESDE LA
+   * CAMPANA.
+   *
+   * ======================================================================
+   * POR QUE LA CAMPANA MANDA AQUI Y NO A LA FICHA DE LA RESERVA
+   * ======================================================================
+   * La ficha completa de una reserva esta cerrada por rol en la API
+   * (`@Roles('ADMIN','DISPATCHER')`), asi que para limpieza no se podria
+   * cargar ni abriendola a mano. Durante un tiempo el boton «abrir la
+   * reserva» de la campana simplemente NO HACIA NADA para este puesto.
+   *
+   * El destino correcto no era la ficha: era este trabajo, en esta
+   * pantalla, que es lo que de verdad quiere ver quien acaba de recibir
+   * «te han asignado un trabajo».
+   *
+   * `null` es el caso normal: se entro por la pantalla, no por un aviso.
+   */
+  destacado?: string | null;
+  /** Para que el padre olvide el destacado cuando se descarta el aviso. */
+  onDestacadoVisto?: () => void;
   onSessionLost: (reason?: 'expired' | 'noAccess') => void;
 }
 
@@ -97,7 +119,13 @@ interface MyJobsProps {
  *   - Las instrucciones de acceso van destacadas y con su aviso: es el unico
  *     dato de esta pantalla que no debe leerse en alto.
  */
-export function MyJobs({ locale, staffFirstName, onSessionLost }: MyJobsProps) {
+export function MyJobs({
+  locale,
+  staffFirstName,
+  destacado = null,
+  onDestacadoVisto,
+  onSessionLost,
+}: MyJobsProps) {
   const { t } = useTranslation();
 
   const [jobs, setJobs] = useState<MyJob[] | null>(null);
@@ -129,6 +157,16 @@ export function MyJobs({ locale, staffFirstName, onSessionLost }: MyJobsProps) {
   /** El trabajo cuyo ajuste se esta enviando, si hay alguno. */
   const [ajustando, setAjustando] = useState<string | null>(null);
   const [preguntarLlegada, setPreguntarLlegada] = useState<string | null>(null);
+  /**
+   * EL TRABAJO CUYO «HE TERMINADO» ESTA PENDIENTE DE CONFIRMAR.
+   *
+   * Se guarda el identificador y no el trabajo entero por la misma razon que
+   * arriba: la lista se refresca cada treinta segundos y cada vez trae
+   * objetos nuevos. Con el trabajo guardado, el cuadro ensenaria las tareas
+   * pendientes de hace medio minuto; con el identificador, se vuelve a
+   * buscar en la lista de ahora.
+   */
+  const [preguntarFinal, setPreguntarFinal] = useState<string | null>(null);
   const toast = useToast();
 
   /**
@@ -360,6 +398,15 @@ export function MyJobs({ locale, staffFirstName, onSessionLost }: MyJobsProps) {
       if (status === 'IN_PROGRESS') {
         olvidarNavegacion();
         setPreguntarLlegada(null);
+      } else {
+        /*
+         * Fichada la salida, el cuadro de confirmacion se cierra. Va aqui y
+         * no en el `onClick` del boton de confirmar: si la peticion falla
+         * —sin cobertura en la puerta de una casa es lo normal— el cuadro
+         * tiene que seguir abierto para poder reintentar. Cerrandolo al
+         * pulsar, el fallo dejaria la pantalla como si nada hubiera pasado.
+         */
+        setPreguntarFinal(null);
       }
       /*
        * ESTO ES LO QUE MAS FALTA HACIA DE TODA LA PANTALLA. Marcar la llegada
@@ -513,12 +560,27 @@ export function MyJobs({ locale, staffFirstName, onSessionLost }: MyJobsProps) {
     return <SkeletonMisTrabajos />;
   }
 
+  /*
+   * SE LLEGO DESDE UN AVISO Y EL TRABAJO NO ESTA EN LA LISTA.
+   *
+   * Pasa de verdad: la lista empieza en el dia de hoy, asi que un aviso
+   * guardado sin leer desde la semana pasada senala un trabajo que ya no se
+   * sirve. Sin esta linea, pulsar ese aviso dejaba la pantalla exactamente
+   * igual que antes de pulsarlo —el mismo sintoma que el boton muerto que
+   * esto venia a arreglar— y no habia forma de saber si el fallo era de la
+   * aplicacion o del aviso.
+   */
+  const destacadoAusente = destacado !== null && !jobs.some((j) => j.bookingId === destacado);
+
   if (jobs.length === 0) {
     return (
-      <section className="ft-card flex flex-col items-center gap-2 px-6 py-12 text-center">
-        <BriefcaseIcon className="h-9 w-9 text-slate-400 dark:text-slate-500" />
-        <p className="text-sm text-slate-600 dark:text-slate-400">{t('admin.myJobs.empty')}</p>
-      </section>
+      <div className="space-y-4">
+        {destacadoAusente && <AvisoSinTrabajo onCerrar={onDestacadoVisto} />}
+        <section className="ft-card flex flex-col items-center gap-2 px-6 py-12 text-center">
+          <BriefcaseIcon className="h-9 w-9 text-slate-400 dark:text-slate-500" />
+          <p className="text-sm text-slate-600 dark:text-slate-400">{t('admin.myJobs.empty')}</p>
+        </section>
+      </div>
     );
   }
 
@@ -537,9 +599,19 @@ export function MyJobs({ locale, staffFirstName, onSessionLost }: MyJobsProps) {
   // El trabajo por el que se pregunta, si sigue en la lista.
   const trabajoDeLlegada =
     preguntarLlegada === null ? null : (jobs.find((j) => j.bookingId === preguntarLlegada) ?? null);
+  /*
+   * Y el del «he terminado». Se busca en la lista DE AHORA y no se guardo al
+   * pulsar: asi las tareas pendientes que ensena el cuadro son las de este
+   * momento, incluso si un companero marco una mientras el cuadro estaba
+   * abierto.
+   */
+  const trabajoDeSalida =
+    preguntarFinal === null ? null : (jobs.find((j) => j.bookingId === preguntarFinal) ?? null);
 
   return (
     <div className="space-y-4">
+      {destacadoAusente && <AvisoSinTrabajo onCerrar={onDestacadoVisto} />}
+
       {deHoy.length > 0 && (
         <>
           <h2 className="px-1 text-xs font-bold tracking-wide text-slate-500 uppercase dark:text-slate-400">
@@ -552,10 +624,12 @@ export function MyJobs({ locale, staffFirstName, onSessionLost }: MyJobsProps) {
               locale={locale}
               ocupado={ocupado === job.bookingId}
               onMarcar={marcar}
+              onPedirFinal={(job) => setPreguntarFinal(job.bookingId)}
               onMarcarTarea={marcarTarea}
               ajustando={ajustando === job.bookingId}
               onAjustar={ajustar}
               onNavegar={(destino) => recordarNavegacion(destino.bookingId)}
+              destacada={job.bookingId === destacado}
             />
           ))}
         </>
@@ -573,10 +647,12 @@ export function MyJobs({ locale, staffFirstName, onSessionLost }: MyJobsProps) {
               locale={locale}
               ocupado={ocupado === job.bookingId}
               onMarcar={marcar}
+              onPedirFinal={(job) => setPreguntarFinal(job.bookingId)}
               onMarcarTarea={marcarTarea}
               ajustando={ajustando === job.bookingId}
               onAjustar={ajustar}
               onNavegar={(destino) => recordarNavegacion(destino.bookingId)}
+              destacada={job.bookingId === destacado}
             />
           ))}
         </>
@@ -607,6 +683,58 @@ export function MyJobs({ locale, staffFirstName, onSessionLost }: MyJobsProps) {
           }}
         />
       )}
+
+      {/*
+        LA CONFIRMACION DE «HE TERMINADO».
+        ====================================================================
+        Mismo sitio y misma razon que la de llegada: fuera de la tarjeta,
+        para que cerrar el cuadro no dependa de que esa tarjeta siga en la
+        lista cuando la lista se refresque.
+      */}
+      {trabajoDeSalida && (
+        <DialogoFinal
+          key={trabajoDeSalida.bookingId}
+          direccion={`${trabajoDeSalida.addressLine1}, ${trabajoDeSalida.city}`}
+          pendientes={pendingChecklistCount(trabajoDeSalida.checklist)}
+          ocupado={ocupado === trabajoDeSalida.bookingId}
+          onConfirmar={() => void marcar(trabajoDeSalida, 'COMPLETED')}
+          onDescartar={() => setPreguntarFinal(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------------ */
+
+/**
+ * «ESE TRABAJO YA NO ESTA EN TU LISTA».
+ *
+ * Se puede cerrar, y cerrarlo olvida el destacado en el padre: si no, el
+ * aviso volveria a aparecer en cada refresco de la lista —cada treinta
+ * segundos— por un aviso que ya se leyo.
+ */
+function AvisoSinTrabajo({ onCerrar }: { onCerrar?: () => void }) {
+  const { t } = useTranslation();
+
+  return (
+    <div
+      className="ft-card flex items-start gap-3 bg-amber-50 p-4 dark:bg-amber-950/40"
+      role="status"
+    >
+      <AlertIcon className="mt-0.5 h-5 w-5 shrink-0 text-amber-800 dark:text-amber-300" />
+      <p className="min-w-0 flex-1 text-sm text-amber-900 dark:text-amber-200">
+        {t('admin.myJobs.highlightGone')}
+      </p>
+      {onCerrar && (
+        <button
+          type="button"
+          className="ft-btn-ghost min-h-9 shrink-0 px-2 text-xs"
+          onClick={onCerrar}
+        >
+          {t('admin.myJobs.highlightDismiss')}
+        </button>
+      )}
     </div>
   );
 }
@@ -618,21 +746,45 @@ function Tarjeta({
   locale,
   ocupado,
   onMarcar,
+  onPedirFinal,
   onMarcarTarea,
   ajustando,
   onAjustar,
   onNavegar,
+  destacada,
 }: {
   job: MyJob;
   locale: Locale;
   ocupado: boolean;
   onMarcar: (job: MyJob, status: 'IN_PROGRESS' | 'COMPLETED') => Promise<void>;
+  onPedirFinal: (job: MyJob) => void;
   onMarcarTarea: (job: MyJob, code: string, done: boolean) => Promise<void>;
   ajustando: boolean;
   onAjustar: (job: MyJob, cambios: FieldAdjustmentInput) => Promise<void>;
   onNavegar: (job: MyJob) => void;
+  /** Si se llego a esta pantalla desde un aviso que senalaba ESTE trabajo. */
+  destacada: boolean;
 }) {
   const { t } = useTranslation();
+  const tarjeta = useRef<HTMLElement | null>(null);
+
+  /*
+   * LA TARJETA SENALADA SE TRAE A LA PANTALLA SOLA.
+   *
+   * Sin esto, pulsar un aviso de la campana dejaba a la persona en lo alto
+   * de una lista donde el trabajo del aviso podia estar tres tarjetas mas
+   * abajo: el borde de color estaba, pero fuera de la vista.
+   *
+   * `scrollIntoView` se comprueba antes de llamarla porque el entorno de
+   * las pruebas no siempre la trae, y una pantalla que revienta al montarse
+   * es mucho peor que una que no se desplaza. `smooth` no se usa: en un
+   * movil lento, la animacion compite con el primer pintado de la lista.
+   */
+  useEffect(() => {
+    const nodo = tarjeta.current;
+    if (!destacada || !nodo || typeof nodo.scrollIntoView !== 'function') return;
+    nodo.scrollIntoView({ block: 'start' });
+  }, [destacada]);
 
   /*
    * Se mira en cada tarjeta y no una vez al arrancar: es una expresion
@@ -645,7 +797,14 @@ function Tarjeta({
   const completa = `${direccion}, ${job.city}, ${job.state} ${job.postalCode}`;
 
   return (
-    <section className="ft-card space-y-4 p-5">
+    <section
+      ref={tarjeta}
+      className={
+        destacada
+          ? 'ft-card space-y-4 p-5 ring-2 ring-brand-600 dark:ring-sun-300'
+          : 'ft-card space-y-4 p-5'
+      }
+    >
       <div>
         <p className="flex items-start gap-2 text-lg font-bold text-slate-900 dark:text-white">
           <ClockIcon className="mt-1 h-5 w-5 shrink-0 text-brand-700 dark:text-sun-300" />
@@ -833,7 +992,7 @@ function Tarjeta({
         onEnviar={(cambios) => onAjustar(job, cambios)}
       />
 
-      <Acciones job={job} ocupado={ocupado} onMarcar={onMarcar} />
+      <Acciones job={job} ocupado={ocupado} onMarcar={onMarcar} onPedirFinal={onPedirFinal} />
     </section>
   );
 }
@@ -869,10 +1028,21 @@ function Acciones({
   job,
   ocupado,
   onMarcar,
+  onPedirFinal,
 }: {
   job: MyJob;
   ocupado: boolean;
   onMarcar: (job: MyJob, status: 'IN_PROGRESS' | 'COMPLETED') => Promise<void>;
+  /**
+   * PIDE CONFIRMACION, NO FICHA.
+   *
+   * «He terminado» es el unico boton de esta pantalla que no hace lo que
+   * dice al pulsarlo: abre una pregunta. `COMPLETED` es final —no hay
+   * transicion de salida ni para el equipo ni para coordinacion— y un toque
+   * sin querer cerraba un trabajo a mitad sin que nada se interpusiera.
+   * Ver `DialogoFinal.tsx`.
+   */
+  onPedirFinal: (job: MyJob) => void;
 }) {
   const { t } = useTranslation();
 
@@ -908,7 +1078,7 @@ function Acciones({
         type="button"
         className="ft-btn-primary w-full py-3 text-base"
         disabled={ocupado}
-        onClick={() => void onMarcar(job, 'COMPLETED')}
+        onClick={() => onPedirFinal(job)}
       >
         {ocupado ? <SpinnerIcon className="h-5 w-5" /> : <CheckIcon className="h-5 w-5" />}
         {ocupado ? t('admin.working') : t('admin.myJobs.finish')}

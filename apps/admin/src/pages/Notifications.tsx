@@ -21,6 +21,25 @@ interface NotificationsPageProps {
   onSessionLost: () => void;
   /** Para que la campana vuelva a contar despues de marcar como leidas. */
   onCambio?: () => void;
+  /**
+   * VOLVER, CUANDO NO HAY MENU QUE LLEVE DE VUELTA.
+   *
+   * Para limpieza la cabecera no pinta pestanas —su puesto tiene una sola
+   * pantalla— asi que esta bandeja era un sitio sin salida: se llegaba por
+   * la campana y de ahi no se movia nadie. Para administracion y
+   * coordinacion sobra, porque las pestanas siguen ahi: se omite y el boton
+   * no se pinta.
+   */
+  onVolver?: () => void;
+  /**
+   * LA ETIQUETA DEL BOTON QUE LLEVA A LO QUE SENALA EL AVISO.
+   *
+   * Es un parametro porque el DESTINO depende del puesto: coordinacion abre
+   * la ficha de la reserva; limpieza va a su trabajo en «Mis trabajos»,
+   * porque la ficha esta cerrada por rol en la API. El boton tiene que
+   * decir a donde lleva de verdad, no a donde lleva para otro puesto.
+   */
+  abrirLabelKey?: string;
 }
 
 /**
@@ -41,6 +60,8 @@ export function NotificationsPage({
   onAbrirReserva,
   onSessionLost,
   onCambio,
+  onVolver,
+  abrirLabelKey = 'admin.inbox.openEntity',
 }: NotificationsPageProps) {
   const { t } = useTranslation();
 
@@ -104,6 +125,13 @@ export function NotificationsPage({
 
   return (
     <section className="space-y-4">
+      {onVolver && (
+        <button type="button" className="ft-btn-ghost" onClick={onVolver}>
+          <ArrowLeftIcon className="h-4 w-4" aria-hidden="true" />
+          {t('admin.inbox.back')}
+        </button>
+      )}
+
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-lg font-bold text-slate-900 dark:text-white">
           {t('admin.inbox.title')}
@@ -168,7 +196,7 @@ export function NotificationsPage({
                         }}
                       >
                         <ArrowLeftIcon className="h-4 w-4 rotate-180" aria-hidden="true" />
-                        {t('admin.inbox.openEntity')}
+                        {t(abrirLabelKey)}
                       </button>
                     )}
                   </div>

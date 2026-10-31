@@ -7,6 +7,10 @@
 > No propone nada todavía: enumera lo que está construido, lo que falta y lo
 > que cuesta cada hueco. Hermana de `docs/43`, que hace lo mismo con el
 > sistema entero.
+>
+> **Estado al 31/10/2026:** H4, H5 y H7 están **cerrados** — ver
+> `docs/52-tres-huecos-del-equipo-cerrados.md`. Los demás siguen abiertos, y
+> tres de ellos (H1, H2, H6) esperan una decisión de la dueña, no código.
 
 ---
 
@@ -101,7 +105,7 @@ El propio archivo deja escrito cuál sería la solución buena: _«guardarlos a
 propósito y borrarlos al cerrar sesión, no dejar que el service worker los
 recoja de paso»_.
 
-### H4. «He terminado» es un toque, y no se puede deshacer
+### H4. ~~«He terminado» es un toque, y no se puede deshacer~~ — **CERRADO** (`docs/52` §1)
 
 ```tsx
 // MyJobs.tsx:911
@@ -116,7 +120,7 @@ lo que de verdad pasó—.
 manos mojadas, cierra un trabajo a mitad. Es el botón más barato de arreglar
 de toda esta lista: pedir confirmación.
 
-### H5. Dos botones muertos en la campana
+### H5. ~~Dos botones muertos en la campana~~ — **CERRADO** (`docs/52` §2)
 
 Para `CLEANER`, `App.tsx:261` fija la pantalla:
 
@@ -142,7 +146,7 @@ oculta los datos de clientes.
 guardado aparte, en el móvil personal. En un equipo que cambia de
 composición cada semana, eso falla.
 
-### H7. Nadie avisa antes de que caduque la sesión
+### H7. ~~Nadie avisa antes de que caduque la sesión~~ — **CERRADO** (`docs/52` §3)
 
 La API devuelve `sessionExpiresAt` en cada sesión. **El panel no lo usa en
 ningún sitio** (`grep` lo confirma: solo aparece en una prueba de la API).
@@ -182,16 +186,26 @@ Ordenado por lo que cuesta no hacerlo, no por lo que cuesta hacerlo:
 1. **H1, la lista de verificación.** Es la única función del puesto que está
    construida entera y no hace nada. No es código: es una tarde con la dueña
    escribiendo las tareas.
-2. **H4, confirmar «he terminado».** Media hora, y evita un estado final
-   puesto sin querer.
+2. ~~**H4, confirmar «he terminado».**~~ Hecho — `docs/52` §1.
 3. **H2, «no había nadie».** Es la situación real que hoy no tiene botón, y la
    que cuesta dinero cuando no se anota.
-4. **H5, los dos botones muertos.** Pequeño, y es de las cosas que hacen que
-   alguien deje de confiar en una aplicación.
-5. **H7, avisar de la sesión.** Pequeño también.
+4. ~~**H5, los dos botones muertos.**~~ Hecho — `docs/52` §2.
+5. ~~**H7, avisar de la sesión.**~~ Hecho — `docs/52` §3, y por el camino
+   apareció un fallo que esta auditoría no había visto: `TOKEN_REFRESHED` no
+   estaba atendido, así que `sessionExpiresAt` se quedaba congelado toda la
+   jornada.
 6. **H6, el teléfono del compañero.** Decisión de la dueña antes que de
    código: es dar el número de una persona a otra.
 7. **H3, trabajar sin cobertura.** El más caro y el más delicado: hay que
    guardar datos de clientes en el móvil a propósito, con su borrado al cerrar
    sesión. Merece su propia etapa y su repaso de seguridad.
 8. **H8, las fotos de prueba del trabajo.** Ya estaba apuntado en `docs/38`.
+
+---
+
+## 5. Lo que queda, y de quién depende
+
+De los cinco abiertos, **tres no son código**: H1 necesita las tareas de la
+lista, H2 necesita que la dueña decida quién puede declarar «no había nadie» y
+H6 su permiso para dar el teléfono de una empleada a otra. Los dos de código
+son H3 (cobertura) y H8 (fotos de prueba).

@@ -15,6 +15,7 @@ import { NotificationsPage } from './pages/Notifications';
 import { SeriesPage } from './pages/Series';
 import { Privacidad } from './pages/Privacidad';
 import { NotificationsBell } from './components/NotificationsBell';
+import { AvisoDeSesion } from './components/AvisoDeSesion';
 import {
   AlertIcon,
   BriefcaseIcon,
@@ -31,6 +32,8 @@ import { SkeletonListaReservas } from './components/Skeletons';
 import { LogoMark } from './components/Logo';
 import { persistLocale } from './i18n';
 import { readPasswordLink, type PasswordLink } from './lib/password-link';
+import { hayQueAvisarDeLaSesion, minutosQueSeEnsenan } from './lib/sesion-caduca';
+import { useRefrescoVisible } from './lib/use-refresco';
 
 /** Las tres pantallas del panel. El detalle de una reserva se abre sobre la agenda. */
 type Vista = 'agenda' | 'myJobs' | 'settings' | 'notifications' | 'series' | 'privacy';
@@ -50,7 +53,7 @@ type Vista = 'agenda' | 'myJobs' | 'settings' | 'notifications' | 'series' | 'pr
 export default function App() {
   const { t, i18n } = useTranslation();
   const locale = (i18n.resolvedLanguage ?? 'en') as Locale;
-  const { state, signOut, refresh } = useStaffSession();
+  const { state, signOut, refresh, renovar } = useStaffSession();
   const { theme, toggleTheme } = useTheme();
 
   const [vista, setVista] = useState<Vista>('agenda');
@@ -62,6 +65,16 @@ export default function App() {
    * el numero viejo hasta recargar la pagina.
    */
   const [refrescoDeLaBandeja, setRefrescoDeLaBandeja] = useState(0);
+  /*
+   * EL TRABAJO QUE SENALABA UN AVISO, PARA LIMPIEZA.
+   *
+   * Un aviso de la campana apunta a una reserva. Coordinacion y
+   * administracion abren su ficha; limpieza no puede —la ficha esta cerrada
+   * por rol en la API— asi que para ese puesto el destino es su propio
+   * trabajo dentro de «Mis trabajos», y esto es el identificador que esa
+   * pantalla usa para destacarlo y traerlo a la vista.
+   */
+  const [destacado, setDestacado] = useState<string | null>(null);
 
   /*
    * El enlace de correo se lee UNA SOLA VEZ, al arrancar, y se guarda.
@@ -77,6 +90,22 @@ export default function App() {
   const [enlaceAtendido, setEnlaceAtendido] = useState(false);
 
   const dentro = state.status === 'signed-in';
+
+  /*
+   * EL RELOJ QUE HACE QUE EL AVISO DE SESION APAREZCA.
+   *
+   * Sin esto, «¿queda poco?» solo se preguntaria cuando algo repintase el
+   * panel por otro motivo, y en «Mis trabajos» eso puede no pasar en media
+   * hora: el aviso llegaria tarde o no llegaria.
+   *
+   * Treinta segundos es el paso mas grueso que sigue sirviendo con un umbral
+   * de cinco minutos, y `useRefrescoVisible` ya hace lo unico que aqui
+   * importa de verdad: NO contar con la pantalla apagada, y comprobar EN EL
+   * ACTO al volver a la aplicacion, que es cuando el movil sale del bolsillo
+   * y cuando la renovacion automatica puede haberse perdido.
+   */
+  const [ahora, setAhora] = useState(() => new Date());
+  useRefrescoVisible(() => setAhora(new Date()), 30_000);
 
   /*
    * Cierre por inactividad. Solo vigila con sesion iniciada: en la pantalla
@@ -258,7 +287,43 @@ export default function App() {
    * convive con la agenda.
    */
   const soloMisTrabajos = state.staff.role === 'CLEANER';
-  const actual: Vista = soloMisTrabajos ? 'myJobs' : vista;
+  /*
+   * ======================================================================
+   * LIMPIEZA TIENE DOS PANTALLAS, NO UNA
+   * ======================================================================
+   * Esta linea decia `soloMisTrabajos ? 'myJobs' : vista`, y con eso la
+   * campana —que SI se pinta para el puesto y SI recibe sus avisos— tenia
+   * dos botones que no hacian nada: «ver todas» y «abrir la reserva»
+   * cambiaban `vista`, y `vista` no se miraba nunca.
+   *
+   * La bandeja entra en la lista porque es la unica forma de volver a leer
+   * un aviso ya leido, y lo que sirve ahi son los propios: la API filtra
+   * por audiencia, asi que un puesto de limpieza no ve los de dinero ni los
+   * de administracion.
+   *
+   * LO QUE SIGUE FUERA, Y A PROPOSITO: la ficha de una reserva, los
+   * ajustes, las series y la privacidad. No es que se escondan —la API
+   * responde 403 a los tres ultimos y a la ficha— es que no tienen nada que
+   * ensenar a este puesto.
+   */
+  const VISTAS_DE_LIMPIEZA: readonly Vista[] = ['myJobs', 'notifications'];
+  const actual: Vista = soloMisTrabajos && !VISTAS_DE_LIMPIEZA.includes(vista) ? 'myJobs' : vista;
+
+  /**
+   * A DONDE LLEVA UN AVISO QUE SENALA UNA RESERVA.
+   *
+   * El unico sitio donde se decide, para que la campana y la lista completa
+   * no puedan discrepar. Para limpieza, a su trabajo; para el resto, a la
+   * ficha.
+   */
+  const abrirLoQueSenala = (bookingId: string): void => {
+    if (soloMisTrabajos) {
+      setDestacado(bookingId);
+      irA('myJobs');
+      return;
+    }
+    setOpenBookingId(bookingId);
+  };
 
   return (
     <div className="min-h-dvh">
@@ -299,7 +364,7 @@ export default function App() {
                 onVerTodas={() => {
                   irA('notifications');
                 }}
-                onAbrirReserva={setOpenBookingId}
+                onAbrirReserva={abrirLoQueSenala}
                 onSessionLost={() => {
                   alPerderSesion('expired');
                 }}
@@ -395,6 +460,31 @@ export default function App() {
             </nav>
           )}
         </div>
+
+        {/*
+          EL AVISO DE SESION, DENTRO DE LA CABECERA PEGAJOSA.
+          ==================================================
+          Va aqui y no en `<main>` porque la cabecera es `sticky`: desde
+          dentro, el aviso sigue a la vista con la pantalla desplazada. En el
+          contenido se quedaria arriba, y en una lista larga de trabajos eso
+          es lo mismo que no estar.
+
+          Lo pinta la FECHA, no un interruptor: se renueva la sesion —a mano
+          o sola— y la condicion deja de cumplirse. Nadie tiene que acordarse
+          de apagarlo.
+
+          EL RELOJ SE PASA COMO DATO (`ahora`) Y NO SE LEE DENTRO DE LAS
+          FUNCIONES. Asi las dos son puras y se pueden probar con una fecha
+          fija, y ademas no hace falta remontar el aviso con una `key` para
+          que la cuenta baje: remontarlo perderia el giro del boton justo
+          cuando la renovacion esta en vuelo.
+        */}
+        {hayQueAvisarDeLaSesion(state.staff.sessionExpiresAt, ahora) && (
+          <AvisoDeSesion
+            minutos={minutosQueSeEnsenan(state.staff.sessionExpiresAt, ahora)}
+            onRenovar={renovar}
+          />
+        )}
       </header>
 
       <main className="mx-auto max-w-5xl px-4 py-6">
@@ -402,6 +492,8 @@ export default function App() {
           <MyJobs
             locale={locale}
             staffFirstName={state.staff.firstName}
+            destacado={destacado}
+            onDestacadoVisto={() => setDestacado(null)}
             onSessionLost={alPerderSesion}
           />
         ) : actual === 'settings' && puedeConfigurar ? (
@@ -432,13 +524,25 @@ export default function App() {
         actual === 'notifications' && !openBookingId ? (
           <NotificationsPage
             locale={locale}
-            onAbrirReserva={setOpenBookingId}
+            onAbrirReserva={abrirLoQueSenala}
             onSessionLost={() => {
               alPerderSesion('expired');
             }}
             onCambio={() => {
               setRefrescoDeLaBandeja((n) => n + 1);
             }}
+            /*
+              El boton de volver y la etiqueta del destino solo cambian para
+              limpieza: es el puesto que no tiene pestanas en la cabecera y
+              el unico cuyo aviso lleva a «Mis trabajos» en vez de a la
+              ficha de la reserva.
+            */
+            {...(soloMisTrabajos
+              ? {
+                  onVolver: () => irA('myJobs'),
+                  abrirLabelKey: 'admin.inbox.openMyJob',
+                }
+              : {})}
           />
         ) : openBookingId ? (
           <BookingDetailPage
