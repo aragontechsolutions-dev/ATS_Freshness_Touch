@@ -220,6 +220,13 @@ services:
       - key: NOTIFICATION_RETRY_MINUTES
         value: '5'
 
+      # Cada cuantas horas se mira si hay fotos o videos guardados sin un
+      # permiso que los ampare. En horas y no en minutos porque lo que
+      # vigila no cambia en minutos: una pieza sin permiso lo sigue estando
+      # manana. Cero lo apaga.
+      - key: GALLERY_CONSENT_SWEEP_HOURS
+        value: '24'
+
       # La direccion del SITIO PUBLICO, para componer el enlace con el que un
       # cliente retira sus fotos el solo. La API no lo sabe por su cuenta: se
       # despliegan por separado y en dominios distintos.

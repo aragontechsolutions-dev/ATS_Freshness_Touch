@@ -395,3 +395,30 @@ la fecha nueva, que es justo la que no tiene en la cabeza.
 La contrapartida: se pierde la constancia de que aquel recordatorio salió. Se
 acepta porque un recordatorio de un día que ya no existe no es prueba de nada
 útil. Queda anotado en la auditoría con `reminderReset`.
+
+---
+
+## 14. Un tercer destinatario: quien asigna los equipos
+
+> Etapa 3.34. Detalle completo en `docs/50-tres-piezas-de-operacion.md` §C.
+
+Hasta entonces, una reserva confirmada producía dos avisos hacia dentro: el
+mensaje de Telegram al chat de operaciones y **la copia del correo del
+cliente** al buzón interno (§1).
+
+La copia es útil cuando el cliente llama —se ve exactamente lo que tiene
+delante— y no sirve para repartir trabajo: está escrita para él, lleva el
+precio, y no dice lo único que importa ahí, que esa reserva **no tiene equipo
+todavía**.
+
+Así que hay un destinatario más, con su propio texto y su propia audiencia en
+el registro (`DISPATCH`), que contesta por separado «¿le llegó al buzón del
+equipo?» y «¿le llegó a quien asigna?».
+
+**Lleva referencia, franja horaria, ciudad y servicio. No lleva el nombre del
+cliente, ni la calle, ni el importe**: nada de eso hace falta para poner un
+equipo, y todo lo que sale por correo se queda para siempre en un buzón que no
+controlamos. La ficha entera está en el panel, detrás de una sesión.
+
+Es el único correo del sistema cuyo **idioma se pregunta**: va a un buzón, y un
+buzón no tiene idioma. No se usa el del cliente, que lo eligió otra persona.

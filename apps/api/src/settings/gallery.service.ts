@@ -208,11 +208,32 @@ export class GalleryService {
       ...minisAntes.filter((path) => !minisDespues.includes(path)),
     ];
 
+    /*
+     * LA FECHA DE ALTA LA PONE EL SERVIDOR, Y SE CONSERVA.
+     *
+     * Lo que llega del panel no la trae —ni debe: es el dato con el que se
+     * decide a quien molestar por una pieza olvidada sin permiso, y eso no
+     * puede venir del navegador—. Lo nuevo se sella con la hora de ahora; lo
+     * que ya estaba conserva lo que tuviera, `null` incluido, para que
+     * corregir un titulo no reinicie el reloj.
+     */
+    const ahora = new Date().toISOString();
+    const sellada: Gallery = {
+      videos: gallery.videos.map((video) => {
+        const previo = anterior.videos.find((v) => v.videoId === video.videoId);
+        return { ...video, addedAt: previo ? previo.addedAt : ahora };
+      }),
+      photos: gallery.photos.map((photo) => {
+        const previo = anterior.photos.find((p) => p.path === photo.path);
+        return { ...photo, addedAt: previo ? previo.addedAt : ahora };
+      }),
+    };
+
     await this.prisma.db.$transaction(async (tx) => {
       await tx.businessSetting.upsert({
         where: { key: SETTINGS_KEY },
-        create: { key: SETTINGS_KEY, value: gallery, updatedBy: staff.staffId },
-        update: { value: gallery, updatedBy: staff.staffId },
+        create: { key: SETTINGS_KEY, value: sellada, updatedBy: staff.staffId },
+        update: { value: sellada, updatedBy: staff.staffId },
       });
 
       await this.audit.record(
@@ -296,6 +317,41 @@ export class GalleryService {
    * almacen configurado, y entonces es mejor una seccion sin esa foto que una
    * portada con un icono de imagen rota.
    */
+  /**
+   * CUANTAS PIEZAS LLEVAN DEMASIADO TIEMPO GUARDADAS SIN PERMISO.
+   *
+   * ======================================================================
+   * POR QUE HACE FALTA PREGUNTARLO, SI LA PANTALLA YA LO DICE
+   * ======================================================================
+   * La pantalla de la galeria lo dice, si: «hay N piezas guardadas que no se
+   * estan publicando». El problema es que hay que abrirla para leerlo, y
+   * quien sube una foto cree que ya esta puesta — no vuelve a mirar.
+   *
+   * Es el fallo silencioso de una lista blanca: la pieza no da error, no
+   * sale en la web y no se queja. Esto es lo que permite que el aviso vaya
+   * a buscar a alguien en vez de esperar sentado.
+   *
+   * `addedAt` nulo cuenta como VIEJA: son las piezas anteriores a que la
+   * fecha existiera, que son justo las que hay que mirar hoy.
+   */
+  async sinPermisoDesdeHace(dias: number, ahora: Date = new Date()): Promise<number> {
+    const gallery = await this.get();
+    const publicables = await this.consentimientos.piezasPublicables();
+    const corte = ahora.getTime() - dias * 86_400_000;
+
+    const vieja = (addedAt: string | null): boolean =>
+      addedAt === null || new Date(addedAt).getTime() <= corte;
+
+    const fotos = gallery.photos.filter(
+      (photo) => !publicables.photoPaths.has(photo.path) && vieja(photo.addedAt),
+    );
+    const videos = gallery.videos.filter(
+      (video) => !publicables.videoIds.has(video.videoId) && vieja(video.addedAt),
+    );
+
+    return fotos.length + videos.length;
+  }
+
   async getPublic(): Promise<PublicGallery> {
     const gallery = await this.get();
 

@@ -534,6 +534,12 @@ export const en = {
             body: 'We tried five times to send the {{event}} email for booking {{reference}} and it kept failing. They have paid and have nothing in writing: call them.',
           },
         },
+        gallery: {
+          uncovered: {
+            title: 'Photos saved but not published',
+            body: '{{count}} piece(s) have been in the gallery for more than {{days}} days with no image release covering them, so they are not on the website. Open Photos and videos and link them to a release — or delete them.',
+          },
+        },
         series: {
           slot_taken: {
             title: 'A repeat booking could not be created',
@@ -761,6 +767,10 @@ export const en = {
       strictNotice:
         'Nothing is published without a release on file. An item with no release stays saved but does not appear on the website.',
       add: 'Record a release',
+      addQuick: 'Long-standing customer (permission by message)',
+      quickSteps:
+        'For photos you already have with only a verbal yes: 1) message the customer and get a written yes, 2) save a screenshot, 3) fill this in and attach that screenshot below. A verbal permission is not invalid everywhere — it is just impossible to prove, and the day it matters is the day someone says they never gave it.',
+      showAllFields: 'Show every field',
       empty:
         'No releases recorded yet. Until one is, nothing from the gallery appears on the website.',
       reference: 'Reference',
@@ -883,6 +893,22 @@ export const en = {
       internalEmailHelp: 'This mailbox receives the same email the customer got.',
       internalEmailEmpty: 'No copy is sent.',
       internalEmailInvalid: 'Enter a valid email address.',
+
+      /*
+       * OTRO CORREO, NO OTRA COPIA. La copia interna es el correo del
+       * cliente; esto es «hay una reserva sin equipo», escrito para quien
+       * reparte el trabajo y sin el precio dentro.
+       */
+      dispatchEmail: 'Email whoever assigns the teams',
+      dispatchEmailHelp:
+        'A short alert for each new booking: reference, when, city and service. No customer name, no street and no amount — those stay in the panel.',
+      dispatchEmailEmpty:
+        'Nobody is emailed. New bookings still appear in the inbox and on Telegram.',
+      dispatchEmailInvalid: 'Enter a valid email address.',
+      dispatchLocale: 'Language of that alert',
+      dispatchLocaleHelp:
+        'It goes to a mailbox, not to a person, so there is nobody to take the language from. The customer language is not used: that one was chosen by somebody else.',
+      dispatchLocaleInvalid: 'Pick English or Spanish.',
       telegramOnNewBooking: 'Send a Telegram message for each new booking',
       telegramOnNewBookingHelp:
         'Only for bookings that are confirmed and paid. Abandoned forms are not reported, so the alert stays worth reading.',

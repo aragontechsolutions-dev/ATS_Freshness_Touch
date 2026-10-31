@@ -14,6 +14,7 @@ import type { LocalAuthProvider } from '../auth/providers/local-auth.provider';
 import { IMAGE_STORAGE } from '../storage/storage.types';
 import type { MemoryImageStorageProvider } from '../storage/providers/memory-image-storage.provider';
 import { GalleryService } from './gallery.service';
+import { GalleryConsentSweepService } from './gallery-consent-sweep.service';
 import { MediaConsentsService } from './media-consents.service';
 
 vi.hoisted(() => {
@@ -24,6 +25,8 @@ vi.hoisted(() => {
   process.env.EMAIL_PROVIDER = 'log';
   process.env.REMINDER_SWEEP_MINUTES = '0';
   process.env.AUDIT_PURGE_HOURS = '0';
+  /* El barrido de piezas sin permiso, apagado: cada prueba lo llama a mano. */
+  process.env.GALLERY_CONSENT_SWEEP_HOURS = '0';
   process.env.RATE_LIMIT_MAX = '2000';
   process.env.QUOTE_RATE_LIMIT_MAX = '2000';
 });
@@ -922,5 +925,141 @@ describe('sin papel no se publica', () => {
     });
 
     expect((await leer()).body.photos).toEqual([]);
+  });
+});
+
+describe('las piezas que se quedan en el limbo', () => {
+  /*
+   * EL FALLO QUE ESTO VIGILA ES MUDO. Una pieza sin permiso no da error, no
+   * sale en la web y no se queja: quien la subio cree que ya esta puesta. El
+   * panel lo dice, pero hay que abrirlo, y justamente no se abre cuando se
+   * cree que el trabajo ya esta hecho.
+   */
+  const barrido = (): GalleryConsentSweepService => app.get(GalleryConsentSweepService);
+
+  beforeEach(async () => {
+    await db.exec(`DELETE FROM staff_notification_reads; DELETE FROM staff_notifications;`);
+  });
+
+  it('el servidor sella la fecha de alta, no el navegador', async () => {
+    await db.exec(`DELETE FROM media_consents;`);
+    app.get(MediaConsentsService).invalidate();
+
+    await guardar({
+      videos: [],
+      photos: [{ path: FOTO, title: { en: null, es: null } }],
+    });
+
+    const panel = await leerComoAdmin();
+    const foto = panel.body.gallery.photos[0] as { addedAt: string | null };
+
+    expect(foto.addedAt).not.toBeNull();
+  });
+
+  it('una foto recien subida NO se denuncia', async () => {
+    /*
+     * El orden normal es subir la foto y anotar el permiso despues, a veces
+     * al dia siguiente. Avisar el mismo dia convertiria el aviso en parte
+     * del procedimiento, y lo que suena siempre se deja de leer.
+     */
+    await db.exec(`DELETE FROM media_consents;`);
+    app.get(MediaConsentsService).invalidate();
+
+    await guardar({
+      videos: [],
+      photos: [{ path: FOTO, title: { en: null, es: null } }],
+    });
+
+    expect(await barrido().pasada()).toBe(0);
+
+    const avisos = await db.query(
+      `SELECT id FROM staff_notifications WHERE kind = 'gallery.uncovered'`,
+    );
+    expect(avisos.rows).toHaveLength(0);
+  });
+
+  it('la misma foto, pasados los dias de gracia, SI', async () => {
+    await db.exec(`DELETE FROM media_consents;`);
+    app.get(MediaConsentsService).invalidate();
+
+    await guardar({
+      videos: [],
+      photos: [{ path: FOTO, title: { en: null, es: null } }],
+    });
+
+    const dentroDeUnaSemana = new Date(Date.now() + 7 * 86_400_000);
+
+    expect(await barrido().pasada(dentroDeUnaSemana)).toBe(1);
+
+    const avisos = await db.query<{ kind: string; audience: string; params: { count?: number } }>(
+      `SELECT kind, audience, params FROM staff_notifications WHERE kind = 'gallery.uncovered'`,
+    );
+
+    expect(avisos.rows).toHaveLength(1);
+    /* A administracion: los permisos de imagen son cosa suya. */
+    expect(avisos.rows[0]?.audience).toBe('ADMIN');
+    expect(avisos.rows[0]?.params.count).toBe(1);
+  });
+
+  it('NO REPITE el aviso en la pasada siguiente', async () => {
+    /*
+     * Esto no avisa de un hecho, avisa de un ESTADO, y el estado sigue
+     * siendo verdad manana. Sin antirrebote, la bandeja se llenaria del
+     * mismo aviso hasta que alguien lo arreglara — y una bandeja asi se
+     * deja de leer, que es el unico modo de fallo que tiene.
+     */
+    await db.exec(`DELETE FROM media_consents;`);
+    app.get(MediaConsentsService).invalidate();
+
+    await guardar({
+      videos: [],
+      photos: [{ path: FOTO, title: { en: null, es: null } }],
+    });
+
+    const despues = new Date(Date.now() + 7 * 86_400_000);
+    await barrido().pasada(despues);
+    await barrido().pasada(new Date(despues.getTime() + 60_000));
+
+    const avisos = await db.query(
+      `SELECT id FROM staff_notifications WHERE kind = 'gallery.uncovered'`,
+    );
+    expect(avisos.rows).toHaveLength(1);
+  });
+
+  it('con el permiso anotado no hay nada que denunciar', async () => {
+    await amparar({ photoPaths: [FOTO] });
+
+    await guardar({
+      videos: [],
+      photos: [{ path: FOTO, title: { en: null, es: null } }],
+    });
+
+    expect(await barrido().pasada(new Date(Date.now() + 7 * 86_400_000))).toBe(0);
+  });
+
+  it('corregir el titulo no reinicia el reloj', async () => {
+    /*
+     * Si al reguardar se sellara la fecha otra vez, bastaria con tocar un
+     * titulo para que una foto olvidada volviera a parecer recien subida y
+     * el aviso no llegara nunca.
+     */
+    await db.exec(`DELETE FROM media_consents;`);
+    app.get(MediaConsentsService).invalidate();
+
+    await guardar({
+      videos: [],
+      photos: [{ path: FOTO, title: { en: null, es: null } }],
+    });
+
+    const primera = (await leerComoAdmin()).body.gallery.photos[0] as { addedAt: string };
+
+    await guardar({
+      videos: [],
+      photos: [{ path: FOTO, title: { en: 'Kitchen', es: 'Cocina' } }],
+    });
+
+    const segunda = (await leerComoAdmin()).body.gallery.photos[0] as { addedAt: string };
+
+    expect(segunda.addedAt).toBe(primera.addedAt);
   });
 });

@@ -1,3 +1,4 @@
+import { DateTime } from 'luxon';
 import type { Locale, StaffRole } from '@freshness/types';
 import type { EmailMessage } from '../notifications.types';
 import { COMPANY_NAME, emailHtml } from './layout';
@@ -239,4 +240,148 @@ function comoHtml(partes: {
     contacto,
     branding: { logoUrl: data.logoUrl },
   });
+}
+
+/* -------------------------------------------------------------------------- */
+/*  El aviso a quien asigna los equipos                                       */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Lo que necesita quien reparte el trabajo. Y solo eso.
+ *
+ * ========================================================================
+ * NI EL NOMBRE DEL CLIENTE, NI LA CALLE, NI EL PRECIO
+ * ========================================================================
+ * No es cautela de mas: es que no hacen falta para lo unico que este correo
+ * pide —abrir el panel y poner un equipo— y todo lo que se manda por correo
+ * se queda para siempre en un buzon que no controlamos.
+ *
+ * El precio ademas tiene su propio motivo: quien coordina mueve la agenda y
+ * no cobra a nadie, y la factura no entra en esa decision. Es la misma linea
+ * que ya separa el chat del equipo de limpieza del de operaciones.
+ *
+ * La ficha entera —con el nombre, la direccion completa y el importe— esta
+ * en el panel, detras de una sesion.
+ */
+export interface DispatchEmailData {
+  locale: Locale;
+  reference: string;
+  /** Inicio y fin en UTC; se pintan en la zona de la empresa. */
+  scheduledStart: Date;
+  scheduledEnd: Date;
+  timezone: string;
+  /** Ciudad y estado. La calle NO. */
+  city: string;
+  state: string;
+  /** Que clase de limpieza, tal cual la guarda la reserva. */
+  service: string;
+  companyPhone: string | null;
+  companyEmail: string | null;
+  logoUrl: string | null;
+}
+
+const ETIQUETA_LOCALE: Record<Locale, string> = { en: 'en-US', es: 'es-US' };
+
+/** El dia, y la franja de principio a fin. Es lo que decide si cabe un equipo. */
+function franja(data: DispatchEmailData): string {
+  const inicio = DateTime.fromJSDate(data.scheduledStart).setZone(data.timezone);
+  const fin = DateTime.fromJSDate(data.scheduledEnd).setZone(data.timezone);
+  const idioma = ETIQUETA_LOCALE[data.locale];
+
+  const dia = inicio.setLocale(idioma).toLocaleString({
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+  });
+  const hora = (momento: DateTime): string =>
+    momento.setLocale(idioma).toLocaleString({ hour: 'numeric', minute: '2-digit' });
+
+  return `${dia}, ${hora(inicio)} – ${hora(fin)}`;
+}
+
+/**
+ * HA ENTRADO UNA RESERVA Y HAY QUE PONERLE EQUIPO.
+ *
+ * ========================================================================
+ * POR QUE NO VALIA LA COPIA INTERNA QUE YA HABIA
+ * ========================================================================
+ * `internalEmail` recibe EL MISMO correo que el cliente. Eso es util cuando
+ * el cliente llama —se ve exactamente lo que tiene delante— y no sirve para
+ * esto: esta escrito para el, lleva el precio, y no dice lo unico que
+ * importa aqui, que es que esa reserva todavia no tiene a nadie asignado.
+ *
+ * ========================================================================
+ * NO LLEVA ENLACE AL PANEL, Y ES A PROPOSITO
+ * ========================================================================
+ * Seria mas comodo, y haria falta una variable de entorno mas con la
+ * direccion del panel. Una variable que se puede quedar mal puesta o
+ * anticuada pone un enlace roto en TODOS los correos, y un enlace roto en un
+ * aviso urgente es peor que no tener enlace. El dia que se quiera, es una
+ * linea; mientras tanto, el panel se abre como se abre todos los dias.
+ */
+export function newBookingDispatchEmail(to: string, data: DispatchEmailData): EmailMessage {
+  const es = data.locale === 'es';
+
+  const titulo = es ? 'Reserva nueva sin equipo' : 'New booking with no team yet';
+
+  const parrafos = es
+    ? [
+        'Ha entrado una reserva confirmada y todavía no tiene equipo asignado.',
+        'Ábrela en el panel y asígnale uno.',
+      ]
+    : [
+        'A confirmed booking has come in and it does not have a team yet.',
+        'Open it in the panel and assign one.',
+      ];
+
+  const datos: [string, string][] = es
+    ? [
+        ['Referencia', data.reference],
+        ['Cuándo', franja(data)],
+        ['Dónde', `${data.city}, ${data.state}`],
+        ['Servicio', data.service],
+      ]
+    : [
+        ['Reference', data.reference],
+        ['When', franja(data)],
+        ['Where', `${data.city}, ${data.state}`],
+        ['Service', data.service],
+      ];
+
+  /*
+   * Se dice en el propio correo que falta informacion y donde esta. Sin esa
+   * frase, quien lo recibe busca el nombre del cliente, no lo encuentra y
+   * cree que el aviso esta incompleto.
+   */
+  const nota = es
+    ? 'El nombre del cliente, la dirección completa y el importe están en la ficha del panel: por correo no viajan.'
+    : 'The customer name, the full address and the amount are in the booking in the panel: they do not travel by email.';
+
+  const contacto = pieDeContacto(data, es);
+
+  return {
+    to,
+    subject: es ? `Asignar equipo · ${data.reference}` : `Assign a team · ${data.reference}`,
+    text: [
+      titulo,
+      '',
+      ...parrafos,
+      '',
+      ...datos.map(([etiqueta, valor]) => `${etiqueta}: ${valor}`),
+      '',
+      nota,
+      ...(contacto.length > 0 ? ['', ...contacto] : []),
+      '',
+      COMPANY_NAME,
+    ].join('\n'),
+    html: emailHtml({
+      locale: data.locale,
+      titulo,
+      parrafos,
+      datos,
+      nota,
+      contacto,
+      branding: { logoUrl: data.logoUrl },
+    }),
+  };
 }

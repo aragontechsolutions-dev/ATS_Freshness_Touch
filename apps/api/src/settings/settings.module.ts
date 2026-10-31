@@ -9,6 +9,7 @@ import { CompanyLocationService } from './company-location.service';
 import { GalleryController } from './gallery.controller';
 import { MediaRemovalController } from './media-removal.controller';
 import { GalleryService } from './gallery.service';
+import { GalleryConsentSweepService } from './gallery-consent-sweep.service';
 import { MediaConsentsService } from './media-consents.service';
 import { SiteCopyController } from './site-copy.controller';
 import { SiteCopyService } from './site-copy.service';
@@ -27,6 +28,7 @@ import { SiteCopyService } from './site-copy.service';
     MediaRemovalController,
   ],
   providers: [
+    GalleryConsentSweepService,
     BusinessSettingsService,
     SiteCopyService,
     GalleryService,

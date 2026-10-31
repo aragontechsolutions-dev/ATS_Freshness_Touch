@@ -359,6 +359,91 @@ describe('anotar un permiso', () => {
   });
 });
 
+describe('el atajo de la clienta de siempre', () => {
+  /*
+   * EL CASO: la empresa lleva anos limpiando las mismas casas y tiene fotos
+   * con el permiso dado DE PALABRA. Un permiso verbal no vale —no porque
+   * sea invalido en todas partes, sino porque no se puede demostrar— asi
+   * que hay que convertirlo en un mensaje escrito y archivarlo.
+   *
+   * Lo que se prueba es que el atajo no se invente nada que no se pueda
+   * suponer, y que no sea una via para saltarse ninguna regla.
+   */
+  async function abrirAtajo(): Promise<void> {
+    await montar();
+    await pulsar('Long-standing customer (permission by message)');
+  }
+
+  it('propone el mensaje como prueba, no el papel', async () => {
+    await abrirAtajo();
+
+    escribir('Customer', 'Marta');
+    escribir('Property', 'Una calle');
+    escribir('Reference', 'WA-2026-MARTA');
+    escribir('Service date', '2026-03-10');
+    await guardar();
+
+    const enviado = createMediaConsent.mock.calls[0]?.[0];
+    expect(enviado?.evidenceKind).toBe('MESSAGE');
+  });
+
+  it('da por cubierta la casa entera y solo la web', async () => {
+    await abrirAtajo();
+
+    escribir('Customer', 'Marta');
+    escribir('Property', 'Una calle');
+    escribir('Reference', 'WA-2026-MARTA');
+    escribir('Service date', '2026-03-10');
+    await guardar();
+
+    const enviado = createMediaConsent.mock.calls[0]?.[0];
+    expect(enviado?.coversInterior).toBe(true);
+    expect(enviado?.coversExterior).toBe(true);
+    /* El mensaje que se le manda al cliente habla de la web y de nada mas. */
+    expect(enviado?.channels).toEqual(['WEBSITE']);
+  });
+
+  it('NO MARCA EL «ANTES» POR NADIE', async () => {
+    /*
+     * Es la parte sensible del permiso: la casa sucia de una persona
+     * concreta. Un atajo que la diera por marcada publicaria eso sin que
+     * nadie lo hubiera decidido.
+     */
+    await abrirAtajo();
+
+    escribir('Customer', 'Marta');
+    escribir('Property', 'Una calle');
+    escribir('Reference', 'WA-2026-MARTA');
+    escribir('Service date', '2026-03-10');
+    await guardar();
+
+    expect(createMediaConsent.mock.calls[0]?.[0].allowsBefore).toBe(false);
+  });
+
+  it('no rellena la fecha del servicio, que es de cada clienta', async () => {
+    await abrirAtajo();
+
+    escribir('Customer', 'Marta');
+    escribir('Property', 'Una calle');
+    escribir('Reference', 'WA-2026-MARTA');
+    /* Sin fecha de servicio no se puede guardar: el contrato la exige. */
+    await guardar();
+
+    expect(createMediaConsent).not.toHaveBeenCalled();
+  });
+
+  it('se puede salir del modo corto y ver todo', async () => {
+    await abrirAtajo();
+
+    expect(contenedor.textContent).toContain('Show every field');
+
+    await pulsar('Show every field');
+
+    /* Los campos escondidos vuelven, y el de salir desaparece. */
+    expect(contenedor.textContent).not.toContain('Show every field');
+  });
+});
+
 describe('retirar un permiso', () => {
   /*
    * DESPUBLICA AL MOMENTO. Entre pulsar y que la foto desaparezca de la web

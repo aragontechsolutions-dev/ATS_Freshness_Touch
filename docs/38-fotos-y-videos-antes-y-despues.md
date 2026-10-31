@@ -60,6 +60,13 @@ que se hable con el cliente**, y las dos versiones dicen lo mismo.
 porque no se puede demostrar, y el día que haga falta es precisamente el día
 en que el cliente dice que no lo dio.
 
+> **Y por eso NO existe un tipo de prueba «verbal»** (etapa 3.34). Lo que sí
+> hay es el camino para convertir uno en válido, que cuesta un WhatsApp: se
+> pide el «sí» por escrito, se guarda la captura y se archiva como `MESSAGE`.
+> El panel tiene un atajo para ese caso —«clienta de siempre»— que rellena lo
+> que en él solo tiene una respuesta y **nunca marca el «antes»**. Ver
+> `docs/50-tres-piezas-de-operacion.md` §A.
+
 ### Texto en inglés
 
 ```
@@ -1332,3 +1339,19 @@ escribirnos».
 | `PUBLIC_SITE_URL` | el dominio del sitio | Para componer el enlace. **Si falta, la constancia sale sin botón** y diciendo a dónde escribir. |
 
 #### Lo que todavía no existe en el registro
+
+---
+
+## 12. Las piezas que se quedan en el limbo (etapa 3.34)
+
+La lista blanca tiene un efecto que conviene tener presente: **una pieza sin
+permiso no da error**. Se sube, se guarda, se ve en el panel, y no aparece en
+la web. Quien la subió cree que ya está puesta.
+
+Desde la etapa 3.34 un barrido diario cuenta las piezas sin permiso y, si
+alguna lleva más de tres días así, deja un aviso en la bandeja de
+administración. No avisa el primer día —el orden normal es subir la foto y
+anotar el permiso después— y no repite: avisa de un estado, no de un hecho.
+
+Detalle, y las dos decisiones de `addedAt`, en
+`docs/50-tres-piezas-de-operacion.md` §B.
