@@ -322,6 +322,77 @@ describe('copia interna', () => {
   });
 });
 
+describe('el aviso a quien asigna los equipos', () => {
+  const BUZON = 'coordinacion@freshnesstouch.com';
+
+  it('sale un correo PROPIO, distinto del del cliente', async () => {
+    /*
+     * Es la razon de existir de esta audiencia. La copia interna manda el
+     * correo del cliente a otro buzon; esto manda otro texto, escrito para
+     * quien reparte el trabajo.
+     */
+    await guardarAjustes({ ...DEFAULT_NOTIFICATION_SETTINGS, dispatchEmail: BUZON });
+
+    await notifications.bookingConfirmed(BOOKING_ID);
+
+    const aviso = correo.sent.find((mensaje) => mensaje.to === BUZON);
+
+    expect(aviso).toBeDefined();
+    expect(aviso?.subject).not.toBe(correo.sent[0]?.subject);
+    expect(aviso?.subject).toContain('FT-');
+
+    const fila = (await avisos()).find((f) => f.audience === 'DISPATCH');
+    expect(fila).toMatchObject({ channel: 'EMAIL', status: 'SENT' });
+
+    await guardarAjustes(DEFAULT_NOTIFICATION_SETTINGS);
+  });
+
+  it('NO LLEVA NI EL NOMBRE DEL CLIENTE, NI LA CALLE, NI EL IMPORTE', async () => {
+    /*
+     * LA PRUEBA DE SEGURIDAD DE ESTA PIEZA. Nada de eso hace falta para
+     * poner un equipo, y todo lo que sale por correo se queda para siempre
+     * en un buzon que no controlamos. La ficha entera esta en el panel,
+     * detras de una sesion.
+     */
+    await guardarAjustes({ ...DEFAULT_NOTIFICATION_SETTINGS, dispatchEmail: BUZON });
+
+    await notifications.bookingConfirmed(BOOKING_ID);
+
+    const aviso = correo.sent.find((mensaje) => mensaje.to === BUZON);
+    const cuerpo = `${aviso?.subject ?? ''} ${aviso?.text ?? ''} ${aviso?.html ?? ''}`;
+
+    /* La calle y el nombre son los de la reserva de prueba, no inventados:
+       una lista de datos que no estan en la ficha no prueba nada. */
+    for (const dato of ['Ana', 'García', 'ana.garcia@example.com', '$', 'Evergreen', '4815']) {
+      expect(cuerpo, `no deberia llevar: ${dato}`).not.toContain(dato);
+    }
+
+    await guardarAjustes(DEFAULT_NOTIFICATION_SETTINGS);
+  });
+
+  it('sin buzon configurado no se manda, y queda dicho por que', async () => {
+    await notifications.bookingConfirmed(BOOKING_ID);
+
+    const fila = (await avisos()).find((f) => f.audience === 'DISPATCH');
+
+    expect(fila?.status).toBe('SKIPPED');
+    expect(fila?.failureReason).toContain('asignacion');
+    expect(correo.sent.map((mensaje) => mensaje.to)).not.toContain(BUZON);
+  });
+
+  it('no se manda dos veces por la misma reserva', async () => {
+    await guardarAjustes({ ...DEFAULT_NOTIFICATION_SETTINGS, dispatchEmail: BUZON });
+
+    await notifications.bookingConfirmed(BOOKING_ID);
+    await notifications.bookingConfirmed(BOOKING_ID);
+
+    const cuantos = correo.sent.filter((mensaje) => mensaje.to === BUZON).length;
+    expect(cuantos).toBe(1);
+
+    await guardarAjustes(DEFAULT_NOTIFICATION_SETTINGS);
+  });
+});
+
 describe('quien decide a donde van los avisos', () => {
   it('sin sesion no se leen los ajustes', async () => {
     const respuesta = await request(app.getHttpServer()).get(AJUSTES);

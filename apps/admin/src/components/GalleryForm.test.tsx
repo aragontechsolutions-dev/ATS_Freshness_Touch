@@ -69,8 +69,8 @@ const VACIA: AdminGallery = {
 const CON_DOS: AdminGallery = {
   gallery: {
     videos: [
-      { videoId: UNO, title: { en: 'Kitchen', es: 'Cocina' }, poster: null },
-      { videoId: DOS, title: { en: null, es: null }, poster: null },
+      { videoId: UNO, title: { en: 'Kitchen', es: 'Cocina' }, poster: null, addedAt: null },
+      { videoId: DOS, title: { en: null, es: null }, poster: null, addedAt: null },
     ],
     photos: [],
   },
@@ -83,8 +83,8 @@ const CON_DOS: AdminGallery = {
 /** Con una foto ya publicada, para las pruebas de las fotos. */
 const CON_FOTO: AdminGallery = {
   gallery: {
-    videos: [{ videoId: UNO, title: { en: null, es: null }, poster: null }],
-    photos: [{ path: FOTO, title: { en: 'Kitchen', es: 'Cocina' } }],
+    videos: [{ videoId: UNO, title: { en: null, es: null }, poster: null, addedAt: null }],
+    photos: [{ path: FOTO, title: { en: 'Kitchen', es: 'Cocina' }, addedAt: null }],
   },
   imageUrls: { [FOTO]: FOTO_URL },
   uncovered: { videoIds: [], photoPaths: [] },
@@ -95,7 +95,7 @@ const CON_FOTO: AdminGallery = {
 /** Con un video que ya tiene su miniatura propia. */
 const CON_MINIATURA: AdminGallery = {
   gallery: {
-    videos: [{ videoId: UNO, title: { en: null, es: null }, poster: MINI }],
+    videos: [{ videoId: UNO, title: { en: null, es: null }, poster: MINI, addedAt: null }],
     photos: [],
   },
   imageUrls: { [MINI]: MINI_URL },
@@ -238,7 +238,7 @@ describe('publicar un video', () => {
     await guardar();
 
     expect(saveGallery).toHaveBeenCalledWith({
-      videos: [{ videoId: UNO, title: { en: null, es: null }, poster: null }],
+      videos: [{ videoId: UNO, title: { en: null, es: null }, poster: null, addedAt: null }],
       photos: [],
     });
   });
@@ -293,7 +293,7 @@ describe('retirar un video', () => {
     await guardar();
 
     expect(saveGallery).toHaveBeenCalledWith({
-      videos: [{ videoId: DOS, title: { en: null, es: null }, poster: null }],
+      videos: [{ videoId: DOS, title: { en: null, es: null }, poster: null, addedAt: null }],
       photos: [],
     });
   });
@@ -391,7 +391,7 @@ describe('las fotos', () => {
 
     expect(saveGallery).toHaveBeenCalledWith({
       videos: [],
-      photos: [{ path: FOTO, title: { en: null, es: null } }],
+      photos: [{ path: FOTO, title: { en: null, es: null }, addedAt: null }],
     });
   });
 
@@ -426,7 +426,9 @@ describe('las fotos', () => {
     await guardar();
 
     const enviado = saveGallery.mock.calls[0]?.[0];
-    expect(enviado?.photos).toEqual([{ path: FOTO, title: { en: 'Kitchen', es: 'Cocina' } }]);
+    expect(enviado?.photos).toEqual([
+      { path: FOTO, title: { en: 'Kitchen', es: 'Cocina' }, addedAt: null },
+    ]);
   });
 
   it('y retirar una foto NO borra los videos', async () => {
@@ -557,8 +559,8 @@ describe('lo que esta guardado pero no se publica', () => {
    */
   const SIN_PERMISO: AdminGallery = {
     gallery: {
-      videos: [{ videoId: UNO, title: { en: null, es: null }, poster: null }],
-      photos: [{ path: FOTO, title: { en: null, es: null } }],
+      videos: [{ videoId: UNO, title: { en: null, es: null }, poster: null, addedAt: null }],
+      photos: [{ path: FOTO, title: { en: null, es: null }, addedAt: null }],
     },
     imageUrls: { [FOTO]: FOTO_URL },
     uncovered: { videoIds: [UNO], photoPaths: [FOTO] },

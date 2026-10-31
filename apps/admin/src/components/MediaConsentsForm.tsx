@@ -95,6 +95,49 @@ const VACIO: Borrador = {
 };
 
 /**
+ * EL BORRADOR DE LA CLIENTA DE SIEMPRE.
+ *
+ * ========================================================================
+ * EL CASO QUE RESUELVE
+ * ========================================================================
+ * La empresa lleva anos limpiando las mismas casas y tiene fotos de ese
+ * trabajo con el permiso dado DE PALABRA. Un permiso verbal no vale, no
+ * porque sea invalido en todos los casos, sino porque no se puede demostrar
+ * — y el dia que haga falta es el dia en que el cliente dice que no lo dio
+ * (`docs/38` §2).
+ *
+ * Convertirlo en valido cuesta un WhatsApp: se pide el «si» por escrito, se
+ * guarda la captura, y eso ya es `MESSAGE`, una de las cuatro clases de
+ * prueba que el contrato admite desde el principio.
+ *
+ * ========================================================================
+ * QUE RELLENA, Y POR QUE ESO Y NO MAS
+ * ========================================================================
+ * Lo que en este caso tiene UNA sola respuesta sensata: la clase de prueba,
+ * la fecha de la respuesta (hoy), que cubre la casa entera y que se publica
+ * en la web. Lo que NO rellena es lo que depende de cada clienta —quien es,
+ * que casa, de que dia era el trabajo— ni lo que no se puede suponer: el
+ * «antes» sigue apagado, porque ensenar la casa sucia de alguien es la parte
+ * sensible y nadie la marca por ti.
+ */
+function clientaDeSiempre(hoy: string): Borrador {
+  return {
+    ...VACIO,
+    /* Lo que de verdad se tiene: un mensaje con el «si» dentro. */
+    evidenceKind: 'MESSAGE',
+    /*
+     * La fecha en que contesto, que es HOY: el permiso nace cuando se da por
+     * escrito, no cuando se limpio la casa. La del servicio se escribe
+     * aparte y es la del trabajo al que pertenecen esas fotos.
+     */
+    signedAt: hoy,
+    /* El mensaje pide fotos del trabajo, por dentro y por fuera. */
+    coversInterior: true,
+    coversExterior: true,
+  };
+}
+
+/**
  * LOS PERMISOS DE IMAGEN
  * ----------------------
  * Aqui no se configura nada: SE ARCHIVA UN PAPEL FIRMADO. Lo que se anote
@@ -125,6 +168,15 @@ export function MediaConsentsForm({ locale, onSessionLost }: MediaConsentsFormPr
   const [fichas, setFichas] = useState<StoredMediaConsent[]>([]);
   /** Que ficha se esta editando: su id, `'nueva'`, o nada. */
   const [editando, setEditando] = useState<string | null>(null);
+  /**
+   * El formulario corto.
+   *
+   * NO ES OTRO FORMULARIO: es el mismo con menos campos a la vista y unos
+   * cuantos ya rellenos. Dos formularios que guardan la misma ficha se
+   * separan solos, y el dia que el contrato cambie habria que acordarse de
+   * los dos.
+   */
+  const [rapido, setRapido] = useState(false);
   const [borrador, setBorrador] = useState<Borrador>(VACIO);
 
   /*
@@ -193,6 +245,7 @@ export function MediaConsentsForm({ locale, onSessionLost }: MediaConsentsFormPr
 
       toast.success('admin.consents.saved');
       setEditando(null);
+      setRapido(false);
       setBorrador(VACIO);
       await cargar();
     } catch (error) {
@@ -348,18 +401,54 @@ export function MediaConsentsForm({ locale, onSessionLost }: MediaConsentsFormPr
       </header>
 
       {editando === null ? (
-        <button
-          type="button"
-          className="ft-btn-primary"
-          onClick={() => {
-            setBorrador(VACIO);
-            setEditando('nueva');
-          }}
-        >
-          {t('admin.consents.add')}
-        </button>
+        <div className="flex flex-wrap gap-3">
+          <button
+            type="button"
+            className="ft-btn-primary"
+            onClick={() => {
+              setRapido(false);
+              setBorrador(VACIO);
+              setEditando('nueva');
+            }}
+          >
+            {t('admin.consents.add')}
+          </button>
+          {/*
+            EL ATAJO DE LA CLIENTA DE SIEMPRE. Guarda la misma ficha; lo que
+            cambia es que no pregunta lo que en este caso solo tiene una
+            respuesta. Ver `clientaDeSiempre`.
+          */}
+          <button
+            type="button"
+            className="ft-btn-ghost"
+            onClick={() => {
+              setRapido(true);
+              setBorrador(clientaDeSiempre(new Date().toISOString().slice(0, 10)));
+              setEditando('nueva');
+            }}
+          >
+            {t('admin.consents.addQuick')}
+          </button>
+        </div>
       ) : (
         <form className="ft-card space-y-4 p-4" onSubmit={(evento) => void enviar(evento)}>
+          {rapido && (
+            /*
+             * LOS TRES PASOS, A LA VISTA. Esta pantalla archiva un permiso;
+             * en este caso el permiso hay que CONSEGUIRLO primero, y quien
+             * abre el formulario sin saber eso anota una ficha que no tiene
+             * ninguna prueba detras — que es exactamente lo que no vale.
+             */
+            <p
+              className="rounded-lg border border-brand-200 bg-brand-50 p-3 text-sm
+                         text-slate-700 dark:border-night-600 dark:bg-night-700
+                         dark:text-slate-200"
+              role="note"
+            >
+              {t('admin.consents.quickSteps')}
+            </p>
+          )}
+
           <div className="grid gap-3 sm:grid-cols-2">
             <Texto
               etiqueta={t('admin.consents.reference')}
@@ -452,7 +541,10 @@ export function MediaConsentsForm({ locale, onSessionLost }: MediaConsentsFormPr
            * consecuencias para una persona que no esta en la conversacion —el
            * inquilino— y perdida entre los demas campos se marcaria sin leer.
            */}
-          <fieldset className="rounded-lg border border-amber-300 bg-amber-50 p-3 dark:border-amber-700/60 dark:bg-amber-950/30">
+          <fieldset
+            className="rounded-lg border border-amber-300 bg-amber-50 p-3 dark:border-amber-700/60 dark:bg-amber-950/30"
+            hidden={rapido && !borrador.occupiedByOthers}
+          >
             <legend className="ft-label px-1">{t('admin.consents.occupancy')}</legend>
             <Casilla
               etiqueta={t('admin.consents.occupiedByOthers')}
@@ -510,7 +602,7 @@ export function MediaConsentsForm({ locale, onSessionLost }: MediaConsentsFormPr
             />
           </div>
 
-          <fieldset className="space-y-2">
+          <fieldset className="space-y-2" hidden={rapido}>
             <legend className="ft-label">{t('admin.consents.covers')}</legend>
             <Casilla
               etiqueta={t('admin.consents.coversInterior')}
@@ -546,7 +638,7 @@ export function MediaConsentsForm({ locale, onSessionLost }: MediaConsentsFormPr
             </p>
           </div>
 
-          <fieldset className="space-y-2">
+          <fieldset className="space-y-2" hidden={rapido}>
             <legend className="ft-label">{t('admin.consents.channels')}</legend>
             <p className="text-xs text-slate-600 dark:text-slate-400">
               {t('admin.consents.channelsHelp')}
@@ -587,13 +679,33 @@ export function MediaConsentsForm({ locale, onSessionLost }: MediaConsentsFormPr
             />
           </div>
 
-          <Lista
-            etiqueta={t('admin.consents.notes')}
-            valor={borrador.notes}
-            onCambiar={(v) => {
-              campo('notes', v);
-            }}
-          />
+          {!rapido && (
+            <Lista
+              etiqueta={t('admin.consents.notes')}
+              valor={borrador.notes}
+              onCambiar={(v) => {
+                campo('notes', v);
+              }}
+            />
+          )}
+
+          {rapido && (
+            /*
+             * SE PUEDE SALIR DEL MODO CORTO SIN PERDER LO ESCRITO: es el
+             * mismo borrador, solo deja de esconder campos. Sin esta puerta,
+             * el atajo seria una trampa el dia que la casa la habite otra
+             * persona o haya que publicar tambien en Instagram.
+             */
+            <button
+              type="button"
+              className="ft-btn-ghost"
+              onClick={() => {
+                setRapido(false);
+              }}
+            >
+              {t('admin.consents.showAllFields')}
+            </button>
+          )}
 
           {problema !== null && (
             <p
@@ -616,6 +728,7 @@ export function MediaConsentsForm({ locale, onSessionLost }: MediaConsentsFormPr
               onClick={() => {
                 setEditando(null);
                 setProblema(null);
+                setRapido(false);
               }}
               disabled={guardando}
             >

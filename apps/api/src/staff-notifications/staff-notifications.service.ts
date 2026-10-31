@@ -97,6 +97,30 @@ export class StaffNotificationsService {
    * LO DE SU PUESTO MAS LO SUYO. Una notificacion con `staffId` es de esa
    * persona y de nadie mas; sin el, la ve todo el puesto.
    */
+  /**
+   * ¿HAY YA UN AVISO DE ESTA CLASE DESDE ESA HORA?
+   *
+   * Es el antirrebote de los avisos que nacen de un BARRIDO y no de un
+   * hecho. Una reserva nueva ocurre una vez; «hay fotos sin permiso» es un
+   * estado que sigue siendo verdad en cada pasada, y sin esto la bandeja se
+   * llenaria del mismo aviso una vez por pasada hasta que alguien lo
+   * arreglara. Una bandeja asi se deja de leer, que es el unico modo de
+   * fallo que estos avisos tienen.
+   *
+   * SE PREGUNTA A LA TABLA Y NO A LA MEMORIA: un reinicio del servidor no
+   * puede hacer que vuelva a avisarse de todo.
+   *
+   * No se mira si esta LEIDO, y es deliberado: leer no es arreglar. Si el
+   * problema sigue ahi manana, volver a decirlo es lo correcto.
+   */
+  async hayRecientes(kind: StaffNotificationKind, desde: Date): Promise<boolean> {
+    const cuantos = await this.prisma.db.staffNotification.count({
+      where: { kind, createdAt: { gte: desde } },
+    });
+
+    return cuantos > 0;
+  }
+
   async listar(staff: AuthenticatedStaff, limite: number): Promise<StaffNotificationList> {
     const suyas = {
       audience: staff.role,

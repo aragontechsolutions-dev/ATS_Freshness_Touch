@@ -101,6 +101,8 @@ enum NotificationAudience {
   CUSTOMER
   INTERNAL
   CLEANING
+  /// Quien asigna los equipos. Ver la migracion 20261031100000.
+  DISPATCH
 }
 
 /// SKIPPED no es un fallo: es "estaba apagado o sin configurar".

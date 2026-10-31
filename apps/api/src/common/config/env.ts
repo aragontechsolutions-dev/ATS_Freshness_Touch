@@ -199,6 +199,16 @@ export const EnvSchema = z
     AUDIT_PURGE_HOURS: z.coerce.number().int().min(0).max(168).default(24),
 
     /**
+     * Cada cuantas horas se mira si hay fotos o videos guardados sin un
+     * permiso que los ampare. Cero lo apaga, y es lo que usan las pruebas.
+     *
+     * EN HORAS Y NO EN MINUTOS porque lo que vigila no cambia en minutos: una
+     * pieza sin permiso lo sigue estando manana. Mirarlo cada hora solo
+     * gastaria consultas para contestar lo mismo.
+     */
+    GALLERY_CONSENT_SWEEP_HOURS: z.coerce.number().int().min(0).max(168).default(24),
+
+    /**
      * AVISO DE QUE ALGO VA MAL, cada cuantos minutos se mira. Cero lo apaga.
      *
      * Existe porque dos caidas reales estuvieron escritas en el log durante

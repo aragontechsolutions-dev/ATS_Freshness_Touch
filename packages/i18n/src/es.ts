@@ -480,6 +480,12 @@ export const es: TranslationResources = {
             body: 'Intentamos cinco veces mandar el correo de {{event}} de la reserva {{reference}} y siguió fallando. Ha pagado y no tiene nada por escrito: llámala.',
           },
         },
+        gallery: {
+          uncovered: {
+            title: 'Fotos guardadas que no se publican',
+            body: 'Hay {{count}} pieza(s) en la galería desde hace más de {{days}} días sin un permiso de imagen que las ampare, así que no están en la web. Abre Fotos y vídeos y enlázalas con un permiso — o bórralas.',
+          },
+        },
         series: {
           slot_taken: {
             title: 'Una cita recurrente no se pudo crear',
@@ -691,6 +697,10 @@ export const es: TranslationResources = {
       strictNotice:
         'No se publica nada sin un permiso anotado. Una pieza sin permiso se queda guardada pero no sale en la web.',
       add: 'Anotar un permiso',
+      addQuick: 'Clienta de siempre (permiso por mensaje)',
+      quickSteps:
+        'Para fotos que ya tienes con un sí solo de palabra: 1) escríbele y consigue el sí por escrito, 2) guarda la captura, 3) rellena esto y adjunta esa captura abajo. Un permiso verbal no es inválido en todas partes — es que no se puede demostrar, y el día que importa es el día en que alguien dice que nunca lo dio.',
+      showAllFields: 'Ver todos los campos',
       empty:
         'Todavía no hay permisos anotados. Hasta que haya uno, nada de la galería sale en la web.',
       reference: 'Referencia',
@@ -812,6 +822,17 @@ export const es: TranslationResources = {
       internalEmailHelp: 'Ese buzón recibe el mismo correo que recibió el cliente.',
       internalEmailEmpty: 'No se envía copia.',
       internalEmailInvalid: 'Escribe un correo válido.',
+
+      dispatchEmail: 'Avisar a quien asigna los equipos',
+      dispatchEmailHelp:
+        'Un aviso corto por cada reserva nueva: referencia, cuándo, ciudad y servicio. Sin el nombre del cliente, sin la calle y sin el importe — eso se queda en el panel.',
+      dispatchEmailEmpty:
+        'No se avisa a nadie por correo. Las reservas nuevas siguen saliendo en la bandeja y en Telegram.',
+      dispatchEmailInvalid: 'Escribe un correo válido.',
+      dispatchLocale: 'Idioma de ese aviso',
+      dispatchLocaleHelp:
+        'Va a un buzón, no a una persona, así que no hay de quién sacar el idioma. No se usa el del cliente: ese lo eligió otra persona.',
+      dispatchLocaleInvalid: 'Elige inglés o español.',
       telegramOnNewBooking: 'Enviar un mensaje de Telegram por cada reserva nueva',
       telegramOnNewBookingHelp:
         'Solo de las reservas confirmadas y pagadas. Los formularios abandonados no se avisan, para que el aviso siga mereciendo la pena leerlo.',

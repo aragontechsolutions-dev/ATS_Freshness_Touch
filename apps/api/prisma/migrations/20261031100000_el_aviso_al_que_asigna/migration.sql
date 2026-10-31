@@ -1,0 +1,32 @@
+-- ===========================================================================
+-- EL AVISO A QUIEN ASIGNA LOS EQUIPOS
+-- ===========================================================================
+-- Hasta hoy, cuando entraba una reserva confirmada salian dos avisos hacia
+-- dentro: un mensaje de Telegram al chat de operaciones y una COPIA del
+-- correo del cliente al buzon interno.
+--
+-- Ninguno de los dos sirve para lo que hace falta aqui. La copia interna es
+-- el correo del cliente: esta escrito para el, lleva el precio y no dice lo
+-- unico que le importa a quien reparte el trabajo — que esa reserva todavia
+-- no tiene equipo. Y Telegram no lo lee todo el mundo.
+--
+-- ---------------------------------------------------------------------------
+-- POR QUE UNA AUDIENCIA NUEVA Y NO REUTILIZAR `INTERNAL`
+-- ---------------------------------------------------------------------------
+-- El registro de envios tiene un indice unico sobre
+-- (bookingId, event, channel, audience) para las filas enviadas. Con
+-- `INTERNAL` los dos correos de la misma reserva —la copia y el aviso de
+-- asignacion— serian la misma fila: el segundo chocaria con el indice
+-- DESPUES de haberse enviado, y quedaria enviado y sin registrar.
+--
+-- Son dos destinatarios distintos con dos textos distintos, asi que son dos
+-- audiencias. Y asi el registro contesta por separado «¿le llego al buzon
+-- del equipo?» y «¿le llego a quien asigna?».
+--
+-- Esta migracion solo ANADE el valor; nada en este archivo lo usa, asi que no
+-- hace falta partirla en dos como se hizo con `JOB_ASSIGNED` y con
+-- `BOOKING_RESCHEDULED` (ahi el indice nombraba el valor recien creado y
+-- Postgres no lo admite en la misma transaccion).
+-- ===========================================================================
+
+ALTER TYPE "NotificationAudience" ADD VALUE IF NOT EXISTS 'DISPATCH' AFTER 'CLEANING';

@@ -748,6 +748,15 @@ function aContrato(filas: Fila[], fotos: FilaFoto[]): Gallery {
         es: fila.titleEs.trim() === '' ? null : fila.titleEs.trim(),
       },
       poster: fila.poster,
+      /*
+       * LA FECHA DE ALTA LA DECIDE EL SERVIDOR, y lo que se mande aqui lo
+       * ignora: conserva la que la pieza ya tuviera y solo sella las
+       * nuevas. Va en `null` porque el contrato lo exige, no porque esto
+       * sepa la respuesta — es el dato con el que se decide a quien
+       * molestar por una foto olvidada sin permiso, y eso no puede venir
+       * del navegador. Hay una prueba de que reguardar no reinicia el reloj.
+       */
+      addedAt: null,
     })),
     /*
      * LAS FOTOS VIAJAN SIEMPRE, aunque esta pantalla solo haya tocado los
@@ -761,6 +770,8 @@ function aContrato(filas: Fila[], fotos: FilaFoto[]): Gallery {
         en: foto.titleEn.trim() === '' ? null : foto.titleEn.trim(),
         es: foto.titleEs.trim() === '' ? null : foto.titleEs.trim(),
       },
+      /* Igual que en los videos: la pone el servidor. */
+      addedAt: null,
     })),
   };
 }

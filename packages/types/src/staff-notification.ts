@@ -80,6 +80,16 @@ export const STAFF_NOTIFICATION_KINDS = [
    * la vez, que es una decision de coordinacion y no de un servicio.
    */
   'booking.team_clash',
+  /**
+   * Hay fotos o videos guardados que no se estan publicando porque ningun
+   * permiso los ampara.
+   *
+   * ES UN FALLO SILENCIOSO POR DISENO: la galeria es una lista BLANCA, asi
+   * que una pieza sin permiso no da error, no sale en la web y no se queja.
+   * Quien la subio cree que ya esta puesta. Sin este aviso, la unica forma
+   * de enterarse es abrir la pantalla de la galeria y leer el contador.
+   */
+  'gallery.uncovered',
 ] as const;
 export const StaffNotificationKindSchema = z.enum(STAFF_NOTIFICATION_KINDS);
 export type StaffNotificationKind = z.infer<typeof StaffNotificationKindSchema>;
@@ -161,4 +171,6 @@ export const NOTIFICATION_AUDIENCE: Record<
   'notification.failed': 'ADMIN',
   /* A coordinacion, que es quien reparte los equipos. */
   'booking.team_clash': 'DISPATCHER',
+  /* A administracion: los permisos de imagen son cosa suya (`docs/38`). */
+  'gallery.uncovered': 'ADMIN',
 };

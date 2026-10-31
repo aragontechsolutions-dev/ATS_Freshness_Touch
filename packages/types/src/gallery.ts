@@ -192,6 +192,9 @@ export const GalleryVideoSchema = z.strictObject({
    * funciona y no pide nada a nadie.
    */
   poster: GalleryPosterPathSchema.nullable().default(null),
+
+  /** Cuando se anadio. Ver la nota de `GalleryPhotoSchema`. */
+  addedAt: z.iso.datetime().nullable().default(null),
 });
 export type GalleryVideo = z.infer<typeof GalleryVideoSchema>;
 
@@ -225,6 +228,26 @@ export const GalleryPhotoPathSchema = z
 export const GalleryPhotoSchema = z.strictObject({
   path: GalleryPhotoPathSchema,
   title: GalleryTitleSchema.default(TITULO_SIN_PONER),
+
+  /**
+   * CUANDO SE ANADIO LA PIEZA, para poder avisar de lo que lleva demasiado
+   * tiempo guardado sin permiso que lo ampare.
+   *
+   * LO PONE EL SERVIDOR al guardar, no quien sube: es una fecha con la que
+   * se decide si molestar a alguien, y un dato que decide eso no puede venir
+   * del navegador. Al reguardar la galeria se conserva la que ya tenia, asi
+   * que corregir un titulo no reinicia el reloj.
+   *
+   * NULO = «ya estaba antes de que esto existiera», y cuenta como VIEJA. Es
+   * lo contrario de lo que parece prudente, y es lo correcto: las piezas que
+   * hay hoy sin permiso son exactamente las que hay que mirar, y tratarlas
+   * como recien llegadas dejaria el aviso mudo justo para ellas.
+   *
+   * CON `.default(null)` por la razon de siempre en este archivo: sin el, el
+   * dia del despliegue las filas guardadas dejarian de cumplir el contrato y
+   * la galeria desapareceria de la portada.
+   */
+  addedAt: z.iso.datetime().nullable().default(null),
 });
 export type GalleryPhoto = z.infer<typeof GalleryPhotoSchema>;
 
@@ -236,6 +259,19 @@ export type GalleryPhoto = z.infer<typeof GalleryPhotoSchema>;
  * cargar.
  */
 export const GALLERY_PHOTOS_MAX = 24;
+
+/**
+ * Cuantos dias se deja una pieza guardada sin permiso antes de avisar.
+ *
+ * NO ES CERO A PROPOSITO. El orden natural de trabajo es subir la foto y
+ * despues anotar el permiso, a veces al dia siguiente, cuando el cliente
+ * contesta. Avisar el mismo dia convertiria el aviso en parte del
+ * procedimiento normal, y lo que suena siempre se deja de leer.
+ *
+ * Tres dias es lo que tarda en dejar de ser «lo estoy haciendo» y pasar a
+ * ser «se me olvido».
+ */
+export const GALLERY_UNCOVERED_GRACE_DAYS = 3;
 
 /**
  * Lo que mas puede pesar una foto: 5 MB.

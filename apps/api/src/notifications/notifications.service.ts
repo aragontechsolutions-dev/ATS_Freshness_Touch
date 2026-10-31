@@ -34,6 +34,7 @@ import {
   teamArrivedFarTelegramMessage,
   type BookingEmailData,
 } from './templates/booking-emails';
+import { newBookingDispatchEmail } from './templates/staff-emails';
 
 /**
  * Lo que se lee de una reserva para poder avisar.
@@ -48,6 +49,8 @@ interface ReservaParaAviso {
   /** Que clase de limpieza. Solo lo usa el aviso al equipo. */
   service: string;
   scheduledStart: Date;
+  /** Solo lo usa el aviso a quien asigna: la franja entera decide si cabe. */
+  scheduledEnd: Date;
   timezone: string;
   depositCents: number;
   balanceDueCents: number;
@@ -315,6 +318,7 @@ export class NotificationsService {
 
       if (event === 'BOOKING_CONFIRMED') {
         await this.avisoInterno(bookingId, ajustes, reserva, datos);
+        await this.avisoDeAsignacion(bookingId, ajustes, reserva);
       }
     } catch (error) {
       /*
@@ -523,6 +527,81 @@ export class NotificationsService {
     }
   }
 
+  /**
+   * CORREO A QUIEN ASIGNA LOS EQUIPOS.
+   *
+   * ======================================================================
+   * ES UN AVISO DISTINTO, NO OTRA COPIA
+   * ======================================================================
+   * La copia interna manda al buzon del equipo EL MISMO correo que recibio
+   * el cliente. Sirve para atender una llamada y no sirve para repartir
+   * trabajo: esta escrito para el cliente, lleva el precio y no dice que la
+   * reserva este sin equipo.
+   *
+   * Por eso este tiene su propia plantilla, su propio destinatario y su
+   * propia audiencia en el registro: asi se puede contestar por separado
+   * «¿le llego al buzon del equipo?» y «¿le llego a quien asigna?».
+   *
+   * SIN DIRECCION CONFIGURADA NO SE MANDA, y queda anotado como omitido:
+   * una fila que dice por que no salio vale mas que ninguna fila.
+   */
+  private async avisoDeAsignacion(
+    bookingId: string,
+    ajustes: NotificationSettings,
+    reserva: ReservaParaAviso,
+  ): Promise<void> {
+    if (ajustes.dispatchEmail === null) {
+      await this.registrar({
+        bookingId,
+        event: 'BOOKING_CONFIRMED',
+        channel: 'EMAIL',
+        audience: 'DISPATCH',
+        status: 'SKIPPED',
+        target: null,
+        failureReason: 'No hay buzon de asignacion configurado',
+        providerMessageId: null,
+      });
+      return;
+    }
+
+    if (await this.yaEnviado(bookingId, 'BOOKING_CONFIRMED', 'EMAIL', 'DISPATCH')) return;
+
+    const negocio = await this.business.get();
+
+    /*
+     * EN EL IDIOMA DE LA EMPRESA, NO EN EL DEL CLIENTE. Este correo lo lee
+     * quien trabaja aqui: que le llegue en espanol porque el cliente reservo
+     * en espanol seria mandarselo en un idioma elegido por otra persona.
+     */
+    const mensaje = newBookingDispatchEmail(ajustes.dispatchEmail, {
+      /* Del ajuste, no del cliente ni del codigo. Ver el contrato. */
+      locale: ajustes.dispatchLocale,
+      reference: reserva.reference,
+      scheduledStart: reserva.scheduledStart,
+      scheduledEnd: reserva.scheduledEnd,
+      timezone: reserva.timezone,
+      city: reserva.address.city,
+      state: reserva.address.state,
+      service: reserva.service,
+      companyPhone: negocio.phone,
+      companyEmail: negocio.email,
+      logoUrl: this.marca.logoUrl,
+    });
+
+    const resultado = await this.enviarSinLanzar(() => this.email.send(mensaje));
+
+    await this.registrar({
+      bookingId,
+      event: 'BOOKING_CONFIRMED',
+      channel: 'EMAIL',
+      audience: 'DISPATCH',
+      status: resultado.ok ? 'SENT' : 'FAILED',
+      target: maskEmail(ajustes.dispatchEmail),
+      failureReason: resultado.failureReason,
+      providerMessageId: resultado.providerMessageId,
+    });
+  }
+
   /** Mensaje de Telegram al entrar una reserva confirmada. */
   private async avisoInterno(
     bookingId: string,
@@ -698,6 +777,7 @@ export class NotificationsService {
         // Para el aviso al equipo: que clase de limpieza es.
         service: true,
         scheduledStart: true,
+        scheduledEnd: true,
         timezone: true,
         depositCents: true,
         balanceDueCents: true,

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { LocaleSchema } from './enums';
 
 /**
  * AVISOS
@@ -99,7 +100,7 @@ export type NotificationChannel = z.infer<typeof NotificationChannelSchema>;
  * la PWA (`MyJob`) ya tiene esa misma prohibición; esto la extiende a los
  * avisos.
  */
-export const NOTIFICATION_AUDIENCES = ['CUSTOMER', 'INTERNAL', 'CLEANING'] as const;
+export const NOTIFICATION_AUDIENCES = ['CUSTOMER', 'INTERNAL', 'CLEANING', 'DISPATCH'] as const;
 export const NotificationAudienceSchema = z.enum(NOTIFICATION_AUDIENCES);
 export type NotificationAudience = z.infer<typeof NotificationAudienceSchema>;
 
@@ -135,6 +136,55 @@ export const NotificationSettingsSchema = z.strictObject({
    * No es el correo público de la empresa: puede ser un buzón del equipo.
    */
   internalEmail: z.string().trim().toLowerCase().email().max(160).nullable(),
+
+  /**
+   * EL BUZON DE QUIEN ASIGNA LOS EQUIPOS. `null` = no se le avisa.
+   *
+   * ======================================================================
+   * NO ES LA COPIA INTERNA, Y LA DIFERENCIA ES EL MOTIVO DE QUE EXISTA
+   * ======================================================================
+   * `internalEmail` recibe EL MISMO correo que el cliente. Eso sirve para
+   * atender una llamada —se ve exactamente lo que el cliente tiene delante—
+   * y no sirve para asignar un equipo: no dice que la reserva no tenga
+   * equipo todavia, lleva el precio, y esta escrito para el cliente.
+   *
+   * Esto es otro aviso, con otro texto, para otra persona y con otro
+   * trabajo detras: «ha entrado una reserva y hay que ponerle equipo».
+   *
+   * ======================================================================
+   * POR QUE NO LLEVA INTERRUPTOR
+   * ======================================================================
+   * Igual que la copia interna y que los chats de Telegram: el interruptor
+   * es la propia direccion. Vacio significa apagado, y asi no hay forma de
+   * tener un buzon puesto y el aviso apagado sin darse cuenta.
+   *
+   * SIN VALOR POR DEFECTO NO: con `.default(null)`, porque esta fila se lee
+   * con `safeParse` y SIN MEZCLAR con los valores de partida. Un campo nuevo
+   * obligatorio invalidaria la fila guardada y la configuracion entera
+   * —incluido el chat de Telegram que la empresa ya tenia puesto— volveria
+   * a los valores de fabrica en silencio.
+   */
+  dispatchEmail: z.string().trim().toLowerCase().email().max(160).nullable().default(null),
+
+  /**
+   * EN QUE IDIOMA SE LE ESCRIBE A QUIEN ASIGNA.
+   *
+   * Este es el unico correo del sistema que no tiene de quien sacar el
+   * idioma. Los del cliente van en el que eligio al reservar; los del
+   * personal, en el de su ficha. Este va a un BUZON, y un buzon no tiene
+   * idioma.
+   *
+   * La alternativa era fijarlo en el codigo, y eso es adivinar: la empresa
+   * es de Georgia y el panel esta en ingles por defecto, pero quien reparte
+   * el trabajo aqui puede leer mejor en espanol. Una suposicion mia en un
+   * correo que alguien va a leer a las siete de la manana no es mejor que
+   * un desplegable de dos opciones.
+   *
+   * Lo que NO se usa es el idioma del cliente: que el aviso interno llegue
+   * en espanol porque el cliente reservo en espanol seria escribirle al
+   * equipo en un idioma que eligio otra persona.
+   */
+  dispatchLocale: LocaleSchema.default('en'),
 
   /**
    * EL CHAT DE OPERACIONES. Reservas nuevas, llegadas que no cuadran.
@@ -245,6 +295,8 @@ export type NotificationSettings = z.infer<typeof NotificationSettingsSchema>;
  */
 export const DEFAULT_NOTIFICATION_SETTINGS: NotificationSettings = {
   internalEmail: null,
+  dispatchEmail: null,
+  dispatchLocale: 'en',
   telegramChatId: null,
   telegramCleaningChatId: null,
   telegramTechChatId: null,
@@ -298,6 +350,22 @@ export function telegramChatForAudience(
        * NUNCA. Un cliente no tiene chat de Telegram con la empresa, y
        * devolver aquí cualquiera de los otros mandaría al equipo un mensaje
        * redactado para el cliente. Se devuelve null y el envío se salta.
+       */
+      return null;
+    case 'DISPATCH':
+      /*
+       * TAMPOCO, Y NO POR LA MISMA RAZÓN. Quien asigna los equipos sí está
+       * en el chat de operaciones, pero ese chat YA recibe su mensaje por
+       * cada reserva nueva: devolver aquí `telegramChatId` sería mandar dos
+       * mensajes casi iguales al mismo sitio, y dos avisos del mismo hecho
+       * enseñan a no leer ninguno.
+       *
+       * Esta audiencia existe para el CORREO, que es el canal que faltaba.
+       *
+       * Y que esto haya que escribirlo es justo lo que esta función viene a
+       * conseguir: al añadir la audiencia, el compilador señaló esta línea
+       * y obligó a decidir, en vez de dejar que el aviso saliera al chat que
+       * tocara por descarte.
        */
       return null;
   }

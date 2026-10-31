@@ -40,6 +40,7 @@ export function NotificationSettingsForm({ onSessionLost }: Props) {
   // a `null` al enviar: si se normalizaran en cada pulsación, borrar el
   // contenido para reescribirlo lo daría por vacío a mitad de camino.
   const [internalEmail, setInternalEmail] = useState('');
+  const [dispatchEmail, setDispatchEmail] = useState('');
   const [telegramChatId, setTelegramChatId] = useState('');
   const [telegramCleaningChatId, setTelegramCleaningChatId] = useState('');
   const [telegramTechChatId, setTelegramTechChatId] = useState('');
@@ -55,6 +56,7 @@ export function NotificationSettingsForm({ onSessionLost }: Props) {
       const datos = await fetchNotificationSettings();
       setValores(datos);
       setInternalEmail(datos.internalEmail ?? '');
+      setDispatchEmail(datos.dispatchEmail ?? '');
       setTelegramChatId(datos.telegramChatId ?? '');
       setTelegramCleaningChatId(datos.telegramCleaningChatId ?? '');
       setTelegramTechChatId(datos.telegramTechChatId ?? '');
@@ -85,6 +87,7 @@ export function NotificationSettingsForm({ onSessionLost }: Props) {
     const candidato: unknown = {
       ...valores,
       internalEmail: internalEmail.trim() === '' ? null : internalEmail.trim(),
+      dispatchEmail: dispatchEmail.trim() === '' ? null : dispatchEmail.trim(),
       telegramChatId: telegramChatId.trim() === '' ? null : telegramChatId.trim(),
       telegramCleaningChatId:
         telegramCleaningChatId.trim() === '' ? null : telegramCleaningChatId.trim(),
@@ -113,6 +116,7 @@ export function NotificationSettingsForm({ onSessionLost }: Props) {
       const datos = await saveNotificationSettings(validado.data);
       setValores(datos);
       setInternalEmail(datos.internalEmail ?? '');
+      setDispatchEmail(datos.dispatchEmail ?? '');
       setTelegramChatId(datos.telegramChatId ?? '');
       setTelegramCleaningChatId(datos.telegramCleaningChatId ?? '');
       setTelegramTechChatId(datos.telegramTechChatId ?? '');
@@ -252,6 +256,67 @@ export function NotificationSettingsForm({ onSessionLost }: Props) {
             <p className="mt-1 text-xs text-red-700">{t(fieldErrors.internalEmail)}</p>
           )}
         </div>
+
+        {/*
+          EL BUZON DE QUIEN ASIGNA, SEPARADO DE LA COPIA INTERNA.
+          Son dos correos distintos para dos trabajos distintos: la copia es
+          el correo del cliente —util cuando llama— y esto es «hay una
+          reserva sin equipo». Ver `docs/50`.
+        */}
+        <div>
+          <label className="ft-label" htmlFor="aviso-correo-asignacion">
+            {t('admin.notifications.dispatchEmail')}
+          </label>
+          <input
+            id="aviso-correo-asignacion"
+            className="ft-input"
+            type="email"
+            autoComplete="off"
+            value={dispatchEmail}
+            placeholder="coordinacion@freshnesstouch.com"
+            onChange={(evento) => {
+              setDispatchEmail(evento.target.value);
+            }}
+          />
+          <p className="mt-1 text-xs text-slate-600 dark:text-slate-400">
+            {dispatchEmail.trim() === ''
+              ? t('admin.notifications.dispatchEmailEmpty')
+              : t('admin.notifications.dispatchEmailHelp')}
+          </p>
+          {fieldErrors.dispatchEmail && (
+            <p className="mt-1 text-xs text-red-700">{t(fieldErrors.dispatchEmail)}</p>
+          )}
+        </div>
+
+        {/*
+          El idioma solo se pregunta cuando hay a quien escribirle: un
+          desplegable que no manda nada a ninguna parte es una pregunta sin
+          consecuencia, y esta pantalla ya tiene bastantes campos.
+        */}
+        {dispatchEmail.trim() !== '' && (
+          <div>
+            <label className="ft-label" htmlFor="aviso-idioma-asignacion">
+              {t('admin.notifications.dispatchLocale')}
+            </label>
+            <select
+              id="aviso-idioma-asignacion"
+              className="ft-input"
+              value={valores.dispatchLocale}
+              onChange={(evento) => {
+                setValores((previos) => ({
+                  ...previos,
+                  dispatchLocale: evento.target.value === 'es' ? 'es' : 'en',
+                }));
+              }}
+            >
+              <option value="en">English</option>
+              <option value="es">Español</option>
+            </select>
+            <p className="mt-1 text-xs text-slate-600 dark:text-slate-400">
+              {t('admin.notifications.dispatchLocaleHelp')}
+            </p>
+          </div>
+        )}
 
         <Interruptor
           id="aviso-telegram"
