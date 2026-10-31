@@ -13,6 +13,7 @@ import {
 } from '@freshness/types';
 import { ApiClientError, fetchGallery, saveGallery, uploadGalleryImage } from '../lib/api';
 import { useToast } from './ToastProvider';
+import { copiarAlPortapapeles } from '../lib/portapapeles';
 import { SkeletonFormulario } from './Skeletons';
 import { AlertIcon, SpinnerIcon, UploadIcon } from './Icons';
 import { formatTimestamp } from '../lib/format';
@@ -100,6 +101,15 @@ export function GalleryForm({ locale, onSessionLost }: GalleryFormProps) {
    * Sin esto el modo estricto seria una trampa: se sube una foto, se guarda,
    * se ve aqui y no aparece en la web, y no hay forma de saber por que.
    */
+  /**
+   * EL RESPALDO DE COPIAR, cuando el navegador no deja.
+   *
+   * Un boton de copiar que falla en silencio es de los peores: la persona
+   * cree que tiene la ruta, pega, y sale lo de antes. Aqui se guarda lo que
+   * no se pudo copiar para ENSENARLO y que se copie a mano.
+   */
+  const [sinCopiar, setSinCopiar] = useState<string | null>(null);
+
   const [sinPermiso, setSinPermiso] = useState<{ videoIds: string[]; photoPaths: string[] }>({
     videoIds: [],
     photoPaths: [],
@@ -110,6 +120,22 @@ export function GalleryForm({ locale, onSessionLost }: GalleryFormProps) {
   );
 
   const perdioSesion = onSessionLost;
+
+  /**
+   * Copia un texto y avisa de lo que paso.
+   *
+   * Si el navegador no deja, NO se da por copiado: se ensena el texto para
+   * que se pueda seleccionar a mano. Ver `sinCopiar`.
+   */
+  const copiar = async (texto: string): Promise<void> => {
+    if (await copiarAlPortapapeles(texto)) {
+      setSinCopiar(null);
+      toast.success('admin.gallery.copied');
+      return;
+    }
+
+    setSinCopiar(texto);
+  };
 
   const cargar = useCallback(async () => {
     setCargando(true);
@@ -383,6 +409,67 @@ export function GalleryForm({ locale, onSessionLost }: GalleryFormProps) {
             </span>
           </p>
         )}
+
+        {/*
+          COPIAR DE GOLPE LO QUE NO TIENE PERMISO.
+          Es el paso que faltaba para que el atajo de los permisos sirva de
+          algo: la ruta de una foto son treinta y dos caracteres
+          hexadecimales que hasta ahora solo estaban dentro de la direccion
+          de la imagen. Ver `docs/50`.
+        */}
+        {sinPermiso.photoPaths.length + sinPermiso.videoIds.length > 0 && (
+          <div className="mt-3 flex flex-wrap gap-2">
+            {sinPermiso.photoPaths.length > 0 && (
+              <button
+                type="button"
+                className="ft-btn-ghost"
+                onClick={() => void copiar(sinPermiso.photoPaths.join('\n'))}
+              >
+                {t('admin.gallery.copyUncoveredPhotos', { count: sinPermiso.photoPaths.length })}
+              </button>
+            )}
+            {sinPermiso.videoIds.length > 0 && (
+              <button
+                type="button"
+                className="ft-btn-ghost"
+                onClick={() => void copiar(sinPermiso.videoIds.join('\n'))}
+              >
+                {t('admin.gallery.copyUncoveredVideos', { count: sinPermiso.videoIds.length })}
+              </button>
+            )}
+          </div>
+        )}
+
+        {/*
+          EL RESPALDO. Si el navegador no dejo copiar, el texto se ensena
+          aqui para seleccionarlo a mano: quedarse callado dejaria a la
+          persona pegando lo que tuviera de antes.
+        */}
+        {sinCopiar !== null && (
+          <div className="mt-3 space-y-2" role="alert">
+            <p className="text-sm text-slate-700 dark:text-slate-300">
+              {t('admin.gallery.copyManual')}
+            </p>
+            <textarea
+              className="ft-input font-mono text-xs"
+              readOnly
+              rows={Math.min(sinCopiar.split('\n').length, 6)}
+              value={sinCopiar}
+              onFocus={(evento) => {
+                evento.target.select();
+              }}
+            />
+            <button
+              type="button"
+              className="ft-btn-ghost"
+              onClick={() => {
+                setSinCopiar(null);
+              }}
+            >
+              {t('admin.gallery.copyClose')}
+            </button>
+          </div>
+        )}
       </header>
 
       {filas.length === 0 ? (
@@ -582,14 +669,30 @@ export function GalleryForm({ locale, onSessionLost }: GalleryFormProps) {
                   </p>
                 )}
 
-                <button
-                  type="button"
-                  className="ft-btn-ghost"
-                  onClick={() => quitarFoto(indice)}
-                  disabled={guardando}
-                >
-                  {t('admin.gallery.remove')}
-                </button>
+                <div className="flex flex-wrap gap-2">
+                  {/*
+                    LA RUTA NO SE ENSENA, SE COPIA. Son treinta y dos
+                    caracteres hexadecimales: a la vista solo ensucian la
+                    tarjeta, y a mano se teclean mal. Lo que hace falta es
+                    llevarselos al campo «Fotos que ampara» del permiso.
+                  */}
+                  <button
+                    type="button"
+                    className="ft-btn-ghost"
+                    onClick={() => void copiar(foto.path)}
+                  >
+                    {t('admin.gallery.copyPath')}
+                  </button>
+
+                  <button
+                    type="button"
+                    className="ft-btn-ghost"
+                    onClick={() => quitarFoto(indice)}
+                    disabled={guardando}
+                  >
+                    {t('admin.gallery.remove')}
+                  </button>
+                </div>
               </li>
             ))}
           </ul>

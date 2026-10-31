@@ -92,6 +92,23 @@ const CON_FOTO: AdminGallery = {
   updatedBy: 'Ada Jefa',
 };
 
+/** Dos fotos y un video, ninguno amparado: el caso de la clienta de siempre. */
+const OTRA_FOTO = 'photos/89abcdef0123456789abcdef01234567.jpg';
+
+const SIN_PERMISO: AdminGallery = {
+  gallery: {
+    videos: [{ videoId: UNO, title: { en: null, es: null }, poster: null, addedAt: null }],
+    photos: [
+      { path: FOTO, title: { en: null, es: null }, addedAt: null },
+      { path: OTRA_FOTO, title: { en: null, es: null }, addedAt: null },
+    ],
+  },
+  imageUrls: { [FOTO]: FOTO_URL },
+  uncovered: { videoIds: [UNO], photoPaths: [FOTO, OTRA_FOTO] },
+  updatedAt: null,
+  updatedBy: null,
+};
+
 /** Con un video que ya tiene su miniatura propia. */
 const CON_MINIATURA: AdminGallery = {
   gallery: {
@@ -597,5 +614,89 @@ describe('lo que esta guardado pero no se publica', () => {
 
     expect(contenedor.textContent).not.toContain('not published');
     expect(contenedor.textContent).not.toContain('Not on the website');
+  });
+});
+
+describe('copiar las rutas para el permiso', () => {
+  /*
+   * EL PASO QUE FALTABA. El atajo para archivar el permiso de una clienta de
+   * siempre pide las rutas de las fotos, y la ruta son treinta y dos
+   * caracteres hexadecimales que hasta esta etapa SOLO estaban dentro de la
+   * direccion de la imagen: habia que copiar la URL entera y recortarla a
+   * mano. Un atajo cuyo ultimo paso es eso no es un atajo.
+   */
+  let copiado: string | null;
+
+  beforeEach(() => {
+    copiado = null;
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: {
+        writeText: (texto: string) => {
+          copiado = texto;
+          return Promise.resolve();
+        },
+      },
+    });
+  });
+
+  it('copia la ruta de una foto, sin la direccion de alrededor', async () => {
+    fetchGallery.mockResolvedValue(SIN_PERMISO);
+    await montar();
+
+    await pulsar('Copy path');
+
+    expect(copiado).toBe(FOTO);
+    /* La URL completa no vale: el contrato del permiso la rechaza. */
+    expect(copiado).not.toContain('https://');
+  });
+
+  it('copia de golpe TODAS las fotos sin permiso, una por linea', async () => {
+    fetchGallery.mockResolvedValue(SIN_PERMISO);
+    await montar();
+
+    await pulsar('Copy the 2 photo path(s) with no release');
+
+    expect(copiado).toBe(`${FOTO}\n${OTRA_FOTO}`);
+  });
+
+  it('y los identificadores de los videos, aparte', async () => {
+    /*
+     * Aparte porque en el permiso son dos campos distintos: pegar las dos
+     * listas juntas en uno de ellos no valdria.
+     */
+    fetchGallery.mockResolvedValue(SIN_PERMISO);
+    await montar();
+
+    await pulsar('Copy the 1 video id(s) with no release');
+
+    expect(copiado).toBe(UNO);
+  });
+
+  it('no ofrece copiar nada cuando todo tiene permiso', async () => {
+    fetchGallery.mockResolvedValue(CON_FOTO);
+    await montar();
+
+    expect(contenedor.textContent).not.toContain('with no release');
+  });
+
+  it('SI EL NAVEGADOR NO DEJA COPIAR, ENSENA EL TEXTO', async () => {
+    /*
+     * Lo peor que puede hacer un boton de copiar es fallar en silencio: la
+     * persona cree que tiene la ruta, pega, y sale lo que tuviera de antes.
+     * Pasa de verdad —contexto no seguro, permiso denegado, moviles— asi que
+     * aqui se comprueba que quedarse sin portapapeles no deja a nadie
+     * atascado.
+     */
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: undefined });
+
+    fetchGallery.mockResolvedValue(SIN_PERMISO);
+    await montar();
+
+    await pulsar('Copy path');
+
+    expect(contenedor.textContent).toContain('did not allow copying');
+    const area = contenedor.querySelector('textarea');
+    expect(area?.value).toBe(FOTO);
   });
 });

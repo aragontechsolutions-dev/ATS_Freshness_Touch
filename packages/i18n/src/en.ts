@@ -1088,6 +1088,18 @@ export const en = {
       uncoveredHelp:
         'Nothing goes on the website without a signed release on file. Record it under Image releases and link it to the item.',
       notPublished: 'Not on the website: no release on file',
+
+      /*
+       * COPIAR LA RUTA, NO ENSENARLA. Son 32 caracteres hexadecimales: a la
+       * vista solo ensucian la tarjeta, y a mano se teclean mal. Lo que hace
+       * falta es llevarselos al campo «Photos it covers» del permiso.
+       */
+      copyPath: 'Copy path',
+      copyUncoveredPhotos: 'Copy the {{count}} photo path(s) with no release',
+      copyUncoveredVideos: 'Copy the {{count}} video id(s) with no release',
+      copied: 'Copied. Paste it into “Photos it covers” in Image releases.',
+      copyManual: 'Your browser did not allow copying. Select this text and copy it by hand:',
+      copyClose: 'Done',
     },
 
     location: {
