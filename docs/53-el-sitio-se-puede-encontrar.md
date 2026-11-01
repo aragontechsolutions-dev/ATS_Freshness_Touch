@@ -566,3 +566,112 @@ está mal:
 | `VITE_SITE_URL`   | Vercel, sitio público | Vuelve el problema de los canónicos                                                                                                                     |
 | `PUBLIC_SITE_URL` | Render, API           | Los enlaces de **retirar fotos** de los correos pasan por un redirector. Funcionan, pero el testigo va en el fragmento y conviene no hacerle dar saltos |
 | `CORS_ORIGINS`    | Render, API           | Si no incluye el origen `www`, **el cotizador no funciona**. Como el sitio sí funciona hoy, tiene que estar ya bien; conviene confirmarlo igualmente    |
+
+---
+
+## 14. Dos cosas que encontró Google, no yo (1/11/2026)
+
+Al verificar Search Console salieron dos fallos que ninguna prueba del
+proyecto podía haber encontrado, porque **ninguno de los dos se ve desde
+dentro de la aplicación**.
+
+### 14.1. No había ni un enlace hacia `/es`
+
+La ficha de `/es` en la Inspección de URLs decía:
+
+> **Página de referencia:** No se ha detectado ninguna
+
+Y era literalmente cierto. El selector de idioma era un `<button>` que
+cambiaba la dirección con `pushState`, así que para un rastreador **la
+versión en español no estaba enlazada desde ningún sitio**.
+
+No la dejaba invisible —el `sitemap.xml` y el `hreflang` la anuncian— pero
+una página a la que no enlaza nada desde dentro se rastrea tarde y se
+posiciona peor. Y tenía un coste que no era de buscadores: un botón no se
+puede abrir en una pestaña nueva, ni copiar con el botón derecho, ni abrir
+con el botón central.
+
+**Ahora es un `<a href>` de verdad** que sigue sin recargar: se intercepta la
+pulsación normal y se deja pasar Ctrl, Cmd, Shift, Alt y el botón central,
+porque quien pide «abre esto en otra pestaña» quiere eso. El destino sale de
+`rutaPara`, así que desde `/terms` lleva a `/es/terms` y no a la portada.
+
+Vigilado por `el-espanol-esta-enlazado.test.ts`, y comprobado en un navegador
+real: desde `/` enlaza a `/es`, desde `/terms` a `/es/terms`, la pulsación
+normal no recarga y Ctrl+clic abre pestaña nueva.
+
+### 14.2. El sitemap: «No se ha podido obtener»
+
+Search Console rechazó el sitemap con tipo **«Desconocido»** y **0 páginas**,
+aunque el fichero se abre perfectamente en un navegador.
+
+La pista estaba en **cómo lo pintaba el navegador**: el texto salía corrido y
+sin etiquetas, que es lo que hace un navegador cuando recibe XML anunciado
+como HTML. Un sitemap servido como `text/html` no se parsea: el rastreador lo
+descarta sin mirar dentro.
+
+`vercel.json` ahora declara el tipo a mano:
+
+| Ruta           | `Content-Type`                   |
+| -------------- | -------------------------------- |
+| `/sitemap.xml` | `application/xml; charset=utf-8` |
+| `/robots.txt`  | `text/plain; charset=utf-8`      |
+
+Y aquí pesa más de lo normal, porque la regla general pone
+**`X-Content-Type-Options: nosniff`** en todo: con `nosniff`, un rastreador no
+puede recuperarse de un tipo mal declarado mirando el contenido. Lo que diga
+la cabecera es lo que hay.
+
+> **Honestamente:** no pude confirmar qué cabecera estaba enviando Vercel —la
+> red de esta sesión no alcanza el dominio— así que esto es la causa **más
+> probable**, no una comprobada. «No se ha podido obtener» justo después de
+> enviar también se resuelve solo a veces, cuando Google reintenta. Declarar
+> el tipo quita de en medio toda esa clase de causa; si tras desplegar y
+> reenviar sigue fallando, hay que mirar el cortafuegos de Vercel.
+
+### Lo que esto enseña
+
+Las dos cosas estaban **bien construidas y mal expuestas**. La web funcionaba
+igual de bien para cualquier persona en los dos casos. El proyecto tiene
+guardias para casi todo, y ninguna podía ver esto: una comprueba el marcado
+que escribimos, no el que falta; la otra no sabe qué cabecera pone el
+servidor.
+
+Por eso la única verificación que valía era **publicar y mirar lo que decía
+Search Console**. Conviene volver a mirarla unos días después de cada cambio
+de SEO, no solo al montarla.
+
+---
+
+## 15. Y además tiré el despliegue con un comentario (1/11/2026)
+
+Al declarar el `Content-Type` del sitemap quise dejar escrito **por qué**, y
+JSON no tiene comentarios. Así que inventé una clave `_comentario` dentro de
+cada entrada de `headers`, dando por hecho que lo que no se reconoce se
+ignora.
+
+**No se ignora.** `vercel.json` declara su `$schema` y Vercel valida la
+configuración de forma estricta: una propiedad que no está en el esquema no
+es un aviso, es un error, y **el despliegue falla antes de compilar nada**.
+
+Lo delató que fallara el proyecto `landing` y no el `admin`: lo único que los
+distinguía en ese cambio era ese archivo.
+
+### La parte que importa: CI estaba en verde
+
+`vercel.json` **no lo lee nada nuestro**. `format:check` lo da por bueno
+porque es JSON válido; `lint`, `typecheck`, `test` y `build` no lo miran
+siquiera. Los seis pasos pasaron con el despliegue roto, y el fallo solo
+apareció en el PR, en un sitio donde solo mira quien va a fusionar.
+
+De ahí `vercel-json-no-lleva-inventos.test.ts`, que adelanta esa validación a
+los pasos que ya se ejecutan. No reimplementa el esquema de Vercel —no sería
+honesto mantenerlo— sino que comprueba las claves de las secciones que este
+proyecto usa, que es lo que de verdad falló. Verificado volviendo a meter la
+clave: falla nombrándola.
+
+### La regla, para la próxima
+
+**Si hay que explicar una regla de `vercel.json`, se explica aquí, no ahí.**
+Un archivo de configuración sin comentarios es el precio de JSON, y ese
+precio se paga; no se intenta esquivar.
