@@ -1,5 +1,10 @@
 import { useTranslation } from 'react-i18next';
-import { LEGAL_EFFECTIVE_DATE, PRIVACY_VERSION, TERMS_VERSION } from '@freshness/types';
+import {
+  PRIVACY_EFFECTIVE_DATE,
+  PRIVACY_VERSION,
+  TERMS_EFFECTIVE_DATE,
+  TERMS_VERSION,
+} from '@freshness/types';
 import { useBusinessContact } from '../hooks/useBusinessSettings';
 import { partirNegritas, type Bloque, type Documento } from '../legal/documento';
 import { PRIVACY_EN } from '../legal/privacy-en';
@@ -45,7 +50,13 @@ export function PaginaLegal({ cual }: PaginaLegalProps) {
   const documento: Documento =
     cual === 'terms' ? (enEspanol ? TERMS_ES : TERMS_EN) : enEspanol ? PRIVACY_ES : PRIVACY_EN;
 
+  /*
+   * LA VERSION Y LA FECHA SE ELIGEN JUNTAS, del mismo documento. Antes la
+   * fecha era una sola para los dos, y en cuanto uno cambio sin el otro la
+   * pagina habria mentido sobre alguno. Ver `legal.ts`.
+   */
   const version = cual === 'terms' ? TERMS_VERSION : PRIVACY_VERSION;
+  const fecha = cual === 'terms' ? TERMS_EFFECTIVE_DATE : PRIVACY_EFFECTIVE_DATE;
 
   return (
     <main className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
@@ -57,7 +68,7 @@ export function PaginaLegal({ cual }: PaginaLegalProps) {
         este numero.
       */}
       <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
-        {t('legal.effective', { date: LEGAL_EFFECTIVE_DATE, version: `${String(version)}.0` })}
+        {t('legal.effective', { date: fecha, version: `${String(version)}.0` })}
       </p>
 
       <div className="mt-8 space-y-5">

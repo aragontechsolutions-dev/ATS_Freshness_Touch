@@ -85,7 +85,7 @@ export const es: TranslationResources = {
   },
 
   hero: {
-    badge: 'Con licencia · Asegurados',
+    badge: 'Asegurados',
     title: 'Una casa impecable, sin sorpresas en el precio',
     subtitle:
       'Obtén un precio real en menos de un minuto. Sin llamadas de vuelta, sin cargos ocultos y con un depósito de traslado transparente que se descuenta de tu factura final.',

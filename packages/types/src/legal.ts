@@ -24,16 +24,38 @@ import { z } from 'zod';
  */
 
 /**
- * Fecha de entrada en vigor de los dos documentos.
+ * Fecha de entrada en vigor de CADA documento.
  *
  * Es una constante del codigo y no un ajuste del panel: la fecha va atada al
  * texto, y un texto que se publico el 28 no puede decir que rige desde el 30
  * porque alguien cambio un campo.
+ *
+ * ========================================================================
+ * ERAN UNA SOLA, Y ESO SE ROMPIO EN CUANTO CAMBIO UN DOCUMENTO Y EL OTRO NO
+ * ========================================================================
+ * Habia una unica `LEGAL_EFFECTIVE_DATE` compartida. Funciono mientras los
+ * dos documentos se publicaron el mismo dia. Al retirar «con licencia» del
+ * sitio hubo que corregir una frase de las Condiciones —y solo de esas— y la
+ * constante compartida dejaba dos salidas, las dos falsas: o las Condiciones
+ * version 2 decian regir desde una fecha anterior a su propio texto, o la
+ * Privacidad, sin tocar, pasaba a decir que entro en vigor hoy.
+ *
+ * Cada documento lleva la suya. Suben JUNTO CON su numero de version, nunca
+ * por separado.
  */
-export const LEGAL_EFFECTIVE_DATE = '2026-10-29';
+export const TERMS_EFFECTIVE_DATE = '2026-11-01';
+export const PRIVACY_EFFECTIVE_DATE = '2026-10-29';
 
-/** Version vigente de los Terminos y Condiciones. Ver la regla de arriba. */
-export const TERMS_VERSION = 1;
+/**
+ * Version vigente de los Terminos y Condiciones. Ver la regla de arriba.
+ *
+ * v2 (1/11/2026): el sitio dejo de anunciar «con licencia» y se quedo solo
+ * con «asegurados». La clausula 11 CITABA esa frase del sitio —«nuestro sitio
+ * dice 'con licencia y asegurados' y eso es exactamente lo que somos»— asi
+ * que el contrato habria quedado describiendo una web que ya no existe. Es
+ * fondo, no una errata: cambia lo que la empresa declara ser.
+ */
+export const TERMS_VERSION = 2;
 
 /** Version vigente de la Politica de Privacidad. Ver la regla de arriba. */
 export const PRIVACY_VERSION = 2;

@@ -225,7 +225,7 @@ export const TERMS_EN: Documento = {
         'Put away anything **irreplaceable, highly valuable or sentimental** — jewellery, cash, collectibles, heirlooms, important documents — before we arrive. We ask our team not to move such items, but the safest place for them is away.',
         'Some things break because of how they already were, not because of cleaning: loose fixtures, failing grout, items already cracked or glued, blinds and curtain rods at the end of their life, surfaces with worn finishes. We are not responsible for pre-existing conditions, and we will tell you if we see one.',
         'We do not accept responsibility for damage caused by cleaning products you asked us to use.',
-        '**We never claim to be bonded**, because we are not. Our website says "licensed and insured" and that is exactly what we are.',
+        '**We never claim to be bonded**, because we are not. Our website says "insured", and that is exactly what we are.',
       ],
     },
     {
