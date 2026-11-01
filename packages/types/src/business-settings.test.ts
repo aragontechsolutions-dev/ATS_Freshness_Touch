@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   BusinessSettingsSchema,
+  CIUDADES_DE_PARTIDA,
   DEFAULT_BUSINESS_SETTINGS,
   WeeklyHoursSchema,
   emailHref,
@@ -319,5 +320,133 @@ describe('WhatsApp (etapa 3.16)', () => {
     });
 
     expect(resultado.success).toBe(false);
+  });
+});
+
+/**
+ * LAS CIUDADES Y LAS REDES SOCIALES
+ * =================================
+ * Dos campos nuevos en un `strictObject` que se valida contra una fila ya
+ * guardada. Esa combinacion tiene una trampa concreta y documentada en este
+ * archivo: un campo sin valor por defecto deja invalida la fila que ya
+ * existe, el servicio cae a `DEFAULT_BUSINESS_SETTINGS` y **el telefono
+ * desaparece de toda la web** sin un solo error en ninguna pantalla.
+ */
+describe('las ciudades que se anuncian', () => {
+  const horario = DEFAULT_BUSINESS_SETTINGS.hours;
+  const fila = (cambios: Record<string, unknown> = {}) => ({
+    phone: null,
+    email: null,
+    hours: horario,
+    ...cambios,
+  });
+
+  it('LA FILA GUARDADA SIN ESTE CAMPO SIGUE SIENDO VALIDA', () => {
+    /*
+     * EL FALLO QUE ESTA PRUEBA IMPIDE, y es el de la caida muda: sin
+     * `.default()`, la fila que ya esta en la base no cumple el contrato, se
+     * ignora entera, y con ella se va el telefono del negocio.
+     */
+    const resultado = BusinessSettingsSchema.safeParse(fila());
+
+    expect(resultado.success).toBe(true);
+    expect(resultado.data?.cities).toEqual([...CIUDADES_DE_PARTIDA]);
+    expect(resultado.data?.facebookUrl).toBeNull();
+    expect(resultado.data?.instagramUrl).toBeNull();
+  });
+
+  it('una lista vacia se respeta: no se rellena con las de partida', () => {
+    // Vaciar la lista desde el panel tiene que poder hacerse. Si el valor por
+    // defecto se aplicara tambien al array vacio, la dueña no podria quitar
+    // las ciudades nunca.
+    const resultado = BusinessSettingsSchema.safeParse(fila({ cities: [] }));
+
+    expect(resultado.success).toBe(true);
+    expect(resultado.data?.cities).toEqual([]);
+  });
+
+  it('acepta nombres compuestos y con apostrofe', () => {
+    const resultado = BusinessSettingsSchema.safeParse(
+      fila({ cities: ['Johns Creek', 'Powder Springs', "O'Fallon", 'Winston-Salem'] }),
+    );
+
+    expect(resultado.success).toBe(true);
+  });
+
+  it('RECHAZA UN NOMBRE CON COMA O CON COMILLAS', () => {
+    /*
+     * EL FALLO QUE ESTA PRUEBA IMPIDE. Esta lista entra en el bloque JSON-LD
+     * del sitio. Un nombre con una comilla lo parte en algo que un validador
+     * rechaza, y entonces se pierde el bloque ENTERO —el negocio, el
+     * horario, la zona— por una ciudad mal escrita. No hay sintoma visible.
+     */
+    for (const malo of ['Atlanta, GA', 'Smyrna "centro"', '<script>', 'Marietta.']) {
+      expect(BusinessSettingsSchema.safeParse(fila({ cities: [malo] })).success).toBe(false);
+    }
+  });
+
+  it('las de partida pasan su propia validacion', () => {
+    // Un valor por defecto que no cumple el esquema es una bomba de relojeria:
+    // revienta la primera vez que alguien guarda sin tocar el campo.
+    expect(
+      BusinessSettingsSchema.safeParse(fila({ cities: [...CIUDADES_DE_PARTIDA] })).success,
+    ).toBe(true);
+  });
+});
+
+describe('las direcciones de redes sociales', () => {
+  const fila = (cambios: Record<string, unknown>) => ({
+    phone: null,
+    email: null,
+    hours: DEFAULT_BUSINESS_SETTINGS.hours,
+    ...cambios,
+  });
+
+  it('acepta el perfil con y sin www', () => {
+    for (const url of [
+      'https://www.instagram.com/freshnesstouch.cleaning',
+      'https://instagram.com/freshnesstouch.cleaning',
+    ]) {
+      expect(BusinessSettingsSchema.safeParse(fila({ instagramUrl: url })).success).toBe(true);
+    }
+  });
+
+  it('EXIGE QUE SEA LA RED QUE DICE EL CAMPO', () => {
+    /*
+     * EL FALLO QUE ESTA PRUEBA IMPIDE. `sameAs` declara «este otro sitio
+     * tambien somos nosotros». Una direccion pegada mal le estaria diciendo
+     * eso a Google sobre un sitio ajeno, y no hay nada en la pagina que lo
+     * delate.
+     */
+    expect(
+      BusinessSettingsSchema.safeParse(fila({ instagramUrl: 'https://www.facebook.com/algo' }))
+        .success,
+    ).toBe(false);
+    expect(
+      BusinessSettingsSchema.safeParse(fila({ facebookUrl: 'https://ejemplo.com/algo' })).success,
+    ).toBe(false);
+  });
+
+  it('NO SE DEJA ENGANAR POR UN DOMINIO QUE CONTIENE AL BUENO', () => {
+    // `instagram.com.malo.net` contiene «instagram.com» y no es Instagram.
+    expect(
+      BusinessSettingsSchema.safeParse(fila({ instagramUrl: 'https://instagram.com.malo.net/x' }))
+        .success,
+    ).toBe(false);
+  });
+
+  it('exige https', () => {
+    expect(
+      BusinessSettingsSchema.safeParse(fila({ instagramUrl: 'http://instagram.com/x' })).success,
+    ).toBe(false);
+    expect(
+      BusinessSettingsSchema.safeParse(fila({ facebookUrl: 'javascript:alert(1)' })).success,
+    ).toBe(false);
+  });
+
+  it('`null` es valido: no tener red social no es un error', () => {
+    expect(
+      BusinessSettingsSchema.safeParse(fila({ facebookUrl: null, instagramUrl: null })).success,
+    ).toBe(true);
   });
 });

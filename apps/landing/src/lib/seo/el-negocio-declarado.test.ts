@@ -45,6 +45,8 @@ function datos(cambios: Partial<DatosDelNegocio> = {}): DatosDelNegocio {
     horario: DEFAULT_BUSINESS_SETTINGS.hours,
     base: BASE,
     radioMillas: 50,
+    ciudades: ['Marietta', 'Smyrna'],
+    redes: ['https://www.instagram.com/freshnesstouch.cleaning'],
     ...cambios,
   };
 }
@@ -107,16 +109,68 @@ describe('el nodo del negocio', () => {
   it('el area atendida lleva el estado Y el circulo real, en metros', () => {
     const nodo = negocioJsonLd(datos()) as { areaServed: Record<string, unknown>[] };
 
-    expect(nodo.areaServed[0]).toEqual({ '@type': 'State', name: 'Georgia' });
-    const circulo = nodo.areaServed[1] as { '@type': string; geoRadius: number };
-    expect(circulo['@type']).toBe('GeoCircle');
+    /*
+     * SE BUSCA POR TIPO Y NO POR POSICION. La primera version miraba
+     * `areaServed[1]` y se rompio sola al meter las ciudades en medio: una
+     * prueba que depende del orden de una lista denuncia un cambio que no
+     * es un fallo, y entonces se "arregla" moviendo el indice en vez de
+     * mirar lo que de verdad pasa.
+     */
+    expect(nodo.areaServed).toContainEqual({ '@type': 'State', name: 'Georgia' });
+
+    const circulo = nodo.areaServed.find((a) => a['@type'] === 'GeoCircle') as {
+      geoRadius: number;
+    };
     // 50 millas en metros. `GeoCircle` no admite millas.
     expect(circulo.geoRadius).toBe(80467);
   });
 
+  it('LAS CIUDADES VAN POR SU NOMBRE Y CON SU ESTADO', () => {
+    /*
+     * EL FALLO QUE ESTA PRUEBA IMPIDE. `containedInPlace` no sobra: hay un
+     * Smyrna en Tennessee y otro en Delaware, y un Dallas que casi todo el
+     * mundo situa en Texas. Sin decir el estado, la ciudad mas buscada de la
+     * lista apunta a dos mil kilometros de aqui.
+     */
+    const nodo = negocioJsonLd(datos({ ciudades: ['Smyrna', 'Dallas'] })) as {
+      areaServed: Record<string, unknown>[];
+    };
+    const ciudades = nodo.areaServed.filter((a) => a['@type'] === 'City');
+
+    expect(ciudades).toHaveLength(2);
+    expect(ciudades[0]).toEqual({
+      '@type': 'City',
+      name: 'Smyrna',
+      containedInPlace: { '@type': 'State', name: 'Georgia' },
+    });
+  });
+
+  it('sin ciudades configuradas no aparece ninguna', () => {
+    const nodo = negocioJsonLd(datos({ ciudades: [] })) as { areaServed: { '@type': string }[] };
+    expect(nodo.areaServed.some((a) => a['@type'] === 'City')).toBe(false);
+  });
+
+  it('`sameAs` lleva las redes, y OMITE LAS QUE NO HAY', () => {
+    /*
+     * EL FALLO QUE ESTA PRUEBA IMPIDE. `sameAs: [null]` no es «no tengo
+     * redes»: es un valor invalido que tumba el bloque entero. Y el caso de
+     * tener una sola red configurada es el normal mientras falte la otra.
+     */
+    const una = negocioJsonLd(datos({ redes: ['https://www.instagram.com/x', null] })) as {
+      sameAs?: string[];
+    };
+    expect(una.sameAs).toEqual(['https://www.instagram.com/x']);
+
+    const ninguna = negocioJsonLd(datos({ redes: [null, null] })) as { sameAs?: string[] };
+    expect(ninguna.sameAs).toBeUndefined();
+    expect(JSON.stringify(ninguna)).not.toContain('sameAs');
+  });
+
   it('sin radio conocido NO INVENTA UN CIRCULO', () => {
-    const nodo = negocioJsonLd(datos({ radioMillas: 0 })) as { areaServed: unknown[] };
-    expect(nodo.areaServed).toHaveLength(1);
+    const nodo = negocioJsonLd(datos({ radioMillas: 0 })) as {
+      areaServed: { '@type': string }[];
+    };
+    expect(nodo.areaServed.some((a) => a['@type'] === 'GeoCircle')).toBe(false);
   });
 
   it('LOS DIAS CERRADOS NO SE LISTAN', () => {

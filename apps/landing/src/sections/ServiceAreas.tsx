@@ -1,6 +1,7 @@
 import { Suspense, lazy, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useCatalog } from '../hooks/useCatalog';
+import { useBusinessContact } from '../hooks/useBusinessSettings';
 import { MapPinIcon } from '../components/Icons';
 import { Reveal } from '../components/Reveal';
 
@@ -21,6 +22,11 @@ const ServiceAreaMap = lazy(() => import('../components/ServiceAreaMap'));
 export function ServiceAreas() {
   const { t } = useTranslation();
   const { catalog } = useCatalog();
+  /*
+   * Las ciudades vienen de los ajustes del negocio, no del catalogo: no son
+   * un dato de precios. Ver la nota en `business-settings.ts`.
+   */
+  const { settings } = useBusinessContact();
 
   const zones = catalog?.zones ?? [];
   const base = catalog?.baseOfOperations ?? null;
@@ -248,6 +254,67 @@ export function ServiceAreas() {
             </Reveal>
           ))}
         </div>
+
+        {/*
+          ============================================================
+          LAS CIUDADES, POR SU NOMBRE
+          ============================================================
+          Hasta ahora esta seccion entera no tenia ni un nombre de ciudad:
+          un mapa con anillos y «hasta 50 millas desde nuestra base». Eso
+          deja fuera a las dos personas que importan:
+
+            - La visitante, que no sabe cuantas millas hay de su casa a
+              Marietta y solo quiere ver si viene a la suya.
+            - El buscador, que no puede deducir «Smyrna» de un circulo
+              dibujado alrededor de unas coordenadas. Nadie escribe
+              «limpieza en 50 millas alrededor de Marietta».
+
+          Va DESPUES del mapa y de las zonas a proposito: primero lo que se
+          cobra, luego donde se va. Al reves, la lista parece la oferta y las
+          zonas una letra pequena.
+
+          Si no hay ciudades configuradas NO SE PINTA NADA, ni un titulo
+          vacio: es un estado legitimo —una instalacion nueva, o la dueña
+          vaciando la lista— y una seccion con un hueco se lee como un fallo.
+        */}
+        {settings.cities.length > 0 && (
+          <div className="mt-10">
+            <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
+              {t('areas.citiesTitle')}
+            </h3>
+            <p className="mt-2 max-w-2xl text-sm text-slate-600 dark:text-slate-300">
+              {t('areas.citiesIntro')}
+            </p>
+
+            {/*
+              UNA LISTA DE VERDAD (`<ul>`) y no un parrafo con comas. Con un
+              lector de pantalla, «veinte elementos» se puede saltar; una
+              frase de doscientos caracteres hay que oirla entera. Y un
+              buscador distingue mejor veinte nombres que una cadena.
+            */}
+            <ul className="mt-4 flex list-none flex-wrap gap-2 p-0">
+              {settings.cities.map((ciudad) => (
+                <li
+                  key={ciudad}
+                  className="rounded-full bg-brand-50 px-3 py-1.5 text-sm font-medium
+                             text-brand-800 dark:bg-night-700 dark:text-brand-200"
+                >
+                  {ciudad}
+                </li>
+              ))}
+            </ul>
+
+            {/*
+              LA LISTA NO ES EL LIMITE, y hay que decirlo: si no, quien vive
+              en una ciudad que no sale da por hecho que no vamos y se va.
+              El limite lo marcan las millas, que es lo que cuentan el mapa y
+              las zonas de arriba.
+            */}
+            <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">
+              {t('areas.citiesMore')}
+            </p>
+          </div>
+        )}
       </div>
     </section>
   );
