@@ -21,7 +21,23 @@
  */
 
 /**
- * El dominio de produccion.
+ * El dominio de produccion, CON `www`.
+ *
+ * ========================================================================
+ * EL `www` NO ES DECORATIVO, Y COSTO UNA EQUIVOCACION
+ * ========================================================================
+ * En Vercel, `freshnesstouchcleaning.com` figura como «Redirects to
+ * www.freshnesstouchcleaning.com»: quien sirve el sitio es el `www`, y la
+ * raiz solo redirige.
+ *
+ * La primera version de todo esto uso la raiz. Eso ponia un `canonical`
+ * apuntando a una direccion que REDIRIGE, que es una senal contradictoria
+ * —«la version buena es esta», y esa version contesta «no, es aquella»— y
+ * dejaba un `sitemap.xml` con seis direcciones que ninguna servia contenido.
+ *
+ * Si algun dia se invierte la redireccion en Vercel, esto cambia aqui Y en
+ * `index.html`, que lo lleva escrito a mano porque Open Graph exige
+ * direcciones absolutas. Hay una prueba que falla si los dos no coinciden.
  *
  * Esta escrito aqui como VALOR POR OMISION y no como unica fuente: en un
  * despliegue de vista previa de Vercel o en local, `VITE_SITE_URL` no esta
@@ -29,7 +45,7 @@
  * verdad —un `canonical` hacia produccion desde una vista previa es
  * exactamente lo que evita que Google indexe las vistas previas—.
  */
-export const SITIO_POR_OMISION = 'https://freshnesstouchcleaning.com';
+export const SITIO_POR_OMISION = 'https://www.freshnesstouchcleaning.com';
 
 /**
  * Deja la direccion lista para pegarle rutas detras: sin barra final y sin
