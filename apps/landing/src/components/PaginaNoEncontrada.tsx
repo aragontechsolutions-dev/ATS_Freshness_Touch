@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { LEGAL_PATHS } from '@freshness/types';
+import { useEnlacesInternos } from '../hooks/useEnlacesInternos';
 import { useBusinessContact } from '../hooks/useBusinessSettings';
 
 /**
@@ -32,6 +32,8 @@ import { useBusinessContact } from '../hooks/useBusinessSettings';
  */
 export function PaginaNoEncontrada() {
   const { t } = useTranslation();
+  /* Los enlaces legales en el idioma que se esta leyendo: ver `useEnlacesInternos`. */
+  const enlaces = useEnlacesInternos();
   const contacto = useBusinessContact();
   const whatsapp = contacto.whatsappHref();
 
@@ -69,14 +71,14 @@ export function PaginaNoEncontrada() {
       </p>
 
       <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-        <a className="ft-btn-primary" href="/">
+        <a className="ft-btn-primary" href={enlaces.portada}>
           {t('notFound.home')}
         </a>
         {/*
           «Pedir precio» es lo que venia a hacer la mayoria, asi que lleva
           directo al cotizador y no a la portada a buscarlo.
         */}
-        <a className="ft-btn-outline" href="/#quote">
+        <a className="ft-btn-outline" href={enlaces.seccion('quote')}>
           {t('notFound.quote')}
         </a>
       </div>
@@ -104,11 +106,11 @@ export function PaginaNoEncontrada() {
       )}
 
       <p className="mt-6 text-xs text-slate-500 dark:text-slate-400">
-        <a className="underline" href={LEGAL_PATHS.terms}>
+        <a className="underline" href={enlaces.terms}>
           {t('footer.terms')}
         </a>
         {' · '}
-        <a className="underline" href={LEGAL_PATHS.privacy}>
+        <a className="underline" href={enlaces.privacy}>
           {t('footer.privacy')}
         </a>
       </p>

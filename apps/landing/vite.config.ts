@@ -2,12 +2,13 @@ import { fileURLToPath, URL } from 'node:url';
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
+import { seoFiles } from './vite-seo';
 
 /** Ruta absoluta a partir de una ruta relativa a este archivo. */
 const resolvePath = (relative: string): string => fileURLToPath(new URL(relative, import.meta.url));
 
 export default defineConfig({
-  plugins: [react(), tailwindcss()],
+  plugins: [react(), tailwindcss(), seoFiles()],
 
   resolve: {
     /**

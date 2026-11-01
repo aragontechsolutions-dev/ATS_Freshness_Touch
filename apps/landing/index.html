@@ -5,11 +5,127 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="color-scheme" content="light dark" />
     <meta name="theme-color" content="#145788" />
-    <title>Freshness Touch · Cleaning Services in Georgia</title>
+
+    <!--
+      ESTAS ETIQUETAS SON LAS DE LA PORTADA, Y ESTAN ESCRITAS A MANO A PROPOSITO.
+      ========================================================================
+      El sitio es una aplicacion de una sola pagina: lo que se sirve es un
+      `<div>` vacio y el contenido lo pinta JavaScript. Google ejecuta
+      JavaScript; EL RASTREADOR DE WHATSAPP Y EL DE FACEBOOK NO. Y compartir el
+      enlace por WhatsApp es, en una empresa de limpieza, como llega la mitad
+      de los clientes.
+
+      Asi que lo que esta aqui es lo que ve quien comparte: tiene que estar en
+      el HTML servido, no puesto despues por el navegador.
+
+      `src/hooks/useSeo.ts` REESCRIBE estas mismas etiquetas cuando la pantalla
+      no es la portada. No anade otras al lado: dos `<meta name="description">`
+      en un documento no tienen un ganador definido.
+
+      SI SE CAMBIA UN TEXTO DE AQUI hay que cambiarlo tambien en
+      `packages/i18n/src/en.ts` (bloque `seo.home`), que es de donde sale el
+      mismo texto en caliente. Hay una prueba que comprueba que coinciden:
+      `el-html-servido-dice-lo-mismo.test.ts`.
+    -->
+    <title>House &amp; Office Cleaning in Georgia | Freshness Touch</title>
     <meta
       name="description"
-      content="Fresh Spaces. A Touch Above. Instant online quotes for residential and commercial cleaning across Georgia: transparent pricing, insured and background-checked cleaners."
+      content="Get an instant online price for house or office cleaning anywhere in Georgia. Transparent pricing, insured and background-checked cleaners, no callbacks."
     />
+    <link rel="canonical" href="https://freshnesstouchcleaning.com/" />
+
+    <!--
+      LAS DOS VERSIONES DE IDIOMA DE LA PORTADA.
+      ========================================================================
+      Hasta ahora el idioma vivia solo en `localStorage`, asi que habia UNA
+      direccion sirviendo dos idiomas: el contenido en espanol no estaba mal
+      posicionado, NO EXISTIA para un buscador. Ahora `/` es ingles y `/es`
+      espanol, y esto es lo que le dice a Google que son la misma pagina en
+      dos idiomas y no contenido duplicado.
+
+      `x-default` apunta al ingles: es la version que se sirve a quien no
+      busca en ninguno de los dos.
+
+      Estan aqui en estatico porque la portada es la pagina a la que llegan
+      los rastreadores. `src/lib/seo/aplicar.ts` las reescribe al navegar.
+    -->
+    <link rel="alternate" hreflang="en" href="https://freshnesstouchcleaning.com/" />
+    <link rel="alternate" hreflang="es" href="https://freshnesstouchcleaning.com/es" />
+    <link rel="alternate" hreflang="x-default" href="https://freshnesstouchcleaning.com/" />
+
+    <!--
+      LA VISTA PREVIA AL COMPARTIR EL ENLACE.
+      ========================================================================
+      Sin esto, pegar la direccion en WhatsApp o en Facebook produce una linea
+      de texto azul y nada mas: ni nombre, ni descripcion, ni imagen. Era el
+      hueco de mas valor practico de toda la auditoria y el mas barato de
+      cerrar.
+
+      EL DOMINIO VA ESCRITO AQUI Y NO EN UNA VARIABLE, porque `index.html` se
+      sirve tal cual y Open Graph EXIGE direcciones absolutas: una ruta
+      relativa en `og:image` se ignora entera. Si el dominio cambia, esto se
+      cambia a mano, y hay una prueba que avisa de que no coincide con
+      `VITE_SITE_URL`.
+    -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Freshness Touch" />
+    <meta property="og:url" content="https://freshnesstouchcleaning.com/" />
+    <meta
+      property="og:title"
+      content="House &amp; Office Cleaning in Georgia | Freshness Touch"
+    />
+    <meta
+      property="og:description"
+      content="Get an instant online price for house or office cleaning anywhere in Georgia. Transparent pricing, insured and background-checked cleaners, no callbacks."
+    />
+    <meta property="og:locale" content="en_US" />
+    <meta property="og:locale:alternate" content="es_ES" />
+    <meta
+      property="og:image"
+      content="https://freshnesstouchcleaning.com/brand/og-default.jpg"
+    />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Freshness Touch · Cleaning Services" />
+
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta
+      name="twitter:title"
+      content="House &amp; Office Cleaning in Georgia | Freshness Touch"
+    />
+    <meta
+      name="twitter:description"
+      content="Get an instant online price for house or office cleaning anywhere in Georgia. Transparent pricing, insured and background-checked cleaners, no callbacks."
+    />
+    <meta
+      name="twitter:image"
+      content="https://freshnesstouchcleaning.com/brand/og-default.jpg"
+    />
+
+    <!--
+      DATOS ESTRUCTURADOS: EL BLOQUE MINIMO, Y SOLO EL MINIMO.
+      ========================================================================
+      Aqui va UNICAMENTE lo que no puede cambiar sin un cambio de codigo:
+      nombre, direccion del sitio, logotipo y el estado donde se trabaja. Esto
+      es lo que lee un rastreador que no ejecuta JavaScript.
+
+      El telefono, el correo, el horario, la base de operaciones y el radio
+      atendido NO estan aqui a proposito: se editan desde el panel, asi que
+      escritos aqui serian falsos el dia que la dueña los cambie. Los pone
+      `src/components/DatosEstructurados.tsx` en caliente, con los datos de
+      verdad, REESCRIBIENDO este mismo bloque por su `id`.
+
+      Mismo `@id` en los dos casos: no son dos negocios, es el mismo con mas
+      o menos detalle.
+
+      LO QUE NUNCA VA A ESTAR: `aggregateRating`. Marcar estrellas sin resenas
+      reales y verificables es motivo de accion manual, y eso no quita las
+      estrellas: quita el sitio.
+    -->
+    <script type="application/ld+json" id="datos-estructurados">
+      {"@context":"https://schema.org","@graph":[{"@type":"LocalBusiness","@id":"https://freshnesstouchcleaning.com/#business","name":"Freshness Touch","url":"https://freshnesstouchcleaning.com/","logo":"https://freshnesstouchcleaning.com/brand/logo-full.webp","image":"https://freshnesstouchcleaning.com/brand/og-default.jpg","address":{"@type":"PostalAddress","addressLocality":"Marietta","addressRegion":"GA","addressCountry":"US"},"areaServed":[{"@type":"State","name":"Georgia"}]},{"@type":"WebSite","@id":"https://freshnesstouchcleaning.com/#website","url":"https://freshnesstouchcleaning.com/","name":"Freshness Touch","publisher":{"@id":"https://freshnesstouchcleaning.com/#business"},"inLanguage":["en","es"]}]}
+    </script>
+
     <link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png" />
     <link rel="icon" href="/favicon-192.png" sizes="192x192" type="image/png" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />

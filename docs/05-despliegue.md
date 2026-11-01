@@ -68,6 +68,14 @@ y compilación para que Vercel construya solo lo necesario del monorepo.
 | Variable            | Valor                                  |
 | ------------------- | -------------------------------------- |
 | `VITE_API_BASE_URL` | `https://<tu-api>.onrender.com/api/v1` |
+| `VITE_SITE_URL`     | `https://freshnesstouchcleaning.com`   |
+
+`VITE_SITE_URL` es **opcional**: sin ponerla se usa ese mismo dominio por
+omisión, que es lo que se quiere en las vistas previas de Vercel —un
+`canonical` hacia producción es lo que evita que las vistas previas acaben
+indexadas—. Se pone para que mover el dominio no exija un despliegue de
+código. De ella salen el `canonical`, el `sitemap.xml` y el `robots.txt`
+(ver `docs/53`).
 
 > Ojo: las variables `VITE_*` se **incrustan en el paquete que descarga el
 > navegador** al compilar. Nunca poner un secreto ahí. La URL de la API es
@@ -105,6 +113,21 @@ curl https://<api>/api/v1/pricing/catalog
 
 Y en el sitio: pedir una cotización con un código postal de Georgia, verificar
 que aparece el precio y que la consola del navegador no muestra errores.
+
+Y las cuatro comprobaciones de SEO, que no dan error si fallan (ver `docs/53`):
+
+```bash
+curl https://<sitio>/robots.txt     # tiene que nombrar el sitemap
+curl https://<sitio>/sitemap.xml    # seis URLs: tres páginas por dos idiomas
+curl -s https://<sitio>/ | grep og:image   # con el dominio real dentro
+curl -s https://<sitio>/es | grep '<title>'  # el título en español
+```
+
+La última merece explicación: `/es` devuelve el mismo `index.html` que `/`
+—es una aplicación de una sola página— así que el `<title>` que trae el HTML
+está en inglés y **eso es lo correcto**. Lo que hay que comprobar en `/es` es
+con el navegador abierto: que el texto sale en español y que el `canonical`
+dice `/es`.
 
 ## Dominios sugeridos
 

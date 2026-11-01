@@ -1,5 +1,5 @@
 import { Trans, useTranslation } from 'react-i18next';
-import { LEGAL_PATHS } from '@freshness/types';
+import { useEnlacesInternos } from '../../hooks/useEnlacesInternos';
 import { useCatalog } from '../../hooks/useCatalog';
 import { DoorPinMap } from '../DoorPinMap';
 import {
@@ -27,6 +27,8 @@ interface DetailsStepProps {
  */
 export function DetailsStep({ form, errors, onChange }: DetailsStepProps) {
   const { t } = useTranslation();
+  /* Los enlaces legales en el idioma que se esta leyendo: ver `useEnlacesInternos`. */
+  const enlaces = useEnlacesInternos();
   const { catalog } = useCatalog();
 
   const set = <K extends keyof BookingDetailsForm>(key: K, value: BookingDetailsForm[K]): void => {
@@ -333,7 +335,7 @@ export function DetailsStep({ form, errors, onChange }: DetailsStepProps) {
                 terms: (
                   <a
                     className="underline"
-                    href={LEGAL_PATHS.terms}
+                    href={enlaces.terms}
                     target="_blank"
                     rel="noopener noreferrer"
                   />
@@ -341,7 +343,7 @@ export function DetailsStep({ form, errors, onChange }: DetailsStepProps) {
                 privacy: (
                   <a
                     className="underline"
-                    href={LEGAL_PATHS.privacy}
+                    href={enlaces.privacy}
                     target="_blank"
                     rel="noopener noreferrer"
                   />

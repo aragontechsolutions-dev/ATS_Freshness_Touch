@@ -1,11 +1,16 @@
 import { useTranslation } from 'react-i18next';
-import { LEGAL_PATHS } from '@freshness/types';
 import { company } from '../config/company';
+import { useEnlacesInternos } from '../hooks/useEnlacesInternos';
 import { Logo } from './Logo';
 
 export function Footer() {
   const { t } = useTranslation();
   const year = new Date().getFullYear();
+  /*
+   * Los enlaces legales en EL IDIOMA QUE SE ESTA LEYENDO. Con la ruta escrita
+   * a mano, quien lee `/es` acababa en el contrato en ingles.
+   */
+  const enlaces = useEnlacesInternos();
 
   return (
     <footer className="border-t border-slate-200 bg-brand-50 py-10 sm:py-12 dark:border-night-600 dark:bg-night-800/60">
@@ -33,13 +38,13 @@ export function Footer() {
         <nav className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
           <a
             className="underline hover:text-brand-700 dark:hover:text-brand-300"
-            href={LEGAL_PATHS.terms}
+            href={enlaces.terms}
           >
             {t('footer.terms')}
           </a>
           <a
             className="underline hover:text-brand-700 dark:hover:text-brand-300"
-            href={LEGAL_PATHS.privacy}
+            href={enlaces.privacy}
           >
             {t('footer.privacy')}
           </a>

@@ -1,7 +1,8 @@
 import { useTranslation } from 'react-i18next';
 import type { Locale } from '@freshness/types';
 import { supportedLocales } from '@freshness/i18n';
-import { persistLocale } from '../i18n';
+import { cambiarIdioma } from '../i18n';
+import { destinoPara } from '../lib/rutas';
 import { GlobeIcon } from './Icons';
 
 const NOMBRE_IDIOMA: Record<Locale, string> = {
@@ -23,9 +24,21 @@ export function LanguageSwitcher() {
   const actual = (i18n.resolvedLanguage ?? 'en') as Locale;
   const siguiente: Locale = supportedLocales.find((locale) => locale !== actual) ?? 'en';
 
+  /*
+   * CAMBIAR DE IDIOMA AHORA CAMBIA TAMBIEN LA DIRECCION: `/` <-> `/es`.
+   *
+   * Sin eso, los dos idiomas comparten direccion y el espanol no existe para
+   * un buscador — era el hueco mas grande del SEO de este sitio. No recarga:
+   * ver `cambiarIdioma` en `i18n.ts`, que explica por que (alguien a mitad del
+   * formulario de reserva no puede perder lo escrito por pulsar aqui).
+   *
+   * La pantalla se lee de la direccion y no se recibe por propiedad: este
+   * boton esta dentro de la cabecera, que se pinta en cuatro pantallas
+   * distintas, y pasarselo a mano por las cuatro era una ocasion de olvidarse
+   * en una.
+   */
   const cambiar = (): void => {
-    void i18n.changeLanguage(siguiente);
-    persistLocale(siguiente);
+    cambiarIdioma(siguiente, destinoPara(window.location.pathname).pantalla);
   };
 
   return (
