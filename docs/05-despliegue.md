@@ -65,10 +65,10 @@ y compilación para que Vercel construya solo lo necesario del monorepo.
 
 ### Variable de entorno
 
-| Variable            | Valor                                  |
-| ------------------- | -------------------------------------- |
-| `VITE_API_BASE_URL` | `https://<tu-api>.onrender.com/api/v1` |
-| `VITE_SITE_URL`     | `https://freshnesstouchcleaning.com`   |
+| Variable            | Valor                                    |
+| ------------------- | ---------------------------------------- |
+| `VITE_API_BASE_URL` | `https://<tu-api>.onrender.com/api/v1`   |
+| `VITE_SITE_URL`     | `https://www.freshnesstouchcleaning.com` |
 
 `VITE_SITE_URL` es **opcional**: sin ponerla se usa ese mismo dominio por
 omisión, que es lo que se quiere en las vistas previas de Vercel —un

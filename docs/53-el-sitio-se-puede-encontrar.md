@@ -1,8 +1,14 @@
 # 53 — El sitio se puede encontrar
 
 > Auditoría de SEO del sitio público y las tres etapas que se construyeron el
-> 1/11/2026. Dominio canónico: `https://freshnesstouchcleaning.com` (sin
-> `www`), detrás de `VITE_SITE_URL`.
+> 1/11/2026. Dominio canónico: **`https://www.freshnesstouchcleaning.com`**,
+> detrás de `VITE_SITE_URL`.
+>
+> **Corregido el mismo día.** La primera versión usó la raíz sin `www`, porque
+> `docs/15` §4.1 decía «marca el de la raíz como principal» — y se
+> contradecía con la tabla de su §1, que decía lo contrario. Lo montado de
+> verdad es el `www`: en Vercel, la raíz figura como «Redirects to
+> www.freshnesstouchcleaning.com». Ver §13.
 >
 > No es una guía de SEO. Es qué faltaba en **este** sitio, qué se hizo, qué
 > queda y qué depende de la dueña y no del código.
@@ -348,9 +354,9 @@ fallos de verdad, así que se renombró el `id` en vez de debilitarla.
 
 **Una variable nueva, y opcional:**
 
-| Variable        | Dónde                              | Valor                                |
-| --------------- | ---------------------------------- | ------------------------------------ |
-| `VITE_SITE_URL` | Vercel, proyecto del sitio público | `https://freshnesstouchcleaning.com` |
+| Variable        | Dónde                              | Valor                                    |
+| --------------- | ---------------------------------- | ---------------------------------------- |
+| `VITE_SITE_URL` | Vercel, proyecto del sitio público | `https://www.freshnesstouchcleaning.com` |
 
 Sin ponerla funciona igual: cae en ese mismo dominio por omisión, que es lo que
 se quiere en las vistas previas de Vercel —un canonical hacia producción es lo
@@ -375,7 +381,7 @@ Esto es la mitad del SEO local y no se puede programar:
    estructurado es la mitad web de esa coherencia, y sirve de poco si la otra
    mitad dice otra cosa.
 2. **Google Search Console.** Verificar el dominio y **enviar el sitemap**
-   (`https://freshnesstouchcleaning.com/sitemap.xml`). Es lo que convierte
+   (`https://www.freshnesstouchcleaning.com/sitemap.xml`). Es lo que convierte
    «existe un sitemap» en «Google lo ha leído», y además es donde se ve si
    `hreflang` se aceptó.
 3. **Bing Webmaster Tools.** Mismo sitemap. Importa más de lo que parece: Bing
@@ -500,3 +506,63 @@ Facebook rechaza las peticiones desde esta sesión.
 Se pega en **Ajustes → Dónde nos anunciamos**, igual que la de Instagram
 (limpia, **sin** el `?xtok=...`: ese parámetro es un testigo de compartir y no
 tiene por qué acabar en el HTML público).
+
+---
+
+## 13. El `www`, y por qué estuvo mal un rato (1/11/2026)
+
+Todo el trabajo de las etapas 1 a 3 se construyó sobre
+`https://freshnesstouchcleaning.com`, **sin `www`**. Está mal. El canónico es
+el `www`.
+
+### Cómo se llegó al error
+
+Al empezar pregunté explícitamente cuál era el dominio canónico, precisamente
+porque equivocarlo es de las pocas cosas de SEO que hacen daño activo. La
+respuesta fue «sin www», y coincidía con `docs/15` §4.1 paso 3:
+
+> «Marca el de la raíz como principal; Vercel configura solo la redirección
+> del `www` hacia él.»
+
+Lo que no vi entonces es que **ese paso contradecía la tabla del §1 del mismo
+documento**, que decía que el canónico era el `www`. Y lo que está montado es
+lo de la tabla, como se ve en Vercel → Domains:
+
+```
+freshnesstouchcleaning.com       Redirects to www.freshnesstouchcleaning.com
+www.freshnesstouchcleaning.com   → ats-freshness-touch-landing
+```
+
+### Por qué importaba
+
+Un `canonical` que apunta a una dirección **que redirige** es una señal
+contradictoria: la página dice «la versión buena es esta», y esa versión
+contesta con un 308 diciendo «no, es aquella». Y el `sitemap.xml` listaba seis
+direcciones de las que ninguna servía contenido.
+
+No es un fallo que se vea: la web funcionaba perfectamente para cualquier
+persona. Solo lo habrían notado los buscadores.
+
+### Qué se cambió
+
+| Dónde                                | Qué                                                                                    |
+| ------------------------------------ | -------------------------------------------------------------------------------------- |
+| `lib/seo/sitio.ts`                   | `SITIO_POR_OMISION` pasa a llevar `www`                                                |
+| `index.html`                         | 14 apariciones: canonical, `hreflang`, Open Graph, Twitter, y el bloque JSON-LD mínimo |
+| `.env.example`, `docs/05`, `docs/08` | El valor de `VITE_SITE_URL`                                                            |
+| `docs/15` §4.1                       | **El paso que estaba mal**, con nota de la corrección                                  |
+
+La prueba `el-html-servido-dice-lo-mismo` compara el dominio de `index.html`
+con `SITIO_POR_OMISION`, así que un cambio a medias —uno de los dos sitios y
+no el otro— falla en CI. Es justo para lo que se escribió.
+
+### Lo que hay que revisar fuera del código
+
+Tres variables de entorno pueden tener la raíz escrita, y ninguna da error si
+está mal:
+
+| Variable          | Dónde                 | Qué pasa si lleva la raíz                                                                                                                               |
+| ----------------- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `VITE_SITE_URL`   | Vercel, sitio público | Vuelve el problema de los canónicos                                                                                                                     |
+| `PUBLIC_SITE_URL` | Render, API           | Los enlaces de **retirar fotos** de los correos pasan por un redirector. Funcionan, pero el testigo va en el fragmento y conviene no hacerle dar saltos |
+| `CORS_ORIGINS`    | Render, API           | Si no incluye el origen `www`, **el cotizador no funciona**. Como el sitio sí funciona hoy, tiene que estar ya bien; conviene confirmarlo igualmente    |

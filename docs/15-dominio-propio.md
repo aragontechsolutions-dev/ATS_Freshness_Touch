@@ -107,8 +107,22 @@ usa Vercel. Aparecen con un candado porque los gestiona Vercel.
 
 1. Proyecto **`ats-freshness-touch-landing`** → Settings → Domains.
 2. Añade `freshnesstouchcleaning.com` **y** `www.freshnesstouchcleaning.com`.
-3. Marca el de la raíz como principal; Vercel configura solo la redirección del
-   `www` hacia él.
+3. Marca el **`www`** como principal; Vercel configura solo la redirección de la
+   raíz hacia él.
+
+> **Corregido el 1/11/2026.** Este paso decía lo contrario —«marca el de la raíz
+> como principal»— y **contradecía la tabla del apartado 1**, que sí dice que el
+> canónico es el `www`. Lo que hay montado de verdad es lo de la tabla: en
+> Vercel, `freshnesstouchcleaning.com` figura como «Redirects to
+> www.freshnesstouchcleaning.com».
+>
+> No fue inofensivo: esa frase me llevó a configurar todo el SEO —`canonical`,
+> `sitemap.xml`, Open Graph y `hreflang`— apuntando a la raíz, es decir, a una
+> dirección que redirige. Se corrigió antes de verificar Search Console, pero
+> es un buen recordatorio de que **una guía que se contradice a sí misma acaba
+> produciendo trabajo mal hecho**, y de que lo que manda es el panel, no el
+> documento.
+
 4. Vercel te enseña **los registros DNS exactos** que hay que crear. Cópialos
    tal cual: no los busques en un tutorial, porque esos valores cambian con el
    tiempo y el que manda es el que te muestre tu panel en ese momento.

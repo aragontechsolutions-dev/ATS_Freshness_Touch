@@ -72,12 +72,12 @@ Health: /health
 
 **Root Directory:** `apps/landing` · El resto lo define `vercel.json`.
 
-| Variable                      | Valor                                | Cuándo                           |
-| ----------------------------- | ------------------------------------ | -------------------------------- |
-| `VITE_API_BASE_URL`           | `https://TU-API.onrender.com/api/v1` | Siempre                          |
-| `VITE_ADMIN_URL`              | `https://TU-PANEL.vercel.app`        | Destino de la puerta de servicio |
-| `VITE_STRIPE_PUBLISHABLE_KEY` | `pk_test_...` / `pk_live_...`        | Solo al activar pagos reales     |
-| `VITE_SITE_URL`               | `https://freshnesstouchcleaning.com` | SEO: canonical, sitemap, robots  |
+| Variable                      | Valor                                    | Cuándo                           |
+| ----------------------------- | ---------------------------------------- | -------------------------------- |
+| `VITE_API_BASE_URL`           | `https://TU-API.onrender.com/api/v1`     | Siempre                          |
+| `VITE_ADMIN_URL`              | `https://TU-PANEL.vercel.app`            | Destino de la puerta de servicio |
+| `VITE_STRIPE_PUBLISHABLE_KEY` | `pk_test_...` / `pk_live_...`            | Solo al activar pagos reales     |
+| `VITE_SITE_URL`               | `https://www.freshnesstouchcleaning.com` | SEO: canonical, sitemap, robots  |
 
 Aplícalas a los tres entornos (Production, Preview, Development).
 
