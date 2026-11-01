@@ -692,6 +692,17 @@ export const es: TranslationResources = {
         'La ley exige una dirección física en todo correo comercial, así que sin ella no se pueden mandar ofertas.',
       county: 'Condado',
       countyHelp: 'Los Términos la usan para el tribunal que vería una disputa.',
+
+      reach: 'Dónde nos anunciamos',
+      cities: 'Ciudades que atendemos',
+      citiesHelp:
+        'Una por línea. Salen en la web y le dicen a Google dónde enseñarnos: nadie busca «limpieza en 50 millas alrededor de Marietta», busca «house cleaning Smyrna GA».',
+      citiesWarning:
+        'Esta lista no cambia el área que cubres. Eso lo deciden las zonas y las millas. Una ciudad fuera de tu radio se anunciaría y luego el cotizador le diría «fuera de zona» a quien viva allí.',
+      facebookUrl: 'Página de Facebook',
+      instagramUrl: 'Perfil de Instagram',
+      socialHelp:
+        'No se enseñan como botones en la web. Le dicen a Google que el sitio, tu ficha de Google Business Profile y tus redes son la misma empresa, que es lo que decide si apareces en el mapa de resultados locales.',
       contact: 'Contacto',
       phone: 'Telefono',
       phoneSaved: 'Se guardara como {{value}}',
@@ -2104,6 +2115,12 @@ export const es: TranslationResources = {
     mapFreeRadius: 'Hasta {{miles}} millas — sin cargo por traslado',
     legendFreeRadius: 'Sin cargo por traslado ({{miles}} mi)',
     legendInstant: 'Precio al instante en la web',
+
+    citiesTitle: 'Ciudades donde limpiamos',
+    citiesIntro:
+      'Trabajamos en toda el área metropolitana de Atlanta. Si tu ciudad está en esta lista, vamos a tu casa: pide tu precio en menos de un minuto.',
+    citiesMore:
+      '¿No está la tuya? La lista no es el límite: lo que decide es la distancia desde nuestra base, la del mapa de arriba. Pon tu código postal en el cotizador y te lo dice al momento.',
     legendOnRequest: 'Precio en persona',
 
     /**

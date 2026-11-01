@@ -88,6 +88,8 @@ export function DatosEstructurados({ preguntas = SIN_PREGUNTAS }: DatosEstructur
         horario: settings.hours,
         base,
         radioMillas,
+        ciudades: settings.cities,
+        redes: [settings.facebookUrl, settings.instagramUrl],
       },
       preguntas,
     );

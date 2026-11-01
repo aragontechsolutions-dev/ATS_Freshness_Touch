@@ -97,6 +97,10 @@ export interface DatosDelNegocio {
   base: BaseDeOperaciones | null;
   /** Radio maximo atendido, en millas. `0` si todavia no se sabe. */
   radioMillas: number;
+  /** Las ciudades que se anuncian, por su nombre. Puede venir vacia. */
+  ciudades: readonly string[];
+  /** Perfiles de redes sociales, para `sameAs`. Los nulos se omiten. */
+  redes: readonly (string | null)[];
 }
 
 /** Una milla en metros, para `GeoCircle`, que se expresa en metros. */
@@ -168,6 +172,23 @@ export function negocioJsonLd(datos: DatosDelNegocio): object {
      */
     areaServed: [
       { '@type': 'State', name: 'Georgia' },
+      /*
+       * LAS CIUDADES, UNA A UNA.
+       *
+       * El estado y el circulo dicen «hasta aqui llegamos»; esto dice los
+       * NOMBRES, que es lo que se busca. Un buscador no deduce «Smyrna» de
+       * un circulo de 50 millas alrededor de unas coordenadas.
+       *
+       * `containedInPlace` con Georgia NO SOBRA: hay un Smyrna en Tennessee
+       * y otro en Delaware, y un Dallas que casi todo el mundo situa en
+       * Texas. Sin decir el estado, la ciudad mas buscada de esta lista
+       * apunta a dos mil kilometros de aqui.
+       */
+      ...datos.ciudades.map((nombre) => ({
+        '@type': 'City',
+        name: nombre,
+        containedInPlace: { '@type': 'State', name: 'Georgia' },
+      })),
       ...(datos.base && datos.radioMillas > 0
         ? [
             {
@@ -193,6 +214,17 @@ export function negocioJsonLd(datos: DatosDelNegocio): object {
    * invalido, y un validador lo marca como error en todo el bloque. Es la
    * misma regla que ya cumple la web al pintarlo: sin numero no hay boton.
    */
+  /*
+   * `sameAs`: los perfiles que tambien son este negocio.
+   *
+   * Es de lo que mas ayuda a que Google entienda que la web, la ficha de
+   * Google Business Profile y el Facebook son LA MISMA empresa. Los nulos se
+   * filtran: `sameAs: [null]` no es «no tengo redes», es un valor invalido
+   * que tumba el bloque entero.
+   */
+  const redes = datos.redes.filter((url): url is string => url !== null && url !== '');
+  if (redes.length > 0) nodo.sameAs = redes;
+
   if (datos.telefono) nodo.telephone = datos.telefono;
   if (datos.email) nodo.email = datos.email;
   if (datos.legalName) nodo.legalName = datos.legalName;

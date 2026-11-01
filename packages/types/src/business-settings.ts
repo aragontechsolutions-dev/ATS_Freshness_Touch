@@ -102,6 +102,69 @@ export type WeeklyHours = z.infer<typeof WeeklyHoursSchema>;
  * El telefono y el correo son opcionales porque al arrancar el proyecto no
  * estan; el horario no, porque sin horario no hay agenda que ofrecer.
  */
+/**
+ * LAS CIUDADES CON LAS QUE ARRANCA, dichas por la dueña el 1/11/2026.
+ *
+ * Es el valor de partida, no la fuente: lo que manda es lo guardado en el
+ * panel. Esta aqui por el mismo motivo que el horario de partida —que el
+ * sistema funcione sin que nadie teclee nada el primer dia— y conviene
+ * mantenerlo al dia, pero ya no decide.
+ *
+ * Todas son del area metropolitana de Atlanta y caen dentro del radio
+ * atendido. Eso NO lo comprueba el codigo y no puede comprobarlo: la
+ * distancia se mide con el geocodificador, y una lista de nombres no lleva
+ * coordenadas. Si algun dia se anade una ciudad fuera del radio, el sitio la
+ * anunciaria y el cotizador diria «fuera de zona» — una contradiccion que
+ * solo se evita mirando.
+ */
+export const CIUDADES_DE_PARTIDA = [
+  'Atlanta',
+  'Acworth',
+  'Alpharetta',
+  'Austell',
+  'Brookhaven',
+  'Canton',
+  'Chamblee',
+  'Dallas',
+  'Decatur',
+  'Douglasville',
+  'Dunwoody',
+  'Johns Creek',
+  'Kennesaw',
+  'Mableton',
+  'Marietta',
+  'Powder Springs',
+  'Roswell',
+  'Sandy Springs',
+  'Smyrna',
+  'Villa Rica',
+] as const;
+
+/**
+ * Una direccion de perfil en una red concreta.
+ *
+ * ========================================================================
+ * SE EXIGE EL DOMINIO, Y NO ES UNA FORMALIDAD
+ * ========================================================================
+ * `sameAs` declara «este otro sitio tambien somos nosotros». Una direccion
+ * pegada mal —el portapapeles traia otra cosa, un acortador, la web de un
+ * competidor— le estaria diciendo eso a Google sobre un sitio ajeno, y no
+ * hay ningun sintoma visible en la pagina.
+ *
+ * Se acepta el dominio y sus subdominios (`www.`, `m.`), y se exige HTTPS.
+ */
+function RedSocialSchema(dominio: string) {
+  const patron = new RegExp(`^https://([a-z0-9-]+\\.)*${dominio.replace('.', '\\.')}/`, 'i');
+
+  return z
+    .string()
+    .trim()
+    .max(300)
+    .refine((valor) => patron.test(valor), {
+      message: `Tiene que ser una direccion https:// de ${dominio}`,
+    });
+}
+
 export const BusinessSettingsSchema = z.strictObject({
   phone: PhoneE164Schema.nullable(),
   /**
@@ -155,6 +218,74 @@ export const BusinessSettingsSchema = z.strictObject({
   /** El condado de Georgia, para la clausula de jurisdiccion. */
   county: z.string().trim().max(80).nullable().default(null),
 
+  /*
+   * ====================================================================
+   * LAS CIUDADES QUE SE ATIENDEN, POR SU NOMBRE
+   * ====================================================================
+   * NO SUSTITUYEN A LAS ZONAS, Y NO SON LO MISMO. Las zonas
+   * (`service-area.ts`) son millas desde la base y deciden QUE SE COBRA y
+   * donde sale el precio solo. Esto es una lista de nombres y decide QUE SE
+   * ANUNCIA.
+   *
+   * Existen porque el sitio no tenia ni un nombre de ciudad. Decia «hasta 50
+   * millas desde nuestra base», y eso no lo busca nadie: quien necesita una
+   * limpieza escribe «house cleaning Smyrna GA». Sin los nombres escritos en
+   * la pagina, esas busquedas no pueden encontrarnos — da igual que la casa
+   * caiga dentro del radio.
+   *
+   * VAN AQUI Y NO EN EL AREA DE SERVICIO a proposito. El area de servicio
+   * viaja dentro de `PricingConfig` hasta el motor de precios, y una lista de
+   * nombres no pinta nada ahi: no decide ni una cifra. Aqui conviven con la
+   * razon social y la direccion postal, que son lo mismo —hechos del negocio
+   * que se publican— y que ya se sirven al sitio en la misma peticion.
+   *
+   * EL VALOR POR DEFECTO SON LAS CIUDADES DE VERDAD, no una lista vacia.
+   * Igual que el horario de partida: para que funcione desde el primer
+   * minuto sin que nadie tenga que teclear veinte nombres. Lo que manda
+   * sigue siendo el panel.
+   */
+  cities: z
+    .array(
+      z
+        .string()
+        .trim()
+        .min(2)
+        .max(60)
+        /*
+         * Letras, espacios, guiones y apostrofes. Nada mas.
+         *
+         * No es paranoia: esta lista se pinta en la portada Y entra en los
+         * datos estructurados. Un nombre con una coma o un punto parte el
+         * JSON-LD en algo que un validador rechaza, y entonces se pierde el
+         * bloque ENTERO —el negocio, el horario, todo— por una ciudad mal
+         * escrita.
+         */
+        .regex(/^[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ' -]*$/, 'Solo letras, espacios, guiones y apostrofes'),
+    )
+    .max(60)
+    .default([...CIUDADES_DE_PARTIDA]),
+
+  /*
+   * ====================================================================
+   * LAS REDES SOCIALES, PARA `sameAs`
+   * ====================================================================
+   * No se pintan como botones en el sitio: van a los datos estructurados.
+   * Es de lo que mas ayuda a que Google entienda que la web, la ficha de
+   * Google Business Profile y el Facebook son LA MISMA empresa, que es
+   * justo lo que decide el paquete local.
+   *
+   * EDITABLES Y NO ESCRITAS EN EL CODIGO, por lo de siempre en este
+   * archivo: una cuenta se cambia, y cambiarla no puede exigir un
+   * despliegue.
+   *
+   * `null` POR DEFECTO, y aqui si: una direccion de red social inventada es
+   * peor que ninguna. `sameAs` le dice a Google «este otro sitio tambien
+   * somos nosotros»; apuntando al sitio equivocado, se le esta regalando la
+   * identidad del negocio a un tercero.
+   */
+  facebookUrl: RedSocialSchema('facebook.com').nullable().default(null),
+  instagramUrl: RedSocialSchema('instagram.com').nullable().default(null),
+
   hours: WeeklyHoursSchema,
 });
 export type BusinessSettings = z.infer<typeof BusinessSettingsSchema>;
@@ -172,6 +303,9 @@ export const DEFAULT_BUSINESS_SETTINGS: BusinessSettings = {
   legalName: null,
   mailingAddress: null,
   county: null,
+  cities: [...CIUDADES_DE_PARTIDA],
+  facebookUrl: null,
+  instagramUrl: null,
   hours: {
     1: { open: '08:00', close: '18:00' },
     2: { open: '08:00', close: '18:00' },

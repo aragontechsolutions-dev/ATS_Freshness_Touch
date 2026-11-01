@@ -63,7 +63,7 @@ Conviene decirlo antes, porque evitó trabajo:
 | Hueco                                             | Por qué no se hizo                                                                                                                                                                                                                                                                                                 |
 | ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | **El HTML servido sigue siendo un `<div>` vacío** | Google ejecuta JavaScript y ve la página entera. WhatsApp y Facebook no lo ejecutan, pero ya tienen lo que necesitan en las etiquetas estáticas de `index.html`. Quien se queda sin ver el contenido es Bing y los rastreadores de los asistentes. Arreglarlo es prerenderizar en el build, y es una etapa propia. |
-| **No hay contenido por ciudad**                   | La zona de servicio se expresa en **millas desde la base** («hasta 50 millas»). Nadie busca «limpieza en 50 millas alrededor de Marietta»: busca «house cleaning Smyrna GA». Necesita las ciudades reales de la dueña, así que es contenido antes que código.                                                      |
+| ~~No hay contenido por ciudad~~                   | **Cerrado el 1/11/2026**, con las veinte ciudades que dio la dueña. Ver §12.                                                                                                                                                                                                                                       |
 | **El paquete principal son 218 KB comprimidos**   | Y como la página se pinta entera con JavaScript, nada aparece hasta que se descarga y ejecuta. Afecta al LCP, que es una señal de posicionamiento. Es optimización, no SEO, y merece su propia medición.                                                                                                           |
 | **El 404 contesta HTTP 200**                      | `vercel.json` reescribe todo hacia `index.html` —hizo falta para que `/terms` funcionara— así que un sitio estático no puede contestar 404 de verdad. Mitigado con `noindex, follow`, que es lo único que impide que se indexe.                                                                                    |
 
@@ -166,9 +166,8 @@ estado) con el **mismo `@id`**, y `DatosEstructurados.tsx` lo reescribe por su
   estrellas: quita el sitio de los resultados.
 - **`priceRange`.** Habría que inventarse un rango: el precio depende del
   tamaño, la frecuencia y la distancia. El cotizador da el número exacto.
-- **`sameAs`.** Son los perfiles de redes sociales y no los sé. Es de las
-  cosas que más ayudan a que Google entienda que la web, la ficha de Google y
-  el Facebook son la **misma** empresa. Está en la lista de la dueña, abajo.
+- ~~**`sameAs`.**~~ **Cerrado el 1/11/2026**: ya no se escribe aquí, sale de
+  los ajustes del panel. Ver §12.
 - **Una calle en `address`.** Deliberado: es un negocio que va a casa del
   cliente. Google recomienda que un negocio de área de servicio no publique su
   dirección exacta, y aquí además sería la casa de la dueña. Sí van ciudad,
@@ -381,12 +380,10 @@ Esto es la mitad del SEO local y no se puede programar:
    `hreflang` se aceptó.
 3. **Bing Webmaster Tools.** Mismo sitemap. Importa más de lo que parece: Bing
    alimenta a varios asistentes, y es el que **no** ejecuta JavaScript.
-4. **Los perfiles de redes sociales.** Hacen falta las direcciones del Facebook
-   y el Instagram para añadir `sameAs` al bloque estructurado. Es de lo que más
-   ayuda a que Google entienda que las tres cosas son la misma empresa. Cuando
-   las tenga, son tres líneas de código.
-5. **Las ciudades reales que atiende.** Para el contenido por ciudad (§3). Hoy
-   la web dice «hasta 50 millas desde la base» y nadie busca eso.
+4. ~~**Los perfiles de redes sociales.**~~ Los dio el 1/11/2026. Ya no son
+   código: se pegan en **Ajustes → Dónde nos anunciamos**. Ver §12.
+5. ~~**Las ciudades reales que atiende.**~~ Las dio el 1/11/2026 y ya están
+   publicadas. Ver §12.
 6. **Reseñas de verdad, en Google.** No en la web: en la web no se pueden
    marcar sin inventarlas. Las de Google salen en el paquete local solas.
 
@@ -403,3 +400,103 @@ Esto es la mitad del SEO local y no se puede programar:
    propia porque cambia cómo arranca la aplicación.
 4. **El peso del paquete.** 218 KB comprimidos antes de pintar nada. Afecta al
    LCP. Es optimización con medición, no SEO.
+
+---
+
+## 12. Las ciudades y las redes sociales (1/11/2026)
+
+La dueña dio las dos cosas que faltaban, así que se cerraron los dos huecos
+que dependían de ella: el contenido por ciudad y `sameAs`.
+
+### Dónde viven, y por qué ahí
+
+En `BusinessSettings` (la fila `business` de `business_settings`), junto a la
+razón social y la dirección postal. **No en el código**, por la razón de
+siempre en este proyecto: un dato que la dueña cambia no puede exigir un
+despliegue. Y **no en el área de servicio**, aunque la tentación es obvia: ese
+objeto viaja dentro de `PricingConfig` hasta el motor de precios, y una lista
+de nombres no decide ni una cifra.
+
+Es una columna JSON, así que **no hizo falta migración**.
+
+### La distinción que hay que mantener clara
+
+|                                           | Qué es               | Qué decide                               |
+| ----------------------------------------- | -------------------- | ---------------------------------------- |
+| **Las zonas** (`service-area.ts`)         | Millas desde la base | Qué se cobra y dónde sale el precio solo |
+| **Las ciudades** (`business-settings.ts`) | Nombres              | Qué se anuncia                           |
+
+Añadir una ciudad **no amplía el área atendida**. Si se añadiera una fuera del
+radio, el sitio la anunciaría y el cotizador le diría «fuera de zona» a quien
+viva allí. El código no puede comprobarlo —la distancia se mide con el
+geocodificador y una lista de nombres no lleva coordenadas— así que el panel
+lo advierte en texto, junto al campo.
+
+### La trampa del `strictObject`, otra vez
+
+Los tres campos llevan `.default(...)`. Sin eso, la fila ya guardada deja de
+cumplir el contrato, `business-settings.service.ts` la descarta y devuelve
+`DEFAULT_BUSINESS_SETTINGS`, que lleva `phone: null`: **el teléfono
+desaparecería de toda la web sin un solo error en ninguna pantalla**. Es la
+misma caída muda que ya está documentada en ese archivo para `whatsapp`. Hay
+una prueba que valida una fila sin los campos nuevos.
+
+Las ciudades llevan como valor por defecto **las veinte de verdad**, igual que
+el horario de partida: para que funcionen desde el primer minuto sin que nadie
+teclee veinte nombres. Las redes van a `null`, y ahí la asimetría es a
+propósito: **una dirección de red social inventada es peor que ninguna**.
+
+### Un fallo que estuve a punto de dejar escrito
+
+`Settings.tsx` no manda el objeto que leyó del servidor: lo **construye de
+cero** con sus campos. Un campo del contrato que ese objeto no incluya no
+viaja vacío, viaja **ausente** — y como todos tienen `.default(...)`, Zod lo
+rellena y el servidor lo guarda encima.
+
+La primera versión tocaba el estado y la pantalla, y dejaba el objeto de envío
+sin los tres campos nuevos. **Cualquier guardado desde Ajustes habría devuelto
+las ciudades a las de partida y borrado las redes**, diciendo que fue bien.
+
+De ahí `ajustes-no-borran-lo-que-no-ensenan.test.ts`: recorre las claves del
+contrato y comprueba que todas aparecen en el objeto que se envía. Se verificó
+quitando `cities` a propósito, y falla nombrando el campo.
+
+### Qué se publica
+
+- **En la página**, al final de «Zonas de servicio»: la lista de ciudades como
+  `<ul>` de verdad y no un párrafo con comas —con un lector de pantalla,
+  «veinte elementos» se puede saltar; una frase de doscientos caracteres hay
+  que oírla entera—. Con una línea debajo diciendo que **la lista no es el
+  límite**: sin ella, quien vive en una ciudad que no sale da por hecho que no
+  vamos y cierra la pestaña.
+- **En el JSON-LD**: cada ciudad como `City` con
+  `containedInPlace: { State: Georgia }`. Eso no sobra: hay un **Smyrna en
+  Tennessee** y otro en Delaware, y un **Dallas** que casi todo el mundo sitúa
+  en Texas. Sin el estado, la ciudad más buscada de la lista apunta a dos mil
+  kilómetros de aquí.
+- **`sameAs`** con las redes configuradas, omitiendo las que no hay:
+  `sameAs: [null]` no es «no tengo redes», es un valor inválido que tumba el
+  bloque entero.
+
+### Validación, y por qué es más dura de lo que parece
+
+- **Nombres de ciudad**: solo letras, espacios, guiones y apóstrofes. La lista
+  entra en el JSON-LD, y un nombre con una comilla lo parte en algo que un
+  validador rechaza — se perdería el bloque **entero**, el negocio y el
+  horario incluidos, por una ciudad mal escrita.
+- **Redes**: se exige `https://` y **el dominio que dice el campo**. `sameAs`
+  declara «este otro sitio también somos nosotros»; una dirección pegada mal
+  se lo estaría diciendo a Google sobre un sitio ajeno, sin ningún síntoma en
+  la página. Se comprueba también que `instagram.com.loquesea.net` no cuele.
+
+### Lo que queda pendiente de ella
+
+**La dirección real de la página de Facebook.** La que dio es un enlace de
+compartir (`facebook.com/share/18PkcJEDd3/`), que es un redirector, no la
+dirección del perfil. Funciona, pero para `sameAs` conviene la canónica —la
+que sale en la barra del navegador al abrir la página—. No pude resolverla:
+Facebook rechaza las peticiones desde esta sesión.
+
+Se pega en **Ajustes → Dónde nos anunciamos**, igual que la de Instagram
+(limpia, **sin** el `?xtok=...`: ese parámetro es un testigo de compartir y no
+tiene por qué acabar en el HTML público).

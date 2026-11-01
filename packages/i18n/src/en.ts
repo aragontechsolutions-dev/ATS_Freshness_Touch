@@ -798,6 +798,26 @@ export const en = {
         'A physical address is required by law in any marketing email, so without it we cannot send offers.',
       county: 'County',
       countyHelp: 'Used by the Terms for the court that would hear a dispute.',
+
+      /*
+       * ======================================================================
+       * DONDE SE ANUNCIA EL SERVICIO
+       * ======================================================================
+       * Lo lee quien administra, y tiene que entender en media linea que esto
+       * NO amplia el area atendida. Es el malentendido caro: anadir una
+       * ciudad fuera del radio hace que la web la anuncie y que el cotizador
+       * le diga «fuera de zona» a quien viva alli.
+       */
+      reach: 'Where we advertise',
+      cities: 'Cities we serve',
+      citiesHelp:
+        'One per line. They appear on the website and tell Google where to show us — nobody searches for "cleaning within 50 miles of Marietta", they search for "house cleaning Smyrna GA".',
+      citiesWarning:
+        'This list does not change the area you cover. The zones and the mileage do that. A city outside your radius would be advertised and then turned down by the quote tool.',
+      facebookUrl: 'Facebook page',
+      instagramUrl: 'Instagram profile',
+      socialHelp:
+        'These are not shown as buttons on the website. They tell Google that the site, your Google Business Profile and your social accounts are the same business, which is what decides whether you show up in the local map results.',
       contact: 'Contact',
       phone: 'Phone number',
       phoneSaved: 'Will be saved as {{value}}',
@@ -2379,6 +2399,23 @@ export const en = {
     mapFreeRadius: 'Up to {{miles}} miles — no travel charge',
     legendFreeRadius: 'No travel charge ({{miles}} mi)',
     legendInstant: 'Instant price online',
+    /*
+     * ======================================================================
+     * LAS CIUDADES, POR SU NOMBRE
+     * ======================================================================
+     * Esta seccion no tenia ni una. El mapa dice «hasta 50 millas desde
+     * nuestra base», que no lo busca nadie y que no le dice a una visitante
+     * si vamos a su casa.
+     *
+     * `citiesMore` NO ES RELLENO: sin esa linea, quien vive en una ciudad
+     * que no sale en la lista da por hecho que no vamos y cierra la pagina.
+     * El limite lo marcan las millas, no la lista.
+     */
+    citiesTitle: 'Cities we clean in',
+    citiesIntro:
+      'We work across metro Atlanta. If your city is on this list, we come to you — get your price online in under a minute.',
+    citiesMore:
+      'Not on the list? The list is not the limit: what decides is the distance from our base, shown on the map above. Enter your ZIP code in the quote tool and it will tell you straight away.',
     legendOnRequest: 'We price it in person',
 
     /**

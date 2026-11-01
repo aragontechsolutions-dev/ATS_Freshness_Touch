@@ -314,6 +314,17 @@ function BusinessSettingsForm({ locale, onSessionLost }: SettingsPageProps) {
   const [legalName, setLegalName] = useState('');
   const [mailingAddress, setMailingAddress] = useState('');
   const [county, setCounty] = useState('');
+  /*
+   * LAS CIUDADES, UNA POR LINEA.
+   *
+   * Se guarda como TEXTO y no como array porque es lo que de verdad se hace
+   * con esto: pegar una lista. Con un array y un boton de «anadir ciudad»,
+   * meter veinte nombres son cuarenta pulsaciones; con un area de texto es
+   * un pegado. Se parte por lineas al enviar.
+   */
+  const [cities, setCities] = useState('');
+  const [facebookUrl, setFacebookUrl] = useState('');
+  const [instagramUrl, setInstagramUrl] = useState('');
   const [hours, setHours] = useState(DEFAULT_BUSINESS_SETTINGS.hours);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
@@ -331,6 +342,9 @@ function BusinessSettingsForm({ locale, onSessionLost }: SettingsPageProps) {
       setLegalName(datos.settings.legalName ?? '');
       setMailingAddress(datos.settings.mailingAddress ?? '');
       setCounty(datos.settings.county ?? '');
+      setCities(datos.settings.cities.join('\n'));
+      setFacebookUrl(datos.settings.facebookUrl ?? '');
+      setInstagramUrl(datos.settings.instagramUrl ?? '');
       setHours(datos.settings.hours);
       setAutoria({ updatedAt: datos.updatedAt, updatedBy: datos.updatedBy });
     } catch (error) {
@@ -369,6 +383,19 @@ function BusinessSettingsForm({ locale, onSessionLost }: SettingsPageProps) {
       legalName: legalName.trim() === '' ? null : legalName.trim(),
       mailingAddress: mailingAddress.trim() === '' ? null : mailingAddress.trim(),
       county: county.trim() === '' ? null : county.trim(),
+      /*
+       * SE PARTE POR LINEAS Y SE TIRAN LAS VACIAS.
+       *
+       * Un pegado trae casi siempre una linea en blanco al final, y una
+       * cadena vacia no pasa el `min(2)` del contrato: sin esto, pegar la
+       * lista daria un error de validacion por algo que no se ve.
+       */
+      cities: cities
+        .split('\n')
+        .map((linea) => linea.trim())
+        .filter((linea) => linea !== ''),
+      facebookUrl: facebookUrl.trim() === '' ? null : facebookUrl.trim(),
+      instagramUrl: instagramUrl.trim() === '' ? null : instagramUrl.trim(),
       hours,
     };
 
@@ -388,6 +415,9 @@ function BusinessSettingsForm({ locale, onSessionLost }: SettingsPageProps) {
       setLegalName(datos.settings.legalName ?? '');
       setMailingAddress(datos.settings.mailingAddress ?? '');
       setCounty(datos.settings.county ?? '');
+      setCities(datos.settings.cities.join('\n'));
+      setFacebookUrl(datos.settings.facebookUrl ?? '');
+      setInstagramUrl(datos.settings.instagramUrl ?? '');
       setHours(datos.settings.hours);
       setAutoria({ updatedAt: datos.updatedAt, updatedBy: datos.updatedBy });
       toast.success('admin.settings.saved');
@@ -522,6 +552,98 @@ function BusinessSettingsForm({ locale, onSessionLost }: SettingsPageProps) {
             <p className="mt-1 text-xs text-red-700">{t(fieldErrors.county)}</p>
           )}
         </div>
+      </section>
+
+      {/* ------------------------- Donde se anuncia ------------------------- */}
+      {/*
+        SECCION PROPIA, Y NO DENTRO DE «ZONAS DE SERVICIO», porque no son lo
+        mismo: las zonas son millas y deciden QUE SE COBRA; esto son nombres y
+        decide QUE SE ANUNCIA. Mezclarlas invita a creer que anadir una ciudad
+        amplia el area atendida, y no la amplia.
+      */}
+      <section className="ft-card space-y-4 p-4">
+        <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+          {t('admin.settings.reach')}
+        </h3>
+
+        <div>
+          <label className="ft-label" htmlFor="ajuste-ciudades">
+            {t('admin.settings.cities')}
+          </label>
+          <textarea
+            id="ajuste-ciudades"
+            className="ft-input font-mono text-sm"
+            rows={10}
+            value={cities}
+            placeholder={'Marietta\nSmyrna\nKennesaw'}
+            onChange={(evento) => {
+              setCities(evento.target.value);
+            }}
+            aria-describedby="ajuste-ciudades-ayuda"
+          />
+          <p id="ajuste-ciudades-ayuda" className="mt-1 text-xs text-slate-600 dark:text-slate-400">
+            {t('admin.settings.citiesHelp')}
+          </p>
+          {/*
+            El aviso que de verdad hace falta: esta lista NO amplia el area
+            atendida. Una ciudad fuera del radio se anunciaria en la web y el
+            cotizador diria «fuera de zona» a quien viva alli.
+          */}
+          <p className="mt-1 text-xs font-medium text-amber-800 dark:text-amber-300">
+            {t('admin.settings.citiesWarning')}
+          </p>
+          {fieldErrors.cities && (
+            <p className="mt-1 text-xs text-red-700">{t(fieldErrors.cities)}</p>
+          )}
+        </div>
+
+        <div>
+          <label className="ft-label" htmlFor="ajuste-facebook">
+            {t('admin.settings.facebookUrl')}
+          </label>
+          <input
+            id="ajuste-facebook"
+            className="ft-input"
+            type="url"
+            inputMode="url"
+            autoComplete="off"
+            maxLength={300}
+            value={facebookUrl}
+            placeholder="https://www.facebook.com/..."
+            onChange={(evento) => {
+              setFacebookUrl(evento.target.value);
+            }}
+          />
+          {fieldErrors.facebookUrl && (
+            <p className="mt-1 text-xs text-red-700">{t(fieldErrors.facebookUrl)}</p>
+          )}
+        </div>
+
+        <div>
+          <label className="ft-label" htmlFor="ajuste-instagram">
+            {t('admin.settings.instagramUrl')}
+          </label>
+          <input
+            id="ajuste-instagram"
+            className="ft-input"
+            type="url"
+            inputMode="url"
+            autoComplete="off"
+            maxLength={300}
+            value={instagramUrl}
+            placeholder="https://www.instagram.com/..."
+            onChange={(evento) => {
+              setInstagramUrl(evento.target.value);
+            }}
+          />
+          {fieldErrors.instagramUrl && (
+            <p className="mt-1 text-xs text-red-700">{t(fieldErrors.instagramUrl)}</p>
+          )}
+        </div>
+
+        <p className="text-xs text-slate-600 dark:text-slate-400">
+          {t('admin.settings.socialHelp')}
+        </p>
       </section>
 
       {/* ---------------------------- Contacto ---------------------------- */}
