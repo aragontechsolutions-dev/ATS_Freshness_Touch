@@ -675,3 +675,58 @@ clave: falla nombrándola.
 **Si hay que explicar una regla de `vercel.json`, se explica aquí, no ahí.**
 Un archivo de configuración sin comentarios es el precio de JSON, y ese
 precio se paga; no se intenta esquivar.
+
+---
+
+## 16. Quitar «con licencia» tocó el contrato (1/11/2026)
+
+La dueña pidió quitar **«Con licencia»** del distintivo del hero y dejar solo
+**«Asegurados»**. Es una línea de texto, y arrastró tres cosas más.
+
+### El contrato citaba esa frase
+
+La cláusula 11 de las Condiciones decía, literalmente:
+
+> «**Nunca decimos estar afianzados**, porque no lo estamos. Nuestro sitio
+> dice "con licencia y asegurados" y eso es exactamente lo que somos.»
+
+Quitarlo solo del hero habría dejado el contrato **describiendo una web que
+ya no existe** — y en un documento cuyo propósito es ser preciso sobre qué se
+declara ser y qué no. Ahora dice «nuestro sitio dice "asegurados"».
+
+> **Lo que NO se añadió, a propósito:** la cláusula no afirma ahora que la
+> empresa _no_ tenga licencia. No lo sé, y las dos cosas son posibles —que no
+> la tenga, o que la tenga y prefiera no anunciarla—. Decirlo sería inventar
+> un hecho sobre el negocio en un documento legal. Si la dueña quiere que el
+> contrato lo declare expresamente, es una línea más y una decisión suya.
+
+### Y eso obliga a subir la versión
+
+`legal.ts` tiene una regla escrita: **corregir un texto ya publicado no es
+editar el archivo, es publicar una versión nueva.** Esto es fondo, no una
+errata: cambia lo que la empresa declara ser. `TERMS_VERSION` pasa de **1 a
+2**.
+
+Se comprobó antes qué arrastra ese número: `acceptanceIsCurrent` **solo se usa
+en el panel**, para avisar de que lo que aceptó un cliente no es lo publicado
+hoy. **No fuerza a nadie a volver a aceptar nada** y no bloquea ninguna
+reserva. Las reservas antiguas conservan `termsVersion: 1`, que es el
+registro correcto de lo que esa persona aceptó.
+
+### La fecha de entrada en vigor estaba compartida, y se rompió
+
+Había una sola `LEGAL_EFFECTIVE_DATE` para los dos documentos. Funcionó
+mientras se publicaron el mismo día. Con las Condiciones cambiando y la
+Privacidad no, la constante compartida dejaba dos salidas y **las dos
+falsas**:
+
+- Las Condiciones v2 diciendo regir desde una fecha anterior a su texto, o
+- La Privacidad, sin tocar, diciendo que entró en vigor hoy.
+
+Ahora hay `TERMS_EFFECTIVE_DATE` y `PRIVACY_EFFECTIVE_DATE`, y cada una sube
+**junto con** su número de versión.
+
+### Comprobado
+
+No queda ni un «licen» en la página, en ninguno de los dos idiomas, y el
+distintivo dice «Insured» / «Asegurados». Verificado en un navegador real.

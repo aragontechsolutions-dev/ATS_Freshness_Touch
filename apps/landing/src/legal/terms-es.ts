@@ -222,7 +222,7 @@ export const TERMS_ES: Documento = {
         'Guarde antes de que lleguemos lo **irreemplazable, de mucho valor o con valor sentimental**: joyas, dinero, objetos de colección, herencias, documentos importantes. Pedimos a nuestro equipo que no mueva esas cosas, pero el sitio más seguro para ellas es guardadas.',
         'Algunas cosas se rompen por cómo estaban ya, no por la limpieza: fijaciones flojas, juntas deterioradas, objetos ya agrietados o pegados, persianas y barras de cortina al final de su vida, superficies con el acabado gastado. No respondemos de condiciones preexistentes, y se lo diremos si vemos una.',
         'No aceptamos responsabilidad por daños causados por productos de limpieza que usted nos pidió usar.',
-        '**Nunca decimos estar afianzados**, porque no lo estamos. Nuestro sitio dice «con licencia y asegurados» y eso es exactamente lo que somos.',
+        '**Nunca decimos estar afianzados**, porque no lo estamos. Nuestro sitio dice «asegurados», y eso es exactamente lo que somos.',
       ],
     },
     {

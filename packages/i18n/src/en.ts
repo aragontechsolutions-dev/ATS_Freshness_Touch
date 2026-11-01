@@ -95,7 +95,7 @@ export const en = {
   },
 
   hero: {
-    badge: 'Licensed · Insured',
+    badge: 'Insured',
     title: 'A cleaner home, without the guesswork',
     subtitle:
       'Get a real price in under a minute. No callbacks, no surprise fees, and a transparent travel deposit that is credited back on your final bill.',
