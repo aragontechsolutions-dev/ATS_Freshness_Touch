@@ -24,6 +24,32 @@ export const es: TranslationResources = {
     theme: { light: 'Modo claro', dark: 'Modo oscuro' },
   },
 
+  seo: {
+    home: {
+      title: 'Limpieza de Casas y Oficinas en Georgia | Freshness Touch',
+      description:
+        'Precio al instante para limpieza de casas y oficinas en todo Georgia. Precios claros, personal asegurado y verificado, y sin esperar una llamada.',
+    },
+    terms: {
+      title: 'Condiciones del servicio | Freshness Touch',
+      description:
+        'Las condiciones que se aplican al reservar una limpieza con Freshness Touch: citas, cancelaciones, el depósito de traslado y los cambios al llegar.',
+    },
+    privacy: {
+      title: 'Política de privacidad | Freshness Touch',
+      description:
+        'Qué guardamos al reservar una limpieza, para qué, cuánto tiempo, y cómo pedir que lo borremos o que retiremos una foto de tu casa de esta web.',
+    },
+    notFound: {
+      title: 'Página no encontrada | Freshness Touch',
+      description: 'Esa página no está aquí. Vuelve a la portada para ver un precio al instante.',
+    },
+    removal: {
+      title: 'Retirar tus fotos | Freshness Touch',
+      description: 'Pide que quitemos de nuestra web una foto o un vídeo de tu casa.',
+    },
+  },
+
   /*
    * LAS ETIQUETAS DEL MENU SON MAS CORTAS QUE LOS TITULOS DE SECCION, y es
    * deliberado: en la cabecera compiten por sitio con el logotipo, el

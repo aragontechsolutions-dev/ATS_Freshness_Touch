@@ -23,6 +23,59 @@ export const en = {
   },
 
   /*
+   * ==========================================================================
+   * LO QUE SE LEE EN UN RESULTADO DE BUSQUEDA Y AL COMPARTIR EL ENLACE
+   * ==========================================================================
+   * Hasta ahora las cuatro pantallas del sitio compartian el titulo y la
+   * descripcion escritos en `index.html`, asi que las condiciones de servicio
+   * se anunciaban en Google como la portada de una empresa de limpieza. Tres
+   * direcciones con el mismo titulo tienen un nombre para un buscador, y no
+   * es halagueno.
+   *
+   * REGLAS AL ESCRIBIR AQUI, que no son estilo sino limites del medio:
+   *
+   *   - TITULO: hasta unos 60 caracteres. Mas largo, Google lo corta con
+   *     puntos suspensivos y lo que se pierde es siempre el final.
+   *   - DESCRIPCION: hasta unos 155. Igual.
+   *   - El titulo empieza por LO QUE SE VENDE y acaba con la marca. Quien
+   *     busca «limpieza de casas» no busca «Freshness Touch»: todavia no sabe
+   *     que existimos.
+   *   - LA CIUDAD NO VA EN EL TITULO, y es una decision. La base de
+   *     operaciones se edita desde el panel (`baseOfOperations`), asi que una
+   *     ciudad escrita aqui mentiria el dia que la empresa se mude. La
+   *     precision local se consigue con los datos estructurados
+   *     (`lib/seo/negocio.ts`), que SI salen de los datos reales.
+   */
+  seo: {
+    home: {
+      title: 'House & Office Cleaning in Georgia | Freshness Touch',
+      description:
+        'Get an instant online price for house or office cleaning anywhere in Georgia. Transparent pricing, insured and background-checked cleaners, no callbacks.',
+    },
+    terms: {
+      title: 'Terms of Service | Freshness Touch',
+      description:
+        'The terms that apply when you book a cleaning with Freshness Touch: scheduling, cancellations, the travel deposit and how changes on site are handled.',
+    },
+    privacy: {
+      title: 'Privacy Policy | Freshness Touch',
+      description:
+        'What we keep when you book a cleaning, why, for how long, and how to ask us to delete it or take a photo of your home off this website.',
+    },
+    /* Las dos que NO se indexan. Tienen texto porque la pestana del navegador
+     * lo ensena igual, y «Freshness Touch · Cleaning Services in Georgia» en
+     * una pantalla de tramite desconcierta. */
+    notFound: {
+      title: 'Page not found | Freshness Touch',
+      description: 'That page is not here. Go back to the home page for an instant cleaning price.',
+    },
+    removal: {
+      title: 'Remove your photos | Freshness Touch',
+      description: 'Ask us to take a photo or video of your home off our website.',
+    },
+  },
+
+  /*
    * LAS ETIQUETAS DEL MENU SON MAS CORTAS QUE LOS TITULOS DE SECCION, y es
    * deliberado: en la cabecera compiten por sitio con el logotipo, el
    * telefono, el idioma y el tema, y el contenedor no pasa de 1152 px.

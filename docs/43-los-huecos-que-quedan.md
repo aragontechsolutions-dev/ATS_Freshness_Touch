@@ -247,6 +247,20 @@ fila lleva, y conviene que siga siendo una decisión y no un olvido.
 
 ---
 
+## El SEO del sitio público, aparte
+
+Esta lista mira el sistema por dentro. Si el sitio se puede **encontrar** es
+otra pregunta, y tiene su propio documento: **`docs/53-el-sitio-se-puede-encontrar.md`**
+(auditoría del 1/11/2026 y las tres etapas que se construyeron).
+
+De los ocho huecos que encontró se cerraron ocho; quedan cuatro cosas abiertas
+—prerenderizado, contenido por ciudad, el peso del paquete y el 404 que
+contesta 200— más **seis tareas que son de la dueña y no de código**, entre
+ellas Google Business Profile y Search Console, que pesan más que todo lo
+demás junto.
+
+---
+
 ## El PWA del equipo de limpieza, aparte
 
 Esta lista mira el sistema entero. El móvil de quien limpia tiene la suya
