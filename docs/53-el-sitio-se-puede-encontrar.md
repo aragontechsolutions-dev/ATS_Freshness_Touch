@@ -640,3 +640,38 @@ servidor.
 Por eso la única verificación que valía era **publicar y mirar lo que decía
 Search Console**. Conviene volver a mirarla unos días después de cada cambio
 de SEO, no solo al montarla.
+
+---
+
+## 15. Y además tiré el despliegue con un comentario (1/11/2026)
+
+Al declarar el `Content-Type` del sitemap quise dejar escrito **por qué**, y
+JSON no tiene comentarios. Así que inventé una clave `_comentario` dentro de
+cada entrada de `headers`, dando por hecho que lo que no se reconoce se
+ignora.
+
+**No se ignora.** `vercel.json` declara su `$schema` y Vercel valida la
+configuración de forma estricta: una propiedad que no está en el esquema no
+es un aviso, es un error, y **el despliegue falla antes de compilar nada**.
+
+Lo delató que fallara el proyecto `landing` y no el `admin`: lo único que los
+distinguía en ese cambio era ese archivo.
+
+### La parte que importa: CI estaba en verde
+
+`vercel.json` **no lo lee nada nuestro**. `format:check` lo da por bueno
+porque es JSON válido; `lint`, `typecheck`, `test` y `build` no lo miran
+siquiera. Los seis pasos pasaron con el despliegue roto, y el fallo solo
+apareció en el PR, en un sitio donde solo mira quien va a fusionar.
+
+De ahí `vercel-json-no-lleva-inventos.test.ts`, que adelanta esa validación a
+los pasos que ya se ejecutan. No reimplementa el esquema de Vercel —no sería
+honesto mantenerlo— sino que comprueba las claves de las secciones que este
+proyecto usa, que es lo que de verdad falló. Verificado volviendo a meter la
+clave: falla nombrándola.
+
+### La regla, para la próxima
+
+**Si hay que explicar una regla de `vercel.json`, se explica aquí, no ahí.**
+Un archivo de configuración sin comentarios es el precio de JSON, y ese
+precio se paga; no se intenta esquivar.

@@ -35,25 +35,6 @@
       ]
     },
     {
-      "_comentario": [
-        "EL TIPO DE CONTENIDO DEL SITEMAP, DECLARADO A MANO.",
-        "",
-        "Google Search Console contesto 'No se ha podido obtener' al enviar el",
-        "sitemap, con tipo 'Desconocido' y 0 paginas, aunque el fichero se abre",
-        "bien en un navegador. La pista estaba en como lo pintaba el navegador:",
-        "el texto salia corrido y sin etiquetas, que es lo que hace un navegador",
-        "cuando recibe XML anunciado como HTML.",
-        "",
-        "Un sitemap servido como text/html no se parsea: el rastreador lo",
-        "descarta sin mirar dentro. Esto lo deja en application/xml, que es lo",
-        "que la especificacion de sitemaps exige, y quita de en medio toda esa",
-        "clase de causa.",
-        "",
-        "Y pesa mas de lo normal aqui porque la regla de arriba pone",
-        "X-Content-Type-Options: nosniff en TODO: con nosniff, un rastreador no",
-        "puede recuperarse de un tipo mal declarado mirando el contenido. Lo que",
-        "diga la cabecera es lo que hay."
-      ],
       "source": "/sitemap.xml",
       "headers": [
         {
@@ -63,7 +44,6 @@
       ]
     },
     {
-      "_comentario": "robots.txt es texto plano, por el mismo motivo.",
       "source": "/robots.txt",
       "headers": [
         {
