@@ -125,12 +125,23 @@ async function fichajes(bookingId: string): Promise<FilaFichaje[]> {
 
 /* ------------------------- La lista de verificacion ------------------------- */
 
-/** Tres tareas de mentira: ver el comentario en `beforeAll`. */
+/** Tareas de mentira: ver el comentario en `beforeAll`. */
 const CATALOGO_DE_PRUEBA: readonly ChecklistItem[] = [
   { code: 'COCINA_FREGADERO', room: 'KITCHEN', appliesTo: ALL_SERVICES },
   { code: 'SALON_POLVO', room: 'COMMON_AREAS', appliesTo: ALL_SERVICES },
   { code: 'BANO_ESPEJO', room: 'BATHROOM', appliesTo: ['DEEP'] },
   { code: 'TAREA_RETIRADA', room: 'KITCHEN', appliesTo: ALL_SERVICES, retired: true },
+  /*
+   * LA TAREA DE UN EXTRA. Las reservas de estas pruebas no compran ningun
+   * extra, asi que esta no entra en ninguna lista y NO SE PUEDE MARCAR. Es lo
+   * que comprueba el bloque «la tarea de un extra que no se pago».
+   */
+  {
+    code: 'HORNO_POR_DENTRO',
+    room: 'KITCHEN',
+    appliesTo: ALL_SERVICES,
+    requiresAddOn: 'INSIDE_OVEN',
+  },
 ];
 
 async function marcarTarea(
@@ -217,15 +228,16 @@ beforeAll(async () => {
   process.env.DATABASE_URL = `postgresql://postgres:postgres@127.0.0.1:${PUERTO}/postgres`;
 
   /*
-   * EL CATALOGO DE TAREAS, SUSTITUIDO POR TRES DE MENTIRA.
+   * EL CATALOGO DE TAREAS, SUSTITUIDO POR UNAS DE MENTIRA.
    *
-   * El de verdad esta vacio mientras las plantillas del cliente esten
-   * pendientes de transcribir, y con el vacio el camino de ESCRITURA no se
-   * podria probar en absoluto: toda peticion seria rechazada por «esa tarea
-   * no existe» y lo unico verificado seria el rechazo.
+   * El de verdad tiene cincuenta y nueve tareas con codigos largos. Usarlo
+   * aqui obligaria a elegir uno a mano —`KITCHEN_APPLIANCE_FRONTS`— y estas
+   * pruebas dejarian de verificar el camino de escritura para pasar a
+   * verificar que ese codigo sigue existiendo: el dia que la dueña reordene
+   * su lista se caerian por un motivo que no tiene que ver con el endpoint.
    *
-   * Con estas tres se recorre EL MISMO codigo que produccion: la unica
-   * diferencia es el contenido de una lista de datos.
+   * Con estas se recorre EL MISMO codigo que produccion: la unica diferencia
+   * es el contenido de una lista de datos.
    */
   const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
     .overrideProvider(JOB_CHECKLIST_CATALOG_TOKEN)
@@ -700,13 +712,14 @@ describe('la lista que llega con el trabajo', () => {
   it('trae las tareas del servicio, en orden de recorrido de la casa', async () => {
     /*
      * La reserva de estas pruebas es STANDARD, asi que `BANO_ESPEJO` —solo de
-     * la profunda— no entra, y la retirada tampoco. Lo que queda sale primero
-     * el salon y despues la cocina, que es el orden del recorrido y no el del
-     * catalogo.
+     * la profunda— no entra; la retirada tampoco, y `HORNO_POR_DENTRO` menos
+     * aun, porque esa reserva no compro el extra. Lo que queda sale primero la
+     * cocina y despues el salon: es el orden del recorrido de la casa, no el
+     * del catalogo.
      */
     const lista = await listaDe(DE_CLEO);
 
-    expect(lista.map((t) => t.code)).toEqual(['SALON_POLVO', 'COCINA_FREGADERO']);
+    expect(lista.map((t) => t.code)).toEqual(['COCINA_FREGADERO', 'SALON_POLVO']);
     expect(lista.every((t) => !t.done)).toBe(true);
   });
 
@@ -872,6 +885,37 @@ describe('que codigos se aceptan', () => {
     const respuesta = await marcarTarea(DE_CLEO, 'TAREA_RETIRADA', true);
 
     expect(respuesta.status).toBe(400);
+  });
+
+  it('RECHAZA LA TAREA DE UN EXTRA QUE ESA RESERVA NO PAGO', async () => {
+    /*
+     * ======================================================================
+     * ESTA ES LA PRUEBA QUE PROTEGE LA FACTURA DE UN EXTRA
+     * ======================================================================
+     * `HORNO_POR_DENTRO` exige el extra `INSIDE_OVEN`, y esta reserva no lo
+     * compro —`addOns` se queda en `[]`—, asi que no sale en su lista.
+     *
+     * Pero no basta con que no salga. La pantalla no es la frontera: el movil
+     * manda el codigo de la tarea, y quien tenga sesion de limpieza puede
+     * mandar el que quiera. Sin esta comprobacion en el SERVIDOR quedaria
+     * escrito en la base de datos que se limpio por dentro un horno que nadie
+     * contrato — y eso es exactamente lo que coordinacion lee cuando un
+     * cliente reclama, y lo que sostiene el cobro de un extra.
+     *
+     * Se comprueba tambien que NO SE ESCRIBIO NADA: un 400 con la fila puesta
+     * seria peor que no tener la comprobacion, porque pareceria correcto.
+     */
+    const respuesta = await marcarTarea(DE_CLEO, 'HORNO_POR_DENTRO', true);
+
+    expect(respuesta.status).toBe(400);
+    expect(await tareasMarcadas(DE_CLEO)).toEqual([]);
+  });
+
+  it('y esa tarea tampoco aparece en la lista del trabajo', async () => {
+    // La otra mitad: si apareciera, el equipo limpiaria un horno sin cobrar.
+    const codigos = (await listaDe(DE_CLEO)).map((t) => t.code);
+
+    expect(codigos).not.toContain('HORNO_POR_DENTRO');
   });
 
   it('rechaza un codigo desmesurado', async () => {

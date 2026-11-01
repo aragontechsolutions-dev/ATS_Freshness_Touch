@@ -26,6 +26,7 @@ import { AJUSTE_SELECT, ExtrasGuardadosSchema, ajusteAContrato } from './field-a
 import {
   JOB_CHECKLIST_CATALOG_TOKEN,
   esTareaDelTrabajo,
+  extrasContratados,
   montarChecklist,
 } from './job-checklist.helper';
 import type { Prisma } from '../generated/prisma/client';
@@ -511,7 +512,12 @@ export class MyJobsService {
   ): Promise<MyJob> {
     const asignacion = await this.prisma.db.bookingAssignment.findUnique({
       where: { bookingId_staffId: { bookingId, staffId: staff.staffId } },
-      select: { booking: { select: { status: true, service: true } } },
+      /*
+       * `addOns` ESTA AQUI PARA LA COMPROBACION DE SEGURIDAD de mas abajo:
+       * `esTareaDelTrabajo` necesita los extras pagados para rechazar
+       * `ADDON_INSIDE_OVEN` en una reserva que no compro ese extra.
+       */
+      select: { booking: { select: { status: true, service: true, addOns: true } } },
     });
 
     if (!asignacion) {
@@ -537,7 +543,14 @@ export class MyJobsService {
       });
     }
 
-    if (!esTareaDelTrabajo(asignacion.booking.service, cambio.itemCode, this.catalogo)) {
+    if (
+      !esTareaDelTrabajo(
+        asignacion.booking.service,
+        extrasContratados(asignacion.booking.addOns),
+        cambio.itemCode,
+        this.catalogo,
+      )
+    ) {
       throw new BadRequestException({
         code: API_ERROR_CODES.VALIDATION_ERROR,
         messageKey: 'admin.errorChecklistUnknownItem',
@@ -733,7 +746,12 @@ function toMyJob(trabajo: FilaTrabajo, staffId: string, catalogo: readonly Check
      * tareas pide cada servicio, y si lo supiera habria dos catalogos que
      * mantener de acuerdo.
      */
-    checklist: montarChecklist(trabajo.service, trabajo.checklistItems, catalogo),
+    checklist: montarChecklist(
+      trabajo.service,
+      extrasContratados(trabajo.addOns),
+      trabajo.checklistItems,
+      catalogo,
+    ),
     /*
      * AQUI MUEREN LOS IMPORTES DEL AJUSTE. `toMyJobAdjustment` quita la
      * diferencia y el total nuevo: quien limpia reporta lo que ve, y lo que

@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { BookingStatusSchema, type BookingStatus } from './booking';
-import { ServiceTypeSchema, type ServiceType } from './enums';
+import { ServiceTypeSchema, type AddOnCode, type ServiceType } from './enums';
 
 /**
  * LA LISTA DE VERIFICACION DE UN TRABAJO
@@ -49,15 +49,35 @@ import { ServiceTypeSchema, type ServiceType } from './enums';
 /**
  * Las estancias de la casa.
  *
- * SON LAS TRES DE LAS PLANTILLAS DE TRABAJO DEL CLIENTE, ni una mas: areas
- * comunes, baños y cocina. Los dormitorios no tienen lista propia porque en
- * esas plantillas no la tienen: entran en areas comunes.
+ * SON LAS DE LA LISTA QUE ESCRIBIO LA DUENA el 1/11/2026, y en su orden. Ese
+ * orden es el del recorrido de la casa y se respeta al pintar: una lista que
+ * salta de la cocina al baño y vuelve al salon obliga a leerla entera varias
+ * veces.
  *
- * El orden es el del recorrido de la casa, y se respeta al pintar: una lista
- * que salta de la cocina al baño y vuelve al salon obliga a leerla entera
- * varias veces.
+ * ========================================================================
+ * DOS CAMBIOS RESPECTO A LO QUE HABIA, Y LOS DOS SON SUYOS
+ * ========================================================================
+ *   - LAS HABITACIONES TIENEN LISTA PROPIA. Antes entraban en areas comunes
+ *     porque las plantillas antiguas no las separaban. Su lista si las
+ *     separa, y tiene tareas que no estan en ningun otro sitio —cambiar las
+ *     sabanas, tender las camas—.
+ *   - `WHOLE_HOUSE` NO ES UNA ESTANCIA, y por eso va la ultima. Es donde
+ *     caen las tareas de la limpieza profunda y de mudanza que no pertenecen
+ *     a una habitacion concreta: zocalos, puertas, rejillas, ventiladores.
+ *     Su lista las escribe asi, en bloque y despues de las estancias, porque
+ *     es como se hacen: recorriendo la casa entera una vez.
+ *
+ * CAMBIAR ESTA LISTA ES SEGURO. La estancia NO se guarda en la base de
+ * datos: alli solo esta el codigo de la tarea. La estancia sale del catalogo
+ * cada vez que se pinta.
  */
-export const CHECKLIST_ROOMS = ['COMMON_AREAS', 'BATHROOM', 'KITCHEN'] as const;
+export const CHECKLIST_ROOMS = [
+  'KITCHEN',
+  'BATHROOM',
+  'BEDROOM',
+  'COMMON_AREAS',
+  'WHOLE_HOUSE',
+] as const;
 export const ChecklistRoomSchema = z.enum(CHECKLIST_ROOMS);
 export type ChecklistRoom = z.infer<typeof ChecklistRoomSchema>;
 
@@ -93,6 +113,20 @@ export interface ChecklistItem {
   readonly appliesTo: readonly ServiceType[];
 
   /**
+   * LA TAREA SOLO APARECE SI SE CONTRATO ESTE EXTRA.
+   *
+   * El interior del horno, el del refrigerador, los gabinetes por dentro,
+   * los vidrios y doblar la ropa NO entran en ninguna limpieza, ni siquiera
+   * en la profunda o en la de mudanza: se pagan aparte. Su lista lo dice
+   * dos veces, en la seccion de extras y otra vez en las aclaraciones.
+   *
+   * Sin esto habria que elegir entre dos cosas malas: ofrecer la tarea
+   * siempre —y que el equipo limpie un horno que nadie pago— u omitirla
+   * siempre, y que la pague alguien y no aparezca en la lista.
+   */
+  readonly requiresAddOn?: AddOnCode;
+
+  /**
    * Una tarea retirada. Ver la cabecera: no se borra, se apaga.
    *
    * Deja de aparecer en los trabajos nuevos y sigue leyendose en los viejos
@@ -102,26 +136,139 @@ export interface ChecklistItem {
 }
 
 /**
+ * Atajos de legibilidad. Sesenta tareas repitiendo el mismo array seria
+ * ruido, y un array distinto por descuido seria una tarea que no aparece.
+ */
+const RESIDENCIAL: readonly ServiceType[] = ['STANDARD', 'DEEP', 'MOVE_IN_OUT'];
+const PROFUNDA_Y_MUDANZA: readonly ServiceType[] = ['DEEP', 'MOVE_IN_OUT'];
+const SOLO_MUDANZA: readonly ServiceType[] = ['MOVE_IN_OUT'];
+
+/**
  * EL CATALOGO DE TAREAS.
  *
- * ========================================================================
- * ESTA VACIO A PROPOSITO, Y NO ES UN OLVIDO
- * ========================================================================
- * Las tareas de las plantillas de trabajo del cliente —areas comunes (11),
- * baños (7) y cocina (7)— ESTAN PENDIENTES DE TRANSCRIBIR desde la Etapa 2,
- * y siguen pendientes hoy (`docs/21-modelo-de-operaciones.md` §4).
+ * Transcrito el 1/11/2026 de la lista que escribio la dueña. Estuvo vacio
+ * desde la Etapa 2 a proposito: una lista de limpieza plausible pero que no
+ * fuera la de esta empresa habria sido peor que ninguna, porque alguien la
+ * daria por buena y quedaria registrado que se hizo un trabajo que nadie
+ * pidio.
  *
- * No se rellena con tareas inventadas «de momento». Una lista de limpieza
- * plausible pero que no es la de esta empresa es peor que ninguna lista:
- * alguien la daria por buena, la marcaria entera, y quedaria registrado que
- * se hizo un trabajo que nadie pidio.
+ * ==========================================================================
+ * COMO SE ACUMULAN LOS SERVICIOS, QUE ES LO QUE DICE SU LISTA
+ * ==========================================================================
+ *   - ESTANDAR: las cuatro estancias.
+ *   - PROFUNDA: todo lo de la estandar MAS once tareas suyas.
+ *   - ENTRADA O SALIDA: todo lo de la profunda MAS cuatro suyas.
  *
- * Mientras este vacio, toda la maquinaria de arriba y de abajo funciona y la
- * seccion simplemente no se pinta. El dia que lleguen las capturas, esto se
- * rellena y no hay que tocar nada mas: ni la base de datos, ni la API, ni las
- * pantallas.
+ * Eso se expresa con `appliesTo` y no con una jerarquia: una tarea estandar
+ * se declara en los tres servicios. Es mas repetitivo de leer y no tiene el
+ * fallo de la herencia —cambiar la base y mover sin querer lo que incluye un
+ * servicio que no se estaba tocando—.
+ *
+ * ==========================================================================
+ * LA DE MUDANZA LLEVA TODAS LAS TAREAS, AUNQUE LA CASA ESTE VACIA
+ * ==========================================================================
+ * Su lista dice «todas las tareas APLICABLES». Y en una vivienda vacia hay
+ * tareas que no aplican: cambiar las sabanas, por ejemplo.
+ *
+ * No se decide aqui cuales. Van todas, y el equipo marca «no aplica» en la
+ * casa, que es justo el estado que ella pidio. Decidirlo en el catalogo
+ * seria adivinar desde una oficina lo que hay dentro de una casa concreta:
+ * hay mudanzas con la cama todavia puesta.
  */
-export const JOB_CHECKLIST_CATALOG: readonly ChecklistItem[] = [];
+export const JOB_CHECKLIST_CATALOG: readonly ChecklistItem[] = [
+  /* ----------------------- COCINA ----------------------- */
+  { code: 'KITCHEN_COUNTERS', room: 'KITCHEN', appliesTo: RESIDENCIAL },
+  { code: 'KITCHEN_CABINET_FRONTS', room: 'KITCHEN', appliesTo: RESIDENCIAL },
+  { code: 'KITCHEN_STOVETOP', room: 'KITCHEN', appliesTo: RESIDENCIAL },
+  { code: 'KITCHEN_APPLIANCE_FRONTS', room: 'KITCHEN', appliesTo: RESIDENCIAL },
+  { code: 'KITCHEN_MICROWAVE', room: 'KITCHEN', appliesTo: RESIDENCIAL },
+  { code: 'KITCHEN_SINK', room: 'KITCHEN', appliesTo: RESIDENCIAL },
+  { code: 'KITCHEN_TABLE', room: 'KITCHEN', appliesTo: RESIDENCIAL },
+  { code: 'KITCHEN_WINDOW_DUST', room: 'KITCHEN', appliesTo: RESIDENCIAL },
+  { code: 'KITCHEN_COBWEBS', room: 'KITCHEN', appliesTo: RESIDENCIAL },
+  { code: 'KITCHEN_TRASH', room: 'KITCHEN', appliesTo: RESIDENCIAL },
+  { code: 'KITCHEN_VACUUM', room: 'KITCHEN', appliesTo: RESIDENCIAL },
+  { code: 'KITCHEN_MOP', room: 'KITCHEN', appliesTo: RESIDENCIAL },
+
+  /* ----------------------- BANOS ----------------------- */
+  { code: 'BATH_SINK', room: 'BATHROOM', appliesTo: RESIDENCIAL },
+  { code: 'BATH_MIRRORS', room: 'BATHROOM', appliesTo: RESIDENCIAL },
+  { code: 'BATH_TOILET', room: 'BATHROOM', appliesTo: RESIDENCIAL },
+  { code: 'BATH_SHOWER', room: 'BATHROOM', appliesTo: RESIDENCIAL },
+  { code: 'BATH_CABINET_FRONTS', room: 'BATHROOM', appliesTo: RESIDENCIAL },
+  { code: 'BATH_WINDOW_DUST', room: 'BATHROOM', appliesTo: RESIDENCIAL },
+  { code: 'BATH_COBWEBS', room: 'BATHROOM', appliesTo: RESIDENCIAL },
+  { code: 'BATH_TRASH', room: 'BATHROOM', appliesTo: RESIDENCIAL },
+  { code: 'BATH_VACUUM', room: 'BATHROOM', appliesTo: RESIDENCIAL },
+  { code: 'BATH_MOP', room: 'BATHROOM', appliesTo: RESIDENCIAL },
+
+  /* ----------------------- HABITACIONES ----------------------- */
+  { code: 'BEDROOM_DUST', room: 'BEDROOM', appliesTo: RESIDENCIAL },
+  { code: 'BEDROOM_MIRRORS', room: 'BEDROOM', appliesTo: RESIDENCIAL },
+  { code: 'BEDROOM_BEDS', room: 'BEDROOM', appliesTo: RESIDENCIAL },
+  { code: 'BEDROOM_WINDOW_DUST', room: 'BEDROOM', appliesTo: RESIDENCIAL },
+  { code: 'BEDROOM_COBWEBS', room: 'BEDROOM', appliesTo: RESIDENCIAL },
+  { code: 'BEDROOM_TRASH', room: 'BEDROOM', appliesTo: RESIDENCIAL },
+  { code: 'BEDROOM_VACUUM', room: 'BEDROOM', appliesTo: RESIDENCIAL },
+  { code: 'BEDROOM_MOP', room: 'BEDROOM', appliesTo: RESIDENCIAL },
+
+  /* ----------------------- SALA, COMEDOR, PASILLOS Y ESCALERAS ----------------------- */
+  { code: 'COMMON_DUST', room: 'COMMON_AREAS', appliesTo: RESIDENCIAL },
+  { code: 'COMMON_GLASS_TABLES', room: 'COMMON_AREAS', appliesTo: RESIDENCIAL },
+  { code: 'COMMON_FINGERPRINTS', room: 'COMMON_AREAS', appliesTo: RESIDENCIAL },
+  { code: 'COMMON_WINDOW_DUST', room: 'COMMON_AREAS', appliesTo: RESIDENCIAL },
+  { code: 'COMMON_COBWEBS', room: 'COMMON_AREAS', appliesTo: RESIDENCIAL },
+  { code: 'COMMON_HANDRAILS', room: 'COMMON_AREAS', appliesTo: RESIDENCIAL },
+  { code: 'COMMON_TRASH', room: 'COMMON_AREAS', appliesTo: RESIDENCIAL },
+  { code: 'COMMON_VACUUM', room: 'COMMON_AREAS', appliesTo: RESIDENCIAL },
+  { code: 'COMMON_MOP', room: 'COMMON_AREAS', appliesTo: RESIDENCIAL },
+
+  /* ------- SOLO PROFUNDA Y MUDANZA: se suman a todo lo de arriba ------- */
+  { code: 'DEEP_BASEBOARDS', room: 'WHOLE_HOUSE', appliesTo: PROFUNDA_Y_MUDANZA },
+  { code: 'DEEP_DOORS', room: 'WHOLE_HOUSE', appliesTo: PROFUNDA_Y_MUDANZA },
+  { code: 'DEEP_FANS_LIGHTS', room: 'WHOLE_HOUSE', appliesTo: PROFUNDA_Y_MUDANZA },
+  { code: 'DEEP_BLINDS_SILLS', room: 'WHOLE_HOUSE', appliesTo: PROFUNDA_Y_MUDANZA },
+  { code: 'DEEP_VENTS', room: 'WHOLE_HOUSE', appliesTo: PROFUNDA_Y_MUDANZA },
+  { code: 'DEEP_CABINET_FRONTS', room: 'KITCHEN', appliesTo: PROFUNDA_Y_MUDANZA },
+  { code: 'DEEP_STOVE_GREASE', room: 'KITCHEN', appliesTo: PROFUNDA_Y_MUDANZA },
+  { code: 'DEEP_SOAP_SCUM', room: 'BATHROOM', appliesTo: PROFUNDA_Y_MUDANZA },
+  { code: 'DEEP_TOILET_EDGES', room: 'BATHROOM', appliesTo: PROFUNDA_Y_MUDANZA },
+  { code: 'DEEP_UNDER_CUSHIONS', room: 'COMMON_AREAS', appliesTo: PROFUNDA_Y_MUDANZA },
+  { code: 'DEEP_BEHIND_OBJECTS', room: 'WHOLE_HOUSE', appliesTo: PROFUNDA_Y_MUDANZA },
+
+  /* ----------------- SOLO ENTRADA O SALIDA ----------------- */
+  { code: 'MOVE_CLOSETS', room: 'WHOLE_HOUSE', appliesTo: SOLO_MUDANZA },
+  { code: 'MOVE_CLEARED_SPACES', room: 'WHOLE_HOUSE', appliesTo: SOLO_MUDANZA },
+  { code: 'MOVE_FINAL_SWEEP', room: 'WHOLE_HOUSE', appliesTo: SOLO_MUDANZA },
+  { code: 'MOVE_REPORT_DAMAGE', room: 'WHOLE_HOUSE', appliesTo: SOLO_MUDANZA },
+
+  /* ------------- SOLO SI SE CONTRATO EL EXTRA ------------- */
+  {
+    code: 'ADDON_INSIDE_OVEN',
+    room: 'KITCHEN',
+    appliesTo: RESIDENCIAL,
+    requiresAddOn: 'INSIDE_OVEN',
+  },
+  {
+    code: 'ADDON_INSIDE_FRIDGE',
+    room: 'KITCHEN',
+    appliesTo: RESIDENCIAL,
+    requiresAddOn: 'INSIDE_FRIDGE',
+  },
+  {
+    code: 'ADDON_INSIDE_CABINETS',
+    room: 'KITCHEN',
+    appliesTo: RESIDENCIAL,
+    requiresAddOn: 'WINDOWS_AND_CABINETS',
+  },
+  {
+    code: 'ADDON_INTERIOR_WINDOWS',
+    room: 'WHOLE_HOUSE',
+    appliesTo: RESIDENCIAL,
+    requiresAddOn: 'WINDOWS_AND_CABINETS',
+  },
+  { code: 'ADDON_LAUNDRY', room: 'WHOLE_HOUSE', appliesTo: RESIDENCIAL, requiresAddOn: 'LAUNDRY' },
+];
 
 /**
  * Las tareas que le toca a un servicio, en orden de recorrido de la casa.
@@ -129,16 +276,33 @@ export const JOB_CHECKLIST_CATALOG: readonly ChecklistItem[] = [];
  * Deja fuera las retiradas: en un trabajo nuevo no se pide algo que la
  * empresa ya no hace.
  *
- * El catalogo entra POR PARAMETRO con un valor por defecto, y no es
- * decoracion: es lo que permite probar esta funcion y las pantallas con un
- * catalogo de prueba mientras el de verdad esta pendiente de contenido.
+ * ==========================================================================
+ * LOS EXTRAS SON OBLIGATORIOS, Y NO POR CAPRICHO DE LA FIRMA
+ * ==========================================================================
+ * `extras` son los extras QUE ESA RESERVA PAGO. Sin ellos no se puede
+ * decidir si el interior del horno entra en la lista, y un valor por defecto
+ * —`[]`— seria la peor version posible de esto: quien llamara sin pasarlos no
+ * veria ningun error, simplemente la tarea del horno no apareceria nunca, en
+ * ninguna casa, y nadie sabria por que. Exigirlo convierte ese descuido en un
+ * fallo de compilacion en el unico momento en que se puede arreglar barato.
+ *
+ * Por eso va ANTES del catalogo: al cambiar el orden, cualquier llamada
+ * antigua deja de compilar en vez de seguir funcionando a medias.
+ *
+ * El catalogo, en cambio, SI entra con valor por defecto: es lo que permite
+ * probar esta funcion y las pantallas con un catalogo pequeño y controlado en
+ * vez de con las cincuenta y nueve tareas de verdad.
  */
 export function checklistForService(
   service: ServiceType,
+  extras: readonly AddOnCode[],
   catalogo: readonly ChecklistItem[] = JOB_CHECKLIST_CATALOG,
 ): readonly ChecklistItem[] {
   const vigentes = catalogo.filter(
-    (tarea) => tarea.retired !== true && tarea.appliesTo.includes(service),
+    (tarea) =>
+      tarea.retired !== true &&
+      tarea.appliesTo.includes(service) &&
+      (tarea.requiresAddOn === undefined || extras.includes(tarea.requiresAddOn)),
   );
 
   /*

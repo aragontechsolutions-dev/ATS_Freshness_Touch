@@ -16,7 +16,11 @@ import { AuditService } from '../audit/audit.service';
 import type { Prisma } from '../generated/prisma/client';
 import { defaultSchedulingConfig } from '../scheduling/scheduling.config';
 import { FieldAdjustmentsService } from './field-adjustments.service';
-import { JOB_CHECKLIST_CATALOG_TOKEN, montarChecklist } from './job-checklist.helper';
+import {
+  JOB_CHECKLIST_CATALOG_TOKEN,
+  extrasContratados,
+  montarChecklist,
+} from './job-checklist.helper';
 
 /** Lo que el listado necesita de cada reserva, y nada mas. */
 const LIST_SELECT = {
@@ -347,7 +351,12 @@ export class BookingsAdminService {
        * pantalla la montara por su cuenta, coordinacion y limpieza podrian
        * estar viendo listas distintas del mismo trabajo.
        */
-      checklist: montarChecklist(booking.service, booking.checklistItems, this.catalogo),
+      checklist: montarChecklist(
+        booking.service,
+        extrasContratados(booking.addOns),
+        booking.checklistItems,
+        this.catalogo,
+      ),
       adjustments: ajustes,
       clockIns: booking.clockIns.map((f): ClockInRecord => ({
         staffId: f.staffId,

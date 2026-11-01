@@ -4,33 +4,28 @@ Qué hay que hacer en cada estancia de la casa, marcado a medida que se hace.
 Es lo que el equipo mira al llegar y lo que coordinación mira cuando un
 cliente llama diciendo que algo se quedó sin hacer.
 
-> ## ⚠️ Pendiente de contenido: las tareas todavía no están escritas
+> ## ✅ El catálogo tiene contenido desde el 1/11/2026
 >
-> **La maquinaria está terminada y el catálogo de tareas está vacío.** Las
-> tareas de las plantillas de trabajo del cliente —áreas comunes (11), baños
-> (7) y cocina (7)— están pendientes de transcribir **desde la Etapa 2**
-> (`docs/21-modelo-de-operaciones.md` §4), y siguen pendientes.
+> **59 tareas**, transcritas de la lista que escribió la dueña para la app del
+> equipo de limpieza. Estuvo vacío desde la Etapa 2 a propósito, y el aviso
+> que había aquí decía por qué: _una lista de limpieza verosímil pero que no
+> es la de esta empresa es peor que ninguna lista, porque alguien la daría por
+> buena y quedaría registrado que se hizo un trabajo que nadie pidió._
 >
-> Mientras el catálogo esté vacío, **la sección simplemente no se pinta** en
-> ninguna de las dos pantallas. Todo lo demás —la tabla, la API, la pantalla
-> de limpieza, la del panel, la seguridad y las pruebas— funciona y está
-> probado contra un catálogo de prueba.
+> Lo que hay que saber de la transcripción:
 >
-> **Qué hay que hacer el día que lleguen las capturas**, y nada más:
+> | Dato                        | Valor                                                                       |
+> | --------------------------- | --------------------------------------------------------------------------- |
+> | Tareas en el catálogo       | 59                                                                          |
+> | Estándar                    | 39 (cocina 12, baños 10, habitaciones 8, sala/comedor/pasillos/escaleras 9) |
+> | Profunda                    | las 39 anteriores **más 11**                                                |
+> | Entrada o salida de mudanza | las 50 anteriores **más 4**                                                 |
+> | Solo con el extra pagado    | 5, que **no** entran en ninguna limpieza                                    |
 >
-> 1. Rellenar `JOB_CHECKLIST_CATALOG` en
->    `packages/types/src/job-checklist.ts` con un código por tarea.
-> 2. Escribir su texto en `checklist.items.<CÓDIGO>` en `en.ts` y en `es.ts`.
-> 3. Cambiar la prueba «ESTÁ PENDIENTE DE CONTENIDO» de
->    `job-checklist.test.ts`, que está en rojo a propósito para que nadie
->    rellene el catálogo sin enterarse.
->
-> No hay que tocar la base de datos, ni la API, ni ninguna pantalla.
->
-> **Por qué no se rellenó con tareas plausibles «de momento»:** una lista de
-> limpieza verosímil pero que no es la de esta empresa es **peor que ninguna
-> lista**. Alguien la daría por buena, la marcaría entera, y quedaría
-> registrado que se hizo un trabajo que nadie pidió.
+> **Lo que todavía no está, y está en la lista de la dueña:** los tres estados
+> (Completada / Pendiente / **No aplica**) y el motivo cuando una tarea queda
+> pendiente. Hoy una tarea solo está marcada o no. Eso es la Etapa 2 y pide
+> **una migración**: ver §11.
 
 ---
 
@@ -40,14 +35,14 @@ La base de datos **no guarda una copia de la lista por cada trabajo**. Guarda
 **una fila por tarea marcada**, con su código, quién la marcó y cuándo. La
 lista que se pinta sale del catálogo, que vive en el código.
 
-La alternativa era copiar las veinticinco tareas sobre cada reserva al
+La alternativa era copiar las cuarenta tareas sobre cada reserva al
 crearla —una «fotografía», como se hace con el precio—. Se descartó, y
 conviene tener escrito por qué:
 
 | Motivo                                           | Detalle                                                                                                                                                                                                           |
 | ------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **El precio se fotografía porque es un acuerdo** | Lo que se pactó con el cliente no puede cambiar porque alguien toque la pantalla de Tarifas. Una lista de tareas **no es un acuerdo con nadie**: es cómo trabaja esta empresa, y cuando cambia, cambia para todos |
-| **Veinticinco filas por reserva, vacías**        | Con mil trabajos al año son veinticinco mil filas que casi siempre dicen «no marcada», que es exactamente lo mismo que no tener fila                                                                              |
+| **Cuarenta filas por reserva, vacías**           | Con mil trabajos al año son cuarenta mil filas que casi siempre dicen «no marcada», que es exactamente lo mismo que no tener fila                                                                                 |
 | **Habría que escribirlas al reservar**           | Dentro del camino del dinero. Ese camino ya hace demasiado; cualquier cosa que se le añada es una forma nueva de que **una reserva pagada falle**                                                                 |
 
 ### 1.1 El precio de esa decisión, y cómo se paga
@@ -70,20 +65,34 @@ consulta por un motivo.
 
 ---
 
-## 2. Las tres estancias
+## 2. Las cinco estancias
 
-`COMMON_AREAS`, `BATHROOM` y `KITCHEN`. Son **las tres de las plantillas del
-cliente**, ni una más: los dormitorios no tienen lista propia porque en esas
-plantillas no la tienen, entran en áreas comunes.
+`KITCHEN`, `BATHROOM`, `BEDROOM`, `COMMON_AREAS` y `WHOLE_HOUSE`, **en ese
+orden**, que es el de la lista de la dueña y el del recorrido de la casa. Se
+respeta al pintar: una lista que salta de la cocina al baño y vuelve al salón
+obliga a leerla entera varias veces para no dejarse nada.
 
-El orden del enumerado es el del recorrido de la casa, y se respeta al pintar:
-una lista que salta de la cocina al baño y vuelve al salón obliga a leerla
-entera varias veces.
+### 2.1 Dos cambios respecto a lo que había, y los dos son suyos
 
-**Una lista por tipo de estancia, no por habitación.** Una casa con tres baños
-tiene **siete** tareas de baño, no veintiuna. Es lo que dice la plantilla del
-cliente —una sola lista de baños— y es lo que se puede marcar de pie con una
-mano.
+- **Las habitaciones tienen lista propia.** Antes entraban en áreas comunes,
+  porque las plantillas antiguas no las separaban. Su lista sí las separa, y
+  tiene tareas que no están en ningún otro sitio: **cambiar las sábanas** y
+  **tender las camas**.
+- **`WHOLE_HOUSE` no es una estancia**, y por eso va la última. Es donde caen
+  las tareas de la limpieza profunda y de mudanza que no pertenecen a una
+  habitación concreta: zócalos, puertas, rejillas, ventiladores. Su lista las
+  escribe así, en bloque y después de las estancias, porque es como se hacen:
+  recorriendo la casa entera una vez.
+
+> **Cambiar esta lista es seguro.** La estancia **no se guarda en la base de
+> datos**: allí solo está el código de la tarea. La estancia sale del catálogo
+> cada vez que se pinta.
+
+### 2.2 Una lista por tipo de estancia, no por habitación
+
+Una casa con tres baños tiene **diez** tareas de baño, no treinta. Es lo que
+dice la lista de la dueña —una sola lista de baños— y es lo que se puede
+marcar de pie con una mano.
 
 ---
 
@@ -133,6 +142,52 @@ rechazar y la pantalla para decidir si pinta las casillas. Con dos listas, la
 pantalla acabaría ofreciendo casillas que el servidor rechaza, y cada toque
 daría un error que nadie sabría explicar.
 
+### 3.4 La tarea de un extra no existe si ese extra no se pagó
+
+Cinco tareas del catálogo llevan `requiresAddOn`:
+
+| Tarea                    | Extra que exige        | ¿Se vende hoy?              |
+| ------------------------ | ---------------------- | --------------------------- |
+| `ADDON_INSIDE_OVEN`      | `INSIDE_OVEN`          | **Sí**                      |
+| `ADDON_INSIDE_FRIDGE`    | `INSIDE_FRIDGE`        | **Sí**                      |
+| `ADDON_INSIDE_CABINETS`  | `WINDOWS_AND_CABINETS` | No (`OFFERED_ADD_ON_CODES`) |
+| `ADDON_INTERIOR_WINDOWS` | `WINDOWS_AND_CABINETS` | No                          |
+| `ADDON_LAUNDRY`          | `LAUNDRY`              | No                          |
+
+El interior del horno, el del refrigerador, los gabinetes por dentro, los
+vidrios y doblar la ropa **no entran en ninguna limpieza**, ni siquiera en la
+profunda o en la de mudanza: se pagan aparte. La lista de la dueña lo dice dos
+veces, en la sección de extras y otra vez en las aclaraciones.
+
+> **Las tres últimas filas no aparecerán en ninguna casa todavía**, porque sus
+> extras no están a la venta. Es correcto y está escrito a propósito: el día
+> que se ofrezcan, la tarea ya funciona sin tocar nada.
+
+**Sin esto habría que elegir entre dos cosas malas**, y las dos cuestan
+dinero de verdad: ofrecer la tarea siempre, y que el equipo limpie un horno
+que nadie pagó; u omitirla siempre, y que alguien lo pague y no aparezca en la
+lista.
+
+**La comprobación está en el servidor, no en la pantalla.** El móvil manda el
+código de la tarea, y quien tenga sesión de limpieza puede mandar el que
+quiera. Sin la comprobación en `esTareaDelTrabajo`, quedaría escrito en la
+base de datos que se limpió por dentro un horno que nadie contrató — y eso es
+exactamente lo que coordinación lee cuando un cliente reclama, y lo que
+sostiene el cobro de un extra.
+
+**Si un ajuste de campo quita el extra después de marcar la tarea**, la tarea
+sale de la lista de hoy y **se sigue leyendo señalada**, por el mismo camino
+que una tarea retirada (§1.1). No se pierde el registro de un trabajo que se
+hizo de verdad.
+
+**Los extras se releen del JSON con el contrato** (`extrasContratados`, que
+usa el mismo `ExtrasGuardadosSchema` que el precio y los ajustes de campo).
+Una lista ilegible cuenta como «sin extras», y que el fallo caiga de ese lado
+es lo correcto aquí: una lista a la que le falta la tarea del horno **se
+nota** —el equipo pregunta— y no deja rastro falso; una lista con la tarea del
+horno que nadie pagó **se marca**, y entonces la base de datos afirma que se
+hizo un trabajo que no se vendió.
+
 ---
 
 ## 4. Marcar es idempotente, y hace falta que lo sea
@@ -154,8 +209,9 @@ estaba marcado **no es un error**, es el resultado que se pedía.
 
 ## 5. No hay auditoría por cada toque, y es deliberado
 
-Una lista son veinticinco tareas, y un trabajo de dos personas con sus
-correcciones pasa de las cincuenta escrituras. Auditarlas enterraría bajo
+Una lista estándar son treinta y nueve tareas —cincuenta y cuatro en una
+mudanza con extras—, y un trabajo de dos personas con sus correcciones pasa
+del centenar de escrituras. Auditarlas enterraría bajo
 miles de líneas al mes lo que coordinación de verdad busca en la auditoría:
 quién cambió un precio, quién canceló una reserva, quién entró al panel.
 
@@ -193,14 +249,14 @@ respuestas de la API la traen ya montada.
   adorno: en una casa con mala cobertura pasan dos segundos entre el toque y
   el movimiento, y esa espera no se lee como «está guardando», se lee como
   «no me ha cogido el toque». Se vuelve a pulsar, y así es como una lista de
-  veinticinco tareas acaba marcada a medias.
+  cuarenta tareas acaba marcada a medias.
 - **Sin reloj de espera y sin deshabilitar la casilla.** El movimiento ya es
   la confirmación, y deshabilitarla mientras se guarda impediría corregir un
   toque equivocado justo en el segundo en que uno se da cuenta.
 - **Sin aviso al acertar, y sí al fallar.** Es lo contrario que al fichar
   (`docs/25` §6), y la diferencia está razonada: fichar ocurre una vez y hay
   que quedarse tranquilo de que quedó registrado; marcar tareas ocurre
-  veinticinco veces en una casa, y veinticinco avisos seguidos tapan la
+  cuarenta veces en una casa, y cuarenta avisos seguidos tapan la
   pantalla. **La casilla marcándose ya es la confirmación.** Lo que sí avisa
   es el fallo, porque una casilla que vuelve sola a su sitio sin explicación
   se lee como que la pantalla va mal.
@@ -267,6 +323,11 @@ Lo que se revisó al cerrar la etapa:
   podría escribir una fila por cada cadena que se le ocurriera y usar la lista
   como **un almacén de texto libre colgado de una reserva**. También
   validada quitándola a propósito: cuatro pruebas se ponen en rojo.
+- **Y se comprueba contra los extras que esa reserva pagó** (§3.4). Es la
+  misma comprobación y el mismo sitio, pero protege otra cosa: que no quede
+  registrado un trabajo que no se vendió. Tiene prueba de punta a punta, que
+  verifica el 400 **y que no se escribió ninguna fila**: un 400 con la fila
+  puesta sería peor que no tener la comprobación, porque parecería correcto.
 - **El contrato acota el código a 64 caracteres.** Sin el tope, cada toque
   podría escribir en la base una cadena de un megabyte.
 - **El cuerpo es estricto.** `doneAt` y `doneByStaffId` los pone el servidor
@@ -291,47 +352,91 @@ Lo que se revisó al cerrar la etapa:
 o el de geocodificación. En producción **siempre** es el catálogo real; lo
 único que lo sustituye son las pruebas.
 
-No es un capricho de diseño: **con el catálogo importado a pelo, el camino de
-escritura no se podría probar en absoluto** mientras esté vacío. Toda petición
-sería rechazada por «esa tarea no existe», y lo único verificado sería el
-rechazo —quedando sin prueba que marcar escribe una fila, que marcar dos veces
-no escribe dos, que desmarcar borra y que no se puede marcar en un trabajo
-ajeno—.
+No es un capricho de diseño, y el motivo **cambió al llenarse el catálogo**.
+Cuando estaba vacío, sin el token el camino de escritura no se podía probar en
+absoluto. Ahora que tiene 59 tareas con códigos largos
+—`KITCHEN_APPLIANCE_FRONTS`—, el motivo es otro: una prueba que use esos
+códigos deja de verificar el endpoint y pasa a verificar **que ese código
+sigue existiendo**. El día que la dueña reordene su lista se caerían las
+pruebas de marcar, desmarcar y rechazar un trabajo ajeno, por un motivo que no
+tiene nada que ver con lo que comprueban.
 
-Con el token, la prueba de punta a punta pasa un catálogo de tres tareas y
-recorre **el mismo código** que producción.
+Con el token, la prueba de punta a punta pasa un catálogo de cinco tareas de
+mentira y recorre **el mismo código** que producción.
+
+Y queda un tercer motivo, para después: **el día que el catálogo salga del
+código y lo edite coordinación desde el panel, el sitio por donde entra ya
+está hecho.**
 
 ---
 
 ## 9. Dónde está cada cosa
 
-| Qué                                 | Dónde                                                      |
-| ----------------------------------- | ---------------------------------------------------------- |
-| El contrato y el catálogo           | `packages/types/src/job-checklist.ts`                      |
-| Los textos de las tareas            | `packages/i18n/src/en.ts` y `es.ts`, en `checklist.items`  |
-| La tabla                            | `apps/api/prisma/migrations/20261001160000_job_checklist/` |
-| Montar la lista y validar el código | `apps/api/src/admin/job-checklist.helper.ts`               |
-| Marcar y desmarcar                  | `apps/api/src/admin/my-jobs.service.ts`                    |
-| El endpoint                         | `PATCH /admin/my-jobs/:bookingId/checklist`                |
-| La pantalla, para las dos vistas    | `apps/admin/src/components/JobChecklist.tsx`               |
-| La pantalla de limpieza             | `apps/admin/src/pages/MyJobs.tsx`                          |
-| El detalle del panel                | `apps/admin/src/pages/BookingDetail.tsx`                   |
+| Qué                                   | Dónde                                                      |
+| ------------------------------------- | ---------------------------------------------------------- |
+| El contrato y el catálogo (59 tareas) | `packages/types/src/job-checklist.ts`                      |
+| El filtro por servicio y por extra    | `checklistForService`, en el mismo archivo                 |
+| Los textos de las tareas              | `packages/i18n/src/en.ts` y `es.ts`, en `checklist.items`  |
+| Los nombres de las estancias          | los mismos archivos, en `checklist.rooms`                  |
+| La tabla                              | `apps/api/prisma/migrations/20261001160000_job_checklist/` |
+| Montar la lista y validar el código   | `apps/api/src/admin/job-checklist.helper.ts`               |
+| Leer los extras del JSON de la base   | `extrasContratados`, en el mismo archivo                   |
+| Marcar y desmarcar                    | `apps/api/src/admin/my-jobs.service.ts`                    |
+| El endpoint                           | `PATCH /admin/my-jobs/:bookingId/checklist`                |
+| La pantalla, para las dos vistas      | `apps/admin/src/components/JobChecklist.tsx`               |
+| La pantalla de limpieza               | `apps/admin/src/pages/MyJobs.tsx`                          |
+| El detalle del panel                  | `apps/admin/src/pages/BookingDetail.tsx`                   |
 
 ---
 
-## 10. Lo que quedó sin resolver
+## 10. Lo que quedó resuelto al llegar la lista
 
-- **Las tareas, que es todo el contenido.** Ver el aviso del principio.
+- **Las tareas, que era todo el contenido.** 59, transcritas el 1/11/2026.
+- **Sí cambia la lista dentro de cada servicio**, y era la pregunta abierta.
+  Su lista lo dice sin ambigüedad: la profunda es «todo lo de la estándar
+  **más** 11 tareas», y la de entrada o salida «todo lo de la profunda **más**
+  4». Se expresa con `appliesTo` tarea por tarea, **y no con una jerarquía**:
+  es más repetitivo de leer y no tiene el fallo de la herencia, que es cambiar
+  la base y mover sin querer lo que incluye un servicio que no se estaba
+  tocando. Hay una prueba que comprueba que las 59 declaraciones dicen de
+  verdad eso.
+- **La de mudanza lleva todas las tareas, aunque la casa esté vacía.** Su
+  lista dice «todas las tareas **aplicables**», y en una vivienda vacía hay
+  tareas que no aplican —cambiar las sábanas—. **No se decide en el catálogo
+  cuáles.** Van todas y el equipo marca «no aplica» en la casa, que es justo
+  el estado que ella pidió. Decidirlo aquí sería adivinar desde una oficina lo
+  que hay dentro de una casa concreta: hay mudanzas con la cama todavía
+  puesta.
+- **El alcance de la web ya coincidía con sus aclaraciones.** La sección «qué
+  no incluye» del sitio público (`scope`) ya dice: sin ventanas por fuera, sin
+  platos, sin refrigerador ni gabinetes con cosas dentro. No hubo nada que
+  corregir.
+
+---
+
+## 11. Lo que sigue pendiente
+
+- **LOS TRES ESTADOS Y EL MOTIVO.** Su lista los pide con estas palabras:
+  _«Cada tarea debe tener estas opciones: Completada / Pendiente / No aplica.
+  Si queda pendiente, debe permitir anotar el motivo.»_ Hoy una tarea está
+  marcada o no: la tabla no tiene columna de estado ni de nota, así que **pide
+  una migración**, un cambio de contrato (`done: boolean` pasa a ser un
+  estado) y tocar la API y la pantalla del móvil. Es la Etapa 2 de este
+  trabajo.
+- **La revisión antes de salir** (sección 7 de su lista, 10 puntos). Solapa en
+  parte con el fichaje de salida y con las fotos, así que antes de añadir nada
+  hay que ver qué de eso ya existe.
 - **La lista es la del servicio que el cliente contrató en la web.** Quedó
   decidido en la Etapa 3.6. Tiene una consecuencia que conviene tener escrita:
   como la lista sale del servicio de la reserva y no de una copia congelada,
   **cambiar el servicio cambiaría la lista bajo los pies del equipo a media
   limpieza**. Por eso el ajuste de campo no deja cambiarlo
   (`docs/28-ajustes-de-campo.md` §3).
-- **Sigue sin saberse si la lista cambia dentro de cada servicio.** El
-  catálogo lo admite —cada tarea declara `appliesTo`— pero las plantillas del
-  cliente no dicen si una profunda pide más tareas que una estándar. Se
-  decidirá al transcribirlas.
+- **Tres de las cinco tareas de extra no se verán todavía**, porque sus extras
+  no están a la venta (§3.4).
+- **El catálogo vive en el código.** Cambiar una tarea es un despliegue, no una
+  pantalla de ajustes. El token de NestJS (§8) es el sitio por donde entraría
+  el día que coordinación tenga que editarlo.
 - **No hay foto de lo hecho.** Es la siguiente capacidad de la Etapa 3 y
   depende de decidir dónde se almacenan las fotos.
 - **No funciona sin conexión.** Cada toque es una petición: en un sótano sin

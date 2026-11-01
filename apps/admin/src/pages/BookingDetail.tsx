@@ -269,8 +269,8 @@ export function BookingDetailPage({
         marca quien esta alli; si coordinacion pudiera marcar desde la
         oficina, la lista dejaria de ser el registro de lo que se hizo.
 
-        Tampoco se pinta si no hay lista, que hoy es el caso normal: las
-        tareas de las plantillas del cliente estan pendientes de transcribir.
+        Tampoco se pinta si no hay lista: pasa con un servicio que no pida
+        ninguna tarea, y una tarjeta vacia solo haria dudar de si se perdio.
       */}
       {booking.checklist.length > 0 && (
         <section className="ft-card p-5">

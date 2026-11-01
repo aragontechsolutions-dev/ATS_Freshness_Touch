@@ -53,12 +53,13 @@ export function JobChecklist({ entries, locale, onToggle }: JobChecklistProps) {
   const { t } = useTranslation();
 
   /*
-   * LA SECCION NO SE PINTA SI NO HAY LISTA, y hoy es el caso normal: las
-   * tareas de las plantillas del cliente estan pendientes de transcribir, asi
-   * que el catalogo esta vacio.
+   * LA SECCION NO SE PINTA SI NO HAY LISTA.
    *
-   * Una tarjeta vacia que dijera «sin tareas» seria peor que nada: en la
-   * puerta de una casa parece que la lista se ha perdido.
+   * Ya no es el caso normal —el catalogo tiene las cincuenta y nueve tareas
+   * de la lista de la dueña— pero sigue siendo posible: un servicio que no
+   * pida ninguna tarea, o un trabajo de un servicio comercial el dia que
+   * exista. Una tarjeta vacia que dijera «sin tareas» seria peor que nada: en
+   * la puerta de una casa parece que la lista se ha perdido.
    */
   if (entries.length === 0) return null;
 

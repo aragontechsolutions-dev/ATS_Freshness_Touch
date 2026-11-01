@@ -2,11 +2,13 @@ import {
   CHECKLIST_ROOMS,
   JOB_CHECKLIST_CATALOG,
   checklistForService,
+  type AddOnCode,
   type ChecklistItem,
   type ChecklistRoom,
   type JobChecklistEntry,
   type ServiceType,
 } from '@freshness/types';
+import { ExtrasGuardadosSchema } from './field-adjustment.helper';
 
 /**
  * LA LISTA DE VERIFICACION DE UN TRABAJO, MONTADA EN UN SITIO
@@ -27,16 +29,21 @@ import {
  * ========================================================================
  * POR QUE UN PROVEEDOR Y NO LA CONSTANTE IMPORTADA DIRECTAMENTE
  * ========================================================================
- * El catalogo de verdad esta VACIO hoy: las tareas de las plantillas del
- * cliente estan pendientes de transcribir. Con la constante importada a pelo,
- * el camino de escritura —marcar una tarea— no se podria probar de punta a
- * punta en absoluto: toda peticion seria rechazada por «esa tarea no existe»,
- * y la unica parte verificada seria el rechazo.
+ * El catalogo de verdad tiene cincuenta y nueve tareas con codigos largos
+ * —`KITCHEN_APPLIANCE_FRONTS`—. Una prueba de punta a punta que los use tiene
+ * que elegir uno de esos codigos a mano, y a partir de ahi deja de probar el
+ * camino de escritura y pasa a probar que ese codigo sigue existiendo: el dia
+ * que la dueña reordene su lista, la prueba se cae por un motivo que no tiene
+ * nada que ver con lo que verifica.
  *
- * Eso dejaria sin prueba justo lo que importa: que marcar escribe una fila,
- * que marcar dos veces no escribe dos, que desmarcar borra, y que no se puede
- * marcar en un trabajo ajeno. Con un token, la prueba de punta a punta pasa
- * un catalogo de tres tareas y recorre EL MISMO codigo que produccion.
+ * Lo que importa verificar es que marcar escribe una fila, que marcar dos
+ * veces no escribe dos, que desmarcar borra, y que no se puede marcar en un
+ * trabajo ajeno. Con un token, la prueba pasa un catalogo de tres tareas
+ * inventadas y recorre EL MISMO codigo que produccion.
+ *
+ * Y sigue habiendo un motivo que no es de pruebas: cuando el catalogo salga
+ * del codigo y lo edite coordinacion desde el panel, el sitio por donde
+ * entra ya esta hecho.
  *
  * Es la misma decision que ya se tomo con el proveedor de geocodificacion y
  * con el de pagos: lo que cambia entre entornos entra por la puerta de
@@ -64,15 +71,25 @@ export interface FilaTareaMarcada {
  *
  * Van al final y marcadas con `retired`, para que la pantalla pueda decir
  * «esto ya no se pide» en vez de enseñarlas como trabajo de hoy.
+ *
+ * ========================================================================
+ * Y ESO MISMO CUBRE UN EXTRA QUE SE QUITO DESPUES DE MARCARLO
+ * ========================================================================
+ * `extras` decide si el interior del horno entra en la lista. Si un ajuste de
+ * campo quitara ese extra de la reserva despues de que alguien marcara la
+ * tarea, la tarea ya no estaria en la lista de hoy — y por el mismo camino de
+ * arriba se sigue leyendo, señalada. No se pierde el registro de un trabajo
+ * que se hizo de verdad.
  */
 export function montarChecklist(
   service: ServiceType,
+  extras: readonly AddOnCode[],
   marcadas: readonly FilaTareaMarcada[],
   catalogo?: readonly ChecklistItem[],
 ): JobChecklistEntry[] {
   const porCodigo = new Map(marcadas.map((fila) => [fila.itemCode, fila]));
 
-  const vigentes = checklistForService(service, catalogo);
+  const vigentes = checklistForService(service, extras, catalogo);
   const entradas: JobChecklistEntry[] = vigentes.map((tarea) =>
     entrada(tarea.code, tarea.room, false, porCodigo.get(tarea.code)),
   );
@@ -134,11 +151,37 @@ function estanciaDe(code: string, catalogo?: readonly ChecklistItem[]): Checklis
  *
  * Las retiradas NO valen: una tarea que la empresa ya no hace no se puede
  * marcar como hecha hoy.
+ *
+ * Y TAMPOCO VALE LA DE UN EXTRA QUE NO SE PAGO. Es la mitad que de verdad
+ * importa de los extras: sin esto, el movil podria marcar
+ * `ADDON_INSIDE_OVEN` en una reserva sin ese extra, y quedaria registrado que
+ * se limpio por dentro un horno que nadie contrato. Eso no es un dato de
+ * adorno: es lo que coordinacion lee cuando un cliente reclama, y lo que
+ * sostiene la factura de un extra.
  */
 export function esTareaDelTrabajo(
   service: ServiceType,
+  extras: readonly AddOnCode[],
   itemCode: string,
   catalogo?: readonly ChecklistItem[],
 ): boolean {
-  return checklistForService(service, catalogo).some((tarea) => tarea.code === itemCode);
+  return checklistForService(service, extras, catalogo).some((tarea) => tarea.code === itemCode);
+}
+
+/**
+ * LOS CODIGOS DE EXTRA DE UNA RESERVA, LEIDOS DEL JSON DE LA BASE.
+ *
+ * La columna `addOns` es un `Json` opaco: lo que hay dentro lo escribio
+ * alguna version del codigo, puede que no la de hoy. `ExtrasGuardadosSchema`
+ * es el MISMO contrato con el que se releen los extras para el precio y para
+ * los ajustes de campo, y su `catch([])` convierte una lista ilegible en «sin
+ * extras» en vez de en una pantalla rota.
+ *
+ * QUE EL FALLO CAIGA DEL LADO DE «SIN EXTRAS» ES LO CORRECTO AQUI: una lista
+ * a la que le falta la tarea del horno se nota —el equipo pregunta— y no deja
+ * rastro falso. Una lista con la tarea del horno que nadie pago se marca, y
+ * entonces la base de datos afirma que se hizo un trabajo que no se vendio.
+ */
+export function extrasContratados(addOns: unknown): readonly AddOnCode[] {
+  return ExtrasGuardadosSchema.parse(addOns).map((extra) => extra.code);
 }

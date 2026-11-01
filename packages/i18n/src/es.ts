@@ -199,13 +199,97 @@ export const es: TranslationResources = {
     retired: 'Ya no forma parte de este servicio',
 
     rooms: {
-      COMMON_AREAS: 'Salón y habitaciones',
-      BATHROOM: 'Baños',
       KITCHEN: 'Cocina',
+      BATHROOM: 'Baños',
+      BEDROOM: 'Habitaciones',
+      COMMON_AREAS: 'Sala, comedor, pasillos y escaleras',
+      WHOLE_HOUSE: 'Toda la casa',
     },
 
-    /* Pendientes de transcribir: ver el comentario en `en.ts`. */
-    items: {},
+    /* Una clave por codigo del catalogo: ver el comentario en `en.ts`. */
+    items: {
+      /* ---------- COCINA ---------- */
+      KITCHEN_COUNTERS: 'Limpiar encimeras y backsplash.',
+      KITCHEN_CABINET_FRONTS: 'Limpiar el exterior de los gabinetes.',
+      KITCHEN_STOVETOP: 'Limpiar la superficie de la estufa.',
+      KITCHEN_APPLIANCE_FRONTS: 'Limpiar el exterior de los electrodomésticos.',
+      KITCHEN_MICROWAVE: 'Limpiar el microondas por dentro y por fuera.',
+      KITCHEN_SINK: 'Limpiar fregadero y grifería.',
+      KITCHEN_TABLE: 'Limpiar mesa y superficies accesibles de las sillas.',
+      KITCHEN_WINDOW_DUST:
+        'Quitar polvo y telas de araña de las ventanas, sin limpiar los vidrios.',
+      KITCHEN_COBWEBS: 'Quitar telas de araña de las áreas accesibles.',
+      KITCHEN_TRASH: 'Vaciar la basura y reemplazar la bolsa.',
+      KITCHEN_VACUUM: 'Aspirar el piso.',
+      KITCHEN_MOP: 'Trapear el piso.',
+
+      /* ---------- BANOS ---------- */
+      BATH_SINK: 'Limpiar lavamanos, encimeras y grifería.',
+      BATH_MIRRORS: 'Limpiar espejos.',
+      BATH_TOILET: 'Limpiar y desinfectar el inodoro por dentro y por fuera, incluida la base.',
+      BATH_SHOWER: 'Limpiar bañera, ducha y puertas de vidrio de la ducha.',
+      BATH_CABINET_FRONTS: 'Limpiar el exterior de los gabinetes.',
+      BATH_WINDOW_DUST: 'Quitar polvo y telas de araña de las ventanas, sin limpiar los vidrios.',
+      BATH_COBWEBS: 'Quitar telas de araña de las áreas accesibles.',
+      BATH_TRASH: 'Vaciar la basura y reemplazar la bolsa.',
+      BATH_VACUUM: 'Aspirar el piso.',
+      BATH_MOP: 'Trapear el piso.',
+
+      /* ---------- HABITACIONES ---------- */
+      BEDROOM_DUST: 'Quitar el polvo de muebles y superficies accesibles.',
+      BEDROOM_MIRRORS: 'Limpiar espejos.',
+      BEDROOM_BEDS:
+        'Cambiar las sábanas cuando el cliente deje las limpias disponibles y tender las camas.',
+      BEDROOM_WINDOW_DUST:
+        'Quitar polvo y telas de araña de las ventanas, sin limpiar los vidrios.',
+      BEDROOM_COBWEBS: 'Quitar telas de araña de las áreas accesibles.',
+      BEDROOM_TRASH: 'Vaciar los cestos de basura.',
+      BEDROOM_VACUUM: 'Aspirar alfombras y pisos.',
+      BEDROOM_MOP: 'Trapear los pisos que lo permitan.',
+
+      /* ---------- SALA, COMEDOR, PASILLOS Y ESCALERAS ---------- */
+      COMMON_DUST: 'Quitar el polvo de muebles, repisas y decoraciones accesibles.',
+      COMMON_GLASS_TABLES: 'Limpiar mesas y superficies de vidrio de los muebles.',
+      COMMON_FINGERPRINTS: 'Limpiar huellas visibles en manijas e interruptores.',
+      COMMON_WINDOW_DUST: 'Quitar polvo y telas de araña de las ventanas, sin limpiar los vidrios.',
+      COMMON_COBWEBS: 'Quitar telas de araña de las áreas accesibles.',
+      COMMON_HANDRAILS: 'Limpiar pasamanos.',
+      COMMON_TRASH: 'Vaciar los cestos de basura.',
+      COMMON_VACUUM: 'Aspirar alfombras, pisos y escaleras.',
+      COMMON_MOP: 'Trapear los pisos que lo permitan.',
+
+      /* ---------- SOLO LIMPIEZA PROFUNDA Y MUDANZA ---------- */
+      DEEP_BASEBOARDS: 'Limpiar detalladamente los zócalos accesibles.',
+      DEEP_DOORS: 'Limpiar puertas, marcos, manijas e interruptores.',
+      DEEP_FANS_LIGHTS: 'Quitar el polvo de ventiladores y lámparas accesibles.',
+      DEEP_BLINDS_SILLS: 'Quitar el polvo de persianas y alféizares interiores accesibles.',
+      DEEP_VENTS: 'Quitar el polvo del exterior de las rejillas de ventilación accesibles.',
+      DEEP_CABINET_FRONTS: 'Limpiar con detalle el exterior de los gabinetes.',
+      DEEP_STOVE_GREASE:
+        'Retirar grasa acumulada de la superficie de la estufa y del exterior de la campana.',
+      DEEP_SOAP_SCUM:
+        'Trabajar la acumulación de jabón y sarro en duchas, bañeras y grifería con productos adecuados para cada material.',
+      DEEP_TOILET_EDGES: 'Limpiar con detalle esquinas, bordes y alrededor de los inodoros.',
+      DEEP_UNDER_CUSHIONS:
+        'Aspirar debajo de los cojines de los sofás, cuando el material lo permita.',
+      DEEP_BEHIND_OBJECTS:
+        'Limpiar debajo y detrás de objetos pequeños que puedan moverse con seguridad.',
+
+      /* ---------- SOLO ENTRADA O SALIDA ---------- */
+      MOVE_CLOSETS: 'Limpiar repisas y pisos de clósets vacíos.',
+      MOVE_CLEARED_SPACES: 'Limpiar los espacios despejados donde antes había muebles.',
+      MOVE_FINAL_SWEEP: 'Revisar cada habitación para retirar polvo y residuos pequeños.',
+      MOVE_REPORT_DAMAGE: 'Registrar daños observados o suciedad que no pudo retirarse.',
+
+      /* ---------- SOLO SI SE CONTRATO EL EXTRA ---------- */
+      ADDON_INSIDE_OVEN: 'Limpiar el interior del horno.',
+      ADDON_INSIDE_FRIDGE: 'Limpiar el interior del refrigerador.',
+      ADDON_INSIDE_CABINETS:
+        'Limpiar el interior de gabinetes y cajones, únicamente si están vacíos.',
+      ADDON_INTERIOR_WINDOWS:
+        'Limpiar los vidrios de las ventanas por dentro, indicando cuáles y cuántas.',
+      ADDON_LAUNDRY: 'Doblar ropa limpia, según la cantidad acordada.',
+    },
   },
 
   frequency: {
