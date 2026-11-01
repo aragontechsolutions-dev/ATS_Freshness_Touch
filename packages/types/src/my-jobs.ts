@@ -148,9 +148,9 @@ export const MyJobSchema = z.strictObject({
    * mantener de acuerdo. Llega la lista que toca, ya en orden, con el estado
    * de cada tarea.
    *
-   * Puede venir VACIA, y es un estado legitimo: mientras las tareas de las
-   * plantillas del cliente esten pendientes de transcribir, el catalogo esta
-   * vacio y la seccion no se pinta. Ver `job-checklist.ts`.
+   * Puede venir VACIA, y es un estado legitimo: un servicio que no pida
+   * ninguna tarea deja la lista vacia y la seccion no se pinta. Ver
+   * `job-checklist.ts`.
    */
   checklist: z.array(JobChecklistEntrySchema),
 

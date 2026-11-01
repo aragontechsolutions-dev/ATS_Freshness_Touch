@@ -84,13 +84,13 @@ import type { Env } from '../common/config/env';
        *
        * Entra por la puerta de delante y no importado a pelo dentro de los
        * servicios, igual que el proveedor de pagos o el de geocodificacion.
-       * El motivo esta en `job-checklist.helper.ts`: el catalogo de verdad
-       * esta vacio mientras las plantillas del cliente esten pendientes de
-       * transcribir, y sin este token el camino de ESCRITURA —marcar una
-       * tarea— no se podria probar de punta a punta en absoluto.
+       * El motivo esta en `job-checklist.helper.ts`: con el catalogo
+       * importado a pelo, las pruebas de punta a punta tendrian que elegir a
+       * mano codigos de la lista de la dueña, y se caerian el dia que ella la
+       * reordene por un motivo que no tiene nada que ver con lo que verifican.
        *
        * En produccion es siempre el catalogo real. Lo unico que lo sustituye
-       * son las pruebas, con tres tareas de mentira y el mismo codigo debajo.
+       * son las pruebas, con unas tareas de mentira y el mismo codigo debajo.
        */
       provide: JOB_CHECKLIST_CATALOG_TOKEN,
       useValue: JOB_CHECKLIST_CATALOG,

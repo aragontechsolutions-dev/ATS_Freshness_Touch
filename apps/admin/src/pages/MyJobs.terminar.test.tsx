@@ -1,7 +1,12 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { JobChecklistEntry, MyJob, MyJobs as MyJobsRespuesta } from '@freshness/types';
+import type {
+  ChecklistItemState,
+  JobChecklistEntry,
+  MyJob,
+  MyJobs as MyJobsRespuesta,
+} from '@freshness/types';
 import '../i18n';
 
 /**
@@ -56,13 +61,14 @@ vi.mock('../lib/geolocalizacion', () => ({
 const BOOKING = '10000000-0000-4000-8000-000000000001';
 const OTRO = '10000000-0000-4000-8000-000000000002';
 
-function tarea(code: string, done: boolean): JobChecklistEntry {
+function tarea(code: string, state: ChecklistItemState | null = null): JobChecklistEntry {
   return {
     code,
     room: 'COMMON_AREAS',
-    done,
-    doneAt: done ? '2026-10-04T10:00:00.000Z' : null,
-    doneByFirstName: done ? 'Cleo' : null,
+    state,
+    note: null,
+    markedAt: state === null ? null : '2026-10-04T10:00:00.000Z',
+    markedByFirstName: state === null ? null : 'Cleo',
     retired: false,
   };
 }
@@ -180,24 +186,49 @@ describe('H4: «he terminado» pregunta antes de cerrar el trabajo', () => {
      * —«te quedan 2»— es lo unico que distingue el toque bueno del
      * accidental.
      */
-    await montar([trabajo({ checklist: [tarea('POLVO', false), tarea('SUELO', false)] })]);
+    await montar([trabajo({ checklist: [tarea('POLVO'), tarea('SUELO')] })]);
 
     await act(async () => {
       boton('I have finished').click();
     });
 
-    expect(hayTexto('2 tasks not ticked')).toBe(true);
+    expect(hayTexto('have not looked at 2 tasks')).toBe(true);
   });
 
-  it('sin tareas pendientes NO dice «te quedan 0»', async () => {
-    await montar([trabajo({ checklist: [tarea('POLVO', true)] })]);
+  it('sin tareas por mirar NO dice «te quedan 0»', async () => {
+    await montar([trabajo({ checklist: [tarea('POLVO', 'DONE')] })]);
 
     await act(async () => {
       boton('I have finished').click();
     });
 
     expect(hayTexto('Finish this job?')).toBe(true);
-    expect(hayTexto('not ticked')).toBe(false);
+    expect(hayTexto('have not looked at')).toBe(false);
+  });
+
+  it('UNA PENDIENTE DECLARADA NO CUENTA: ya se decidio, con su motivo', async () => {
+    /*
+     * ES LA DISTINCION QUE PIDIO LA DUENA, puesta donde mas se nota. Quien
+     * marco una tarea «pendiente» ya la miro, decidio que no se podia hacer y
+     * lo explico. Nombrarsela al terminar seria pedirle que haga algo que ya
+     * ha dicho que no puede hacer.
+     *
+     * Y «no aplica» tampoco cuenta: era justo el problema que habia que
+     * arreglar. Una casa vacia de mudanza salia con veinte tareas «sin hacer»
+     * cuando en veinte de ellas no habia nada que hacer.
+     */
+    await montar([
+      trabajo({
+        checklist: [tarea('POLVO', 'PENDING'), tarea('SUELO', 'NOT_APPLICABLE')],
+      }),
+    ]);
+
+    await act(async () => {
+      boton('I have finished').click();
+    });
+
+    expect(hayTexto('Finish this job?')).toBe(true);
+    expect(hayTexto('have not looked at')).toBe(false);
   });
 
   it('confirmar SI ficha la salida', async () => {

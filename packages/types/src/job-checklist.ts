@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { BookingStatusSchema, type BookingStatus } from './booking';
-import { ServiceTypeSchema, type ServiceType } from './enums';
+import { ServiceTypeSchema, type AddOnCode, type ServiceType } from './enums';
 
 /**
  * LA LISTA DE VERIFICACION DE UN TRABAJO
@@ -49,17 +49,73 @@ import { ServiceTypeSchema, type ServiceType } from './enums';
 /**
  * Las estancias de la casa.
  *
- * SON LAS TRES DE LAS PLANTILLAS DE TRABAJO DEL CLIENTE, ni una mas: areas
- * comunes, baños y cocina. Los dormitorios no tienen lista propia porque en
- * esas plantillas no la tienen: entran en areas comunes.
+ * SON LAS DE LA LISTA QUE ESCRIBIO LA DUENA el 1/11/2026, y en su orden. Ese
+ * orden es el del recorrido de la casa y se respeta al pintar: una lista que
+ * salta de la cocina al baño y vuelve al salon obliga a leerla entera varias
+ * veces.
  *
- * El orden es el del recorrido de la casa, y se respeta al pintar: una lista
- * que salta de la cocina al baño y vuelve al salon obliga a leerla entera
- * varias veces.
+ * ========================================================================
+ * DOS CAMBIOS RESPECTO A LO QUE HABIA, Y LOS DOS SON SUYOS
+ * ========================================================================
+ *   - LAS HABITACIONES TIENEN LISTA PROPIA. Antes entraban en areas comunes
+ *     porque las plantillas antiguas no las separaban. Su lista si las
+ *     separa, y tiene tareas que no estan en ningun otro sitio —cambiar las
+ *     sabanas, tender las camas—.
+ *   - `WHOLE_HOUSE` NO ES UNA ESTANCIA, y por eso va la ultima. Es donde
+ *     caen las tareas de la limpieza profunda y de mudanza que no pertenecen
+ *     a una habitacion concreta: zocalos, puertas, rejillas, ventiladores.
+ *     Su lista las escribe asi, en bloque y despues de las estancias, porque
+ *     es como se hacen: recorriendo la casa entera una vez.
+ *
+ * CAMBIAR ESTA LISTA ES SEGURO. La estancia NO se guarda en la base de
+ * datos: alli solo esta el codigo de la tarea. La estancia sale del catalogo
+ * cada vez que se pinta.
  */
-export const CHECKLIST_ROOMS = ['COMMON_AREAS', 'BATHROOM', 'KITCHEN'] as const;
+export const CHECKLIST_ROOMS = [
+  'KITCHEN',
+  'BATHROOM',
+  'BEDROOM',
+  'COMMON_AREAS',
+  'WHOLE_HOUSE',
+] as const;
 export const ChecklistRoomSchema = z.enum(CHECKLIST_ROOMS);
 export type ChecklistRoom = z.infer<typeof ChecklistRoomSchema>;
+
+/**
+ * EN QUE QUEDO UNA TAREA.
+ *
+ * ==========================================================================
+ * SON LOS TRES QUE PIDIO LA DUEÑA, Y HAY UN CUARTO QUE NO SE GUARDA
+ * ==========================================================================
+ * Su lista lo dice asi: «Cada tarea debe tener estas opciones: Completada /
+ * Pendiente / No aplica. Si queda pendiente, debe permitir anotar el motivo.»
+ *
+ * El cuarto estado es «SIN TOCAR», y es la AUSENCIA de fila en la base de
+ * datos. No esta en el enumerado porque no se escribe nunca: es el estado de
+ * partida de las cuarenta tareas de una lista, y guardarlo serian cuarenta
+ * mil filas al año diciendo «no la he mirado».
+ *
+ * ==========================================================================
+ * «PENDIENTE» NO ES LO MISMO QUE «SIN TOCAR», y es la distincion que
+ * justifica todo este cambio
+ * ==========================================================================
+ * Sin tocar significa que nadie ha mirado esa tarea. Pendiente significa que
+ * alguien la miro, decidio que no se podia hacer y lo explico. Una es trabajo
+ * por decidir; la otra es una respuesta.
+ *
+ * Y «NO APLICA» es la que hacia falta de verdad: en una casa vacia de mudanza
+ * son la mitad de las tareas —cambiar las sabanas de una cama que no existe—.
+ * Con un unico booleano salian igual que las que se quedaron sin hacer, y una
+ * lista que dice «quedaron 20 sin hacer» en una casa donde no habia nada que
+ * hacer en 20 de ellas no sirve para responder a nadie.
+ */
+export const ChecklistItemStateSchema = z.enum(['DONE', 'PENDING', 'NOT_APPLICABLE']);
+export type ChecklistItemState = z.infer<typeof ChecklistItemStateSchema>;
+
+/** El tope del motivo, en caracteres. Esta aqui porque lo usan el contrato,
+ * la base de datos y el contador de la pantalla, y tres numeros sueltos
+ * acaban siendo tres numeros distintos. */
+export const CHECKLIST_NOTE_MAX = 300;
 
 /**
  * UNA TAREA DEL CATALOGO.
@@ -93,6 +149,20 @@ export interface ChecklistItem {
   readonly appliesTo: readonly ServiceType[];
 
   /**
+   * LA TAREA SOLO APARECE SI SE CONTRATO ESTE EXTRA.
+   *
+   * El interior del horno, el del refrigerador, los gabinetes por dentro,
+   * los vidrios y doblar la ropa NO entran en ninguna limpieza, ni siquiera
+   * en la profunda o en la de mudanza: se pagan aparte. Su lista lo dice
+   * dos veces, en la seccion de extras y otra vez en las aclaraciones.
+   *
+   * Sin esto habria que elegir entre dos cosas malas: ofrecer la tarea
+   * siempre —y que el equipo limpie un horno que nadie pago— u omitirla
+   * siempre, y que la pague alguien y no aparezca en la lista.
+   */
+  readonly requiresAddOn?: AddOnCode;
+
+  /**
    * Una tarea retirada. Ver la cabecera: no se borra, se apaga.
    *
    * Deja de aparecer en los trabajos nuevos y sigue leyendose en los viejos
@@ -102,26 +172,139 @@ export interface ChecklistItem {
 }
 
 /**
+ * Atajos de legibilidad. Sesenta tareas repitiendo el mismo array seria
+ * ruido, y un array distinto por descuido seria una tarea que no aparece.
+ */
+const RESIDENCIAL: readonly ServiceType[] = ['STANDARD', 'DEEP', 'MOVE_IN_OUT'];
+const PROFUNDA_Y_MUDANZA: readonly ServiceType[] = ['DEEP', 'MOVE_IN_OUT'];
+const SOLO_MUDANZA: readonly ServiceType[] = ['MOVE_IN_OUT'];
+
+/**
  * EL CATALOGO DE TAREAS.
  *
- * ========================================================================
- * ESTA VACIO A PROPOSITO, Y NO ES UN OLVIDO
- * ========================================================================
- * Las tareas de las plantillas de trabajo del cliente —areas comunes (11),
- * baños (7) y cocina (7)— ESTAN PENDIENTES DE TRANSCRIBIR desde la Etapa 2,
- * y siguen pendientes hoy (`docs/21-modelo-de-operaciones.md` §4).
+ * Transcrito el 1/11/2026 de la lista que escribio la dueña. Estuvo vacio
+ * desde la Etapa 2 a proposito: una lista de limpieza plausible pero que no
+ * fuera la de esta empresa habria sido peor que ninguna, porque alguien la
+ * daria por buena y quedaria registrado que se hizo un trabajo que nadie
+ * pidio.
  *
- * No se rellena con tareas inventadas «de momento». Una lista de limpieza
- * plausible pero que no es la de esta empresa es peor que ninguna lista:
- * alguien la daria por buena, la marcaria entera, y quedaria registrado que
- * se hizo un trabajo que nadie pidio.
+ * ==========================================================================
+ * COMO SE ACUMULAN LOS SERVICIOS, QUE ES LO QUE DICE SU LISTA
+ * ==========================================================================
+ *   - ESTANDAR: las cuatro estancias.
+ *   - PROFUNDA: todo lo de la estandar MAS once tareas suyas.
+ *   - ENTRADA O SALIDA: todo lo de la profunda MAS cuatro suyas.
  *
- * Mientras este vacio, toda la maquinaria de arriba y de abajo funciona y la
- * seccion simplemente no se pinta. El dia que lleguen las capturas, esto se
- * rellena y no hay que tocar nada mas: ni la base de datos, ni la API, ni las
- * pantallas.
+ * Eso se expresa con `appliesTo` y no con una jerarquia: una tarea estandar
+ * se declara en los tres servicios. Es mas repetitivo de leer y no tiene el
+ * fallo de la herencia —cambiar la base y mover sin querer lo que incluye un
+ * servicio que no se estaba tocando—.
+ *
+ * ==========================================================================
+ * LA DE MUDANZA LLEVA TODAS LAS TAREAS, AUNQUE LA CASA ESTE VACIA
+ * ==========================================================================
+ * Su lista dice «todas las tareas APLICABLES». Y en una vivienda vacia hay
+ * tareas que no aplican: cambiar las sabanas, por ejemplo.
+ *
+ * No se decide aqui cuales. Van todas, y el equipo marca «no aplica» en la
+ * casa, que es justo el estado que ella pidio. Decidirlo en el catalogo
+ * seria adivinar desde una oficina lo que hay dentro de una casa concreta:
+ * hay mudanzas con la cama todavia puesta.
  */
-export const JOB_CHECKLIST_CATALOG: readonly ChecklistItem[] = [];
+export const JOB_CHECKLIST_CATALOG: readonly ChecklistItem[] = [
+  /* ----------------------- COCINA ----------------------- */
+  { code: 'KITCHEN_COUNTERS', room: 'KITCHEN', appliesTo: RESIDENCIAL },
+  { code: 'KITCHEN_CABINET_FRONTS', room: 'KITCHEN', appliesTo: RESIDENCIAL },
+  { code: 'KITCHEN_STOVETOP', room: 'KITCHEN', appliesTo: RESIDENCIAL },
+  { code: 'KITCHEN_APPLIANCE_FRONTS', room: 'KITCHEN', appliesTo: RESIDENCIAL },
+  { code: 'KITCHEN_MICROWAVE', room: 'KITCHEN', appliesTo: RESIDENCIAL },
+  { code: 'KITCHEN_SINK', room: 'KITCHEN', appliesTo: RESIDENCIAL },
+  { code: 'KITCHEN_TABLE', room: 'KITCHEN', appliesTo: RESIDENCIAL },
+  { code: 'KITCHEN_WINDOW_DUST', room: 'KITCHEN', appliesTo: RESIDENCIAL },
+  { code: 'KITCHEN_COBWEBS', room: 'KITCHEN', appliesTo: RESIDENCIAL },
+  { code: 'KITCHEN_TRASH', room: 'KITCHEN', appliesTo: RESIDENCIAL },
+  { code: 'KITCHEN_VACUUM', room: 'KITCHEN', appliesTo: RESIDENCIAL },
+  { code: 'KITCHEN_MOP', room: 'KITCHEN', appliesTo: RESIDENCIAL },
+
+  /* ----------------------- BANOS ----------------------- */
+  { code: 'BATH_SINK', room: 'BATHROOM', appliesTo: RESIDENCIAL },
+  { code: 'BATH_MIRRORS', room: 'BATHROOM', appliesTo: RESIDENCIAL },
+  { code: 'BATH_TOILET', room: 'BATHROOM', appliesTo: RESIDENCIAL },
+  { code: 'BATH_SHOWER', room: 'BATHROOM', appliesTo: RESIDENCIAL },
+  { code: 'BATH_CABINET_FRONTS', room: 'BATHROOM', appliesTo: RESIDENCIAL },
+  { code: 'BATH_WINDOW_DUST', room: 'BATHROOM', appliesTo: RESIDENCIAL },
+  { code: 'BATH_COBWEBS', room: 'BATHROOM', appliesTo: RESIDENCIAL },
+  { code: 'BATH_TRASH', room: 'BATHROOM', appliesTo: RESIDENCIAL },
+  { code: 'BATH_VACUUM', room: 'BATHROOM', appliesTo: RESIDENCIAL },
+  { code: 'BATH_MOP', room: 'BATHROOM', appliesTo: RESIDENCIAL },
+
+  /* ----------------------- HABITACIONES ----------------------- */
+  { code: 'BEDROOM_DUST', room: 'BEDROOM', appliesTo: RESIDENCIAL },
+  { code: 'BEDROOM_MIRRORS', room: 'BEDROOM', appliesTo: RESIDENCIAL },
+  { code: 'BEDROOM_BEDS', room: 'BEDROOM', appliesTo: RESIDENCIAL },
+  { code: 'BEDROOM_WINDOW_DUST', room: 'BEDROOM', appliesTo: RESIDENCIAL },
+  { code: 'BEDROOM_COBWEBS', room: 'BEDROOM', appliesTo: RESIDENCIAL },
+  { code: 'BEDROOM_TRASH', room: 'BEDROOM', appliesTo: RESIDENCIAL },
+  { code: 'BEDROOM_VACUUM', room: 'BEDROOM', appliesTo: RESIDENCIAL },
+  { code: 'BEDROOM_MOP', room: 'BEDROOM', appliesTo: RESIDENCIAL },
+
+  /* ----------------------- SALA, COMEDOR, PASILLOS Y ESCALERAS ----------------------- */
+  { code: 'COMMON_DUST', room: 'COMMON_AREAS', appliesTo: RESIDENCIAL },
+  { code: 'COMMON_GLASS_TABLES', room: 'COMMON_AREAS', appliesTo: RESIDENCIAL },
+  { code: 'COMMON_FINGERPRINTS', room: 'COMMON_AREAS', appliesTo: RESIDENCIAL },
+  { code: 'COMMON_WINDOW_DUST', room: 'COMMON_AREAS', appliesTo: RESIDENCIAL },
+  { code: 'COMMON_COBWEBS', room: 'COMMON_AREAS', appliesTo: RESIDENCIAL },
+  { code: 'COMMON_HANDRAILS', room: 'COMMON_AREAS', appliesTo: RESIDENCIAL },
+  { code: 'COMMON_TRASH', room: 'COMMON_AREAS', appliesTo: RESIDENCIAL },
+  { code: 'COMMON_VACUUM', room: 'COMMON_AREAS', appliesTo: RESIDENCIAL },
+  { code: 'COMMON_MOP', room: 'COMMON_AREAS', appliesTo: RESIDENCIAL },
+
+  /* ------- SOLO PROFUNDA Y MUDANZA: se suman a todo lo de arriba ------- */
+  { code: 'DEEP_BASEBOARDS', room: 'WHOLE_HOUSE', appliesTo: PROFUNDA_Y_MUDANZA },
+  { code: 'DEEP_DOORS', room: 'WHOLE_HOUSE', appliesTo: PROFUNDA_Y_MUDANZA },
+  { code: 'DEEP_FANS_LIGHTS', room: 'WHOLE_HOUSE', appliesTo: PROFUNDA_Y_MUDANZA },
+  { code: 'DEEP_BLINDS_SILLS', room: 'WHOLE_HOUSE', appliesTo: PROFUNDA_Y_MUDANZA },
+  { code: 'DEEP_VENTS', room: 'WHOLE_HOUSE', appliesTo: PROFUNDA_Y_MUDANZA },
+  { code: 'DEEP_CABINET_FRONTS', room: 'KITCHEN', appliesTo: PROFUNDA_Y_MUDANZA },
+  { code: 'DEEP_STOVE_GREASE', room: 'KITCHEN', appliesTo: PROFUNDA_Y_MUDANZA },
+  { code: 'DEEP_SOAP_SCUM', room: 'BATHROOM', appliesTo: PROFUNDA_Y_MUDANZA },
+  { code: 'DEEP_TOILET_EDGES', room: 'BATHROOM', appliesTo: PROFUNDA_Y_MUDANZA },
+  { code: 'DEEP_UNDER_CUSHIONS', room: 'COMMON_AREAS', appliesTo: PROFUNDA_Y_MUDANZA },
+  { code: 'DEEP_BEHIND_OBJECTS', room: 'WHOLE_HOUSE', appliesTo: PROFUNDA_Y_MUDANZA },
+
+  /* ----------------- SOLO ENTRADA O SALIDA ----------------- */
+  { code: 'MOVE_CLOSETS', room: 'WHOLE_HOUSE', appliesTo: SOLO_MUDANZA },
+  { code: 'MOVE_CLEARED_SPACES', room: 'WHOLE_HOUSE', appliesTo: SOLO_MUDANZA },
+  { code: 'MOVE_FINAL_SWEEP', room: 'WHOLE_HOUSE', appliesTo: SOLO_MUDANZA },
+  { code: 'MOVE_REPORT_DAMAGE', room: 'WHOLE_HOUSE', appliesTo: SOLO_MUDANZA },
+
+  /* ------------- SOLO SI SE CONTRATO EL EXTRA ------------- */
+  {
+    code: 'ADDON_INSIDE_OVEN',
+    room: 'KITCHEN',
+    appliesTo: RESIDENCIAL,
+    requiresAddOn: 'INSIDE_OVEN',
+  },
+  {
+    code: 'ADDON_INSIDE_FRIDGE',
+    room: 'KITCHEN',
+    appliesTo: RESIDENCIAL,
+    requiresAddOn: 'INSIDE_FRIDGE',
+  },
+  {
+    code: 'ADDON_INSIDE_CABINETS',
+    room: 'KITCHEN',
+    appliesTo: RESIDENCIAL,
+    requiresAddOn: 'WINDOWS_AND_CABINETS',
+  },
+  {
+    code: 'ADDON_INTERIOR_WINDOWS',
+    room: 'WHOLE_HOUSE',
+    appliesTo: RESIDENCIAL,
+    requiresAddOn: 'WINDOWS_AND_CABINETS',
+  },
+  { code: 'ADDON_LAUNDRY', room: 'WHOLE_HOUSE', appliesTo: RESIDENCIAL, requiresAddOn: 'LAUNDRY' },
+];
 
 /**
  * Las tareas que le toca a un servicio, en orden de recorrido de la casa.
@@ -129,16 +312,33 @@ export const JOB_CHECKLIST_CATALOG: readonly ChecklistItem[] = [];
  * Deja fuera las retiradas: en un trabajo nuevo no se pide algo que la
  * empresa ya no hace.
  *
- * El catalogo entra POR PARAMETRO con un valor por defecto, y no es
- * decoracion: es lo que permite probar esta funcion y las pantallas con un
- * catalogo de prueba mientras el de verdad esta pendiente de contenido.
+ * ==========================================================================
+ * LOS EXTRAS SON OBLIGATORIOS, Y NO POR CAPRICHO DE LA FIRMA
+ * ==========================================================================
+ * `extras` son los extras QUE ESA RESERVA PAGO. Sin ellos no se puede
+ * decidir si el interior del horno entra en la lista, y un valor por defecto
+ * —`[]`— seria la peor version posible de esto: quien llamara sin pasarlos no
+ * veria ningun error, simplemente la tarea del horno no apareceria nunca, en
+ * ninguna casa, y nadie sabria por que. Exigirlo convierte ese descuido en un
+ * fallo de compilacion en el unico momento en que se puede arreglar barato.
+ *
+ * Por eso va ANTES del catalogo: al cambiar el orden, cualquier llamada
+ * antigua deja de compilar en vez de seguir funcionando a medias.
+ *
+ * El catalogo, en cambio, SI entra con valor por defecto: es lo que permite
+ * probar esta funcion y las pantallas con un catalogo pequeño y controlado en
+ * vez de con las cincuenta y nueve tareas de verdad.
  */
 export function checklistForService(
   service: ServiceType,
+  extras: readonly AddOnCode[],
   catalogo: readonly ChecklistItem[] = JOB_CHECKLIST_CATALOG,
 ): readonly ChecklistItem[] {
   const vigentes = catalogo.filter(
-    (tarea) => tarea.retired !== true && tarea.appliesTo.includes(service),
+    (tarea) =>
+      tarea.retired !== true &&
+      tarea.appliesTo.includes(service) &&
+      (tarea.requiresAddOn === undefined || extras.includes(tarea.requiresAddOn)),
   );
 
   /*
@@ -179,13 +379,14 @@ export function canEditChecklist(status: BookingStatus): boolean {
 }
 
 /**
- * Lo que el movil manda al marcar o desmarcar una tarea.
+ * Lo que el movil manda al decir en que quedo una tarea.
  *
  * ========================================================================
- * SE PUEDE DESMARCAR, Y ES DELIBERADO
+ * SE PUEDE VOLVER ATRAS, Y ES DELIBERADO
  * ========================================================================
- * `done: false` existe porque esta pantalla se usa de pie, con una mano y a
- * veces con guantes: los toques equivocados son la norma, no la excepcion.
+ * `state: null` deja la tarea sin tocar otra vez, y existe porque esta
+ * pantalla se usa de pie, con una mano y a veces con guantes: los toques
+ * equivocados son la norma, no la excepcion.
  *
  * Una lista que no se puede corregir tiene un resultado predecible: la
  * primera vez que alguien marque sin querer «horno limpiado», aprendera que
@@ -193,39 +394,75 @@ export function canEditChecklist(status: BookingStatus): boolean {
  * sirve para lo unico que tiene que servir: responder a un cliente que llama
  * diciendo que algo se quedo sin hacer.
  *
- * Quien desmarca y cuando queda registrado igual, porque la fila se borra y
- * se vuelve a crear con su autor y su hora.
+ * Quien lo cambio y cuando queda registrado igual: la fila se reescribe con
+ * su autor y su hora.
  */
-export const ChecklistProgressSchema = z.strictObject({
-  /**
-   * El codigo de la tarea. SE COMPRUEBA EN EL SERVIDOR contra el catalogo
-   * del servicio de ese trabajo: aqui no se puede validar contra el
-   * enumerado porque el catalogo es una lista de datos, no un `z.enum`.
+export const ChecklistProgressSchema = z
+  .strictObject({
+    /**
+     * El codigo de la tarea. SE COMPRUEBA EN EL SERVIDOR contra el catalogo
+     * del servicio de ese trabajo: aqui no se puede validar contra el
+     * enumerado porque el catalogo es una lista de datos, no un `z.enum`.
+     *
+     * El tope de 64 caracteres no es un detalle: sin el, se podria meter en la
+     * base una cadena de un megabyte por cada toque.
+     */
+    itemCode: z.string().min(1).max(64),
+
+    /** En que queda. `null` la deja SIN TOCAR, que borra la fila. */
+    state: ChecklistItemStateSchema.nullable(),
+
+    /**
+     * EL MOTIVO, SOLO SI QUEDA PENDIENTE.
+     *
+     * Opcional, y no se exige. La dueña escribio «debe PERMITIR anotar el
+     * motivo», no «debe exigirlo», y la diferencia importa: exigirlo dejaria
+     * a quien no puede escribir en ese momento —prisa, guantes, una mano—
+     * sin poder marcar la tarea como pendiente, y la dejaria sin tocar. Se
+     * perderia la informacion entera por intentar conseguirla completa.
+     *
+     * `min(1)` DESPUES de `trim()`: un motivo en blanco no es un motivo, y
+     * admitirlo dejaria filas que dicen «hay un motivo» sin motivo. El
+     * cliente manda `null`, no cadena vacia.
+     */
+    note: z.string().trim().min(1).max(CHECKLIST_NOTE_MAX).nullable().default(null),
+  })
+  /*
+   * EL MOTIVO SOLO VIAJA CON «PENDIENTE», Y ESTO NO ES UNA REGLA DE FORMA.
    *
-   * El tope de 64 caracteres no es un detalle: sin el, se podria meter en la
-   * base una cadena de un megabyte por cada toque.
+   * Un campo de texto que se acepta en cualquier estado es un almacen de
+   * texto libre colgado de una reserva, que es exactamente lo que evita la
+   * comprobacion del codigo de tarea contra el catalogo. La misma regla esta
+   * escrita como `CHECK` en la base de datos: el servidor es un programa que
+   * se cambia, y la restriccion es la que sigue en pie si alguien escribe por
+   * otro camino.
    */
-  itemCode: z.string().min(1).max(64),
-  done: z.boolean(),
-});
+  .refine((valor) => valor.note === null || valor.state === 'PENDING', {
+    message: 'El motivo solo se anota en una tarea que queda pendiente',
+    path: ['note'],
+  });
 export type ChecklistProgress = z.infer<typeof ChecklistProgressSchema>;
+export type ChecklistProgressInput = z.input<typeof ChecklistProgressSchema>;
 
 /**
- * Una tarea tal como se LEE: la tarea y su estado en este trabajo.
+ * Una tarea tal como se LEE: la tarea y en que quedo en este trabajo.
  *
- * `doneByFirstName` es el nombre de pila de quien la marco, sin apellido,
- * igual que en el resto de la pantalla de limpieza. Esta porque en una casa
- * con dos personas sirve para no hacer dos veces lo mismo, que es justo el
- * problema que esta lista resuelve en el dia a dia.
+ * `markedByFirstName` es el nombre de pila de quien lo decidio, sin
+ * apellido, igual que en el resto de la pantalla de limpieza. Esta porque en
+ * una casa con dos personas sirve para no hacer dos veces lo mismo, que es
+ * justo el problema que esta lista resuelve en el dia a dia.
  */
 export const JobChecklistEntrySchema = z.strictObject({
   code: z.string(),
   room: ChecklistRoomSchema,
-  done: z.boolean(),
-  /** Cuando se marco. `null` si no esta marcada. */
-  doneAt: z.iso.datetime().nullable(),
-  /** Quien la marco, por su nombre de pila. `null` si no esta marcada. */
-  doneByFirstName: z.string().nullable(),
+  /** En que quedo. `null` es SIN TOCAR: nadie ha mirado esta tarea. */
+  state: ChecklistItemStateSchema.nullable(),
+  /** El motivo, solo en una pendiente. `null` en cualquier otro caso. */
+  note: z.string().nullable(),
+  /** Cuando se decidio. `null` si esta sin tocar. */
+  markedAt: z.iso.datetime().nullable(),
+  /** Quien lo decidio, por su nombre de pila. `null` si esta sin tocar. */
+  markedByFirstName: z.string().nullable(),
   /**
    * Una tarea MARCADA que ya no esta en el catalogo del servicio.
    *
@@ -238,20 +475,56 @@ export const JobChecklistEntrySchema = z.strictObject({
 });
 export type JobChecklistEntry = z.infer<typeof JobChecklistEntrySchema>;
 
+/** Como queda una lista, contada por estados. */
+export interface ChecklistCounts {
+  /** Sin tocar: nadie ha mirado estas tareas. Es lo que queda por DECIDIR. */
+  readonly untouched: number;
+  readonly done: number;
+  /** Se miraron y no se pudieron hacer. Son una RESPUESTA, no trabajo. */
+  readonly pending: number;
+  readonly notApplicable: number;
+}
+
 /**
- * Cuantas tareas quedan sin marcar.
+ * Cuenta una lista por estados.
  *
- * NO BLOQUEA NADA, Y ESO ES UNA DECISION DE DISENO, no una simplificacion.
- * Un trabajo se puede terminar con tareas sin marcar, por el mismo motivo
- * por el que el fichaje nunca se bloquea (`clock-in.ts`): el boton de «he
+ * ==========================================================================
+ * SON CUATRO NUMEROS Y NO UNO, Y ESO SUSTITUYE AL CONTADOR DE ANTES
+ * ==========================================================================
+ * Antes habia un solo numero: «sin marcar». Con tres estados ese numero
+ * mezclaba dos cosas que no se parecen en nada —una tarea que nadie ha
+ * mirado y una que no habia que hacer— y el resultado era el que la dueña
+ * queria arreglar: una casa vacia de mudanza salia con veinte tareas «sin
+ * hacer» cuando en veinte de ellas no habia nada que hacer.
+ *
+ * `untouched` ES EL QUE AVISA. Son las que quedan por decidir, y es lo que se
+ * dice antes de terminar un trabajo. `pending` no entra ahi: esa tarea ya
+ * esta resuelta desde el punto de vista de quien limpia —la miro, no se pudo,
+ * lo explico— y cerrarle el paso por ella seria pedirle que haga algo que ya
+ * ha dicho que no puede hacer.
+ *
+ * ==========================================================================
+ * NO BLOQUEA NADA, Y ESO ES UNA DECISION DE DISENO
+ * ==========================================================================
+ * Un trabajo se puede terminar con tareas sin tocar, por el mismo motivo por
+ * el que el fichaje nunca se bloquea (`clock-in.ts`): el boton de «he
  * terminado» es lo que registra la salida, y negarlo porque falta un toque
  * deja a la empleada en la puerta de una casa sin poder cerrar su trabajo.
  *
- * Sirve para avisar —«te quedan 3»— y para que coordinacion lo vea despues.
- * Las retiradas no cuentan: no son trabajo pendiente de nadie.
+ * LAS RETIRADAS NO CUENTAN EN NINGUNO de los cuatro: no son trabajo de nadie
+ * hoy, son historia de un trabajo viejo.
  */
-export function pendingChecklistCount(entradas: readonly JobChecklistEntry[]): number {
-  return entradas.filter((entrada) => !entrada.done && !entrada.retired).length;
+export function checklistCounts(entradas: readonly JobChecklistEntry[]): ChecklistCounts {
+  const vigentes = entradas.filter((entrada) => !entrada.retired);
+  const cuantas = (estado: ChecklistItemState): number =>
+    vigentes.filter((entrada) => entrada.state === estado).length;
+
+  return {
+    untouched: vigentes.filter((entrada) => entrada.state === null).length,
+    done: cuantas('DONE'),
+    pending: cuantas('PENDING'),
+    notApplicable: cuantas('NOT_APPLICABLE'),
+  };
 }
 
 /** La clave de traduccion del texto de una tarea. */
@@ -262,6 +535,11 @@ export function checklistItemTextKey(code: string): string {
 /** La clave de traduccion del nombre de una estancia. */
 export function checklistRoomTextKey(room: ChecklistRoom): string {
   return `checklist.rooms.${room}`;
+}
+
+/** La clave de traduccion del nombre de un estado. */
+export function checklistStateTextKey(state: ChecklistItemState): string {
+  return `checklist.states.${state}`;
 }
 
 /**

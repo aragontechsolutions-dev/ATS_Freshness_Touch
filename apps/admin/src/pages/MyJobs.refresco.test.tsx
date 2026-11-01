@@ -192,10 +192,10 @@ describe('el refresco automatico', () => {
      * 3.5.h, y es peor que aquel: alli hacian falta dos toques seguidos,
      * aqui basta UNO, porque el reloj dispara solo.
      *
-     * Se marca una tarea, el servidor todavia no ha contestado, y el reloj
-     * salta. Si el sondeo se llevara a cabo, traeria una foto SIN la marca
-     * —el servidor aun no la tiene— y la casilla se volveria atras sin que
-     * nadie hubiera tocado nada.
+     * Se decide una tarea, el servidor todavia no ha contestado, y el reloj
+     * salta. Si el sondeo se llevara a cabo, traeria una foto SIN lo decidido
+     * —el servidor aun no lo tiene— y el boton se apagaria solo sin que nadie
+     * hubiera tocado nada.
      */
     await montar(
       trabajo({
@@ -203,9 +203,10 @@ describe('el refresco automatico', () => {
           {
             code: 'POLVO',
             room: 'COMMON_AREAS',
-            done: false,
-            doneAt: null,
-            doneByFirstName: null,
+            state: null,
+            note: null,
+            markedAt: null,
+            markedByFirstName: null,
             retired: false,
           },
         ],
@@ -216,9 +217,14 @@ describe('el refresco automatico', () => {
     // El servidor no contesta: la peticion se queda en vuelo.
     markChecklistItem.mockReturnValue(new Promise(() => {}));
 
-    const casilla = contenedor.querySelector('input[type=checkbox]');
-    if (!(casilla instanceof HTMLInputElement)) throw new Error('no hay casilla');
-    act(() => casilla.click());
+    /*
+     * El primero de los tres botones de estado de esa tarea. Se coge por el
+     * grupo y no por el texto: es el unico grupo de la pantalla.
+     */
+    const grupo = contenedor.querySelector('[role=group]');
+    const marcar = grupo?.querySelector('button');
+    if (!(marcar instanceof HTMLButtonElement)) throw new Error('no hay botones de estado');
+    act(() => marcar.click());
 
     await pasan(60);
 

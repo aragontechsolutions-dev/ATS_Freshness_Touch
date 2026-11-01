@@ -211,39 +211,169 @@ export const en = {
   checklist: {
     title: 'What to do in the house',
     /** «Te quedan 3». Avisa, no bloquea: el trabajo se puede terminar igual. */
-    pending_one: '{{count}} task left',
-    pending_other: '{{count}} tasks left',
+    left_one: '{{count}} to decide',
+    left_other: '{{count}} to decide',
     /* Lo mismo contado para coordinacion, que lee un trabajo ya cerrado. */
-    notTicked_one: '{{count}} task not ticked',
-    notTicked_other: '{{count}} tasks not ticked',
-    allDone: 'Everything on the list is done',
-    /** Quien y cuando marco una tarea. */
-    doneBy: '{{name}}, {{time}}',
+    untouched_one: '{{count}} not looked at',
+    untouched_other: '{{count}} not looked at',
+    allDone: 'Everything on the list is settled',
+    /** Quien y cuando dijo en que quedaba una tarea. */
+    markedBy: '{{name}}, {{time}}',
     /** Una tarea que se marco cuando se pedia y que ya no se pide. */
     retired: 'No longer part of this service',
 
+    /*
+     * ======================================================================
+     * LOS TRES ESTADOS, Y POR QUE LAS ETIQUETAS SON TAN CORTAS
+     * ======================================================================
+     * Van en tres botones uno al lado del otro, en una pantalla de 390 px.
+     * Cada boton tiene que seguir siendo pulsable con guantes, asi que el
+     * texto manda: «Done / Pending / N/A», no «Mark as completed».
+     */
+    states: {
+      DONE: 'Done',
+      PENDING: 'Pending',
+      NOT_APPLICABLE: 'N/A',
+    },
+    /* La etiqueta accesible de cada boton: ahi si cabe la frase entera. */
+    setState: {
+      DONE: 'Mark as done',
+      PENDING: 'Leave pending',
+      NOT_APPLICABLE: 'Does not apply here',
+    },
+    /** Pulsar el estado que ya esta puesto deja la tarea sin tocar. */
+    clearState: 'Leave it undecided',
+
+    /* Los recuentos que lee coordinacion en un trabajo ya cerrado. */
+    countPending_one: '{{count}} left pending',
+    countPending_other: '{{count}} left pending',
+    countNotApplicable_one: '{{count}} did not apply',
+    countNotApplicable_other: '{{count}} did not apply',
+
+    /*
+     * EL MOTIVO. Se pide, no se exige: la dueña escribio «debe PERMITIR
+     * anotar el motivo». Exigirlo dejaria sin marcar la tarea a quien no
+     * puede escribir en ese momento, y se perderia la informacion entera por
+     * intentar conseguirla completa.
+     */
+    noteTitle: 'Why is it pending?',
+    notePlaceholder: 'Reason (optional)',
+    noteSave: 'Save reason',
+    noteClear: 'Remove the reason',
+
+    /*
+     * LAS ESTANCIAS, EN EL ORDEN DE `CHECKLIST_ROOMS`.
+     *
+     * `WHOLE_HOUSE` no es una estancia: es donde caen las tareas de la
+     * limpieza profunda y de mudanza que se hacen recorriendo la casa entera
+     * —zocalos, puertas, rejillas—, y por eso va la ultima.
+     */
     rooms: {
-      COMMON_AREAS: 'Living areas and bedrooms',
-      BATHROOM: 'Bathrooms',
       KITCHEN: 'Kitchen',
+      BATHROOM: 'Bathrooms',
+      BEDROOM: 'Bedrooms',
+      COMMON_AREAS: 'Living room, dining room, hallways and stairs',
+      WHOLE_HOUSE: 'Whole house',
     },
 
     /*
      * ======================================================================
-     * LAS TAREAS, PENDIENTES DE CONTENIDO
+     * LAS TAREAS. UNA CLAVE POR CODIGO DEL CATALOGO, CON EL MISMO NOMBRE
      * ======================================================================
-     * Las de las plantillas de trabajo del cliente —areas comunes (11),
-     * baños (7) y cocina (7)— estan pendientes de transcribir desde la Etapa
-     * 2 (`docs/21-modelo-de-operaciones.md` §4).
+     * Transcritas el 1/11/2026 de la lista que escribio la dueña. Estuvieron
+     * vacias a proposito hasta entonces: una lista de limpieza plausible pero
+     * que no fuera la de esta empresa habria sido peor que ninguna, porque
+     * alguien la daria por buena y quedaria registrado que se hizo un trabajo
+     * que nadie pidio.
      *
-     * No se rellena con tareas inventadas: una lista de limpieza plausible
-     * pero que no es la de esta empresa es peor que ninguna, porque alguien
-     * la daria por buena y quedaria registrado que se hizo un trabajo que
-     * nadie pidio.
+     * EL ORDEN DE AQUI NO PINTA NADA. Lo que se ve en la pantalla lo ordena
+     * `checklistForService` recorriendo `CHECKLIST_ROOMS`; estas claves van
+     * agrupadas igual que el catalogo solo para poder compararlas de un
+     * vistazo. Si faltara una, `t()` devuelve la clave en crudo y en la
+     * pantalla saldria `checklist.items.KITCHEN_SINK` — por eso hay una
+     * prueba que recorre el catalogo entero y las exige en los dos idiomas.
      *
-     * Una clave por codigo del catalogo, con el mismo nombre exacto.
+     * EL TEXTO ES PARA LEERLO DE PIE, CON GUANTES Y CON UNA MANO: una linea,
+     * en imperativo, y diciendo el limite cuando lo hay —«sin limpiar los
+     * vidrios»—. El limite forma parte de la tarea: dejarlo fuera es lo que
+     * acaba con un cliente convencido de que se le prometio otra cosa.
      */
-    items: {},
+    items: {
+      /* ---------- COCINA ---------- */
+      KITCHEN_COUNTERS: 'Clean countertops and backsplash.',
+      KITCHEN_CABINET_FRONTS: 'Clean the outside of the cabinets.',
+      KITCHEN_STOVETOP: 'Clean the stovetop surface.',
+      KITCHEN_APPLIANCE_FRONTS: 'Clean the outside of the appliances.',
+      KITCHEN_MICROWAVE: 'Clean the microwave inside and out.',
+      KITCHEN_SINK: 'Clean the sink and taps.',
+      KITCHEN_TABLE: 'Clean the table and the reachable surfaces of the chairs.',
+      KITCHEN_WINDOW_DUST: 'Dust the windows and clear cobwebs, without cleaning the glass.',
+      KITCHEN_COBWEBS: 'Clear cobwebs from reachable areas.',
+      KITCHEN_TRASH: 'Empty the bin and replace the bag.',
+      KITCHEN_VACUUM: 'Vacuum the floor.',
+      KITCHEN_MOP: 'Mop the floor.',
+
+      /* ---------- BANOS ---------- */
+      BATH_SINK: 'Clean the basin, countertops and taps.',
+      BATH_MIRRORS: 'Clean the mirrors.',
+      BATH_TOILET: 'Clean and disinfect the toilet inside and out, base included.',
+      BATH_SHOWER: 'Clean the bath, shower and shower glass doors.',
+      BATH_CABINET_FRONTS: 'Clean the outside of the cabinets.',
+      BATH_WINDOW_DUST: 'Dust the windows and clear cobwebs, without cleaning the glass.',
+      BATH_COBWEBS: 'Clear cobwebs from reachable areas.',
+      BATH_TRASH: 'Empty the bin and replace the bag.',
+      BATH_VACUUM: 'Vacuum the floor.',
+      BATH_MOP: 'Mop the floor.',
+
+      /* ---------- HABITACIONES ---------- */
+      BEDROOM_DUST: 'Dust the furniture and reachable surfaces.',
+      BEDROOM_MIRRORS: 'Clean the mirrors.',
+      BEDROOM_BEDS: 'Change the sheets when the customer leaves clean ones out, and make the beds.',
+      BEDROOM_WINDOW_DUST: 'Dust the windows and clear cobwebs, without cleaning the glass.',
+      BEDROOM_COBWEBS: 'Clear cobwebs from reachable areas.',
+      BEDROOM_TRASH: 'Empty the waste baskets.',
+      BEDROOM_VACUUM: 'Vacuum rugs and floors.',
+      BEDROOM_MOP: 'Mop the floors that allow it.',
+
+      /* ---------- SALA, COMEDOR, PASILLOS Y ESCALERAS ---------- */
+      COMMON_DUST: 'Dust the furniture, shelves and reachable decorations.',
+      COMMON_GLASS_TABLES: 'Clean tables and the glass surfaces of the furniture.',
+      COMMON_FINGERPRINTS: 'Clean visible fingerprints from handles and switches.',
+      COMMON_WINDOW_DUST: 'Dust the windows and clear cobwebs, without cleaning the glass.',
+      COMMON_COBWEBS: 'Clear cobwebs from reachable areas.',
+      COMMON_HANDRAILS: 'Clean the handrails.',
+      COMMON_TRASH: 'Empty the waste baskets.',
+      COMMON_VACUUM: 'Vacuum rugs, floors and stairs.',
+      COMMON_MOP: 'Mop the floors that allow it.',
+
+      /* ---------- SOLO LIMPIEZA PROFUNDA Y MUDANZA ---------- */
+      DEEP_BASEBOARDS: 'Detail-clean the reachable baseboards.',
+      DEEP_DOORS: 'Clean doors, frames, handles and switches.',
+      DEEP_FANS_LIGHTS: 'Dust reachable ceiling fans and light fittings.',
+      DEEP_BLINDS_SILLS: 'Dust reachable blinds and interior window sills.',
+      DEEP_VENTS: 'Dust the outside of reachable air vents.',
+      DEEP_CABINET_FRONTS: 'Detail-clean the outside of the cabinets.',
+      DEEP_STOVE_GREASE: 'Remove built-up grease from the stovetop and the outside of the hood.',
+      DEEP_SOAP_SCUM:
+        'Work on soap scum and limescale in showers, baths and taps with products suited to each material.',
+      DEEP_TOILET_EDGES: 'Detail-clean corners, edges and around the toilets.',
+      DEEP_UNDER_CUSHIONS: 'Vacuum under the sofa cushions, where the material allows it.',
+      DEEP_BEHIND_OBJECTS: 'Clean under and behind small objects that can be moved safely.',
+
+      /* ---------- SOLO ENTRADA O SALIDA ---------- */
+      MOVE_CLOSETS: 'Clean the shelves and floors of empty closets.',
+      MOVE_CLEARED_SPACES: 'Clean the cleared spaces where furniture used to be.',
+      MOVE_FINAL_SWEEP: 'Go through every room to remove dust and small debris.',
+      MOVE_REPORT_DAMAGE: 'Record any damage seen, or dirt that could not be removed.',
+
+      /* ---------- SOLO SI SE CONTRATO EL EXTRA ---------- */
+      ADDON_INSIDE_OVEN: 'Clean the inside of the oven.',
+      ADDON_INSIDE_FRIDGE: 'Clean the inside of the fridge.',
+      ADDON_INSIDE_CABINETS: 'Clean the inside of cabinets and drawers, only if they are empty.',
+      ADDON_INTERIOR_WINDOWS:
+        'Clean the window glass from the inside, noting which ones and how many.',
+      ADDON_LAUNDRY: 'Fold clean laundry, up to the agreed amount.',
+    },
   },
 
   frequency: {
@@ -1775,8 +1905,14 @@ export const en = {
       finishTitle: 'Finish this job?',
       finishWarning:
         'Your leaving time is recorded and the job closes. This cannot be undone from your phone: if you tap it by mistake, call the office.',
-      finishPending_one: 'You still have {{count}} task not ticked on the list.',
-      finishPending_other: 'You still have {{count}} tasks not ticked on the list.',
+      /*
+       * CUENTA LAS QUE NADIE HA MIRADO, no las que quedaron pendientes. Una
+       * tarea marcada «pendiente» ya esta resuelta desde el punto de vista de
+       * quien limpia —la miro, no se pudo, lo explico— y nombrarla aqui seria
+       * pedirle que haga algo que ya ha dicho que no puede hacer.
+       */
+      finishPending_one: 'You have not looked at {{count}} task on the list yet.',
+      finishPending_other: 'You have not looked at {{count}} tasks on the list yet.',
       finishConfirm: 'Yes, I have finished',
       /* Corto y sin disculpas: decir que no tiene que costar un toque. */
       finishCancel: 'Not yet',

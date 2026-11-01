@@ -685,7 +685,7 @@ model Staff {
   assignments BookingAssignment[]
   clockIns    BookingClockIn[]
 
-  /// Las tareas que ha marcado como hechas.
+  /// Las tareas de las que ha dicho en que quedaron.
   checklistItems BookingChecklistItem[]
 
   /// Los ajustes de campo que ha propuesto y los que ha resuelto.
@@ -974,14 +974,34 @@ model BookingChecklistItem {
   /// servidor comprueba el codigo contra el catalogo antes de escribir.
   itemCode String @db.VarChar(64)
 
-  /// RESTRICT y no CASCADE, igual que en los fichajes: que se marco y quien
-  /// lo marco es el registro de un trabajo hecho, y no debe borrarse porque
-  /// se de de baja a esa persona.
-  doneByStaffId String @db.Uuid
-  doneBy        Staff  @relation(fields: [doneByStaffId], references: [id], onDelete: Restrict)
+  /// EN QUE QUEDO LA TAREA. Lo pidio la dueña: completada, pendiente o no
+  /// aplica. No hay fila = no se ha tocado todavia, que es el estado de
+  /// partida y no se escribe.
+  ///
+  /// SIN VALOR POR OMISION a proposito. Con `@default(DONE)`, una escritura
+  /// que se olvidara del estado quedaria registrada como «completada», que es
+  /// la afirmacion mas fuerte de las tres y la que puede acabar delante de un
+  /// cliente.
+  state ChecklistItemState
+
+  /// POR QUE NO SE HIZO. Solo en una tarea PENDIENTE: lo garantiza una
+  /// restriccion CHECK en la base de datos, no solo el servidor. Es opcional
+  /// —exigirlo dejaria sin marcar la tarea a quien no puede escribir en ese
+  /// momento— y topa en 300 caracteres, porque es una frase escrita de pie.
+  note String? @db.VarChar(300)
+
+  /// RESTRICT y no CASCADE, igual que en los fichajes: en que quedo una tarea
+  /// y quien lo decidio es el registro de un trabajo hecho, y no debe
+  /// borrarse porque se de de baja a esa persona.
+  markedByStaffId String @db.Uuid
+  markedBy        Staff  @relation(fields: [markedByStaffId], references: [id], onDelete: Restrict)
 
   /// Segun el reloj del SERVIDOR, no del movil.
-  doneAt DateTime @default(now()) @db.Timestamptz(3)
+  ///
+  /// SE LLAMA `markedAt` Y NO `doneAt`, y el cambio de nombre es la migracion
+  /// 20261101120000: en una fila que dice «no aplica», una columna llamada
+  /// `doneAt` afirma literalmente lo contrario de lo que paso.
+  markedAt DateTime @default(now()) @db.Timestamptz(3)
 
   /// UNA TAREA SOLO PUEDE ESTAR MARCADA UNA VEZ EN UN TRABAJO.
   ///
@@ -995,6 +1015,19 @@ model BookingChecklistItem {
   /// que solo cuesta escrituras.
   @@unique([bookingId, itemCode])
   @@map("booking_checklist_items")
+}
+
+/// EN QUE QUEDO UNA TAREA DE LA LISTA.
+///
+/// Son los tres que pidio la dueña. El cuarto estado —«sin tocar»— no esta
+/// aqui porque no se guarda: es la ausencia de fila.
+enum ChecklistItemState {
+  /// Hecha.
+  DONE
+  /// Habia que hacerla y NO se hizo. Es la unica que admite motivo.
+  PENDING
+  /// No habia nada que hacer: la cama que no existe en una casa vacia.
+  NOT_APPLICABLE
 }
 
 /// Los cuatro estados de una propuesta de ajuste.

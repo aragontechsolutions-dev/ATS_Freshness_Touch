@@ -199,21 +199,62 @@ describe('reglas de integridad', () => {
     expect(porTarea, 'falta la unicidad de (bookingId, itemCode)').toBeDefined();
   });
 
-  it('una tarea marcada no se borra al dar de baja a quien la marco', async () => {
+  it('una tarea decidida no se borra al dar de baja a quien la decidio', async () => {
     /*
-     * RESTRICT y no CASCADE, igual que en los fichajes: que se marco y quien
-     * lo marco es el registro de un trabajo hecho. Que desaparezca porque se
-     * da de baja a esa persona en el sistema es justo lo que no debe pasar,
-     * porque es cuando mas falta hace poder mirarlo.
+     * RESTRICT y no CASCADE, igual que en los fichajes: en que quedo una
+     * tarea y quien lo decidio es el registro de un trabajo hecho. Que
+     * desaparezca porque se da de baja a esa persona en el sistema es justo
+     * lo que no debe pasar, porque es cuando mas falta hace poder mirarlo.
+     *
+     * LA RESTRICCION SE LLAMA `markedByStaffId` DESDE LA MIGRACION
+     * 20261101120000, que renombro la columna: en una fila que dice «no
+     * aplica», una columna llamada `doneByStaffId` afirmaba literalmente lo
+     * contrario de lo que paso. La migracion renombra tambien la clave ajena
+     * justo para que esta prueba la siga encontrando por su nombre.
      */
     const rule = await db.query<{ delete_rule: string }>(
       `SELECT rc.delete_rule
        FROM information_schema.referential_constraints rc
        JOIN information_schema.table_constraints tc ON tc.constraint_name = rc.constraint_name
        WHERE tc.table_name = 'booking_checklist_items'
-         AND rc.constraint_name LIKE '%doneByStaffId%'`,
+         AND rc.constraint_name LIKE '%markedByStaffId%'`,
     );
     expect(rule.rows[0]?.delete_rule).toBe('RESTRICT');
+  });
+
+  it('EL MOTIVO DE UNA TAREA SOLO CABE EN UNA PENDIENTE', async () => {
+    /*
+     * La misma regla que comprueba el servidor, escrita tambien en la base de
+     * datos. No es redundancia por gusto: el servidor es un programa que se
+     * cambia, y esta restriccion es la que sigue en pie si alguien escribe en
+     * la tabla por otro camino —una consulta a mano durante una incidencia,
+     * un script de migracion—.
+     *
+     * Lo que protege es que el motivo signifique siempre lo mismo: la
+     * respuesta a «¿por que no se hizo?».
+     */
+    const check = await db.query<{ constraint_name: string }>(
+      `SELECT constraint_name FROM information_schema.table_constraints
+       WHERE table_name = 'booking_checklist_items' AND constraint_type = 'CHECK'
+         AND constraint_name LIKE '%motivo_solo_si_pendiente%'`,
+    );
+    expect(check.rows, 'falta el CHECK del motivo').toHaveLength(1);
+  });
+
+  it('el estado de una tarea NO tiene valor por omision', async () => {
+    /*
+     * A PROPOSITO. Con `DEFAULT 'DONE'`, una insercion que se olvidara del
+     * estado quedaria registrada como «completada», que es la afirmacion mas
+     * fuerte de las tres y la que puede acabar delante de un cliente. Sin
+     * valor por omision, ese descuido es un error en el primer intento.
+     */
+    const columna = await db.query<{ column_default: string | null; is_nullable: string }>(
+      `SELECT column_default, is_nullable FROM information_schema.columns
+       WHERE table_name = 'booking_checklist_items' AND column_name = 'state'`,
+    );
+
+    expect(columna.rows[0]?.is_nullable).toBe('NO');
+    expect(columna.rows[0]?.column_default).toBeNull();
   });
 
   it('pero si se borra con el trabajo al que pertenece', async () => {

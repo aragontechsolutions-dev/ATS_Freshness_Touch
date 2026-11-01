@@ -6,7 +6,12 @@ import { Test } from '@nestjs/testing';
 import type { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { ALL_SERVICES, MyJobsSchema, type ChecklistItem } from '@freshness/types';
+import {
+  ALL_SERVICES,
+  MyJobsSchema,
+  type ChecklistItem,
+  type ChecklistItemState,
+} from '@freshness/types';
 import { AppModule } from '../app.module';
 import { AUTH_PROVIDER } from '../auth/auth.types';
 import { JOB_CHECKLIST_CATALOG_TOKEN } from './job-checklist.helper';
@@ -125,44 +130,80 @@ async function fichajes(bookingId: string): Promise<FilaFichaje[]> {
 
 /* ------------------------- La lista de verificacion ------------------------- */
 
-/** Tres tareas de mentira: ver el comentario en `beforeAll`. */
+/** Tareas de mentira: ver el comentario en `beforeAll`. */
 const CATALOGO_DE_PRUEBA: readonly ChecklistItem[] = [
   { code: 'COCINA_FREGADERO', room: 'KITCHEN', appliesTo: ALL_SERVICES },
   { code: 'SALON_POLVO', room: 'COMMON_AREAS', appliesTo: ALL_SERVICES },
   { code: 'BANO_ESPEJO', room: 'BATHROOM', appliesTo: ['DEEP'] },
   { code: 'TAREA_RETIRADA', room: 'KITCHEN', appliesTo: ALL_SERVICES, retired: true },
+  /*
+   * LA TAREA DE UN EXTRA. Las reservas de estas pruebas no compran ningun
+   * extra, asi que esta no entra en ninguna lista y NO SE PUEDE MARCAR. Es lo
+   * que comprueba el bloque «la tarea de un extra que no se pago».
+   */
+  {
+    code: 'HORNO_POR_DENTRO',
+    room: 'KITCHEN',
+    appliesTo: ALL_SERVICES,
+    requiresAddOn: 'INSIDE_OVEN',
+  },
 ];
 
+/**
+ * Dice en que queda una tarea.
+ *
+ * `state: null` la deja SIN TOCAR, que es lo que antes era `done: false`. El
+ * motivo va aparte porque solo lo admite una pendiente.
+ */
 async function marcarTarea(
   bookingId: string,
   itemCode: string,
-  done: boolean,
-  token?: string,
+  state: ChecklistItemState | null,
+  opciones: { note?: string | null; token?: string } = {},
 ): Promise<request.Response> {
   return request(app.getHttpServer())
     .patch(`${RUTA}/${bookingId}/checklist`)
-    .set('authorization', `Bearer ${token ?? (await comoCleo())}`)
-    .send({ itemCode, done });
+    .set('authorization', `Bearer ${opciones.token ?? (await comoCleo())}`)
+    .send({ itemCode, state, note: opciones.note ?? null });
 }
 
 interface FilaTarea {
   itemCode: string;
-  doneByStaffId: string;
+  state: string;
+  note: string | null;
+  markedByStaffId: string;
 }
 
 async function tareasMarcadas(bookingId: string): Promise<FilaTarea[]> {
   const filas = await db.query<FilaTarea>(
-    `SELECT "itemCode", "doneByStaffId" FROM booking_checklist_items
-      WHERE "bookingId" = '${bookingId}' ORDER BY "doneAt"`,
+    `SELECT "itemCode", "state", "note", "markedByStaffId" FROM booking_checklist_items
+      WHERE "bookingId" = '${bookingId}' ORDER BY "markedAt"`,
   );
   return filas.rows;
+}
+
+/** La hora a la que se decidio una tarea, para comprobar que se reescribe. */
+async function horaDe(bookingId: string, itemCode: string): Promise<string | undefined> {
+  const filas = await db.query<{ markedAt: string }>(
+    `SELECT "markedAt" FROM booking_checklist_items
+      WHERE "bookingId" = '${bookingId}' AND "itemCode" = '${itemCode}'`,
+  );
+  return filas.rows[0]?.markedAt;
 }
 
 /** La lista tal como la devuelve la API para un trabajo. */
 async function listaDe(bookingId: string, token?: string) {
   const respuesta = await misTrabajos(token);
   const job = respuesta.body.jobs.find((j: { bookingId: string }) => j.bookingId === bookingId) as
-    { checklist: { code: string; done: boolean; retired: boolean }[] } | undefined;
+    | {
+        checklist: {
+          code: string;
+          state: string | null;
+          note: string | null;
+          retired: boolean;
+        }[];
+      }
+    | undefined;
   return job?.checklist ?? [];
 }
 
@@ -217,15 +258,16 @@ beforeAll(async () => {
   process.env.DATABASE_URL = `postgresql://postgres:postgres@127.0.0.1:${PUERTO}/postgres`;
 
   /*
-   * EL CATALOGO DE TAREAS, SUSTITUIDO POR TRES DE MENTIRA.
+   * EL CATALOGO DE TAREAS, SUSTITUIDO POR UNAS DE MENTIRA.
    *
-   * El de verdad esta vacio mientras las plantillas del cliente esten
-   * pendientes de transcribir, y con el vacio el camino de ESCRITURA no se
-   * podria probar en absoluto: toda peticion seria rechazada por «esa tarea
-   * no existe» y lo unico verificado seria el rechazo.
+   * El de verdad tiene cincuenta y nueve tareas con codigos largos. Usarlo
+   * aqui obligaria a elegir uno a mano —`KITCHEN_APPLIANCE_FRONTS`— y estas
+   * pruebas dejarian de verificar el camino de escritura para pasar a
+   * verificar que ese codigo sigue existiendo: el dia que la dueña reordene
+   * su lista se caerian por un motivo que no tiene que ver con el endpoint.
    *
-   * Con estas tres se recorre EL MISMO codigo que produccion: la unica
-   * diferencia es el contenido de una lista de datos.
+   * Con estas se recorre EL MISMO codigo que produccion: la unica diferencia
+   * es el contenido de una lista de datos.
    */
   const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
     .overrideProvider(JOB_CHECKLIST_CATALOG_TOKEN)
@@ -700,42 +742,59 @@ describe('la lista que llega con el trabajo', () => {
   it('trae las tareas del servicio, en orden de recorrido de la casa', async () => {
     /*
      * La reserva de estas pruebas es STANDARD, asi que `BANO_ESPEJO` —solo de
-     * la profunda— no entra, y la retirada tampoco. Lo que queda sale primero
-     * el salon y despues la cocina, que es el orden del recorrido y no el del
-     * catalogo.
+     * la profunda— no entra; la retirada tampoco, y `HORNO_POR_DENTRO` menos
+     * aun, porque esa reserva no compro el extra. Lo que queda sale primero la
+     * cocina y despues el salon: es el orden del recorrido de la casa, no el
+     * del catalogo.
      */
     const lista = await listaDe(DE_CLEO);
 
-    expect(lista.map((t) => t.code)).toEqual(['SALON_POLVO', 'COCINA_FREGADERO']);
-    expect(lista.every((t) => !t.done)).toBe(true);
+    expect(lista.map((t) => t.code)).toEqual(['COCINA_FREGADERO', 'SALON_POLVO']);
+    expect(lista.every((t) => t.state === null)).toBe(true);
   });
 
-  it('un trabajo recien confirmado la trae entera sin marcar', async () => {
-    expect((await listaDe(DE_CLEO)).filter((t) => t.done)).toEqual([]);
+  it('un trabajo recien confirmado la trae entera SIN TOCAR, con estado null', async () => {
+    /*
+     * `null` Y NO `DONE` NI `PENDING`: sin tocar es el estado de partida, y
+     * es lo que distingue «nadie ha mirado esto» de «se miro y no se pudo».
+     */
+    expect((await listaDe(DE_CLEO)).filter((t) => t.state !== null)).toEqual([]);
   });
 });
 
-describe('marcar una tarea', () => {
-  it('escribe una fila con quien la marco', async () => {
-    const respuesta = await marcarTarea(DE_CLEO, 'SALON_POLVO', true);
+describe('decir en que queda una tarea', () => {
+  it('escribe una fila con el estado y con quien lo decidio', async () => {
+    const respuesta = await marcarTarea(DE_CLEO, 'SALON_POLVO', 'DONE');
 
     expect(respuesta.status).toBe(200);
     expect(await tareasMarcadas(DE_CLEO)).toEqual([
-      { itemCode: 'SALON_POLVO', doneByStaffId: CLEO },
+      { itemCode: 'SALON_POLVO', state: 'DONE', note: null, markedByStaffId: CLEO },
     ]);
   });
 
-  it('devuelve el trabajo entero con la tarea ya marcada', async () => {
+  it('devuelve el trabajo entero con la tarea ya decidida', async () => {
     /*
      * Devuelve el trabajo y no solo la tarea para que la pantalla se repinte
      * con lo que de verdad hay en la base —incluido lo que una companera haya
-     * marcado mientras tanto— en vez de con lo que el movil cree.
+     * decidido mientras tanto— en vez de con lo que el movil cree.
      */
-    const respuesta = await marcarTarea(DE_CLEO, 'SALON_POLVO', true);
-    const lista = respuesta.body.checklist as { code: string; done: boolean }[];
+    const respuesta = await marcarTarea(DE_CLEO, 'SALON_POLVO', 'DONE');
+    const lista = respuesta.body.checklist as { code: string; state: string | null }[];
 
-    expect(lista.find((t) => t.code === 'SALON_POLVO')?.done).toBe(true);
-    expect(lista.find((t) => t.code === 'COCINA_FREGADERO')?.done).toBe(false);
+    expect(lista.find((t) => t.code === 'SALON_POLVO')?.state).toBe('DONE');
+    expect(lista.find((t) => t.code === 'COCINA_FREGADERO')?.state).toBeNull();
+  });
+
+  it('LOS TRES ESTADOS SE GUARDAN, cada uno con el suyo', async () => {
+    /*
+     * Son los tres que pidio la duena. Que «no aplica» se guarde como tal es
+     * el cambio que de verdad hacia falta: antes salia igual que una tarea
+     * que se quedo sin hacer.
+     */
+    for (const estado of ['DONE', 'PENDING', 'NOT_APPLICABLE'] as const) {
+      await marcarTarea(DE_CLEO, 'SALON_POLVO', estado);
+      expect((await tareasMarcadas(DE_CLEO))[0]?.state, estado).toBe(estado);
+    }
   });
 
   it('ES IDEMPOTENTE: dos toques no dejan dos filas', async () => {
@@ -743,10 +802,10 @@ describe('marcar una tarea', () => {
      * EL CASO REAL, NO UN CASO LIMITE. Esta pantalla se usa de pie, a veces
      * con guantes y con una conexion mala en la puerta de una casa: el doble
      * toque y el reintento son la norma. Sin la unicidad en la base, la lista
-     * diria que la tarea se hizo dos veces.
+     * diria que la tarea se decidio dos veces.
      */
-    await marcarTarea(DE_CLEO, 'SALON_POLVO', true);
-    const segunda = await marcarTarea(DE_CLEO, 'SALON_POLVO', true);
+    await marcarTarea(DE_CLEO, 'SALON_POLVO', 'DONE');
+    const segunda = await marcarTarea(DE_CLEO, 'SALON_POLVO', 'DONE');
 
     expect(segunda.status).toBe(200);
     expect(await tareasMarcadas(DE_CLEO)).toHaveLength(1);
@@ -754,48 +813,204 @@ describe('marcar una tarea', () => {
 
   it('y el segundo toque de OTRA persona no le roba la autoria', async () => {
     /*
-     * `upsert` con el `update` vacio. Si volviera a escribir el autor, el
-     * segundo toque de Dario convertiria «lo hizo Cleo» en «lo hizo Dario»,
+     * ESTA ES LA PRUEBA QUE VIGILA EL ATAJO del servicio: si el estado y el
+     * motivo son los mismos, no se escribe nada. Sin ese atajo, el segundo
+     * toque de Dario convertiria «lo decidio Cleo» en «lo decidio Dario»,
      * borrando a quien de verdad lo hizo.
      */
-    await marcarTarea(DE_CLEO, 'SALON_POLVO', true);
-    await marcarTarea(DE_CLEO, 'SALON_POLVO', true, await comoDario());
+    await marcarTarea(DE_CLEO, 'SALON_POLVO', 'DONE');
+    await marcarTarea(DE_CLEO, 'SALON_POLVO', 'DONE', { token: await comoDario() });
 
     expect(await tareasMarcadas(DE_CLEO)).toEqual([
-      { itemCode: 'SALON_POLVO', doneByStaffId: CLEO },
+      { itemCode: 'SALON_POLVO', state: 'DONE', note: null, markedByStaffId: CLEO },
     ]);
   });
 
-  it('desmarcar borra la fila', async () => {
+  it('PERO CAMBIAR DE ESTADO SI REESCRIBE EL AUTOR Y LA HORA', async () => {
     /*
-     * Se puede desmarcar a proposito: los toques equivocados con guantes son
-     * la norma, y una lista que no se puede corregir deja de usarse en cuanto
-     * alguien marca sin querer «horno limpiado».
+     * La otra mitad de la misma regla, y la que el atajo no puede tragarse:
+     * quien cambia el estado es quien responde de ese estado. Si Dario dice
+     * que lo que Cleo dio por hecho quedo pendiente, la fila tiene que decir
+     * que lo dijo Dario.
      */
-    await marcarTarea(DE_CLEO, 'SALON_POLVO', true);
-    const respuesta = await marcarTarea(DE_CLEO, 'SALON_POLVO', false);
+    await marcarTarea(DE_CLEO, 'SALON_POLVO', 'DONE');
+    const antes = await horaDe(DE_CLEO, 'SALON_POLVO');
+
+    await marcarTarea(DE_CLEO, 'SALON_POLVO', 'PENDING', { token: await comoDario() });
+    const fila = (await tareasMarcadas(DE_CLEO))[0];
+
+    expect(fila?.state).toBe('PENDING');
+    expect(fila?.markedByStaffId).toBe(DARIO);
+    /*
+     * Y LA HORA SE MUEVE. `@default(now())` solo actua al crear, asi que hay
+     * que reescribirla a mano: sin eso, una tarea que pasa de hecha a
+     * pendiente conservaria la hora en que se dio por hecha, y la lista diria
+     * que se decidio antes de lo que se decidio.
+     */
+    expect(await horaDe(DE_CLEO, 'SALON_POLVO')).not.toBe(antes);
+  });
+
+  it('dejarla SIN TOCAR borra la fila', async () => {
+    /*
+     * Se puede volver atras a proposito: los toques equivocados con guantes
+     * son la norma, y una lista que no se puede corregir deja de usarse en
+     * cuanto alguien marca sin querer «horno limpiado».
+     */
+    await marcarTarea(DE_CLEO, 'SALON_POLVO', 'DONE');
+    const respuesta = await marcarTarea(DE_CLEO, 'SALON_POLVO', null);
 
     expect(respuesta.status).toBe(200);
     expect(await tareasMarcadas(DE_CLEO)).toEqual([]);
   });
 
-  it('desmarcar lo que no estaba marcado NO es un error', async () => {
-    // Es el resultado que se pedia: la tarea queda sin marcar.
-    const respuesta = await marcarTarea(DE_CLEO, 'SALON_POLVO', false);
+  it('dejar sin tocar lo que ya estaba sin tocar NO es un error', async () => {
+    // Es el resultado que se pedia: la tarea queda sin decidir.
+    const respuesta = await marcarTarea(DE_CLEO, 'SALON_POLVO', null);
 
     expect(respuesta.status).toBe(200);
     expect(await tareasMarcadas(DE_CLEO)).toEqual([]);
   });
 
-  it('cada companera ve lo que marco la otra', async () => {
+  it('cada companera ve lo que decidio la otra', async () => {
     /*
      * ES PARA LO QUE SIRVE LA LISTA cuando van dos a una casa: no hacer dos
      * veces lo mismo. Dario esta asignado al trabajo de Cleo.
      */
-    await marcarTarea(DE_CLEO, 'SALON_POLVO', true);
+    await marcarTarea(DE_CLEO, 'SALON_POLVO', 'DONE');
 
     const lista = await listaDe(DE_CLEO, await comoDario());
-    expect(lista.find((t) => t.code === 'SALON_POLVO')?.done).toBe(true);
+    expect(lista.find((t) => t.code === 'SALON_POLVO')?.state).toBe('DONE');
+  });
+});
+
+describe('el motivo de una tarea pendiente', () => {
+  it('se guarda con la pendiente', async () => {
+    const respuesta = await marcarTarea(DE_CLEO, 'SALON_POLVO', 'PENDING', {
+      note: 'La habitacion estaba cerrada',
+    });
+
+    expect(respuesta.status).toBe(200);
+    expect((await tareasMarcadas(DE_CLEO))[0]?.note).toBe('La habitacion estaba cerrada');
+  });
+
+  it('UNA PENDIENTE SIN MOTIVO ES VALIDA, y es un caso normal', async () => {
+    /*
+     * La duena escribio «debe PERMITIR anotar el motivo», no «debe
+     * exigirlo». Exigirlo dejaria a quien no puede escribir en ese momento
+     * —prisa, guantes, una mano— sin poder marcar la tarea como pendiente, y
+     * la dejaria sin tocar: se perderia la informacion entera por intentar
+     * conseguirla completa.
+     */
+    const respuesta = await marcarTarea(DE_CLEO, 'SALON_POLVO', 'PENDING');
+
+    expect(respuesta.status).toBe(200);
+    expect((await tareasMarcadas(DE_CLEO))[0]?.note).toBeNull();
+  });
+
+  it('RECHAZA UN MOTIVO EN UNA TAREA HECHA, y no escribe nada', async () => {
+    /*
+     * ======================================================================
+     * NO ES UNA REGLA DE FORMA
+     * ======================================================================
+     * Un campo de texto que se acepta en cualquier estado es un almacen de
+     * texto libre colgado de una reserva, que es exactamente lo que evita la
+     * comprobacion del codigo de tarea contra el catalogo. Y un motivo de «no
+     * se pudo» colgado de una tarea hecha seria, ademas, una contradiccion
+     * guardada.
+     */
+    const respuesta = await marcarTarea(DE_CLEO, 'SALON_POLVO', 'DONE', { note: 'lo que sea' });
+
+    expect(respuesta.status).toBe(400);
+    expect(await tareasMarcadas(DE_CLEO)).toEqual([]);
+  });
+
+  it('y tampoco en una que NO APLICA', async () => {
+    const respuesta = await marcarTarea(DE_CLEO, 'SALON_POLVO', 'NOT_APPLICABLE', {
+      note: 'lo que sea',
+    });
+
+    expect(respuesta.status).toBe(400);
+  });
+
+  it('ni en una tarea que se deja sin tocar', async () => {
+    const respuesta = await marcarTarea(DE_CLEO, 'SALON_POLVO', null, { note: 'lo que sea' });
+
+    expect(respuesta.status).toBe(400);
+  });
+
+  it('RECHAZA UN MOTIVO DESMESURADO', async () => {
+    // Sin el tope del contrato, cada toque podria escribir un megabyte.
+    const respuesta = await marcarTarea(DE_CLEO, 'SALON_POLVO', 'PENDING', {
+      note: 'A'.repeat(500),
+    });
+
+    expect(respuesta.status).toBe(400);
+    expect(await tareasMarcadas(DE_CLEO)).toEqual([]);
+  });
+
+  it('rechaza un motivo en blanco: no es un motivo', async () => {
+    /*
+     * Admitirlo dejaria filas que dicen «hay un motivo» sin motivo. El
+     * cliente manda `null`, que es lo que significa «sin motivo».
+     */
+    const respuesta = await marcarTarea(DE_CLEO, 'SALON_POLVO', 'PENDING', { note: '   ' });
+
+    expect(respuesta.status).toBe(400);
+  });
+
+  it('EL MOTIVO SE BORRA AL PASAR A OTRO ESTADO', async () => {
+    /*
+     * El contrato obliga al cliente a mandar `note: null`, y aqui se
+     * comprueba el resultado: la fila no se queda con un motivo de cuando
+     * estaba pendiente.
+     */
+    await marcarTarea(DE_CLEO, 'SALON_POLVO', 'PENDING', { note: 'No habia productos' });
+    await marcarTarea(DE_CLEO, 'SALON_POLVO', 'DONE');
+
+    expect((await tareasMarcadas(DE_CLEO))[0]).toEqual({
+      itemCode: 'SALON_POLVO',
+      state: 'DONE',
+      note: null,
+      markedByStaffId: CLEO,
+    });
+  });
+
+  it('cambiar SOLO el motivo reescribe la fila sin cambiar de estado', async () => {
+    // Es la segunda peticion que manda la pantalla: primero el estado, y el
+    // motivo despues, cuando se acaba de escribir.
+    await marcarTarea(DE_CLEO, 'SALON_POLVO', 'PENDING');
+    await marcarTarea(DE_CLEO, 'SALON_POLVO', 'PENDING', { note: 'No habia productos' });
+
+    expect((await tareasMarcadas(DE_CLEO))[0]).toEqual({
+      itemCode: 'SALON_POLVO',
+      state: 'PENDING',
+      note: 'No habia productos',
+      markedByStaffId: CLEO,
+    });
+  });
+
+  it('y el motivo llega a la lista que lee la pantalla', async () => {
+    await marcarTarea(DE_CLEO, 'SALON_POLVO', 'PENDING', { note: 'No habia productos' });
+
+    const lista = await listaDe(DE_CLEO);
+    expect(lista.find((t) => t.code === 'SALON_POLVO')?.note).toBe('No habia productos');
+  });
+
+  it('LA BASE DE DATOS LO IMPIDE TAMBIEN, no solo el servidor', async () => {
+    /*
+     * La misma regla, escrita como `CHECK`. No es redundancia por gusto: el
+     * servidor es un programa que se cambia, y esta restriccion es la que
+     * sigue en pie si alguien escribe en la tabla por otro camino —una
+     * consulta a mano durante una incidencia, un script—.
+     */
+    await expect(
+      db.exec(
+        `INSERT INTO booking_checklist_items
+           (id, "bookingId", "itemCode", "state", "note", "markedByStaffId", "markedAt")
+         VALUES ('f2222222-2222-4222-8222-222222222222', '${DE_CLEO}', 'SALON_POLVO',
+                 'DONE', 'un motivo', '${CLEO}', now())`,
+      ),
+    ).rejects.toThrow();
   });
 });
 
@@ -810,7 +1025,7 @@ describe('quien puede marcar, y en que', () => {
      * enseñaria que esa reserva existe, y probando identificadores se podria
      * ir dibujando la agenda de la empresa.
      */
-    const respuesta = await marcarTarea(DE_DARIO, 'SALON_POLVO', true);
+    const respuesta = await marcarTarea(DE_DARIO, 'SALON_POLVO', 'DONE');
 
     expect(respuesta.status).toBe(404);
     expect(await tareasMarcadas(DE_DARIO)).toEqual([]);
@@ -819,7 +1034,7 @@ describe('quien puede marcar, y en que', () => {
   it('sin sesion no se llega', async () => {
     const respuesta = await request(app.getHttpServer())
       .patch(`${RUTA}/${DE_CLEO}/checklist`)
-      .send({ itemCode: 'SALON_POLVO', done: true });
+      .send({ itemCode: 'SALON_POLVO', state: 'DONE', note: null });
 
     expect(respuesta.status).toBe(401);
     expect(await tareasMarcadas(DE_CLEO)).toEqual([]);
@@ -828,7 +1043,7 @@ describe('quien puede marcar, y en que', () => {
   it('un trabajo CANCELADO no admite marcar', async () => {
     // A esa casa no fue nadie. Un registro de tareas hechas ahi contradiria
     // al estado.
-    const respuesta = await marcarTarea(CANCELADA, 'SALON_POLVO', true);
+    const respuesta = await marcarTarea(CANCELADA, 'SALON_POLVO', 'DONE');
 
     expect(respuesta.status).toBe(400);
     expect(await tareasMarcadas(CANCELADA)).toEqual([]);
@@ -842,7 +1057,7 @@ describe('quien puede marcar, y en que', () => {
      */
     await db.exec(`UPDATE bookings SET status = 'COMPLETED' WHERE id = '${DE_CLEO}'`);
 
-    const respuesta = await marcarTarea(DE_CLEO, 'SALON_POLVO', true);
+    const respuesta = await marcarTarea(DE_CLEO, 'SALON_POLVO', 'DONE');
     expect(respuesta.status).toBe(200);
   });
 });
@@ -855,7 +1070,7 @@ describe('que codigos se aceptan', () => {
      * usar la lista de tareas como un almacen de texto libre colgado de una
      * reserva ajena a su proposito.
      */
-    const respuesta = await marcarTarea(DE_CLEO, 'ME_LO_INVENTO', true);
+    const respuesta = await marcarTarea(DE_CLEO, 'ME_LO_INVENTO', 'DONE');
 
     expect(respuesta.status).toBe(400);
     expect(await tareasMarcadas(DE_CLEO)).toEqual([]);
@@ -863,20 +1078,51 @@ describe('que codigos se aceptan', () => {
 
   it('rechaza una tarea de OTRO servicio', async () => {
     // `BANO_ESPEJO` es solo de la profunda, y esta reserva es estandar.
-    const respuesta = await marcarTarea(DE_CLEO, 'BANO_ESPEJO', true);
+    const respuesta = await marcarTarea(DE_CLEO, 'BANO_ESPEJO', 'DONE');
 
     expect(respuesta.status).toBe(400);
   });
 
   it('rechaza una tarea RETIRADA: no se hace hoy lo que la empresa ya no hace', async () => {
-    const respuesta = await marcarTarea(DE_CLEO, 'TAREA_RETIRADA', true);
+    const respuesta = await marcarTarea(DE_CLEO, 'TAREA_RETIRADA', 'DONE');
 
     expect(respuesta.status).toBe(400);
   });
 
+  it('RECHAZA LA TAREA DE UN EXTRA QUE ESA RESERVA NO PAGO', async () => {
+    /*
+     * ======================================================================
+     * ESTA ES LA PRUEBA QUE PROTEGE LA FACTURA DE UN EXTRA
+     * ======================================================================
+     * `HORNO_POR_DENTRO` exige el extra `INSIDE_OVEN`, y esta reserva no lo
+     * compro —`addOns` se queda en `[]`—, asi que no sale en su lista.
+     *
+     * Pero no basta con que no salga. La pantalla no es la frontera: el movil
+     * manda el codigo de la tarea, y quien tenga sesion de limpieza puede
+     * mandar el que quiera. Sin esta comprobacion en el SERVIDOR quedaria
+     * escrito en la base de datos que se limpio por dentro un horno que nadie
+     * contrato — y eso es exactamente lo que coordinacion lee cuando un
+     * cliente reclama, y lo que sostiene el cobro de un extra.
+     *
+     * Se comprueba tambien que NO SE ESCRIBIO NADA: un 400 con la fila puesta
+     * seria peor que no tener la comprobacion, porque pareceria correcto.
+     */
+    const respuesta = await marcarTarea(DE_CLEO, 'HORNO_POR_DENTRO', 'DONE');
+
+    expect(respuesta.status).toBe(400);
+    expect(await tareasMarcadas(DE_CLEO)).toEqual([]);
+  });
+
+  it('y esa tarea tampoco aparece en la lista del trabajo', async () => {
+    // La otra mitad: si apareciera, el equipo limpiaria un horno sin cobrar.
+    const codigos = (await listaDe(DE_CLEO)).map((t) => t.code);
+
+    expect(codigos).not.toContain('HORNO_POR_DENTRO');
+  });
+
   it('rechaza un codigo desmesurado', async () => {
     // Sin el tope del contrato, cada toque podria escribir un megabyte.
-    const respuesta = await marcarTarea(DE_CLEO, 'A'.repeat(200), true);
+    const respuesta = await marcarTarea(DE_CLEO, 'A'.repeat(200), 'DONE');
 
     expect(respuesta.status).toBe(400);
   });
@@ -884,13 +1130,14 @@ describe('que codigos se aceptan', () => {
   it('rechaza un cuerpo con campos de mas', async () => {
     /*
      * El caso realista no es malicia: es un cliente que manda tambien
-     * `doneAt` o `doneBy`. Los dos los pone el servidor —la hora porque el
-     * reloj de un movil se cambia a mano, el autor porque sale de la sesion—.
+     * `markedAt` o `markedBy`. Los dos los pone el servidor —la hora porque
+     * el reloj de un movil se cambia a mano, el autor porque sale de la
+     * sesion—.
      */
     const respuesta = await request(app.getHttpServer())
       .patch(`${RUTA}/${DE_CLEO}/checklist`)
       .set('authorization', `Bearer ${await comoCleo()}`)
-      .send({ itemCode: 'SALON_POLVO', done: true, doneByStaffId: DARIO });
+      .send({ itemCode: 'SALON_POLVO', state: 'DONE', note: null, markedByStaffId: DARIO });
 
     expect(respuesta.status).toBe(400);
     expect(await tareasMarcadas(DE_CLEO)).toEqual([]);
@@ -909,22 +1156,23 @@ describe('una tarea marcada que ya no esta en la lista de hoy', () => {
      * consulta por un motivo.
      */
     await db.exec(
-      `INSERT INTO booking_checklist_items (id, "bookingId", "itemCode", "doneByStaffId", "doneAt")
+      `INSERT INTO booking_checklist_items
+         (id, "bookingId", "itemCode", "state", "markedByStaffId", "markedAt")
        VALUES ('f1111111-1111-4111-8111-111111111111', '${DE_CLEO}', 'TAREA_RETIRADA',
-               '${CLEO}', now())`,
+               'DONE', '${CLEO}', now())`,
     );
 
     const lista = await listaDe(DE_CLEO);
     const retirada = lista.find((t) => t.code === 'TAREA_RETIRADA');
 
     expect(retirada).toBeDefined();
-    expect(retirada?.done).toBe(true);
+    expect(retirada?.state).toBe('DONE');
     expect(retirada?.retired).toBe(true);
   });
 
-  it('y no se puede volver a marcar ni desmarcar', async () => {
+  it('y no se puede volver a tocar', async () => {
     // Se ve, pero no se toca: es trabajo que la empresa ya no hace.
-    expect((await marcarTarea(DE_CLEO, 'TAREA_RETIRADA', false)).status).toBe(400);
+    expect((await marcarTarea(DE_CLEO, 'TAREA_RETIRADA', null)).status).toBe(400);
   });
 });
 
