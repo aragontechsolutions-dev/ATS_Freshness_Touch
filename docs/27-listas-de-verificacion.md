@@ -22,10 +22,9 @@ cliente llama diciendo que algo se quedó sin hacer.
 > | Entrada o salida de mudanza | las 50 anteriores **más 4**                                                 |
 > | Solo con el extra pagado    | 5, que **no** entran en ninguna limpieza                                    |
 >
-> **Lo que todavía no está, y está en la lista de la dueña:** los tres estados
-> (Completada / Pendiente / **No aplica**) y el motivo cuando una tarea queda
-> pendiente. Hoy una tarea solo está marcada o no. Eso es la Etapa 2 y pide
-> **una migración**: ver §11.
+> **Y desde el 1/11/2026 cada tarea tiene los tres estados** que pidió la
+> dueña —Completada / Pendiente / **No aplica**— con su motivo cuando queda
+> pendiente. Es la §3.5 de este documento, y lo que falta ahora está en §11.
 
 ---
 
@@ -98,15 +97,15 @@ marcar de pie con una mano.
 
 ## 3. Qué se puede marcar, y qué no
 
-| Pregunta                         | Respuesta                                                                           |
-| -------------------------------- | ----------------------------------------------------------------------------------- |
-| ¿Quién marca?                    | **Solo quien está asignado** a ese trabajo. Se comprueba en el servidor, no por rol |
-| ¿Puede marcar coordinación?      | **No**, ni siquiera ADMIN, salvo que esté asignada al trabajo                       |
-| ¿Se puede desmarcar?             | **Sí**                                                                              |
-| ¿Bloquea terminar el trabajo?    | **Nunca**                                                                           |
-| ¿En qué estados se puede marcar? | `CONFIRMED`, `IN_PROGRESS` y `COMPLETED`                                            |
+| Pregunta                       | Respuesta                                                                           |
+| ------------------------------ | ----------------------------------------------------------------------------------- |
+| ¿Quién decide?                 | **Solo quien está asignado** a ese trabajo. Se comprueba en el servidor, no por rol |
+| ¿Puede decidir coordinación?   | **No**, ni siquiera ADMIN, salvo que esté asignada al trabajo                       |
+| ¿Se puede volver atrás?        | **Sí**: pulsar el estado que ya está puesto deja la tarea sin decidir               |
+| ¿Bloquea terminar el trabajo?  | **Nunca**                                                                           |
+| ¿En qué estados de la reserva? | `CONFIRMED`, `IN_PROGRESS` y `COMPLETED`                                            |
 
-### 3.1 Se puede desmarcar, y es deliberado
+### 3.1 Se puede volver atrás, y es deliberado
 
 Esta pantalla se usa de pie, con una mano y a veces con guantes: **los toques
 equivocados son la norma, no la excepción**.
@@ -116,6 +115,10 @@ vez que alguien marque sin querer «horno limpiado», aprenderá que la lista
 miente y dejará de usarla. Y una lista en la que nadie confía no sirve para lo
 único que tiene que servir: responder a un cliente que llama diciendo que algo
 se quedó sin hacer.
+
+**Se vuelve atrás pulsando el estado que ya está puesto**, y eso borra la
+fila. Es la única forma de deshacer, y lo dice la etiqueta accesible del botón
+activo (`clearState`), porque a la vista no se ve.
 
 ### 3.2 No bloquea terminar el trabajo
 
@@ -138,8 +141,8 @@ registro que contradice al estado.
 
 La lista de estados está **en el contrato**
 (`CHECKLIST_EDITABLE_STATUSES`) y no en cada lado: el servidor la usa para
-rechazar y la pantalla para decidir si pinta las casillas. Con dos listas, la
-pantalla acabaría ofreciendo casillas que el servidor rechaza, y cada toque
+rechazar y la pantalla para decidir si pinta los botones. Con dos listas, la
+pantalla acabaría ofreciendo botones que el servidor rechaza, y cada toque
 daría un error que nadie sabría explicar.
 
 ### 3.4 La tarea de un extra no existe si ese extra no se pagó
@@ -188,6 +191,74 @@ nota** —el equipo pregunta— y no deja rastro falso; una lista con la tarea d
 horno que nadie pagó **se marca**, y entonces la base de datos afirma que se
 hizo un trabajo que no se vendió.
 
+### 3.5 Los tres estados, y el cuarto que no se guarda
+
+Lo pidió la dueña con estas palabras:
+
+> «Cada tarea debe tener estas opciones: Completada / Pendiente / No aplica.
+> Si queda pendiente, debe permitir anotar el motivo.»
+
+| Estado           | Qué significa                      | ¿Motivo? | ¿Hay fila? |
+| ---------------- | ---------------------------------- | -------- | ---------- |
+| **sin tocar**    | Nadie ha mirado esta tarea todavía | No       | **No**     |
+| `DONE`           | Hecha                              | No       | Sí         |
+| `PENDING`        | Había que hacerla y **no** se hizo | **Sí**   | Sí         |
+| `NOT_APPLICABLE` | No había nada que hacer            | No       | Sí         |
+
+#### «Pendiente» no es lo mismo que «sin tocar»
+
+Es la distinción que justifica todo este cambio. **Sin tocar** significa que
+nadie ha mirado esa tarea; **pendiente** significa que alguien la miró,
+decidió que no se podía hacer y lo explicó. Una es trabajo por decidir; la
+otra es una respuesta.
+
+El cuarto estado **no se guarda**: es la ausencia de fila. Es el estado de
+partida de las cuarenta tareas de una lista, y guardarlo serían cuarenta mil
+filas al año diciendo «no la he mirado», que es exactamente lo mismo que no
+tener fila (§1).
+
+#### «No aplica» es la que hacía falta de verdad
+
+En una casa vacía de mudanza son **la mitad de las tareas**: cambiar las
+sábanas de una cama que no existe. Con el booleano de antes salían igual que
+las que se quedaron sin hacer, y **una lista que dice «quedaron 20 sin hacer»
+en una casa donde no había nada que hacer en 20 de ellas no sirve para
+responder a nadie**.
+
+#### El motivo: se permite, no se exige
+
+La dueña escribió «debe **permitir** anotar el motivo», no «debe exigirlo», y
+la diferencia importa: exigirlo dejaría a quien no puede escribir en ese
+momento —prisa, guantes, una mano— **sin poder marcar la tarea como
+pendiente**, y la dejaría sin tocar. Se perdería la información entera por
+intentar conseguirla completa.
+
+Las reglas del motivo, y las tres están tanto en el contrato como en la base
+de datos:
+
+- **Solo en una tarea `PENDING`.** No es una regla de forma: un campo de texto
+  que se acepta en cualquier estado es **un almacén de texto libre colgado de
+  una reserva**, que es justo lo que evita la comprobación del código de tarea
+  contra el catálogo. Y un motivo de «no se pudo» colgado de una tarea hecha
+  sería, además, una contradicción guardada.
+- **Tope de 300 caracteres** (`CHECKLIST_NOTE_MAX`). Es una frase escrita de
+  pie, no un informe. Sin tope, cada toque podría escribir un megabyte.
+- **En blanco no vale.** Se recorta y se rechaza la cadena vacía: una fila que
+  dice «hay un motivo» sin motivo es peor que no tener fila. El cliente manda
+  `null`.
+
+#### Los dos recuentos, y por qué no es uno
+
+`checklistCounts` devuelve cuatro números en vez del único «sin marcar» que
+había antes, y **`untouched` es el que avisa**. Las pendientes no entran ahí:
+esa tarea ya está resuelta desde el punto de vista de quien limpia, y
+nombrársela al terminar sería pedirle que haga algo que ya ha dicho que no
+puede hacer. Las que no aplican tampoco, que era el problema a arreglar.
+
+En la casa se dice **«te quedan 3 por decidir»**; en el panel, **«3 sin
+mirar · 2 quedaron pendientes · 5 no aplicaban»**. No es lo mismo ni se actúa
+igual.
+
 ---
 
 ## 4. Marcar es idempotente, y hace falta que lo sea
@@ -197,13 +268,38 @@ Dos toques seguidos no dejan dos filas: lo impide un índice único sobre
 hace falta con una conexión mala en la puerta de una casa, donde el doble
 toque y el reintento son la norma.
 
-**Y el segundo toque de otra persona no le roba la autoría al primero.** El
-`upsert` lleva el `update` **vacío** a propósito: si volviera a escribir el
-autor y la hora, el segundo toque de una compañera convertiría «lo hizo Cleo»
-en «lo hizo Darío», borrando a quien de verdad lo hizo.
+### 4.1 La regla de la autoría, entera
 
-Desmarcar borra la fila, con `deleteMany` y no `delete`: desmarcar algo que no
-estaba marcado **no es un error**, es el resultado que se pedía.
+Antes de los tres estados esto se resolvía con un `upsert` cuyo `update`
+estaba **vacío** a propósito. Con estados eso ya no vale —cambiar de estado
+**sí** tiene que escribir—, así que la regla se dice completa:
+
+| Lo que llega                    | Lo que pasa                                     |
+| ------------------------------- | ----------------------------------------------- |
+| **Mismo estado y mismo motivo** | No se toca nada                                 |
+| **Algo distinto**               | Se reescribe con el nuevo autor y la nueva hora |
+
+La primera fila es la que protege la autoría: volver a escribir la hora y el
+autor convertiría el segundo toque de una compañera en «lo hizo ella»,
+borrando a quien de verdad lo decidió. La segunda es la que hace falta que
+funcione: **quien cambia el estado es quien responde de ese estado**. Si Darío
+dice que lo que Cleo dio por hecho quedó pendiente, la fila tiene que decir
+que lo dijo Darío.
+
+**La hora se reescribe a mano** porque `@default(now())` solo actúa al crear.
+Sin eso, una tarea que pasa de hecha a pendiente conservaría la hora en que se
+dio por hecha, y la lista diría que se decidió antes de lo que se decidió.
+
+> **La carrera que queda es inofensiva**, y conviene tenerla escrita: dos
+> toques idénticos simultáneos pueden no ver la fila ninguno de los dos y
+> acabar los dos en el `upsert`. El índice único hace que uno sea una
+> actualización, **y escribe los mismos valores**. Dos toques con estados
+> distintos los decide el último que llega, que es lo que una persona espera
+> de un botón.
+
+Dejar una tarea sin decidir borra la fila, con `deleteMany` y no `delete`:
+dejar sin tocar algo que ya estaba sin tocar **no es un error**, es el
+resultado que se pedía.
 
 ---
 
@@ -224,9 +320,9 @@ de todo lo que pasa (`docs/16-auditoria.md`).
 
 ## 6. Un solo componente para las dos pantallas
 
-`JobChecklist` lo usan la pantalla de limpieza —donde se marca— y el detalle
-del panel —donde solo se lee—. La diferencia es un parámetro: sin `onToggle`,
-las tareas se pintan como texto y no como casillas.
+`JobChecklist` lo usan la pantalla de limpieza —donde se decide— y el detalle
+del panel —donde solo se lee—. La diferencia es un parámetro: sin `onChange`,
+los estados se pintan como etiquetas y no como botones.
 
 **No es ahorro de código:** es que coordinación y limpieza vean **la misma
 lista del mismo trabajo**. Dos componentes acabarían divergiendo —un orden
@@ -239,38 +335,60 @@ respuestas de la API la traen ya montada.
 
 ### 6.1 Detalles de la pantalla que no son decoración
 
-- **Una casilla de verdad (`<input type="checkbox">`)**, no un `div` con
-  `onClick`: se marca con el teclado, el lector de pantalla dice «marcada /
-  sin marcar», y el área pulsable es toda la línea. Medido en el navegador:
-  **entre 48 y 60 px de alto**, por encima de los 44 px que es el mínimo que
-  se acierta de pie.
-- **La casilla se mueve en el acto, antes de que el servidor conteste**, y si
-  el servidor dice que no vuelve a su sitio exactamente como estaba. No es un
-  adorno: en una casa con mala cobertura pasan dos segundos entre el toque y
-  el movimiento, y esa espera no se lee como «está guardando», se lee como
-  «no me ha cogido el toque». Se vuelve a pulsar, y así es como una lista de
-  cuarenta tareas acaba marcada a medias.
-- **Sin reloj de espera y sin deshabilitar la casilla.** El movimiento ya es
-  la confirmación, y deshabilitarla mientras se guarda impediría corregir un
+- **Tres botones, y no un control que va rotando entre los estados.** Un
+  control que cambia a cada toque ocuparía la mitad y sería inservible: para
+  dejar algo en «no aplica» habría que acertar el número de toques, y pasarse
+  de uno significa **afirmar que se hizo**. En una pantalla que se usa con
+  guantes eso pasa todos los días.
+- **`min-h-11`: 44 px**, que es el mínimo que se acierta de pie. Medido en el
+  navegador a 360 y a 390 px de ancho, los tres botones caben en una línea
+  —55, 76 y 72 px de contenido— sin desbordar ni la fila ni la página.
+- **Cada botón lleva icono y texto**, no solo color. Quien no distingue
+  colores lee el texto; y «no aplica» lleva **una raya, no una cruz**, porque
+  una cruz se lee como «falló» y no aplicar no lo es.
+- **Ninguno de los tres es rojo.** «No aplica» va en gris: es la respuesta
+  correcta a una tarea que no había que hacer. «Pendiente» va en ámbar: no es
+  un error de quien limpia, es un aviso para coordinación.
+- **El botón se pone activo en el acto, antes de que el servidor conteste**, y
+  si el servidor dice que no vuelve a su sitio exactamente como estaba —con su
+  estado, su motivo, su hora y su autor anteriores—. No es un adorno: en una
+  casa con mala cobertura pasan dos segundos entre el toque y el movimiento, y
+  esa espera no se lee como «está guardando», se lee como «no me ha cogido el
+  toque». Se vuelve a pulsar, y así es como una lista de cuarenta tareas acaba
+  decidida a medias.
+- **Sin reloj de espera y sin deshabilitar los botones.** El movimiento ya es
+  la confirmación, y deshabilitarlos mientras se guarda impediría corregir un
   toque equivocado justo en el segundo en que uno se da cuenta.
+- **El estado se guarda al tocar el botón, antes de escribir el motivo.** Si
+  los dos viajaran juntos, una pendiente **sin** motivo —que es un caso normal
+  y legítimo— solo se guardaría al pulsar «guardar», y un móvil que se queda
+  sin batería a mitad de la frase se llevaría por delante también el estado.
+  Se guardan por separado: **primero lo que no se puede perder**.
+- **El motivo tiene un botón de guardar, y no se guarda al salir del campo.**
+  Guardar al perder el foco parece más cómodo y no lo es: en un móvil el foco
+  se pierde al girar la pantalla, al bajar el teclado o al tocar cualquier
+  sitio, y cada uno de esos gestos sería una petición con una frase a medias.
+  El botón **solo aparece si hay algo que guardar**, porque un botón que no
+  hace nada al pulsarlo se pulsa dos veces. Y **el campo vacío quita el
+  motivo**: no hace falta un botón aparte.
 - **Sin aviso al acertar, y sí al fallar.** Es lo contrario que al fichar
   (`docs/25` §6), y la diferencia está razonada: fichar ocurre una vez y hay
-  que quedarse tranquilo de que quedó registrado; marcar tareas ocurre
+  que quedarse tranquilo de que quedó registrado; decidir tareas ocurre
   cuarenta veces en una casa, y cuarenta avisos seguidos tapan la
-  pantalla. **La casilla marcándose ya es la confirmación.** Lo que sí avisa
-  es el fallo, porque una casilla que vuelve sola a su sitio sin explicación
-  se lee como que la pantalla va mal.
+  pantalla. **El botón poniéndose activo ya es la confirmación.** Lo que sí
+  avisa es el fallo, porque un botón que se apaga solo sin explicación se lee
+  como que la pantalla va mal.
 - **La lista va debajo de la dirección y encima de los botones.** La dirección
   y el teléfono son lo que se necesita **antes** de llegar; las tareas,
   después de entrar. Puesta arriba empujaría hacia abajo lo primero que hay
   que mirar conduciendo.
-- **Una tarea retirada se pinta apagada, no en verde.** En la pantalla de
-  limpieza convive con casillas azules marcables, y en verde se leería como
-  «está más hecha que las demás». Es lo contrario: es historia, no trabajo de
-  hoy.
-- **El mismo número se dice de dos formas.** «Te quedan 3» para quien está en
-  la casa; «3 tareas sin marcar» para coordinación, que lee un trabajo ya
-  cerrado. No es lo mismo ni se actúa igual.
+- **Una tarea retirada se pinta como etiqueta, sin botones.** Es trabajo que
+  la empresa ya no hace, y ofrecer los botones invitaría a decidir hoy sobre
+  algo que hoy no se pide.
+- **El mismo número se dice de dos formas.** «Te quedan 3 por decidir» para
+  quien está en la casa; «3 sin mirar · 2 quedaron pendientes · 5 no
+  aplicaban» para coordinación, que lee un trabajo ya cerrado. No es lo mismo
+  ni se actúa igual (§3.5).
 
 ---
 
@@ -330,19 +448,36 @@ Lo que se revisó al cerrar la etapa:
   puesta sería peor que no tener la comprobación, porque parecería correcto.
 - **El contrato acota el código a 64 caracteres.** Sin el tope, cada toque
   podría escribir en la base una cadena de un megabyte.
-- **El cuerpo es estricto.** `doneAt` y `doneByStaffId` los pone el servidor
-  —la hora porque el reloj de un móvil se cambia a mano, el autor porque sale
-  de la **sesión**— y mandarlos desde el cliente es un 400.
+- **El motivo solo se acepta en una tarea `PENDING`, y topa en 300.** Es la
+  misma clase de protección que la anterior: sin la restricción, el campo
+  sería un almacén de texto libre colgado de una reserva. Está **dos veces**,
+  en el contrato y como `CHECK` en la base de datos, y la segunda no es
+  redundancia por gusto: el servidor es un programa que se cambia, y la
+  restricción es la que sigue en pie si alguien escribe por otro camino —una
+  consulta a mano durante una incidencia, un script—.
+- **El motivo lo escribe el equipo, así que puede contener cualquier cosa**,
+  datos del cliente incluidos. No se puede evitar, y por eso importa dónde
+  **no** aparece: no entra en la auditoría (§5), ni en ningún aviso, ni en el
+  canal de Telegram del equipo, ni en ninguna URL. Vive solo en la respuesta
+  de `MyJob` y en el detalle del panel, que ya llevan el nombre y la dirección
+  del cliente: **no añade superficie nueva**.
+- **El cuerpo es estricto.** `markedAt` y `markedByStaffId` los pone el
+  servidor —la hora porque el reloj de un móvil se cambia a mano, el autor
+  porque sale de la **sesión**— y mandarlos desde el cliente es un 400.
+- **El estado no tiene valor por omisión en la base de datos**, a propósito.
+  Con `DEFAULT 'DONE'`, una escritura que se olvidara del estado quedaría
+  registrada como «completada», que es la afirmación más fuerte de las tres y
+  la que puede acabar delante de un cliente.
 - **La tabla tiene RLS activado**, como todas (lo comprueba
   `migrations.test.ts`). Aquí lo que protege no es un dato del cliente: es el
   ritmo de trabajo de personas concretas, a qué hora marcó cada cual cada
   tarea en cada casa.
-- **Una tarea marcada no se borra al dar de baja a quien la marcó**
+- **Una tarea decidida no se borra al dar de baja a quien la decidió**
   (`ON DELETE RESTRICT`), igual que un fichaje: es el registro de un trabajo
   hecho, y que desaparezca es justo lo que no debe pasar, porque es cuando más
   falta hace poder mirarlo.
-- **No hay ningún dato nuevo del cliente en esta etapa.** La lista no toca
-  importes, ni teléfonos, ni códigos de puerta.
+- **Ningún dato del cliente entra por aquí.** La lista no toca importes, ni
+  teléfonos, ni códigos de puerta.
 
 ---
 
@@ -372,20 +507,22 @@ está hecho.**
 
 ## 9. Dónde está cada cosa
 
-| Qué                                   | Dónde                                                      |
-| ------------------------------------- | ---------------------------------------------------------- |
-| El contrato y el catálogo (59 tareas) | `packages/types/src/job-checklist.ts`                      |
-| El filtro por servicio y por extra    | `checklistForService`, en el mismo archivo                 |
-| Los textos de las tareas              | `packages/i18n/src/en.ts` y `es.ts`, en `checklist.items`  |
-| Los nombres de las estancias          | los mismos archivos, en `checklist.rooms`                  |
-| La tabla                              | `apps/api/prisma/migrations/20261001160000_job_checklist/` |
-| Montar la lista y validar el código   | `apps/api/src/admin/job-checklist.helper.ts`               |
-| Leer los extras del JSON de la base   | `extrasContratados`, en el mismo archivo                   |
-| Marcar y desmarcar                    | `apps/api/src/admin/my-jobs.service.ts`                    |
-| El endpoint                           | `PATCH /admin/my-jobs/:bookingId/checklist`                |
-| La pantalla, para las dos vistas      | `apps/admin/src/components/JobChecklist.tsx`               |
-| La pantalla de limpieza               | `apps/admin/src/pages/MyJobs.tsx`                          |
-| El detalle del panel                  | `apps/admin/src/pages/BookingDetail.tsx`                   |
+| Qué                                   | Dónde                                                               |
+| ------------------------------------- | ------------------------------------------------------------------- |
+| El contrato y el catálogo (59 tareas) | `packages/types/src/job-checklist.ts`                               |
+| El filtro por servicio y por extra    | `checklistForService`, en el mismo archivo                          |
+| Los textos de las tareas              | `packages/i18n/src/en.ts` y `es.ts`, en `checklist.items`           |
+| Los nombres de las estancias          | los mismos archivos, en `checklist.rooms`                           |
+| La tabla                              | `apps/api/prisma/migrations/20261001160000_job_checklist/`          |
+| Los tres estados y el motivo          | `apps/api/prisma/migrations/20261101120000_tres_estados_por_tarea/` |
+| Los recuentos por estado              | `checklistCounts`, en el contrato                                   |
+| Montar la lista y validar el código   | `apps/api/src/admin/job-checklist.helper.ts`                        |
+| Leer los extras del JSON de la base   | `extrasContratados`, en el mismo archivo                            |
+| Marcar y desmarcar                    | `apps/api/src/admin/my-jobs.service.ts`                             |
+| El endpoint                           | `PATCH /admin/my-jobs/:bookingId/checklist`                         |
+| La pantalla, para las dos vistas      | `apps/admin/src/components/JobChecklist.tsx`                        |
+| La pantalla de limpieza               | `apps/admin/src/pages/MyJobs.tsx`                                   |
+| El detalle del panel                  | `apps/admin/src/pages/BookingDetail.tsx`                            |
 
 ---
 

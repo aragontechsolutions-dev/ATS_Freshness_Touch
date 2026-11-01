@@ -211,16 +211,55 @@ export const en = {
   checklist: {
     title: 'What to do in the house',
     /** «Te quedan 3». Avisa, no bloquea: el trabajo se puede terminar igual. */
-    pending_one: '{{count}} task left',
-    pending_other: '{{count}} tasks left',
+    left_one: '{{count}} to decide',
+    left_other: '{{count}} to decide',
     /* Lo mismo contado para coordinacion, que lee un trabajo ya cerrado. */
-    notTicked_one: '{{count}} task not ticked',
-    notTicked_other: '{{count}} tasks not ticked',
-    allDone: 'Everything on the list is done',
-    /** Quien y cuando marco una tarea. */
-    doneBy: '{{name}}, {{time}}',
+    untouched_one: '{{count}} not looked at',
+    untouched_other: '{{count}} not looked at',
+    allDone: 'Everything on the list is settled',
+    /** Quien y cuando dijo en que quedaba una tarea. */
+    markedBy: '{{name}}, {{time}}',
     /** Una tarea que se marco cuando se pedia y que ya no se pide. */
     retired: 'No longer part of this service',
+
+    /*
+     * ======================================================================
+     * LOS TRES ESTADOS, Y POR QUE LAS ETIQUETAS SON TAN CORTAS
+     * ======================================================================
+     * Van en tres botones uno al lado del otro, en una pantalla de 390 px.
+     * Cada boton tiene que seguir siendo pulsable con guantes, asi que el
+     * texto manda: «Done / Pending / N/A», no «Mark as completed».
+     */
+    states: {
+      DONE: 'Done',
+      PENDING: 'Pending',
+      NOT_APPLICABLE: 'N/A',
+    },
+    /* La etiqueta accesible de cada boton: ahi si cabe la frase entera. */
+    setState: {
+      DONE: 'Mark as done',
+      PENDING: 'Leave pending',
+      NOT_APPLICABLE: 'Does not apply here',
+    },
+    /** Pulsar el estado que ya esta puesto deja la tarea sin tocar. */
+    clearState: 'Leave it undecided',
+
+    /* Los recuentos que lee coordinacion en un trabajo ya cerrado. */
+    countPending_one: '{{count}} left pending',
+    countPending_other: '{{count}} left pending',
+    countNotApplicable_one: '{{count}} did not apply',
+    countNotApplicable_other: '{{count}} did not apply',
+
+    /*
+     * EL MOTIVO. Se pide, no se exige: la dueña escribio «debe PERMITIR
+     * anotar el motivo». Exigirlo dejaria sin marcar la tarea a quien no
+     * puede escribir en ese momento, y se perderia la informacion entera por
+     * intentar conseguirla completa.
+     */
+    noteTitle: 'Why is it pending?',
+    notePlaceholder: 'Reason (optional)',
+    noteSave: 'Save reason',
+    noteClear: 'Remove the reason',
 
     /*
      * LAS ESTANCIAS, EN EL ORDEN DE `CHECKLIST_ROOMS`.
@@ -1866,8 +1905,14 @@ export const en = {
       finishTitle: 'Finish this job?',
       finishWarning:
         'Your leaving time is recorded and the job closes. This cannot be undone from your phone: if you tap it by mistake, call the office.',
-      finishPending_one: 'You still have {{count}} task not ticked on the list.',
-      finishPending_other: 'You still have {{count}} tasks not ticked on the list.',
+      /*
+       * CUENTA LAS QUE NADIE HA MIRADO, no las que quedaron pendientes. Una
+       * tarea marcada «pendiente» ya esta resuelta desde el punto de vista de
+       * quien limpia —la miro, no se pudo, lo explico— y nombrarla aqui seria
+       * pedirle que haga algo que ya ha dicho que no puede hacer.
+       */
+      finishPending_one: 'You have not looked at {{count}} task on the list yet.',
+      finishPending_other: 'You have not looked at {{count}} tasks on the list yet.',
       finishConfirm: 'Yes, I have finished',
       /* Corto y sin disculpas: decir que no tiene que costar un toque. */
       finishCancel: 'Not yet',

@@ -2,15 +2,17 @@ import { describe, expect, it } from 'vitest';
 import {
   ALL_SERVICES,
   CHECKLIST_ROOMS,
+  CHECKLIST_NOTE_MAX,
   ChecklistProgressSchema,
   JOB_CHECKLIST_CATALOG,
   JobChecklistEntrySchema,
+  checklistCounts,
   checklistForService,
   checklistItemTextKey,
   checklistRoomTextKey,
   checklistRoomsPresent,
-  pendingChecklistCount,
   type ChecklistItem,
+  type ChecklistItemState,
   type JobChecklistEntry,
 } from './job-checklist';
 import { AddOnCodeSchema, type AddOnCode } from './enums';
@@ -64,12 +66,23 @@ function entrada(cambios: Partial<JobChecklistEntry> = {}): JobChecklistEntry {
   return {
     code: 'COMMON_A',
     room: 'COMMON_AREAS',
-    done: false,
-    doneAt: null,
-    doneByFirstName: null,
+    state: null,
+    note: null,
+    markedAt: null,
+    markedByFirstName: null,
     retired: false,
     ...cambios,
   };
+}
+
+/** Una tarea en un estado concreto, con hora y autor coherentes. */
+function en(estado: ChecklistItemState, cambios: Partial<JobChecklistEntry> = {}) {
+  return entrada({
+    state: estado,
+    markedAt: '2026-11-01T12:00:00.000Z',
+    markedByFirstName: 'Ana',
+    ...cambios,
+  });
 }
 
 describe('el catalogo de verdad', () => {
@@ -299,39 +312,58 @@ describe('las tareas de un extra', () => {
   });
 });
 
-describe('lo que queda por hacer', () => {
-  it('cuenta solo las sin marcar', () => {
-    expect(
-      pendingChecklistCount([
-        entrada({ code: 'A', done: true }),
-        entrada({ code: 'B' }),
-        entrada({ code: 'C' }),
-      ]),
-    ).toBe(2);
-  });
-
-  it('las retiradas NO cuentan: no son trabajo pendiente de nadie', () => {
+describe('como queda una lista, contada por estados', () => {
+  it('SIN TOCAR Y PENDIENTE SE CUENTAN APARTE, y es el cambio que importa', () => {
     /*
-     * Sin esto, un trabajo con una tarea retirada sin marcar diria «te queda
-     * 1» para siempre, y no habria forma de marcarla porque no se pinta como
-     * marcable.
+     * ======================================================================
+     * EL FALLO QUE ESTO ARREGLA, Y ERA EL MOTIVO DE LA DUENA
+     * ======================================================================
+     * Antes habia un solo numero: «sin marcar». Mezclaba una tarea que nadie
+     * ha mirado con una que no habia que hacer, y el resultado era que una
+     * casa vacia de mudanza salia con veinte tareas «sin hacer» cuando en
+     * veinte de ellas no habia nada que hacer.
      */
-    expect(
-      pendingChecklistCount([
-        entrada({ code: 'A', done: true }),
-        entrada({ code: 'Z', retired: true }),
-      ]),
-    ).toBe(0);
+    const cuentas = checklistCounts([
+      entrada({ code: 'A' }),
+      entrada({ code: 'B' }),
+      en('DONE', { code: 'C' }),
+      en('PENDING', { code: 'D', note: 'No habia productos' }),
+      en('NOT_APPLICABLE', { code: 'E' }),
+    ]);
+
+    expect(cuentas).toEqual({ untouched: 2, done: 1, pending: 1, notApplicable: 1 });
   });
 
-  it('una lista entera marcada no deja nada pendiente', () => {
-    expect(
-      pendingChecklistCount([entrada({ done: true }), entrada({ code: 'B', done: true })]),
-    ).toBe(0);
+  it('LAS RETIRADAS NO CUENTAN EN NINGUNO de los cuatro', () => {
+    /*
+     * No son trabajo de nadie hoy: son historia de un trabajo viejo. Sin
+     * esto, un trabajo con una tarea retirada sin tocar diria «te queda 1»
+     * para siempre, y no habria forma de resolverla porque no se pinta como
+     * tocable.
+     */
+    const cuentas = checklistCounts([
+      entrada({ code: 'A', retired: true }),
+      en('DONE', { code: 'B', retired: true }),
+      en('PENDING', { code: 'C', retired: true }),
+      en('NOT_APPLICABLE', { code: 'D', retired: true }),
+    ]);
+
+    expect(cuentas).toEqual({ untouched: 0, done: 0, pending: 0, notApplicable: 0 });
+  });
+
+  it('una lista entera resuelta no deja nada sin tocar', () => {
+    const cuentas = checklistCounts([en('DONE'), en('NOT_APPLICABLE', { code: 'B' })]);
+
+    expect(cuentas.untouched).toBe(0);
   });
 
   it('y una lista vacia tampoco', () => {
-    expect(pendingChecklistCount([])).toBe(0);
+    expect(checklistCounts([])).toEqual({
+      untouched: 0,
+      done: 0,
+      pending: 0,
+      notApplicable: 0,
+    });
   });
 });
 
@@ -353,14 +385,77 @@ describe('las estancias que se pintan', () => {
   });
 });
 
-describe('el contrato de marcar una tarea', () => {
-  it('acepta marcar y desmarcar', () => {
-    expect(ChecklistProgressSchema.safeParse({ itemCode: 'COMMON_A', done: true }).success).toBe(
-      true,
+describe('el contrato de decir en que queda una tarea', () => {
+  it('acepta los tres estados y el null que la deja sin tocar', () => {
+    for (const state of ['DONE', 'PENDING', 'NOT_APPLICABLE', null] as const) {
+      expect(
+        ChecklistProgressSchema.safeParse({ itemCode: 'COMMON_A', state }).success,
+        String(state),
+      ).toBe(true);
+    }
+  });
+
+  it('rechaza un estado inventado', () => {
+    expect(ChecklistProgressSchema.safeParse({ itemCode: 'COMMON_A', state: 'CASI' }).success).toBe(
+      false,
     );
-    expect(ChecklistProgressSchema.safeParse({ itemCode: 'COMMON_A', done: false }).success).toBe(
-      true,
-    );
+  });
+
+  it('EL MOTIVO SOLO VIAJA CON «PENDIENTE»', () => {
+    /*
+     * NO ES UNA REGLA DE FORMA. Un campo de texto que se acepta en cualquier
+     * estado es un almacen de texto libre colgado de una reserva, que es
+     * exactamente lo que evita la comprobacion del codigo de tarea contra el
+     * catalogo. Y un motivo de «no se pudo» colgado de una tarea hecha seria,
+     * ademas, una contradiccion guardada.
+     */
+    const con = (state: ChecklistItemState | null) =>
+      ChecklistProgressSchema.safeParse({ itemCode: 'COMMON_A', state, note: 'un motivo' }).success;
+
+    expect(con('PENDING')).toBe(true);
+    expect(con('DONE')).toBe(false);
+    expect(con('NOT_APPLICABLE')).toBe(false);
+    expect(con(null)).toBe(false);
+  });
+
+  it('UNA PENDIENTE SIN MOTIVO ES VALIDA, y es un caso normal', () => {
+    /*
+     * La duena escribio «debe PERMITIR anotar el motivo», no «debe
+     * exigirlo». Exigirlo dejaria a quien no puede escribir en ese momento
+     * sin poder marcar la tarea como pendiente, y la dejaria sin tocar: se
+     * perderia la informacion entera por intentar conseguirla completa.
+     */
+    const leido = ChecklistProgressSchema.safeParse({ itemCode: 'COMMON_A', state: 'PENDING' });
+
+    expect(leido.success).toBe(true);
+    expect(leido.success && leido.data.note).toBeNull();
+  });
+
+  it('rechaza un motivo EN BLANCO: no es un motivo', () => {
+    // Admitirlo dejaria filas que dicen «hay un motivo» sin motivo.
+    for (const note of ['', '   ', '\n']) {
+      expect(
+        ChecklistProgressSchema.safeParse({ itemCode: 'COMMON_A', state: 'PENDING', note }).success,
+        JSON.stringify(note),
+      ).toBe(false);
+    }
+  });
+
+  it('recorta el motivo, y lo tope en el maximo del contrato', () => {
+    const leido = ChecklistProgressSchema.safeParse({
+      itemCode: 'COMMON_A',
+      state: 'PENDING',
+      note: '  No habia productos  ',
+    });
+
+    expect(leido.success && leido.data.note).toBe('No habia productos');
+    expect(
+      ChecklistProgressSchema.safeParse({
+        itemCode: 'COMMON_A',
+        state: 'PENDING',
+        note: 'A'.repeat(CHECKLIST_NOTE_MAX + 1),
+      }).success,
+    ).toBe(false);
   });
 
   it('RECHAZA un codigo desmesurado', () => {
@@ -369,45 +464,51 @@ describe('el contrato de marcar una tarea', () => {
      * megabyte. El codigo real son unas pocas letras.
      */
     expect(
-      ChecklistProgressSchema.safeParse({ itemCode: 'A'.repeat(65), done: true }).success,
+      ChecklistProgressSchema.safeParse({ itemCode: 'A'.repeat(65), state: 'DONE' }).success,
     ).toBe(false);
-    expect(ChecklistProgressSchema.safeParse({ itemCode: '', done: true }).success).toBe(false);
+    expect(ChecklistProgressSchema.safeParse({ itemCode: '', state: 'DONE' }).success).toBe(false);
   });
 
   it('rechaza campos de mas', () => {
     /*
      * El caso realista no es malicia, es un cliente que manda tambien
-     * `doneAt` o `doneBy`. Los dos los pone el SERVIDOR: la hora, porque el
-     * reloj de un movil se cambia a mano, y el autor, porque sale de la
+     * `markedAt` o `markedBy`. Los dos los pone el SERVIDOR: la hora, porque
+     * el reloj de un movil se cambia a mano, y el autor, porque sale de la
      * sesion.
      */
-    for (const extra of ['doneAt', 'doneByStaffId', 'bookingId']) {
+    for (const extra of ['markedAt', 'markedByStaffId', 'bookingId', 'done']) {
       expect(
-        ChecklistProgressSchema.safeParse({ itemCode: 'COMMON_A', done: true, [extra]: 'x' })
-          .success,
+        ChecklistProgressSchema.safeParse({
+          itemCode: 'COMMON_A',
+          state: 'DONE',
+          [extra]: 'x',
+        }).success,
+        extra,
       ).toBe(false);
     }
   });
 });
 
 describe('lo que se lee de una tarea', () => {
-  it('una tarea marcada lleva hora y autor', () => {
-    expect(
-      JobChecklistEntrySchema.safeParse(
-        entrada({ done: true, doneAt: '2026-10-01T12:00:00.000Z', doneByFirstName: 'Ana' }),
-      ).success,
-    ).toBe(true);
+  it('una tarea decidida lleva estado, hora y autor', () => {
+    expect(JobChecklistEntrySchema.safeParse(en('DONE')).success).toBe(true);
   });
 
-  it('una tarea sin marcar los lleva a null', () => {
+  it('una pendiente puede llevar su motivo', () => {
+    expect(JobChecklistEntrySchema.safeParse(en('PENDING', { note: 'Cerrada' })).success).toBe(
+      true,
+    );
+  });
+
+  it('una tarea SIN TOCAR lo lleva todo a null', () => {
     expect(JobChecklistEntrySchema.safeParse(entrada()).success).toBe(true);
   });
 
-  it('NO lleva el apellido de quien la marco', () => {
+  it('NO lleva el apellido de quien lo decidio', () => {
     // Igual que en el resto de la pantalla de limpieza: para saber quien hizo
     // que, en un equipo de dos o tres personas, sobra el nombre de pila.
     expect(
-      JobChecklistEntrySchema.safeParse({ ...entrada(), doneByLastName: 'Perez' }).success,
+      JobChecklistEntrySchema.safeParse({ ...entrada(), markedByLastName: 'Perez' }).success,
     ).toBe(false);
   });
 });

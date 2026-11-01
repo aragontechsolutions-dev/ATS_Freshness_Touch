@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { CLOCK_IN_STATE_TEXT_KEY, canEditChecklist, pendingChecklistCount } from '@freshness/types';
+import { CLOCK_IN_STATE_TEXT_KEY, canEditChecklist, checklistCounts } from '@freshness/types';
 import type {
   ClockInKind,
   FieldAdjustmentInput,
@@ -20,7 +20,7 @@ import {
 import { formatPhone } from '@freshness/types';
 import { useToast } from '../components/ToastProvider';
 import { FieldAdjustmentForm } from '../components/FieldAdjustmentForm';
-import { JobChecklist } from '../components/JobChecklist';
+import { JobChecklist, type CambioDeTarea } from '../components/JobChecklist';
 import { SkeletonMisTrabajos } from '../components/Skeletons';
 import {
   AlertIcon,
@@ -439,40 +439,42 @@ export function MyJobs({
   };
 
   /**
-   * Marca o desmarca una tarea.
+   * Dice en que queda una tarea: hecha, pendiente, no aplica o sin decidir.
    *
    * ======================================================================
    * SE PINTA PRIMERO Y SE PREGUNTA DESPUES
    * ======================================================================
-   * La casilla se mueve EN EL ACTO, antes de que el servidor conteste. No
-   * es un adorno: en una casa con mala cobertura pasan dos segundos entre
+   * El boton se pone activo EN EL ACTO, antes de que el servidor conteste.
+   * No es un adorno: en una casa con mala cobertura pasan dos segundos entre
    * el toque y el movimiento, y esa espera no se lee como «esta
    * guardando», se lee como «no me ha cogido el toque». Se vuelve a pulsar,
-   * y asi es como una lista de veinticinco tareas acaba marcada a medias.
+   * y asi es como una lista de cuarenta tareas acaba decidida a medias.
    *
-   * Si el servidor dice que no, la casilla vuelve a su sitio EXACTAMENTE
-   * como estaba —con su hora y su autor anteriores— y se avisa. Una casilla
-   * que vuelve sola sin explicacion se lee como una pantalla rota.
+   * Si el servidor dice que no, la tarea vuelve a su sitio EXACTAMENTE
+   * como estaba —con su estado, su motivo, su hora y su autor anteriores— y
+   * se avisa. Un boton que se apaga solo sin explicacion se lee como una
+   * pantalla rota.
    *
    * ======================================================================
    * SIN AVISO AL ACERTAR, Y SI AL FALLAR
    * ======================================================================
    * Es lo contrario que al fichar, y la diferencia esta razonada: fichar
    * ocurre una vez y hay que quedarse tranquilo de que quedo registrado.
-   * Marcar tareas ocurre veinticinco veces en una casa, y veinticinco
-   * avisos seguidos tapan la pantalla justo cuando se esta trabajando. La
-   * casilla marcandose YA ES la confirmacion.
+   * Decidir tareas ocurre cuarenta veces en una casa, y cuarenta avisos
+   * seguidos tapan la pantalla justo cuando se esta trabajando. El boton
+   * poniendose activo YA ES la confirmacion.
    */
-  const marcarTarea = async (job: MyJob, code: string, done: boolean): Promise<void> => {
+  const cambiarTarea = async (job: MyJob, code: string, cambio: CambioDeTarea): Promise<void> => {
     const anterior = job.checklist.find((entrada) => entrada.code === code);
     if (!anterior) return;
 
     // Lo que se pinta ya mismo, sin preguntar a nadie.
     parcharTarea(setJobs, job.bookingId, {
       ...anterior,
-      done,
-      doneAt: done ? new Date().toISOString() : null,
-      doneByFirstName: done ? staffFirstName : null,
+      state: cambio.state,
+      note: cambio.note,
+      markedAt: cambio.state === null ? null : new Date().toISOString(),
+      markedByFirstName: cambio.state === null ? null : staffFirstName,
     });
 
     const turno = (ultimaPeticion.current.get(job.bookingId) ?? 0) + 1;
@@ -480,15 +482,19 @@ export function MyJobs({
     accionesEnVuelo.current += 1;
 
     try {
-      const actualizado = await markChecklistItem(job.bookingId, { itemCode: code, done });
+      const actualizado = await markChecklistItem(job.bookingId, {
+        itemCode: code,
+        state: cambio.state,
+        note: cambio.note,
+      });
 
       /*
        * SOLO MANDA LA RESPUESTA DE LA ULTIMA PETICION ENVIADA.
        *
-       * Si mientras tanto se marco otra tarea, esta foto del servidor es
-       * vieja por construccion y adoptarla desmarcaria la otra. Lo que esta
-       * pintado en local ya es correcto para las marcas propias; lo unico
-       * que aporta la foto es lo que haya marcado una companera, y eso
+       * Si mientras tanto se decidio otra tarea, esta foto del servidor es
+       * vieja por construccion y adoptarla desharia la otra. Lo que esta
+       * pintado en local ya es correcto para lo decidido aqui; lo unico
+       * que aporta la foto es lo que haya decidido una companera, y eso
        * llega igual con la respuesta de la ultima.
        */
       if (ultimaPeticion.current.get(job.bookingId) !== turno) return;
@@ -503,7 +509,7 @@ export function MyJobs({
       }
 
       // Se deshace SOLO esta tarea, dejandola como estaba. No se repinta el
-      // trabajo entero: eso borraria lo que se haya marcado mientras tanto.
+      // trabajo entero: eso borraria lo que se haya decidido mientras tanto.
       parcharTarea(setJobs, job.bookingId, anterior);
       toast.error(error instanceof ApiClientError ? error.messageKey : 'admin.errorGeneric');
     } finally {
@@ -625,7 +631,7 @@ export function MyJobs({
               ocupado={ocupado === job.bookingId}
               onMarcar={marcar}
               onPedirFinal={(job) => setPreguntarFinal(job.bookingId)}
-              onMarcarTarea={marcarTarea}
+              onCambiarTarea={cambiarTarea}
               ajustando={ajustando === job.bookingId}
               onAjustar={ajustar}
               onNavegar={(destino) => recordarNavegacion(destino.bookingId)}
@@ -648,7 +654,7 @@ export function MyJobs({
               ocupado={ocupado === job.bookingId}
               onMarcar={marcar}
               onPedirFinal={(job) => setPreguntarFinal(job.bookingId)}
-              onMarcarTarea={marcarTarea}
+              onCambiarTarea={cambiarTarea}
               ajustando={ajustando === job.bookingId}
               onAjustar={ajustar}
               onNavegar={(destino) => recordarNavegacion(destino.bookingId)}
@@ -695,7 +701,14 @@ export function MyJobs({
         <DialogoFinal
           key={trabajoDeSalida.bookingId}
           direccion={`${trabajoDeSalida.addressLine1}, ${trabajoDeSalida.city}`}
-          pendientes={pendingChecklistCount(trabajoDeSalida.checklist)}
+          /*
+           * LAS QUE NADIE HA MIRADO, no las que quedaron pendientes. Una
+           * tarea marcada «pendiente» ya esta resuelta desde el punto de
+           * vista de quien limpia —la miro, no se pudo, lo explico— y
+           * nombrarla aqui seria pedirle que haga algo que ya ha dicho que
+           * no puede hacer.
+           */
+          pendientes={checklistCounts(trabajoDeSalida.checklist).untouched}
           ocupado={ocupado === trabajoDeSalida.bookingId}
           onConfirmar={() => void marcar(trabajoDeSalida, 'COMPLETED')}
           onDescartar={() => setPreguntarFinal(null)}
@@ -747,7 +760,7 @@ function Tarjeta({
   ocupado,
   onMarcar,
   onPedirFinal,
-  onMarcarTarea,
+  onCambiarTarea,
   ajustando,
   onAjustar,
   onNavegar,
@@ -758,7 +771,7 @@ function Tarjeta({
   ocupado: boolean;
   onMarcar: (job: MyJob, status: 'IN_PROGRESS' | 'COMPLETED') => Promise<void>;
   onPedirFinal: (job: MyJob) => void;
-  onMarcarTarea: (job: MyJob, code: string, done: boolean) => Promise<void>;
+  onCambiarTarea: (job: MyJob, code: string, cambio: CambioDeTarea) => Promise<void>;
   ajustando: boolean;
   onAjustar: (job: MyJob, cambios: FieldAdjustmentInput) => Promise<void>;
   onNavegar: (job: MyJob) => void;
@@ -977,7 +990,7 @@ function Tarjeta({
         <JobChecklist
           entries={job.checklist}
           locale={locale}
-          onToggle={(code, done) => void onMarcarTarea(job, code, done)}
+          onChange={(code, cambio) => void onCambiarTarea(job, code, cambio)}
         />
       )}
 
@@ -1147,7 +1160,7 @@ function textoDeFichaje(
  *
  * Esta aparte porque se usa en los dos sentidos —al pintar el toque y al
  * deshacerlo si falla— y porque la precision importa: repintar el trabajo
- * entero borraria lo que una companera haya marcado mientras tanto.
+ * entero borraria lo que una companera haya decidido mientras tanto.
  */
 function parcharTarea(
   setJobs: React.Dispatch<React.SetStateAction<MyJob[] | null>>,

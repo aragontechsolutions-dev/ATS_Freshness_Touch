@@ -4,6 +4,7 @@ import {
   checklistForService,
   type AddOnCode,
   type ChecklistItem,
+  type ChecklistItemState,
   type ChecklistRoom,
   type JobChecklistEntry,
   type ServiceType,
@@ -51,11 +52,13 @@ import { ExtrasGuardadosSchema } from './field-adjustment.helper';
  */
 export const JOB_CHECKLIST_CATALOG_TOKEN = 'JOB_CHECKLIST_CATALOG';
 
-/** Una fila de tarea marcada, tal como se lee de la base. */
+/** Una fila de tarea resuelta, tal como se lee de la base. */
 export interface FilaTareaMarcada {
   itemCode: string;
-  doneAt: Date;
-  doneBy: { firstName: string };
+  state: ChecklistItemState;
+  note: string | null;
+  markedAt: Date;
+  markedBy: { firstName: string };
 }
 
 /**
@@ -123,9 +126,15 @@ function entrada(
   return {
     code,
     room,
-    done: marcada !== undefined,
-    doneAt: marcada?.doneAt.toISOString() ?? null,
-    doneByFirstName: marcada?.doneBy.firstName ?? null,
+    /*
+     * SIN FILA ES `null`, QUE ES «SIN TOCAR». No es `DONE` ni `PENDING`: es
+     * el estado de partida de las cuarenta tareas de una lista, y es lo que
+     * distingue «nadie ha mirado esto» de «se miro y no se pudo hacer».
+     */
+    state: marcada?.state ?? null,
+    note: marcada?.note ?? null,
+    markedAt: marcada?.markedAt.toISOString() ?? null,
+    markedByFirstName: marcada?.markedBy.firstName ?? null,
     retired,
   };
 }

@@ -175,8 +175,14 @@ export class BookingsAdminService {
          * pantalla de limpieza para que las dos vean lo mismo.
          */
         checklistItems: {
-          select: { itemCode: true, doneAt: true, doneBy: { select: { firstName: true } } },
-          orderBy: { doneAt: 'asc' },
+          select: {
+            itemCode: true,
+            state: true,
+            note: true,
+            markedAt: true,
+            markedBy: { select: { firstName: true } },
+          },
+          orderBy: { markedAt: 'asc' },
         },
         payments: {
           /*

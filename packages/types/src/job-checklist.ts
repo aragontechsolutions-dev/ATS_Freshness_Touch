@@ -82,6 +82,42 @@ export const ChecklistRoomSchema = z.enum(CHECKLIST_ROOMS);
 export type ChecklistRoom = z.infer<typeof ChecklistRoomSchema>;
 
 /**
+ * EN QUE QUEDO UNA TAREA.
+ *
+ * ==========================================================================
+ * SON LOS TRES QUE PIDIO LA DUEÑA, Y HAY UN CUARTO QUE NO SE GUARDA
+ * ==========================================================================
+ * Su lista lo dice asi: «Cada tarea debe tener estas opciones: Completada /
+ * Pendiente / No aplica. Si queda pendiente, debe permitir anotar el motivo.»
+ *
+ * El cuarto estado es «SIN TOCAR», y es la AUSENCIA de fila en la base de
+ * datos. No esta en el enumerado porque no se escribe nunca: es el estado de
+ * partida de las cuarenta tareas de una lista, y guardarlo serian cuarenta
+ * mil filas al año diciendo «no la he mirado».
+ *
+ * ==========================================================================
+ * «PENDIENTE» NO ES LO MISMO QUE «SIN TOCAR», y es la distincion que
+ * justifica todo este cambio
+ * ==========================================================================
+ * Sin tocar significa que nadie ha mirado esa tarea. Pendiente significa que
+ * alguien la miro, decidio que no se podia hacer y lo explico. Una es trabajo
+ * por decidir; la otra es una respuesta.
+ *
+ * Y «NO APLICA» es la que hacia falta de verdad: en una casa vacia de mudanza
+ * son la mitad de las tareas —cambiar las sabanas de una cama que no existe—.
+ * Con un unico booleano salian igual que las que se quedaron sin hacer, y una
+ * lista que dice «quedaron 20 sin hacer» en una casa donde no habia nada que
+ * hacer en 20 de ellas no sirve para responder a nadie.
+ */
+export const ChecklistItemStateSchema = z.enum(['DONE', 'PENDING', 'NOT_APPLICABLE']);
+export type ChecklistItemState = z.infer<typeof ChecklistItemStateSchema>;
+
+/** El tope del motivo, en caracteres. Esta aqui porque lo usan el contrato,
+ * la base de datos y el contador de la pantalla, y tres numeros sueltos
+ * acaban siendo tres numeros distintos. */
+export const CHECKLIST_NOTE_MAX = 300;
+
+/**
  * UNA TAREA DEL CATALOGO.
  *
  * NO LLEVA TEXTO, LLEVA CODIGO. El texto vive en los paquetes de idioma, en
@@ -343,13 +379,14 @@ export function canEditChecklist(status: BookingStatus): boolean {
 }
 
 /**
- * Lo que el movil manda al marcar o desmarcar una tarea.
+ * Lo que el movil manda al decir en que quedo una tarea.
  *
  * ========================================================================
- * SE PUEDE DESMARCAR, Y ES DELIBERADO
+ * SE PUEDE VOLVER ATRAS, Y ES DELIBERADO
  * ========================================================================
- * `done: false` existe porque esta pantalla se usa de pie, con una mano y a
- * veces con guantes: los toques equivocados son la norma, no la excepcion.
+ * `state: null` deja la tarea sin tocar otra vez, y existe porque esta
+ * pantalla se usa de pie, con una mano y a veces con guantes: los toques
+ * equivocados son la norma, no la excepcion.
  *
  * Una lista que no se puede corregir tiene un resultado predecible: la
  * primera vez que alguien marque sin querer «horno limpiado», aprendera que
@@ -357,39 +394,75 @@ export function canEditChecklist(status: BookingStatus): boolean {
  * sirve para lo unico que tiene que servir: responder a un cliente que llama
  * diciendo que algo se quedo sin hacer.
  *
- * Quien desmarca y cuando queda registrado igual, porque la fila se borra y
- * se vuelve a crear con su autor y su hora.
+ * Quien lo cambio y cuando queda registrado igual: la fila se reescribe con
+ * su autor y su hora.
  */
-export const ChecklistProgressSchema = z.strictObject({
-  /**
-   * El codigo de la tarea. SE COMPRUEBA EN EL SERVIDOR contra el catalogo
-   * del servicio de ese trabajo: aqui no se puede validar contra el
-   * enumerado porque el catalogo es una lista de datos, no un `z.enum`.
+export const ChecklistProgressSchema = z
+  .strictObject({
+    /**
+     * El codigo de la tarea. SE COMPRUEBA EN EL SERVIDOR contra el catalogo
+     * del servicio de ese trabajo: aqui no se puede validar contra el
+     * enumerado porque el catalogo es una lista de datos, no un `z.enum`.
+     *
+     * El tope de 64 caracteres no es un detalle: sin el, se podria meter en la
+     * base una cadena de un megabyte por cada toque.
+     */
+    itemCode: z.string().min(1).max(64),
+
+    /** En que queda. `null` la deja SIN TOCAR, que borra la fila. */
+    state: ChecklistItemStateSchema.nullable(),
+
+    /**
+     * EL MOTIVO, SOLO SI QUEDA PENDIENTE.
+     *
+     * Opcional, y no se exige. La dueña escribio «debe PERMITIR anotar el
+     * motivo», no «debe exigirlo», y la diferencia importa: exigirlo dejaria
+     * a quien no puede escribir en ese momento —prisa, guantes, una mano—
+     * sin poder marcar la tarea como pendiente, y la dejaria sin tocar. Se
+     * perderia la informacion entera por intentar conseguirla completa.
+     *
+     * `min(1)` DESPUES de `trim()`: un motivo en blanco no es un motivo, y
+     * admitirlo dejaria filas que dicen «hay un motivo» sin motivo. El
+     * cliente manda `null`, no cadena vacia.
+     */
+    note: z.string().trim().min(1).max(CHECKLIST_NOTE_MAX).nullable().default(null),
+  })
+  /*
+   * EL MOTIVO SOLO VIAJA CON «PENDIENTE», Y ESTO NO ES UNA REGLA DE FORMA.
    *
-   * El tope de 64 caracteres no es un detalle: sin el, se podria meter en la
-   * base una cadena de un megabyte por cada toque.
+   * Un campo de texto que se acepta en cualquier estado es un almacen de
+   * texto libre colgado de una reserva, que es exactamente lo que evita la
+   * comprobacion del codigo de tarea contra el catalogo. La misma regla esta
+   * escrita como `CHECK` en la base de datos: el servidor es un programa que
+   * se cambia, y la restriccion es la que sigue en pie si alguien escribe por
+   * otro camino.
    */
-  itemCode: z.string().min(1).max(64),
-  done: z.boolean(),
-});
+  .refine((valor) => valor.note === null || valor.state === 'PENDING', {
+    message: 'El motivo solo se anota en una tarea que queda pendiente',
+    path: ['note'],
+  });
 export type ChecklistProgress = z.infer<typeof ChecklistProgressSchema>;
+export type ChecklistProgressInput = z.input<typeof ChecklistProgressSchema>;
 
 /**
- * Una tarea tal como se LEE: la tarea y su estado en este trabajo.
+ * Una tarea tal como se LEE: la tarea y en que quedo en este trabajo.
  *
- * `doneByFirstName` es el nombre de pila de quien la marco, sin apellido,
- * igual que en el resto de la pantalla de limpieza. Esta porque en una casa
- * con dos personas sirve para no hacer dos veces lo mismo, que es justo el
- * problema que esta lista resuelve en el dia a dia.
+ * `markedByFirstName` es el nombre de pila de quien lo decidio, sin
+ * apellido, igual que en el resto de la pantalla de limpieza. Esta porque en
+ * una casa con dos personas sirve para no hacer dos veces lo mismo, que es
+ * justo el problema que esta lista resuelve en el dia a dia.
  */
 export const JobChecklistEntrySchema = z.strictObject({
   code: z.string(),
   room: ChecklistRoomSchema,
-  done: z.boolean(),
-  /** Cuando se marco. `null` si no esta marcada. */
-  doneAt: z.iso.datetime().nullable(),
-  /** Quien la marco, por su nombre de pila. `null` si no esta marcada. */
-  doneByFirstName: z.string().nullable(),
+  /** En que quedo. `null` es SIN TOCAR: nadie ha mirado esta tarea. */
+  state: ChecklistItemStateSchema.nullable(),
+  /** El motivo, solo en una pendiente. `null` en cualquier otro caso. */
+  note: z.string().nullable(),
+  /** Cuando se decidio. `null` si esta sin tocar. */
+  markedAt: z.iso.datetime().nullable(),
+  /** Quien lo decidio, por su nombre de pila. `null` si esta sin tocar. */
+  markedByFirstName: z.string().nullable(),
   /**
    * Una tarea MARCADA que ya no esta en el catalogo del servicio.
    *
@@ -402,20 +475,56 @@ export const JobChecklistEntrySchema = z.strictObject({
 });
 export type JobChecklistEntry = z.infer<typeof JobChecklistEntrySchema>;
 
+/** Como queda una lista, contada por estados. */
+export interface ChecklistCounts {
+  /** Sin tocar: nadie ha mirado estas tareas. Es lo que queda por DECIDIR. */
+  readonly untouched: number;
+  readonly done: number;
+  /** Se miraron y no se pudieron hacer. Son una RESPUESTA, no trabajo. */
+  readonly pending: number;
+  readonly notApplicable: number;
+}
+
 /**
- * Cuantas tareas quedan sin marcar.
+ * Cuenta una lista por estados.
  *
- * NO BLOQUEA NADA, Y ESO ES UNA DECISION DE DISENO, no una simplificacion.
- * Un trabajo se puede terminar con tareas sin marcar, por el mismo motivo
- * por el que el fichaje nunca se bloquea (`clock-in.ts`): el boton de «he
+ * ==========================================================================
+ * SON CUATRO NUMEROS Y NO UNO, Y ESO SUSTITUYE AL CONTADOR DE ANTES
+ * ==========================================================================
+ * Antes habia un solo numero: «sin marcar». Con tres estados ese numero
+ * mezclaba dos cosas que no se parecen en nada —una tarea que nadie ha
+ * mirado y una que no habia que hacer— y el resultado era el que la dueña
+ * queria arreglar: una casa vacia de mudanza salia con veinte tareas «sin
+ * hacer» cuando en veinte de ellas no habia nada que hacer.
+ *
+ * `untouched` ES EL QUE AVISA. Son las que quedan por decidir, y es lo que se
+ * dice antes de terminar un trabajo. `pending` no entra ahi: esa tarea ya
+ * esta resuelta desde el punto de vista de quien limpia —la miro, no se pudo,
+ * lo explico— y cerrarle el paso por ella seria pedirle que haga algo que ya
+ * ha dicho que no puede hacer.
+ *
+ * ==========================================================================
+ * NO BLOQUEA NADA, Y ESO ES UNA DECISION DE DISENO
+ * ==========================================================================
+ * Un trabajo se puede terminar con tareas sin tocar, por el mismo motivo por
+ * el que el fichaje nunca se bloquea (`clock-in.ts`): el boton de «he
  * terminado» es lo que registra la salida, y negarlo porque falta un toque
  * deja a la empleada en la puerta de una casa sin poder cerrar su trabajo.
  *
- * Sirve para avisar —«te quedan 3»— y para que coordinacion lo vea despues.
- * Las retiradas no cuentan: no son trabajo pendiente de nadie.
+ * LAS RETIRADAS NO CUENTAN EN NINGUNO de los cuatro: no son trabajo de nadie
+ * hoy, son historia de un trabajo viejo.
  */
-export function pendingChecklistCount(entradas: readonly JobChecklistEntry[]): number {
-  return entradas.filter((entrada) => !entrada.done && !entrada.retired).length;
+export function checklistCounts(entradas: readonly JobChecklistEntry[]): ChecklistCounts {
+  const vigentes = entradas.filter((entrada) => !entrada.retired);
+  const cuantas = (estado: ChecklistItemState): number =>
+    vigentes.filter((entrada) => entrada.state === estado).length;
+
+  return {
+    untouched: vigentes.filter((entrada) => entrada.state === null).length,
+    done: cuantas('DONE'),
+    pending: cuantas('PENDING'),
+    notApplicable: cuantas('NOT_APPLICABLE'),
+  };
 }
 
 /** La clave de traduccion del texto de una tarea. */
@@ -426,6 +535,11 @@ export function checklistItemTextKey(code: string): string {
 /** La clave de traduccion del nombre de una estancia. */
 export function checklistRoomTextKey(room: ChecklistRoom): string {
   return `checklist.rooms.${room}`;
+}
+
+/** La clave de traduccion del nombre de un estado. */
+export function checklistStateTextKey(state: ChecklistItemState): string {
+  return `checklist.states.${state}`;
 }
 
 /**

@@ -190,13 +190,35 @@ export const es: TranslationResources = {
   /* ------------------ La lista de verificacion de un trabajo ------------------ */
   checklist: {
     title: 'Qué hacer en la casa',
-    pending_one: 'Te queda {{count}} tarea',
-    pending_other: 'Te quedan {{count}} tareas',
-    notTicked_one: '{{count}} tarea sin marcar',
-    notTicked_other: '{{count}} tareas sin marcar',
-    allDone: 'Toda la lista está hecha',
-    doneBy: '{{name}}, {{time}}',
+    left_one: 'Te queda {{count}} por decidir',
+    left_other: 'Te quedan {{count}} por decidir',
+    untouched_one: '{{count}} sin mirar',
+    untouched_other: '{{count}} sin mirar',
+    allDone: 'Toda la lista está resuelta',
+    markedBy: '{{name}}, {{time}}',
     retired: 'Ya no forma parte de este servicio',
+
+    states: {
+      DONE: 'Hecha',
+      PENDING: 'Pendiente',
+      NOT_APPLICABLE: 'No aplica',
+    },
+    setState: {
+      DONE: 'Marcar como hecha',
+      PENDING: 'Dejar pendiente',
+      NOT_APPLICABLE: 'Aquí no aplica',
+    },
+    clearState: 'Dejarla sin decidir',
+
+    countPending_one: '{{count}} quedó pendiente',
+    countPending_other: '{{count}} quedaron pendientes',
+    countNotApplicable_one: '{{count}} no aplicaba',
+    countNotApplicable_other: '{{count}} no aplicaban',
+
+    noteTitle: '¿Por qué quedó pendiente?',
+    notePlaceholder: 'Motivo (opcional)',
+    noteSave: 'Guardar el motivo',
+    noteClear: 'Quitar el motivo',
 
     rooms: {
       KITCHEN: 'Cocina',
@@ -1679,8 +1701,8 @@ export const es: TranslationResources = {
       finishTitle: '¿Doy por terminado este trabajo?',
       finishWarning:
         'Queda registrada tu hora de salida y el trabajo se cierra. Esto no se puede deshacer desde el móvil: si lo pulsas sin querer, llama a la oficina.',
-      finishPending_one: 'Todavía te queda {{count}} tarea sin marcar en la lista.',
-      finishPending_other: 'Todavía te quedan {{count}} tareas sin marcar en la lista.',
+      finishPending_one: 'Todavía te queda {{count}} tarea sin mirar en la lista.',
+      finishPending_other: 'Todavía te quedan {{count}} tareas sin mirar en la lista.',
       finishConfirm: 'Sí, he terminado',
       finishCancel: 'Todavía no',
       highlightGone:

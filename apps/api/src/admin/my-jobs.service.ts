@@ -105,8 +105,14 @@ const JOB_SELECT = {
    * dos veces lo mismo, que es el problema que esta lista resuelve.
    */
   checklistItems: {
-    select: { itemCode: true, doneAt: true, doneBy: { select: { firstName: true } } },
-    orderBy: { doneAt: 'asc' as const },
+    select: {
+      itemCode: true,
+      state: true,
+      note: true,
+      markedAt: true,
+      markedBy: { select: { firstName: true } },
+    },
+    orderBy: { markedAt: 'asc' as const },
   },
   /*
    * LOS AJUSTES DE CAMPO, EN LA MISMA CONSULTA.
@@ -557,30 +563,74 @@ export class MyJobsService {
       });
     }
 
-    if (cambio.done) {
+    if (cambio.state === null) {
       /*
-       * IDEMPOTENTE, Y HACE FALTA QUE LO SEA. Esta pantalla se usa de pie, a
-       * veces con guantes y con una conexion mala en la puerta de una casa:
-       * el doble toque y el reintento son la norma.
+       * DEJARLA SIN TOCAR BORRA LA FILA. Es el estado de partida, y se
+       * representa con la ausencia de fila: ver la migracion 20261001160000.
        *
-       * `upsert` con el `update` VACIO a proposito: si ya estaba marcada, se
-       * deja como estaba. Volver a escribir la hora y el autor convertiria el
-       * segundo toque de otra persona en «lo hizo ella», borrando a quien de
-       * verdad lo hizo.
-       */
-      await this.prisma.db.bookingChecklistItem.upsert({
-        where: { bookingId_itemCode: { bookingId, itemCode: cambio.itemCode } },
-        create: { bookingId, itemCode: cambio.itemCode, doneByStaffId: staff.staffId },
-        update: {},
-      });
-    } else {
-      /*
-       * Desmarcar borra la fila. `deleteMany` y no `delete` porque `delete`
-       * lanza si no hay nada que borrar, y desmarcar algo que no estaba
-       * marcado no es un error: es el resultado que se pedia.
+       * `deleteMany` y no `delete` porque `delete` lanza si no hay nada que
+       * borrar, y dejar sin tocar algo que ya estaba sin tocar no es un
+       * error: es el resultado que se pedia.
        */
       await this.prisma.db.bookingChecklistItem.deleteMany({
         where: { bookingId, itemCode: cambio.itemCode },
+      });
+
+      return this.getOne(bookingId, staff);
+    }
+
+    /*
+     * ======================================================================
+     * EL ATAJO QUE PROTEGE LA AUTORIA: SI NO CAMBIA NADA, NO SE ESCRIBE
+     * ======================================================================
+     * Esta pantalla se usa de pie, a veces con guantes y con una conexion
+     * mala en la puerta de una casa: el doble toque y el reintento son la
+     * norma, no la excepcion.
+     *
+     * Antes de los tres estados esto se resolvia con un `upsert` cuyo
+     * `update` estaba VACIO a proposito. Con estados eso ya no vale: cambiar
+     * de estado SI tiene que escribir. Asi que la regla se dice entera:
+     *
+     *   - MISMO ESTADO Y MISMO MOTIVO: no se toca nada. Volver a escribir la
+     *     hora y el autor convertiria el segundo toque de una compañera en
+     *     «lo hizo ella», borrando a quien de verdad lo decidio.
+     *   - ALGO DISTINTO: se reescribe con el nuevo autor y la nueva hora,
+     *     porque quien cambia el estado es quien responde de ese estado.
+     *
+     * LA CARRERA QUE QUEDA ES INOFENSIVA y conviene tenerla escrita: dos
+     * toques identicos simultaneos pueden no ver la fila ninguno de los dos
+     * y acabar los dos en el `upsert`. El indice unico hace que uno sea una
+     * actualizacion, y escribe los MISMOS valores. Dos toques con estados
+     * distintos los decide el ultimo que llega, que es lo que una persona
+     * espera de un boton.
+     */
+    const existente = await this.prisma.db.bookingChecklistItem.findUnique({
+      where: { bookingId_itemCode: { bookingId, itemCode: cambio.itemCode } },
+      select: { state: true, note: true },
+    });
+
+    if (existente?.state !== cambio.state || existente.note !== cambio.note) {
+      await this.prisma.db.bookingChecklistItem.upsert({
+        where: { bookingId_itemCode: { bookingId, itemCode: cambio.itemCode } },
+        create: {
+          bookingId,
+          itemCode: cambio.itemCode,
+          state: cambio.state,
+          note: cambio.note,
+          markedByStaffId: staff.staffId,
+        },
+        update: {
+          state: cambio.state,
+          note: cambio.note,
+          markedByStaffId: staff.staffId,
+          /*
+           * LA HORA SE REESCRIBE A MANO porque `@default(now())` solo actua
+           * al crear. Sin esto, una tarea que pasa de «hecha» a «pendiente»
+           * conservaria la hora en que se dio por hecha, y la lista diria que
+           * se decidio antes de lo que se decidio.
+           */
+          markedAt: new Date(),
+        },
       });
     }
 

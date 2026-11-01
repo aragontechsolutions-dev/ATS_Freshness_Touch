@@ -222,13 +222,16 @@ del cliente (que en la Etapa 1 no se pide a propósito).
   sitio, y la estándar pasa a venderse solo como plan recurrente.
 - 🔄 **Listas de verificación por estancia**
   (`docs/27-listas-de-verificacion.md`): qué hay que hacer en cada parte de la
-  casa, marcado a medida que se hace, visible para el equipo y para
+  casa, decidido a medida que se hace, visible para el equipo y para
   coordinación. **El contenido llegó el 1/11/2026**: 59 tareas de la lista que
   escribió la dueña, en cinco estancias, con la profunda y la de mudanza
   sumándose a la estándar y cinco tareas que solo aparecen si se pagó el
-  extra. **Queda pendiente** lo que su lista pide y la tabla todavía no
-  admite: los tres estados —Completada / Pendiente / **No aplica**— y el
-  motivo cuando una tarea queda pendiente.
+  extra. Y **cada tarea tiene los tres estados** que ella pidió —Completada /
+  Pendiente / **No aplica**— con su motivo cuando queda pendiente: «no aplica»
+  es el que hacía falta, porque en una casa vacía de mudanza son la mitad de
+  las tareas y antes salían igual que las que se quedaron sin hacer. **Queda
+  pendiente** la revisión antes de salir, que solapa con el fichaje de salida
+  y con las fotos.
 - ✅ **Ajustes de campo** (`docs/28-ajustes-de-campo.md`): el responsable avisa
   desde su móvil de que el trabajo no es el contratado —900 pies que son
   1.300, una nevera que son tres— y coordinación decide si se cobra la
