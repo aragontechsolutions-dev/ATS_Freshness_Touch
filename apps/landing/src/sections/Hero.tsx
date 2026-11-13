@@ -65,34 +65,69 @@ export function Hero() {
           </div>
         </div>
 
-        {/* Tarjeta ilustrativa: muestra de un vistazo como se compone el precio. */}
-        <div
-          className="ft-enter ft-card p-6 lg:p-8"
-          style={{ '--ft-delay': '400ms' } as React.CSSProperties}
-        >
-          <p className="text-sm font-semibold text-slate-500 dark:text-slate-400">
-            {t('calculator.breakdown')}
-          </p>
-          <div className="mt-4 space-y-3 text-sm">
-            {[
-              { label: t('services.STANDARD.name'), value: '$185.00' },
-              { label: t('addOns.INSIDE_OVEN'), value: '$35.00' },
-              { label: t('frequency.BIWEEKLY'), value: '−$22.00' },
-              { label: t('calculator.travelDeposit'), value: '$30.00' },
-            ].map((row) => (
-              <div
-                key={row.label}
-                className="flex items-center justify-between border-b border-dashed
-                           border-slate-200 pb-2 dark:border-night-600"
-              >
-                <span className="text-slate-600 dark:text-slate-400">{row.label}</span>
-                <span className="font-semibold text-slate-900 dark:text-white">{row.value}</span>
-              </div>
-            ))}
+        {/*
+          ==================================================================
+          LA FOTO DE LA FUNDADORA, Y QUE HABIA ANTES AQUI
+          ==================================================================
+          Hasta el 13/11/2026 esta columna llevaba una tarjeta con un desglose
+          de precio INVENTADO —«limpieza estandar $185», «horno $35»—. Se
+          quito por dos motivos, y el segundo pesa mas que el primero:
+
+            1. El cotizador, doscientos pixeles mas abajo, ensena ese mismo
+               desglose con los numeros DE VERDAD de quien lo usa. Un ejemplo
+               inventado al lado de un calculo real no aporta: compite.
+            2. Esta es una empresa a la que se le abre la puerta de casa. En
+               ese negocio el argumento mas fuerte no es un precio de ejemplo,
+               es que detras hay UNA PERSONA CONCRETA, con nombre y cara. La
+               carta de la fundadora ya estaba en el sitio (`about`); lo que
+               faltaba era ponerle cara arriba del todo.
+
+          ==================================================================
+          ESTA FOTO ES EL ELEMENTO LCP DE LA PAGINA
+          ==================================================================
+          Es la imagen mas grande sobre la linea de flotacion, asi que es la
+          que Google cronometra para Core Web Vitals. De ahi cada atributo:
+
+            - `fetchPriority="high"` y SIN `loading="lazy"`: el navegador la
+              pide cuanto antes. Una imagen LCP diferida es el fallo clasico
+              que hunde la metrica sin que nada parezca roto.
+            - `srcSet` con 420 y 755: un movil descarga 28 KB en vez de 66.
+            - El contenedor fija la proporcion y la imagen la rellena. Sin eso
+              el texto de debajo salta al cargar la foto, que es CLS — la otra
+              metrica que mide Google.
+        */}
+        <div className="ft-enter relative" style={{ '--ft-delay': '400ms' } as React.CSSProperties}>
+          <div className="relative aspect-4/5 overflow-hidden rounded-2xl shadow-lg sm:aspect-3/4">
+            <img
+              src="/fotos/hero-carmen-755.webp"
+              srcSet="/fotos/hero-carmen-420.webp 420w, /fotos/hero-carmen-755.webp 755w"
+              sizes="(min-width: 1024px) 32rem, 100vw"
+              width={755}
+              height={1254}
+              alt={t('hero.photoAlt')}
+              fetchPriority="high"
+              decoding="async"
+              className="h-full w-full object-cover object-[50%_10%]"
+            />
           </div>
-          <p className="mt-4 text-xs text-slate-500 dark:text-slate-400">
-            {t('quote.disclaimer.estimate')}
-          </p>
+
+          {/*
+            LA TARJETA CON EL NOMBRE, MONTADA SOBRE LA FOTO.
+            Una foto de alguien con uniforme podria ser de banco de imagenes;
+            el nombre y el cargo son lo que la convierten en una persona.
+            `about.signature` y no una cadena suelta: el nombre ya vivia ahi,
+            en la carta, y dos sitios con el mismo nombre acaban diciendo
+            cosas distintas.
+          */}
+          <div
+            className="absolute -bottom-5 left-4 rounded-xl border border-slate-200 bg-white
+                       px-4 py-3 shadow-lg dark:border-night-600 dark:bg-night-800"
+          >
+            <p className="font-bold text-brand-800 dark:text-white">{t('about.signature')}</p>
+            <p className="mt-0.5 text-xs text-slate-600 dark:text-slate-400">
+              {t('hero.ownerRole')}
+            </p>
+          </div>
         </div>
       </div>
     </section>

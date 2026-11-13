@@ -53,7 +53,32 @@ export function ScopeOfWork() {
         </h2>
         <p className="mt-3 max-w-2xl text-slate-600 dark:text-slate-300">{t('scope.subtitle')}</p>
 
-        <div className="mt-10 grid gap-5 lg:grid-cols-2">
+        {/*
+          UNA BANDA ANCHA Y BAJA, NO UNA FOTO AL LADO DEL TEXTO.
+          Esta seccion son dos tarjetas de listas —lo que entra y lo que no—
+          y meter una columna de foto las estrecharia justo donde hay que
+          leer item por item. Una banda entre el subtitulo y las listas corta
+          el bloque de texto sin robarle sitio a ninguna.
+
+          LA FOTO ES DE MANOS Y NO DE UNA PERSONA ENTERA a proposito: esta
+          seccion habla del detalle del trabajo, no de quien lo hace, y una
+          cara aqui compite con la de la portada.
+        */}
+        <div className="mt-8 aspect-21/9 overflow-hidden rounded-2xl">
+          <img
+            src="/fotos/incluye-banda-1100.webp"
+            srcSet="/fotos/incluye-banda-560.webp 560w, /fotos/incluye-banda-1100.webp 1100w"
+            sizes="(min-width: 1024px) 64rem, 100vw"
+            width={1100}
+            height={470}
+            alt={t('scope.photoAlt')}
+            loading="lazy"
+            decoding="async"
+            className="h-full w-full object-cover"
+          />
+        </div>
+
+        <div className="mt-8 grid gap-5 lg:grid-cols-2">
           {/* ---------------------- Servicios adicionales ---------------------- */}
           <Reveal as="article" className="ft-card p-6">
             <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
