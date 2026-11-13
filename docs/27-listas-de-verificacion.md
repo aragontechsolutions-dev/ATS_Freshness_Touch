@@ -340,9 +340,25 @@ respuestas de la API la traen ya montada.
   dejar algo en «no aplica» habría que acertar el número de toques, y pasarse
   de uno significa **afirmar que se hizo**. En una pantalla que se usa con
   guantes eso pasa todos los días.
-- **`min-h-11`: 44 px**, que es el mínimo que se acierta de pie. Medido en el
-  navegador a 360 y a 390 px de ancho, los tres botones caben en una línea
-  —55, 76 y 72 px de contenido— sin desbordar ni la fila ni la página.
+- **`min-h-11`: 44 px**, que es el mínimo que se acierta de pie. Medido en
+  Chromium con la hoja de estilos compilada del panel: a **360 px** los tres
+  botones miden **91 × 44** y a **390 px**, **101 × 44**. Iguales entre sí
+  —los reparte `flex-1`—, en una línea, sin desbordar y sin que el texto se
+  parta.
+
+  > **La primera medición de esto no valía, y conviene que quede escrito.**
+  > Se hizo sobre una página que traía Tailwind desde un CDN, y ese dominio
+  > está bloqueado en el entorno donde se midió: la página se renderizó **sin
+  > una sola regla de estilo** y los números que salieron —55, 76 y 72 px—
+  > eran el ancho del texto suelto, no el de los botones. La conclusión
+  > resultó ser correcta por casualidad; el dato no lo era.
+  >
+  > La forma honesta de medir una pantalla de este proyecto es servirle el
+  > CSS **compilado de la propia aplicación** (`dist/assets/*.css`) y
+  > comprobar en la misma página que cargó —por ejemplo, que una `.ft-card`
+  > tenga `border-radius` distinto de cero—. Un CDN que no responde no da
+  > error: da una página sin estilos que parece medible.
+
 - **Cada botón lleva icono y texto**, no solo color. Quien no distingue
   colores lee el texto; y «no aplica» lleva **una raya, no una cruz**, porque
   una cruz se lee como «falló» y no aplicar no lo es.
