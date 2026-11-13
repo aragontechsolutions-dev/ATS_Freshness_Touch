@@ -145,77 +145,92 @@ destaca y se pierde su función.
 
 Los iconos son **SVG escritos a mano dentro del repositorio**, no una librería.
 La razón es la de siempre: no arrastrar una dependencia entera —y su peso— por
-unos pocos símbolos. Viven en dos archivos del sitio público:
+unos pocos símbolos. Viven todos en un archivo del sitio público:
 
-| Archivo                       | Qué contiene                                                     |
-| ----------------------------- | ---------------------------------------------------------------- |
-| `components/Icons.tsx`        | Los de interfaz: teléfono, correo, escudo, idioma, menú, flecha… |
-| `components/ServiceIcons.tsx` | Los seis de los servicios, más el mapa `ICONO_POR_SERVICIO`      |
+| Archivo                | Qué contiene                                                                                                                                 |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `components/Icons.tsx` | Los catorce de interfaz: WhatsApp, correo, visto, sol, luna, escudo, chincheta, etiqueta, recargar, idioma, menú, cerrar, reproducir, flecha |
+
+Hubo un segundo archivo, `components/ServiceIcons.tsx`, con un icono por
+servicio. Ya no existe: ver «Los servicios ya no llevan icono» más abajo.
 
 ### El contrato del dibujo
 
-Todos cumplen lo mismo, y hay una prueba que lo comprueba
-(`ServiceIcons.test.tsx`):
+Todos cumplen lo mismo, y lo comprueba
+`components/los-iconos-siguen-el-estilo-de-la-casa.test.tsx`:
 
 - `viewBox="0 0 24 24"` — la misma rejilla para todos. Uno con otra rejilla se
   vería de distinto grosor al lado de los demás.
-- `stroke="currentColor"` y `fill="none"` — **el color no se escribe dentro del
-  icono**. Lo hereda de quien lo usa. Un `#145788` metido en un `path`
-  rompería el modo oscuro en silencio: el icono seguiría pintándose, pero del
-  color equivocado sobre una superficie aclarada.
-- Trazo `1.8`.
-- `aria-hidden="true"` — son decorativos. La tarjeta o el botón que los
-  acompaña ya lleva su texto de verdad; anunciar «pulverizador» antes de
-  «Limpieza estándar» sería repetir con menos precisión.
-- El tamaño se manda desde fuera, por `className`.
+- **El color no se escribe dentro del icono.** Lo hereda de quien lo coloca,
+  por `currentColor`. Casi todos lo heredan en el trazo
+  (`stroke="currentColor"` con `fill="none"`); el de reproducir lo hereda en el
+  relleno (`fill="currentColor"`), que es como se dibuja un triángulo macizo.
+  La regla no es que sea trazo: es que **el color no se decide aquí**. Un
+  `#145788` metido en un `path` rompería el modo oscuro en silencio —el icono
+  seguiría pintándose, pero del color equivocado sobre una superficie
+  aclarada—, y por eso la prueba rechaza cualquier hexadecimal, nombre de color
+  o `rgb()/hsl()/oklch()` dentro del SVG.
+- Trazo `1.8` en los que se dibujan a trazo.
+- `aria-hidden="true"` — son decorativos. El botón o la tarjeta que los
+  acompaña ya lleva su texto de verdad; anunciarlos sería repetir con menos
+  precisión.
+- El tamaño se manda desde fuera, por `className`. La prueba comprueba además
+  que el tamaño de dentro (`h-5 w-5`) **no quede pegado detrás** del de fuera.
+- **Cada uno dibuja algo distinto de los demás.** Es la comprobación que caza
+  el fallo aburrido: copiar un icono para hacer otro y olvidarse de cambiarle
+  el trazado. No da error, se despliega, y dos cosas distintas de la pantalla
+  salen con el mismo símbolo. Cuando falla, nombra los dos culpables.
 
-### Un icono por servicio, y que no se pueda olvidar
+#### Por qué esta prueba vigila `Icons.tsx` y no el archivo donde nació
 
-| Servicio            | Símbolo              | Por qué ese                                 |
-| ------------------- | -------------------- | ------------------------------------------- |
-| `STANDARD`          | Pulverizador         | La herramienta del día a día                |
-| `DEEP`              | Cepillo de cerdas    | Lo que se usa cuando no basta pasar un paño |
-| `MOVE_IN_OUT`       | Caja de mudanza      | La vivienda vacía                           |
-| `AIRBNB_TURNOVER`   | Cama hecha           | El entregable de una rotación               |
-| `POST_CONSTRUCTION` | Casco de obra        | Símbolo universal de que aún hay obra       |
-| `COMMERCIAL`        | Edificio de oficinas | Un edificio, no una casa                    |
+La prueba es la heredera de `ServiceIcons.test.tsx`, que comprobaba estas
+mismas reglas, pero **solo sobre los seis iconos de los servicios**. Al retirar
+ese archivo (13/11/2026) la guardia se habría ido con él, y eso habría sido un
+error doble: las reglas nunca fueron de los iconos de los servicios —son del
+estilo de la casa— y se estaban comprobando en el archivo pequeño mientras el
+grande, el que usa el sitio entero, no tenía a nadie mirando.
 
-`ICONO_POR_SERVICIO` es un `Record<ServiceType, …>` **completo a propósito**:
-añadir un servicio al catálogo y olvidar su icono **no compila**. Si fuese un
-objeto parcial, el servicio nuevo saldría en producción con un hueco en blanco
-y nadie se enteraría hasta que lo viese un cliente.
+Se reapuntó en vez de perderse. Es la lección que conviene recordar al borrar
+un archivo: **antes de retirar algo, mirar qué prueba se cae con él y si lo que
+vigilaba sigue vivo en otro sitio.**
 
-### La placa de color, y por qué el azul cambia de tono
+### Los servicios ya no llevan icono: llevan fotografía
 
-El símbolo no va suelto sobre la tarjeta: va sobre una **placa de color sólido
-de 44×44**. Un trazo de una línea flotando sobre una tarjeta blanca se pierde;
-sobre una placa sólida es lo primero que se ve.
+Las tarjetas de la cuadrícula de servicios han pasado por tres estados, y el
+recorrido explica por qué están como están:
 
-| Modo   | Placa                 | Símbolo | Símbolo sobre placa | Placa sobre tarjeta |
-| ------ | --------------------- | ------- | ------------------- | ------------------- |
-| Claro  | `brand-700` `#145788` | Blanco  | **7.64:1**          | **7.64:1**          |
-| Oscuro | `brand-500` `#2a73a9` | Blanco  | **5.09:1**          | **3.25:1**          |
+1. **La misma imagen seis veces.** El girasol de la marca, un `.webp` de 14 kB
+   repetido en las seis tarjetas. Un adorno repetido no distingue una limpieza
+   estándar de una post-obra: ocupaba el sitio donde debía haber información y
+   no decía nada.
+2. **Un icono por servicio, sobre una placa de color de 44×44.** Resolvió lo
+   anterior —seis símbolos distintos para seis cosas distintas— pero introdujo
+   otro problema: una placa de color sólido con un pictograma dentro es el
+   lenguaje de un panel de administración, no de una empresa a la que se le
+   abre la puerta de casa.
+3. **Una fotografía de trabajo real por tarjeta** (13/11/2026, a petición de la
+   dueña: «para que se vea profesional»). Las hizo el equipo con el móvil en
+   casas reales. Tienen menos calidad que un banco de imágenes y es exactamente
+   por eso que sirven: una foto de archivo con una modelo sonriendo dice «esto
+   puede ser cualquiera»; estas dicen «esto lo hacemos nosotras». El detalle de
+   dónde viven los archivos y por qué está en `docs/54-las-fotos-del-sitio.md`.
 
-El azul oficial **no puede usarse en oscuro**: sobre la tarjeta `#1b1f24` da
-**2.17:1**, por debajo del 3:1 que se exige a un elemento gráfico, y la placa
-se desdibuja dentro de la tarjeta. Por eso se aclara al 500, que es la misma
-regla que ya gobierna los botones.
+Con el tercer estado, `ServiceIcons.tsx` se quedó sin un solo uso y se retiró
+del repositorio junto con su prueba, igual que antes se retiró el girasol
+repetido. **Nada que no se use se queda**, y las reglas que vigilaba su prueba
+viven ahora donde tenían que estar.
 
-**El amarillo se descartó a propósito**, aunque medía de sobra (11.62:1 el
-símbolo y 10.19:1 la placa): es el color del botón de acción, y la regla de un
-solo amarillo por pantalla visible manda. Seis placas amarillas en la
+Lo que **sí sigue en pie** de la etapa de los iconos es la regla de color que la
+originó: el azul oficial `brand-700` `#145788` sobre la tarjeta oscura `#1b1f24`
+da **2.17:1**, por debajo del 3:1 que se exige a un elemento gráfico, así que en
+modo oscuro se aclara al `brand-500` `#2a73a9` (**3.25:1** sobre la tarjeta).
+Es la misma regla que gobierna los botones, y aplica a cualquier superficie de
+color que se añada en el futuro.
+
+Y el amarillo se descartó entonces por un motivo que no ha cambiado: aunque
+medía de sobra, es el color del botón de acción, y la regla de **un solo
+amarillo por pantalla visible** manda. Seis superficies amarillas en la
 cuadrícula de servicios le quitarían el sitio al presupuesto gratis.
-
-### Qué había antes, y por qué se cambió
-
-Las seis tarjetas de servicios llevaban **la misma imagen**: el girasol de la
-marca, un `.webp` de 14 kB repetido seis veces. Un adorno repetido no distingue
-una limpieza estándar de una post-obra; ocupaba el sitio donde debía haber
-información y no decía nada. El archivo se retiró del repositorio al quedarse
-sin uso, y la página ya no descarga esa imagen.
-
-La prueba que cierra la puerta a que vuelva a pasar no comprueba que los iconos
-existan, sino que **los seis dibujan seis cosas distintas**.
 
 ## Interfaz pensada primero para móvil
 

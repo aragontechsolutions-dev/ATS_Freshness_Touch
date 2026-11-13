@@ -9,10 +9,10 @@ export default defineConfig({
      * estado, asi que no necesita ventana ni documento: se ahorra `jsdom` y
      * las pruebas arrancan en un segundo.
      *
-     * Los iconos de los servicios son funciones puras que devuelven marcado, y
-     * se comprueban con `renderToStaticMarkup` de `react-dom`, que funciona en
-     * Node sin DOM. De ahi el `.tsx` en la lista: hay pruebas con JSX, pero
-     * ninguna necesita navegador.
+     * Los iconos (`components/Icons.tsx`) son funciones puras que devuelven
+     * marcado, y se comprueban con `renderToStaticMarkup` de `react-dom`, que
+     * funciona en Node sin DOM. De ahi el `.tsx` en la lista: hay pruebas con
+     * JSX, pero ninguna necesita navegador.
      */
     environment: 'node',
     include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
