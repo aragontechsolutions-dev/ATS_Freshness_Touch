@@ -94,6 +94,9 @@ export const es: TranslationResources = {
     point1: 'Precios transparentes que ves antes de reservar',
     point2: 'Personal con verificación de antecedentes',
     point3: 'En Georgia los servicios de limpieza no pagan sales tax',
+
+    photoAlt: 'Carmen, fundadora de Freshness Touch, con el uniforme de la empresa',
+    ownerRole: 'Fundadora · Freshness Touch',
   },
 
   services: {
@@ -161,6 +164,7 @@ export const es: TranslationResources = {
    * una seccion y evita la discusion entera.
    */
   scope: {
+    photoAlt: 'Primer plano de una limpiadora puliendo la grifería de un baño',
     title: '¿Qué incluye una limpieza?',
     subtitle:
       'Esta es la misma lista de tareas que lleva el equipo cuando llega a tu casa. Sin letra pequeña.',
@@ -2177,6 +2181,7 @@ export const es: TranslationResources = {
     p9: 'Cada casa que limpiamos es una oportunidad de ganarnos la confianza de alguien y de alegrarle un poco el día.',
     p10: 'Gracias por apoyar mi sueño y por dejar que Freshness Touch Cleaning Service forme parte de tu casa.',
 
+    photoAlt: 'Carmen en su escritorio, con el logotipo de Freshness Touch en la pared',
     closing: 'Con gratitud,',
     signature: 'Carmen',
     role: 'Fundadora de Freshness Touch Cleaning Service 🌻',

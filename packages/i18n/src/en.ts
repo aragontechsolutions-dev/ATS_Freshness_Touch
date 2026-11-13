@@ -104,6 +104,18 @@ export const en = {
     point1: 'Transparent pricing you can see before you book',
     point2: 'Background-checked cleaning professionals',
     point3: 'No sales tax on cleaning services in Georgia',
+
+    /*
+     * EL TEXTO ALTERNATIVO DE LA FOTO DE LA PORTADA.
+     *
+     * DESCRIBE LO QUE SE VE, no lo que nos gustaria que pareciera. La foto es
+     * posada, asi que decir «en casa de un cliente» seria afirmar algo que no
+     * consta. Quien usa un lector de pantalla recibe lo mismo que quien mira:
+     * la fundadora, con el uniforme de la empresa.
+     */
+    photoAlt: 'Carmen, founder of Freshness Touch, wearing the company uniform',
+    /** La linea pequena de la tarjeta sobre la foto. Corta a proposito. */
+    ownerRole: 'Founder · Freshness Touch',
   },
 
   services: {
@@ -171,6 +183,8 @@ export const en = {
    * una seccion y evita la discusion entera.
    */
   scope: {
+    /** Lo que se ve en la foto de la seccion. */
+    photoAlt: 'Close-up of a cleaner polishing a bathroom tap',
     title: 'What does a cleaning include?',
     subtitle:
       'This is the same task list our team carries when they arrive at your home. No fine print.',
@@ -2492,6 +2506,12 @@ export const en = {
     p10: 'Thank you for supporting my dream and allowing Freshness Touch Cleaning Service to be part of your home.',
 
     /** La firma. Se pinta aparte porque no es un parrafo mas: es el cierre. */
+    /*
+     * EL TEXTO ALTERNATIVO DE LA FOTO. Describe lo que se ve y nada mas: no
+     * repite la firma, que ya esta escrita debajo en texto. Repetirla haria
+     * que un lector de pantalla dijera «Carmen» dos veces seguidas.
+     */
+    photoAlt: 'Carmen at her desk, with the Freshness Touch logo on the wall behind her',
     closing: 'With gratitude,',
     signature: 'Carmen',
     role: 'Founder, Freshness Touch Cleaning Service 🌻',

@@ -64,30 +64,60 @@ export function About() {
           parece descolocada. El dia que haya una foto de la fundadora, es
           ahi donde entra y la tarjeta vuelve a ensancharse.
         */}
-        <Reveal as="article" className="ft-card mt-8 max-w-3xl p-6 sm:p-8 lg:p-10">
-          {/*
+        {/*
+          ==================================================================
+          LA FOTO DE LA FUNDADORA, QUE ES LA QUE ESTE COMENTARIO ESPERABA
+          ==================================================================
+          Hasta hoy aqui ponia: «El dia que haya una foto de la fundadora, es
+          ahi donde entra y la tarjeta vuelve a ensancharse». Ese dia es hoy.
+
+          La carta deja de ir sola y pasa a compartir fila con la foto. El
+          texto sigue topado a `max-w-prose` dentro de la tarjeta, asi que la
+          linea no se alarga; lo que se gana es que la carta tenga cara.
+
+          EN MOVIL LA FOTO VA PRIMERA y la carta debajo. Es el orden natural:
+          se ve quien escribe y despues se lee lo que escribio.
+        */}
+        <div className="mt-8 grid gap-6 lg:grid-cols-5 lg:items-start">
+          <Reveal className="lg:col-span-2 lg:sticky lg:top-24">
+            <img
+              src="/fotos/sobre-carmen-840.webp"
+              srcSet="/fotos/sobre-carmen-420.webp 420w, /fotos/sobre-carmen-840.webp 840w"
+              sizes="(min-width: 1024px) 22rem, 100vw"
+              width={840}
+              height={1260}
+              alt={t('about.photoAlt')}
+              loading="lazy"
+              decoding="async"
+              className="w-full rounded-2xl object-cover shadow-lg"
+            />
+          </Reveal>
+
+          <Reveal as="article" className="ft-card p-6 sm:p-8 lg:col-span-3 lg:p-10">
+            {/*
             `max-w-prose` deja la línea en unos 65 caracteres. Sin ese tope, en
             un monitor ancho cada párrafo se convierte en una línea de 200
             caracteres y el ojo pierde el renglón al volver a la izquierda.
           */}
-          <div className="max-w-prose space-y-4 text-base leading-relaxed text-slate-700 dark:text-slate-300">
-            {PARRAFOS.map((clave) => (
-              <p key={clave}>{t(`about.${clave}`)}</p>
-            ))}
-          </div>
+            <div className="max-w-prose space-y-4 text-base leading-relaxed text-slate-700 dark:text-slate-300">
+              {PARRAFOS.map((clave) => (
+                <p key={clave}>{t(`about.${clave}`)}</p>
+              ))}
+            </div>
 
-          {/*
+            {/*
             LA FIRMA VA APARTE, con una línea encima. No es un párrafo más: es
             el cierre de una carta, y se lee como tal.
           */}
-          <footer className="mt-8 max-w-prose border-t border-brand-100 pt-6 dark:border-night-600">
-            <p className="text-base text-slate-700 dark:text-slate-300">{t('about.closing')}</p>
-            <p className="mt-2 text-xl font-bold text-brand-800 dark:text-brand-300">
-              {t('about.signature')}
-            </p>
-            <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">{t('about.role')}</p>
-          </footer>
-        </Reveal>
+            <footer className="mt-8 max-w-prose border-t border-brand-100 pt-6 dark:border-night-600">
+              <p className="text-base text-slate-700 dark:text-slate-300">{t('about.closing')}</p>
+              <p className="mt-2 text-xl font-bold text-brand-800 dark:text-brand-300">
+                {t('about.signature')}
+              </p>
+              <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">{t('about.role')}</p>
+            </footer>
+          </Reveal>
+        </div>
       </div>
     </section>
   );

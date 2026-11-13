@@ -35,6 +35,17 @@ una etapa propia.
 
 ---
 
+> ## ⚠️ Hay cuatro fotos de casas de clientes que NO pasan por aquí
+>
+> Desde el 13/11/2026 el sitio público lleva fotografías en la portada, en las
+> tarjetas de servicio, en «qué incluye» y en la carta de la fundadora. Las de
+> los servicios y la de «qué incluye» **están tomadas dentro de viviendas de
+> clientes**, pero son archivos del repositorio, no fotos subidas desde el
+> panel: **no tienen registro en `media_consents`**.
+>
+> Lo que este documento exige —permiso de esa casa, por escrito, con la web
+> enumerada como destino— **les aplica igual**. Ver `docs/54` §0.
+
 ## 2. El modelo de consentimiento
 
 La web es bilingüe, así que el permiso también. **Se firma el del idioma en
