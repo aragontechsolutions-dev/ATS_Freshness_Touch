@@ -3,7 +3,6 @@ import type { Locale, ServiceType } from '@freshness/types';
 import { useCatalog } from '../hooks/useCatalog';
 import { formatCentsCompact } from '../lib/format';
 import { Reveal } from '../components/Reveal';
-import { ICONO_POR_SERVICIO } from '../components/ServiceIcons';
 
 /**
  * LA FOTO DE CADA SERVICIO.
@@ -90,7 +89,6 @@ export function Services() {
             (code) => !catalog || catalog.services.some((service) => service.code === code),
           ).map((code, indice) => {
             const entry = catalog?.services.find((service) => service.code === code);
-            const Icono = ICONO_POR_SERVICIO[code];
             const foto = FOTO_POR_SERVICIO[code];
 
             return (
@@ -132,39 +130,7 @@ export function Services() {
                   </div>
                 )}
                 <div className="flex grow flex-col p-6">
-                  {/*
-                  LA PLACA DE COLOR, NO EL SIMBOLO SUELTO.
-                  Un icono de una sola linea flotando sobre la tarjeta blanca
-                  se pierde; sobre una placa de color solido es lo primero que
-                  se ve de la tarjeta. Mide 44x44, igual que el girasol que
-                  habia antes, asi que la cuadricula no cambia de alto.
-
-                  LOS DOS AZULES SON DELIBERADOS, Y ESTAN MEDIDOS:
-                    claro   `brand-700` #145788 -> icono blanco a 7.64:1,
-                                                   placa sobre tarjeta a 7.64:1
-                    oscuro  `brand-500` #2a73a9 -> icono blanco a 5.09:1,
-                                                   placa sobre tarjeta a 3.25:1
-
-                  El azul oficial sobre el fondo casi negro solo da 2.17:1: la
-                  placa se desdibujaria dentro de la tarjeta oscura. Por eso se
-                  aclara al 500 en oscuro, la misma regla que ya gobierna los
-                  botones del sitio.
-
-                  EL AMARILLO SE DESCARTO A PROPOSITO. Medía de sobra (10:1 y
-                  11:1), pero es el color del boton de accion, y la identidad
-                  fija un solo amarillo por pantalla visible: seis placas
-                  amarillas aqui le quitarian el sitio al presupuesto gratis.
-                */}
-                  <span
-                    className={`inline-flex w-fit rounded-xl bg-brand-700 p-2.5 text-white
-                              shadow-sm dark:bg-brand-500 ${
-                                foto === undefined ? '' : '-mt-11 mb-1 shadow-lg'
-                              }`}
-                  >
-                    <Icono className="h-6 w-6" />
-                  </span>
-
-                  <h3 className="mt-4 text-lg font-semibold text-slate-900 dark:text-white">
+                  <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
                     {t(`services.${code}.name`)}
                   </h3>
                   <p className="mt-2 grow text-sm leading-relaxed text-slate-600 dark:text-slate-400">

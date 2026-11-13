@@ -96,7 +96,7 @@ export function Hero() {
               el texto de debajo salta al cargar la foto, que es CLS — la otra
               metrica que mide Google.
         */}
-        <div className="ft-enter relative" style={{ '--ft-delay': '400ms' } as React.CSSProperties}>
+        <figure className="ft-enter m-0" style={{ '--ft-delay': '400ms' } as React.CSSProperties}>
           <div className="relative aspect-4/5 overflow-hidden rounded-2xl shadow-lg sm:aspect-3/4">
             <img
               src="/fotos/hero-carmen-755.webp"
@@ -112,23 +112,26 @@ export function Hero() {
           </div>
 
           {/*
-            LA TARJETA CON EL NOMBRE, MONTADA SOBRE LA FOTO.
-            Una foto de alguien con uniforme podria ser de banco de imagenes;
+            EL NOMBRE VA DEBAJO DE LA FOTO, NO ENCIMA.
+            La primera version lo montaba sobre la esquina inferior izquierda
+            de la imagen, como una tarjeta flotante. En la maqueta quedaba
+            bien; en el sitio publicado tapaba el frasco y el brazo, y en
+            modo oscuro la tarjeta oscura sobre la foto oscura se leia como
+            una mancha. Debajo no tapa nada y se lee igual en los dos modos.
+
+            UNA FOTO DE ALGUIEN CON UNIFORME PODRIA SER DE BANCO DE IMAGENES;
             el nombre y el cargo son lo que la convierten en una persona.
-            `about.signature` y no una cadena suelta: el nombre ya vivia ahi,
-            en la carta, y dos sitios con el mismo nombre acaban diciendo
-            cosas distintas.
+            `about.signature` y no una cadena suelta: el nombre ya vivia en
+            la carta, y dos sitios con el mismo nombre acaban diciendo cosas
+            distintas.
           */}
-          <div
-            className="absolute -bottom-5 left-4 rounded-xl border border-slate-200 bg-white
-                       px-4 py-3 shadow-lg dark:border-night-600 dark:bg-night-800"
-          >
-            <p className="font-bold text-brand-800 dark:text-white">{t('about.signature')}</p>
-            <p className="mt-0.5 text-xs text-slate-600 dark:text-slate-400">
+          <figcaption className="mt-4 flex items-baseline gap-2">
+            <span className="font-bold text-brand-800 dark:text-white">{t('about.signature')}</span>
+            <span className="text-sm text-slate-600 dark:text-slate-400">
               {t('hero.ownerRole')}
-            </p>
-          </div>
-        </div>
+            </span>
+          </figcaption>
+        </figure>
       </div>
     </section>
   );
